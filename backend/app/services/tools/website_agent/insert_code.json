@@ -1,0 +1,22 @@
+{
+  "name": "insert_code",
+  "description": "Insert new code at a specific position in an existing file. The code will be inserted AFTER the specified line number, pushing existing content down. Use this to add new sections without replacing existing code. IMPORTANT: Always use read_file FIRST to see current structure and determine correct insertion point.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "filename": {
+        "type": "string",
+        "description": "The file to insert code into (HTML, CSS, or JS)"
+      },
+      "after_line": {
+        "type": "number",
+        "description": "Line number after which to insert the new code (1-indexed). The new content will be inserted AFTER this line. Use 0 to insert at the very beginning of the file. Use read_file first to find the correct insertion point."
+      },
+      "content": {
+        "type": "string",
+        "description": "The code to insert. Must maintain proper indentation and structure to match surrounding code. For HTML: ensure tags are properly closed. For CSS: ensure rules are complete. For JS: ensure syntax is valid and functions are complete."
+      }
+    },
+    "required": ["filename", "after_line", "content"]
+  }
+}

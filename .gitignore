@@ -1,0 +1,70 @@
+# Python
+backend/venv/
+backend/myvenv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+*.egg
+.mypy_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Environment & Secrets
+.env
+*.env
+backend/.env
+backend/.flaskenv
+backend/data/google_tokens.json
+
+# Project Data (user uploads, processed files)
+backend/data/projects/
+backend/data/tasks/
+backend/data/temp/
+backend/data/user_memory.json
+
+# Node.js
+node_modules/
+frontend/node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor & IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+
+# Build artifacts
+build/
+*.tsbuildinfo
+
+#claude
+.claude

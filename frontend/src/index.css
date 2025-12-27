@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * NoobBook Design System - Stone + Amber Theme
+ *
+ * A warm, readable color palette optimized for learning/reading apps.
+ *
+ * Color Reference:
+ * - Background: stone-50 (#FAFAF9) - warm off-white
+ * - Surface: white (#FFFFFF) - cards, panels
+ * - Text Primary: stone-800 (#292524) - warm dark gray
+ * - Text Muted: stone-500 (#78716C) - warm medium gray
+ * - Accent: amber-600 (#D97706) - warm gold
+ * - Border: stone-200 (#E7E5E3) - subtle warm gray
+ */
+
+@layer base {
+  :root {
+    /* Background colors - slightly tinted for contrast with white panels */
+    --background: 40 15% 95%;          /* warm cream/beige - more visible than stone-50 */
+    --foreground: 12 10% 15%;          /* stone-800: warm dark text */
+
+    /* Card/Panel surfaces - pure white for maximum contrast */
+    --card: 0 0% 100%;                 /* pure white for cards */
+    --card-foreground: 12 10% 15%;     /* stone-800 */
+
+    /* Popover surfaces */
+    --popover: 0 0% 100%;              /* white */
+    --popover-foreground: 12 10% 15%;  /* stone-800 */
+
+    /* Primary accent - Amber */
+    --primary: 32 95% 44%;             /* amber-600: warm gold */
+    --primary-foreground: 0 0% 100%;   /* white text on amber */
+
+    /* Secondary - subtle stone */
+    --secondary: 60 5% 96%;            /* stone-100 */
+    --secondary-foreground: 12 10% 15%; /* stone-800 */
+
+    /* Muted elements */
+    --muted: 60 5% 96%;                /* stone-100 */
+    --muted-foreground: 25 6% 45%;     /* stone-500 */
+
+    /* Accent - same as primary for consistency */
+    --accent: 48 96% 89%;              /* amber-100: light amber for hover states */
+    --accent-foreground: 32 95% 38%;   /* amber-700: darker amber text */
+
+    /* Destructive - warm red */
+    --destructive: 0 72% 51%;          /* red-500 */
+    --destructive-foreground: 0 0% 100%; /* white */
+
+    /* Borders and inputs */
+    --border: 30 6% 90%;               /* stone-200 */
+    --input: 30 6% 90%;                /* stone-200 */
+    --ring: 32 95% 44%;                /* amber-600 for focus rings */
+
+    /* Border radius */
+    --radius: 0.5rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+  .dark {
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}

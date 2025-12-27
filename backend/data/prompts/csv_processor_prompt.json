@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "name": "csv_processor_prompt",
+  "description": "Prompt for analyzing CSV files and generating concise summaries",
+  "model": "claude-haiku-4-5-20251001",
+  "max_tokens": 600,
+  "temperature": 0.2,
+  "system_prompt": "You are a csv summary generator, your only task is to use the csv_analyser tool to get summary of the csv, the use the resturn_csv_summary to return a concise summary",
+  "user_message": "Analyze this CSV file and provide a summary Filename: {filename}",
+  "created_at": "2025-11-30T00:00:00.000000",
+  "updated_at": "2025-11-30T00:00:00.000000"
+}

@@ -1,0 +1,39 @@
+{
+    "name": "submit_image_extraction",
+    "description": "Submit comprehensive extraction of content from an image. Analyze and describe all aspects of the image including text, visuals, data, and meaning.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "subject": {
+                "type": "string",
+                "description": "What is this image about? The main subject, topic, or purpose of the image."
+            },
+            "content_type": {
+                "type": "string",
+                "enum": ["document", "screenshot", "diagram", "chart", "photo", "infographic", "table", "handwriting", "artwork", "mixed", "other"],
+                "description": "The primary type of content in this image."
+            },
+            "text_content": {
+                "type": "string",
+                "description": "All visible text extracted from the image. Include headers, labels, captions, body text, annotations, etc. Preserve structure where possible. Use [NO TEXT] if no readable text exists."
+            },
+            "visual_description": {
+                "type": "string",
+                "description": "Detailed description of visual elements: layout, composition, objects, people, scenes, illustrations, icons, and any non-text visual content."
+            },
+            "colors_and_style": {
+                "type": "string",
+                "description": "Description of color palette, visual style, design aesthetic, branding elements if any."
+            },
+            "data_content": {
+                "type": "string",
+                "description": "If the image contains charts, graphs, tables, or infographics - extract the actual data, values, labels, trends, and key insights. Use [NO DATA] if not applicable."
+            },
+            "summary": {
+                "type": "string",
+                "description": "A comprehensive 2-3 sentence summary capturing the key information and purpose of this image."
+            }
+        },
+        "required": ["subject", "content_type", "text_content", "visual_description", "colors_and_style", "data_content", "summary"]
+    }
+}

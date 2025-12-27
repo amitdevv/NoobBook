@@ -1,0 +1,18 @@
+{
+  "name": "create_file",
+  "description": "Create a new website file. If file already exists, this will COMPLETELY OVERWRITE it. Use this for initial file creation or complete rewrites. For HTML: must include full <!DOCTYPE html> structure with Tailwind CDN, proper <head> section, navigation, content, footer, and script links. For CSS: complete stylesheet with any custom styles. For JS: complete script with all functionality. Each file must be production-ready and self-contained.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "filename": {
+        "type": "string",
+        "description": "Filename to create. For HTML: index.html, about.html, contact.html, services.html, portfolio.html, blog.html, etc. For CSS: styles.css. For JS: script.js"
+      },
+      "content": {
+        "type": "string",
+        "description": "COMPLETE file content. Must be production-ready and properly formatted. For HTML: full structure from <!DOCTYPE html> to </html> including Tailwind CDN, navigation (identical across all pages), page-specific content, footer (identical across all pages), and script links. Use IMAGE_1, IMAGE_2, etc. as placeholders for generated images. For CSS: complete stylesheet with custom styles only (use Tailwind for 90%+ of styling). For JS: complete script with all interactivity. Keep concise but complete: HTML 3k-10k chars, CSS 500-2k chars, JS 1k-5k chars."
+      }
+    },
+    "required": ["filename", "content"]
+  }
+}

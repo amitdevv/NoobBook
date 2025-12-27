@@ -1,0 +1,26 @@
+{
+  "name": "update_file_lines",
+  "description": "Replace a specific line range in an existing file with new code. Use this to modify or refine existing sections. IMPORTANT: Always use read_file FIRST to see the current content and determine correct line numbers. The specified line range will be completely replaced with the new content.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "filename": {
+        "type": "string",
+        "description": "The file to update (HTML, CSS, or JS)"
+      },
+      "start_line": {
+        "type": "number",
+        "description": "Starting line number to replace (1-indexed, inclusive). Use read_file first to find the correct line numbers."
+      },
+      "end_line": {
+        "type": "number",
+        "description": "Ending line number to replace (1-indexed, inclusive). Lines start_line through end_line will be replaced with new_content."
+      },
+      "new_content": {
+        "type": "string",
+        "description": "The new code to replace the specified line range. Must maintain proper indentation and structure to match surrounding code. Ensure HTML tags are properly closed, CSS rules are complete, and JS syntax is valid."
+      }
+    },
+    "required": ["filename", "start_line", "end_line", "new_content"]
+  }
+}

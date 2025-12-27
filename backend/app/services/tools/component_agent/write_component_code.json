@@ -1,0 +1,38 @@
+{
+  "name": "write_component_code",
+  "description": "FINAL STEP: Write the complete HTML/CSS/JS code for all component variations. YOU MUST provide complete, working code for each variation. Each component must be self-contained and ready to preview in a browser. This is the termination tool - call this only when you have all variations ready.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "components": {
+        "type": "array",
+        "description": "Array of 2-4 complete component variations, each with full HTML/CSS/JS code",
+        "minItems": 2,
+        "maxItems": 4,
+        "items": {
+          "type": "object",
+          "properties": {
+            "variation_name": {
+              "type": "string",
+              "description": "Name of this variation (matches the plan)"
+            },
+            "html_code": {
+              "type": "string",
+              "description": "REQUIRED: Complete, self-contained HTML document. Must include: <!DOCTYPE html>, <html>, <head> with <style> tag for all CSS, <body> with component markup, and <script> tag for any JavaScript. Must be production-ready and work in all modern browsers. Aim for 2000-5000 characters. Make it responsive and accessible. Use semantic HTML."
+            },
+            "description": {
+              "type": "string",
+              "description": "Brief description of this variation's unique features (1-2 sentences)"
+            }
+          },
+          "required": ["variation_name", "html_code", "description"]
+        }
+      },
+      "usage_notes": {
+        "type": "string",
+        "description": "Brief notes on how to use these components, any customization options, or integration tips (optional)"
+      }
+    },
+    "required": ["components"]
+  }
+}

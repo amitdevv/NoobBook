@@ -1,0 +1,44 @@
+{
+  "name": "return_search_result",
+  "description": "Call this tool when you have successfully gathered all information from the web search or URL fetch. This signals completion and returns the final structured result.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "success": {
+        "type": "boolean",
+        "description": "Whether the search/fetch was successful in retrieving useful content."
+      },
+      "title": {
+        "type": "string",
+        "description": "Title of the page/content retrieved, or a descriptive title for search results."
+      },
+      "url": {
+        "type": "string",
+        "description": "The primary URL that was fetched or the most relevant URL from search results."
+      },
+      "content": {
+        "type": "string",
+        "description": "The main extracted content from the page. Should be clean, well-formatted text suitable for RAG processing. Include all relevant information from the page."
+      },
+      "summary": {
+        "type": "string",
+        "description": "A brief summary (2-3 sentences) of what the content is about."
+      },
+      "content_type": {
+        "type": "string",
+        "enum": ["article", "documentation", "blog", "news", "product", "other"],
+        "description": "The type of content retrieved."
+      },
+      "source_urls": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "List of all source URLs that contributed to this result."
+      },
+      "error_message": {
+        "type": "string",
+        "description": "If success is false, describe why the search/fetch failed."
+      }
+    },
+    "required": ["success", "content"]
+  }
+}

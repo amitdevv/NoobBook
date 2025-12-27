@@ -1,0 +1,129 @@
+{
+  "name": "plan_website",
+  "description": "Plan the complete website structure including pages, features, design system, and navigation. This is the first step - analyze the source content and create a comprehensive plan before generating any files.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "site_type": {
+        "type": "string",
+        "enum": ["portfolio", "business", "blog", "landing", "corporate", "personal", "ecommerce"],
+        "description": "The type of website based on content analysis"
+      },
+      "site_name": {
+        "type": "string",
+        "description": "The name/title of the website"
+      },
+      "pages": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "filename": {
+              "type": "string",
+              "description": "The HTML filename (e.g., 'index.html', 'about.html')"
+            },
+            "page_title": {
+              "type": "string",
+              "description": "The page title for <title> tag"
+            },
+            "description": {
+              "type": "string",
+              "description": "Brief description of page content and purpose"
+            }
+          },
+          "required": ["filename", "page_title", "description"]
+        },
+        "minItems": 1,
+        "maxItems": 8,
+        "description": "Array of pages to create (1-8 pages). Must include index.html as first page."
+      },
+      "features": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "animations_scroll",
+            "animations_hover",
+            "gallery_grid",
+            "gallery_lightbox",
+            "contact_form",
+            "newsletter_signup",
+            "testimonials",
+            "accordion_faq",
+            "mobile_menu",
+            "smooth_scroll",
+            "video_embed",
+            "social_links",
+            "blog_preview",
+            "pricing_table"
+          ]
+        },
+        "description": "Features to implement in the website"
+      },
+      "design_system": {
+        "type": "object",
+        "properties": {
+          "primary_color": {
+            "type": "string",
+            "description": "Primary color (hex code, e.g., '#2563eb')"
+          },
+          "secondary_color": {
+            "type": "string",
+            "description": "Secondary color (hex code)"
+          },
+          "accent_color": {
+            "type": "string",
+            "description": "Accent color for CTAs and highlights (hex code)"
+          },
+          "background_color": {
+            "type": "string",
+            "description": "Background color (hex code, e.g., '#ffffff' or '#f9fafb')"
+          },
+          "text_color": {
+            "type": "string",
+            "description": "Primary text color (hex code, e.g., '#1f2937')"
+          },
+          "font_family": {
+            "type": "string",
+            "description": "Google Font family name (e.g., 'Inter', 'Poppins', 'Roboto')"
+          }
+        },
+        "required": ["primary_color", "secondary_color", "text_color"],
+        "description": "Color scheme and typography for Tailwind config"
+      },
+      "navigation_style": {
+        "type": "string",
+        "enum": ["fixed", "sticky", "static"],
+        "description": "Navigation bar style (fixed stays at top, sticky scrolls then sticks, static scrolls normally)"
+      },
+      "images_needed": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "purpose": {
+              "type": "string",
+              "description": "What the image is for (e.g., 'hero_background', 'portfolio_item_1', 'team_photo_ceo')"
+            },
+            "description": {
+              "type": "string",
+              "description": "Detailed description for image generation"
+            },
+            "aspect_ratio": {
+              "type": "string",
+              "enum": ["1:1", "16:9", "4:3", "3:2", "9:16", "21:9"],
+              "description": "Aspect ratio for the image"
+            }
+          },
+          "required": ["purpose", "description", "aspect_ratio"]
+        },
+        "description": "List of images to generate (photos/illustrations only, not icons)"
+      },
+      "layout_notes": {
+        "type": "string",
+        "description": "Additional notes about layout, structure, or specific requirements"
+      }
+    },
+    "required": ["site_type", "site_name", "pages", "features", "design_system", "navigation_style"]
+  }
+}

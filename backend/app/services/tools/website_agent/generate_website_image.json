@@ -1,0 +1,23 @@
+{
+  "name": "generate_website_image",
+  "description": "Generate an image for the website (photos, illustrations, backgrounds only - not icons or simple shapes). Use CSS/SVG for icons, buttons, dividers, and decorative elements. Can be called multiple times to generate all needed images.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "purpose": {
+        "type": "string",
+        "description": "What the image is for (e.g., 'hero_background', 'about_section_photo', 'portfolio_item_1', 'team_member_ceo'). This will be used in the tracking system."
+      },
+      "image_prompt": {
+        "type": "string",
+        "description": "Detailed image generation prompt. Describe the desired image in detail including style, mood, colors, composition, and specific elements. Be specific and descriptive for best results. Example: 'Modern minimalist hero image with abstract geometric shapes in blue and purple gradients, clean professional aesthetic, high-end corporate feel, 3D rendered style with soft lighting'"
+      },
+      "aspect_ratio": {
+        "type": "string",
+        "enum": ["1:1", "16:9", "4:3", "3:2", "9:16", "21:9"],
+        "description": "Aspect ratio for the image. Choose based on usage: 16:9 for hero backgrounds, 1:1 for avatars/logos, 4:3 for content images, 3:2 for portfolio items"
+      }
+    },
+    "required": ["purpose", "image_prompt", "aspect_ratio"]
+  }
+}

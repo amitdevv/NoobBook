@@ -1,0 +1,22 @@
+{
+  "name": "read_file",
+  "description": "Read a website file (HTML, CSS, or JS) with smart context awareness. For files under 100 lines, returns entire file. For larger files, returns overview (first 50 + last 50 lines) unless specific line range is requested. Automatically adds 5 lines of context around requested ranges. ALWAYS use this before updating or inserting code to see current structure and line numbers.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "filename": {
+        "type": "string",
+        "description": "The file to read. Can be any HTML page (index.html, about.html, contact.html, services.html, portfolio.html, blog.html, etc.), styles.css, or script.js"
+      },
+      "start_line": {
+        "type": "number",
+        "description": "Starting line number (1-indexed, optional). If omitted for files over 100 lines, returns overview (first 50 + last 50 lines). If provided, returns this line through end_line (or end of file) with 5 lines of context on each side."
+      },
+      "end_line": {
+        "type": "number",
+        "description": "Ending line number (1-indexed, optional). If omitted, reads from start_line to end of file. If provided with start_line, reads the specified range with context."
+      }
+    },
+    "required": ["filename"]
+  }
+}

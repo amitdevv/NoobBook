@@ -1,0 +1,48 @@
+{
+  "name": "plan_components",
+  "description": "Plan 2-4 component variations based on the user's request. Call this first to establish the component structure, styling approach, and variations before writing code.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "component_category": {
+        "type": "string",
+        "enum": ["button", "card", "form", "navigation", "modal", "list", "grid", "hero", "pricing", "testimonial", "footer", "other"],
+        "description": "The general category of UI component"
+      },
+      "component_description": {
+        "type": "string",
+        "description": "Brief description of what this component is for (e.g., 'Pricing table with 3 tiers', 'Login form with social auth buttons')"
+      },
+      "variations": {
+        "type": "array",
+        "description": "2-4 different variations of this component (different styles, layouts, or features)",
+        "minItems": 2,
+        "maxItems": 4,
+        "items": {
+          "type": "object",
+          "properties": {
+            "variation_name": {
+              "type": "string",
+              "description": "Name for this variation (e.g., 'Modern Gradient', 'Minimal Clean', 'Bold Colorful')"
+            },
+            "style_approach": {
+              "type": "string",
+              "description": "Styling approach for this variation (e.g., 'Gradient background with glassmorphism', 'Flat design with Tailwind', 'Neumorphic with soft shadows')"
+            },
+            "key_features": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "List of 2-4 key visual or functional features that make this variation unique"
+            }
+          },
+          "required": ["variation_name", "style_approach", "key_features"]
+        }
+      },
+      "technical_notes": {
+        "type": "string",
+        "description": "Technical considerations: responsive design approach, accessibility features, JavaScript requirements (if any)"
+      }
+    },
+    "required": ["component_category", "component_description", "variations", "technical_notes"]
+  }
+}

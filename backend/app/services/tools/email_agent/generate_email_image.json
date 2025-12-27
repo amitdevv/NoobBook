@@ -1,0 +1,24 @@
+{
+  "name": "generate_email_image",
+  "description": "Generate an image for use in the email template. Use this only for photos, illustrations, or complex graphics - NOT for icons, buttons, or simple shapes (use CSS/SVG for those). You can call this multiple times for different sections.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "section_name": {
+        "type": "string",
+        "description": "The section name from your plan that needs this image (e.g., 'hero_banner', 'product_showcase')"
+      },
+      "image_prompt": {
+        "type": "string",
+        "description": "Detailed image generation prompt describing the visual style, subject, composition, and mood. Be specific and descriptive."
+      },
+      "aspect_ratio": {
+        "type": "string",
+        "enum": ["1:1", "16:9", "4:3", "3:2", "9:16"],
+        "description": "Aspect ratio for the image based on section layout. 16:9 for wide hero banners, 1:1 for square product images, 4:3 for content images",
+        "default": "16:9"
+      }
+    },
+    "required": ["section_name", "image_prompt", "aspect_ratio"]
+  }
+}

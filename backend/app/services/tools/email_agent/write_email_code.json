@@ -1,0 +1,22 @@
+{
+  "name": "write_email_code",
+  "description": "FINAL STEP: Write the complete HTML email template code. YOU MUST provide the full HTML code in the html_code parameter - this is not optional. The html_code parameter must contain the entire working HTML template from <!DOCTYPE html> to </html>. This is the termination tool - call this only when you have the complete HTML ready.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "html_code": {
+        "type": "string",
+        "description": "REQUIRED: The complete HTML email template. Must be a full, working HTML document with inline CSS, table-based layout, and all content. Structure: <!DOCTYPE html><html><head><meta charset='UTF-8'><title>...</title><style>/* media queries */</style></head><body><table width='600' cellpadding='0' cellspacing='0'><!-- all content with inline styles --></table></body></html>. Reference generated images as IMAGE_1, IMAGE_2, etc. Keep concise (3000-6000 characters). Must be production-ready and compatible with Gmail, Outlook, Apple Mail."
+      },
+      "preheader_text": {
+        "type": "string",
+        "description": "Preheader text that appears in email client preview (50-100 characters, optional)"
+      },
+      "subject_line_suggestion": {
+        "type": "string",
+        "description": "Suggested email subject line based on the content (required)"
+      }
+    },
+    "required": ["html_code", "subject_line_suggestion"]
+  }
+}

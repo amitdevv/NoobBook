@@ -1,0 +1,14 @@
+{
+  "name": "tavily_search",
+  "description": "Search the web using Tavily AI. use in combinatioon with the web search tool to gather better information",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "The search query. Should be the URL or topic you want to search for, try to mention the url as well as the topic"
+      }
+    },
+    "required": ["query"]
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "name": "plan_email_template",
+  "description": "Plan the structure, color scheme, and content sections for the email template. Call this first to establish the template design before generating images or writing code.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "template_type": {
+        "type": "string",
+        "enum": ["newsletter", "promotional", "transactional", "announcement"],
+        "description": "The type of email template to create"
+      },
+      "template_name": {
+        "type": "string",
+        "description": "A descriptive name for this email template (e.g., 'Product Launch Email', 'Monthly Newsletter')"
+      },
+      "color_scheme": {
+        "type": "object",
+        "properties": {
+          "primary": {
+            "type": "string",
+            "description": "Primary brand color (hex code, e.g., '#3B82F6')"
+          },
+          "secondary": {
+            "type": "string",
+            "description": "Secondary accent color (hex code)"
+          },
+          "background": {
+            "type": "string",
+            "description": "Background color (hex code, usually light)"
+          },
+          "text": {
+            "type": "string",
+            "description": "Primary text color (hex code, usually dark for readability)"
+          },
+          "button": {
+            "type": "string",
+            "description": "Call-to-action button color (hex code)"
+          }
+        },
+        "required": ["primary", "secondary", "background", "text", "button"]
+      },
+      "sections": {
+        "type": "array",
+        "description": "Ordered list of email sections from top to bottom",
+        "items": {
+          "type": "object",
+          "properties": {
+            "section_type": {
+              "type": "string",
+              "enum": ["header", "hero", "content", "product_grid", "cta", "testimonial", "footer"],
+              "description": "Type of section"
+            },
+            "section_name": {
+              "type": "string",
+              "description": "Unique name for this section (e.g., 'hero_banner', 'product_showcase')"
+            },
+            "content_description": {
+              "type": "string",
+              "description": "What content will go in this section"
+            },
+            "needs_image": {
+              "type": "boolean",
+              "description": "True if this section needs a generated image (photo/illustration only, not icons)"
+            },
+            "image_description": {
+              "type": "string",
+              "description": "Description of the image needed (if needs_image is true)"
+            }
+          },
+          "required": ["section_type", "section_name", "content_description", "needs_image"]
+        }
+      },
+      "layout_notes": {
+        "type": "string",
+        "description": "Additional notes about layout, spacing, or special design requirements"
+      }
+    },
+    "required": ["template_type", "template_name", "color_scheme", "sections"]
+  }
+}

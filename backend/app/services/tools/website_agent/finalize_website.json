@@ -1,0 +1,35 @@
+{
+  "name": "finalize_website",
+  "description": "TERMINATION TOOL: Call this when the website is complete and all files have been created. This signals that website generation is finished. All HTML pages must be created with consistent navigation and footer, styles.css and script.js must be complete, and all features must be implemented. Do not call this until everything is production-ready.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "summary": {
+        "type": "string",
+        "description": "Brief summary of the completed website including pages created, key features implemented, and any important notes for the user"
+      },
+      "pages_created": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "List of HTML page filenames created (e.g., ['index.html', 'about.html', 'contact.html'])"
+      },
+      "features_implemented": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "List of features successfully implemented (e.g., ['responsive_navigation', 'contact_form', 'image_gallery', 'scroll_animations'])"
+      },
+      "cdn_libraries_used": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "List of CDN libraries used in the website (e.g., ['Tailwind CSS', 'Font Awesome', 'AOS Animations', 'Google Fonts'])"
+      }
+    },
+    "required": ["summary", "pages_created", "features_implemented"]
+  }
+}
