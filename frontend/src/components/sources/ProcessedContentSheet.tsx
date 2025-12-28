@@ -25,9 +25,9 @@ const formatContent = (content: string) => {
   const parts = content.split(pageMarkerRegex);
 
   return parts.map((part, index) => {
+    // Reset lastIndex before test to avoid global regex state issues
+    pageMarkerRegex.lastIndex = 0;
     if (pageMarkerRegex.test(part)) {
-      // Reset regex lastIndex after test
-      pageMarkerRegex.lastIndex = 0;
       return (
         <div
           key={index}
@@ -52,15 +52,15 @@ export const ProcessedContentSheet: React.FC<ProcessedContentSheetProps> = ({
 }) => {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-[95vw] sm:w-[800px] lg:w-[900px] max-w-[1000px] flex flex-col">
-        <SheetHeader className="pb-4 border-b">
+      <SheetContent side="left" className="w-[95vw] sm:w-[800px] lg:w-[900px] max-w-[1000px] flex flex-col pr-0">
+        <SheetHeader className="pb-4 border-b pr-6">
           <SheetTitle className="text-lg font-semibold pr-8" title={sourceName}>
             {sourceName}
           </SheetTitle>
         </SheetHeader>
 
         <ScrollArea className="flex-1 mt-4">
-          <div className="pr-4 pb-8">
+          <div className="pr-6 pb-8">
             <div className="text-[15px] text-stone-700 leading-7 whitespace-pre-wrap break-words tracking-normal">
               {formatContent(content)}
             </div>
