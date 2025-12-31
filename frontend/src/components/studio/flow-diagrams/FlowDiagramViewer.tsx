@@ -210,17 +210,14 @@ export const FlowDiagramViewer: React.FC<FlowDiagramViewerProps> = ({
 
     // Sanitize HTML void elements to be XML-compatible (self-closing)
     // This fixes: "Opening and ending tag mismatch: br line 1 and p"
+    // Uses negative lookahead (?![^>]*\/>) to skip already self-closing tags
     let sanitizedSvg = svgContent
-      // Convert void elements to self-closing format
-      .replace(/<br\s*>/gi, '<br/>')
-      .replace(/<hr\s*>/gi, '<hr/>')
-      .replace(/<img([^>]*)>/gi, '<img$1/>')
-      .replace(/<input([^>]*)>/gi, '<input$1/>')
-      .replace(/<meta([^>]*)>/gi, '<meta$1/>')
-      .replace(/<link([^>]*)>/gi, '<link$1/>')
-      // Also handle cases where there might be attributes before >
-      .replace(/<br\s+([^/>]*)\s*>/gi, '<br $1/>')
-      .replace(/<hr\s+([^/>]*)\s*>/gi, '<hr $1/>');
+      .replace(/<br(?![^>]*\/>)([^>]*)>/gi, '<br$1/>')
+      .replace(/<hr(?![^>]*\/>)([^>]*)>/gi, '<hr$1/>')
+      .replace(/<img(?![^>]*\/>)([^>]*)>/gi, '<img$1/>')
+      .replace(/<input(?![^>]*\/>)([^>]*)>/gi, '<input$1/>')
+      .replace(/<meta(?![^>]*\/>)([^>]*)>/gi, '<meta$1/>')
+      .replace(/<link(?![^>]*\/>)([^>]*)>/gi, '<link$1/>');
 
     const blob = new Blob([sanitizedSvg], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
