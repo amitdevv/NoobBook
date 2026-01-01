@@ -99,7 +99,7 @@ class WireframeAgentService:
 
             # Build user message from config
             user_message = config.get("user_message", "").format(
-                source_content=source_content[:15000], direction=direction
+                source_content=source_content, direction=direction
             )
 
             messages = [{"role": "user", "content": user_message}]

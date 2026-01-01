@@ -40,7 +40,7 @@
                         },
                         "description": {
                             "type": "string",
-                            "description": "What this section contains"
+                            "description": "Optional: What this section contains"
                         }
                     },
                     "required": [

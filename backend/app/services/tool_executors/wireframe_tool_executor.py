@@ -132,7 +132,8 @@ class WireframeToolExecutor:
                 converted = convert_to_excalidraw_elements(final_elements)
                 accumulated.extend(converted)
             except Exception as e:
-                print(f"[WireframeExecutor] Error adding final elements: {e}")
+                # Log error but continue - final elements are optional
+                pass
 
         # Update canvas size if provided
         if "canvas_width" in tool_input:
