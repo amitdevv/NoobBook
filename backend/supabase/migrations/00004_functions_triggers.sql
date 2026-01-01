@@ -207,7 +207,7 @@ BEGIN
     
     IF v_chat_title = 'New Chat' THEN
       -- Extract first 50 chars of message content as title
-      -- Assuming content is JSONB with a 'text' field
+      -- Content is JSONB: try 'text' field first, fall back to string representation
       UPDATE chats
       SET title = SUBSTRING(
         COALESCE(

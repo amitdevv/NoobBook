@@ -11,7 +11,8 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT UNIQUE NOT NULL,
-  encrypted_password TEXT NOT NULL,
+  -- Password managed by Supabase Auth (auth.users)
+
   
   -- Global user preferences and memory
   memory JSONB DEFAULT '{}'::jsonb,
