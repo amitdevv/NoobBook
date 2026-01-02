@@ -119,13 +119,28 @@ export const useAudioGeneration = (projectId: string) => {
 
   /**
    * Download audio file
+   * Educational Note: Cross-origin downloads require fetching as blob first.
+   * The `download` attribute on anchor tags only works for same-origin URLs.
    */
-  const downloadAudio = (job: AudioJob) => {
+  const downloadAudio = async (job: AudioJob) => {
     if (!job.audio_url) return;
-    const link = document.createElement('a');
-    link.href = `http://localhost:5000${job.audio_url}`;
-    link.download = job.audio_filename || 'audio_overview.mp3';
-    link.click();
+
+    try {
+      const response = await fetch(`http://localhost:5000${job.audio_url}`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = job.audio_filename || 'audio_overview.mp3';
+      link.click();
+
+      // Clean up the object URL after download
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to download audio:', error);
+      showError('Failed to download audio file');
+    }
   };
 
   /**
