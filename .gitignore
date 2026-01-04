@@ -62,6 +62,9 @@ lerna-debug.log*
 Thumbs.db
 ehthumbs.db
 
+# Process IDs for startup/shutdown scripts
+.noobbook_pids
+
 # Build artifacts
 build/
 *.tsbuildinfo
