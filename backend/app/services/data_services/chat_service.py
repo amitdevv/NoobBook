@@ -1,8 +1,8 @@
 """
 Chat Service - CRUD operations for chat entities.
 
-Educational Note: This service manages chat entity lifecycle within projects.
-It handles creating, listing, getting, updating, and deleting chats.
+Educational Note: This service manages chat entity lifecycle within projects
+using Supabase as the database backend.
 
 Separation of Concerns:
 - chat_service.py: Chat CRUD (this file)
@@ -10,18 +10,15 @@ Separation of Concerns:
 - message_service.py: Message persistence
 - prompt_loader.py: Prompt management
 """
-import json
-import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Optional, Dict, List, Any
 
-from config import Config
+from app.services.integrations.supabase import get_supabase, is_supabase_enabled
 
 
 class ChatService:
     """
-    Service class for chat entity management.
+    Service class for chat entity management using Supabase.
 
     Educational Note: A chat is a conversation container within a project.
     It has metadata (title, timestamps) and holds messages.
@@ -29,65 +26,15 @@ class ChatService:
 
     def __init__(self):
         """Initialize the chat service."""
-        self.projects_dir = Config.PROJECTS_DIR
-
-    def _get_chats_dir(self, project_id: str) -> Path:
-        """Get the chats directory for a project."""
-        chats_dir = self.projects_dir / project_id / "chats"
-        chats_dir.mkdir(exist_ok=True, parents=True)
-        return chats_dir
-
-    def _get_index_file(self, project_id: str) -> Path:
-        """Get the chats index file path."""
-        return self._get_chats_dir(project_id) / "chats_index.json"
-
-    def _get_chat_file(self, project_id: str, chat_id: str) -> Path:
-        """Get a specific chat's file path."""
-        return self._get_chats_dir(project_id) / f"{chat_id}.json"
-
-    def _load_index(self, project_id: str) -> Dict[str, Any]:
-        """
-        Load the chats index for a project.
-
-        Educational Note: The index provides quick access to chat metadata
-        without loading full chat files with all messages.
-        """
-        index_file = self._get_index_file(project_id)
-
-        if not index_file.exists():
-            # Initialize empty index
-            initial_index = {
-                "project_id": project_id,
-                "chats": [],
-                "last_updated": datetime.now().isoformat()
-            }
-            self._save_index(project_id, initial_index)
-            return initial_index
-
-        try:
-            with open(index_file, 'r') as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            # Reinitialize if corrupted
-            initial_index = {
-                "project_id": project_id,
-                "chats": [],
-                "last_updated": datetime.now().isoformat()
-            }
-            self._save_index(project_id, initial_index)
-            return initial_index
-
-    def _save_index(self, project_id: str, index_data: Dict[str, Any]) -> bool:
-        """Save the chats index."""
-        index_data["last_updated"] = datetime.now().isoformat()
-        index_file = self._get_index_file(project_id)
-
-        try:
-            with open(index_file, 'w') as f:
-                json.dump(index_data, f, indent=2)
-            return True
-        except IOError:
-            return False
+        if not is_supabase_enabled():
+            raise RuntimeError(
+                "Supabase is not configured. Please add SUPABASE_URL and "
+                "SUPABASE_ANON_KEY to your .env file."
+            )
+        self.supabase = get_supabase()
+        self.table = "chats"
+        self.messages_table = "messages"
+        self.studio_signals_table = "studio_signals"
 
     def list_chats(self, project_id: str) -> List[Dict[str, Any]]:
         """
@@ -102,14 +49,26 @@ class ChatService:
         Returns:
             List of chat metadata, sorted by most recent first
         """
-        index = self._load_index(project_id)
-
-        # Sort by updated_at, most recent first
-        chats = sorted(
-            index["chats"],
-            key=lambda c: c.get("updated_at", c["created_at"]),
-            reverse=True
+        response = (
+            self.supabase.table(self.table)
+            .select("id, title, created_at, updated_at")
+            .eq("project_id", project_id)
+            .order("updated_at", desc=True)
+            .execute()
         )
+
+        chats = response.data or []
+
+        # Add message count for each chat
+        for chat in chats:
+            count_response = (
+                self.supabase.table(self.messages_table)
+                .select("id", count="exact")
+                .eq("chat_id", chat["id"])
+                .execute()
+            )
+            chat["message_count"] = count_response.count or 0
+
         return chats
 
     def create_chat(self, project_id: str, title: str = "New Chat") -> Dict[str, Any]:
@@ -126,46 +85,29 @@ class ChatService:
         Returns:
             Created chat metadata
         """
-        chat_id = str(uuid.uuid4())
-        timestamp = datetime.now().isoformat()
-
-        # Chat metadata for index
-        chat_metadata = {
-            "id": chat_id,
-            "title": title,
-            "created_at": timestamp,
-            "updated_at": timestamp,
-            "message_count": 0
-        }
-
-        # Full chat data for file
         chat_data = {
-            "id": chat_id,
             "project_id": project_id,
-            "title": title,
-            "created_at": timestamp,
-            "updated_at": timestamp,
-            "messages": [],
-            "metadata": {
-                "source_references": [],
-                "sub_agents": []
-            },
-            "message_count": 0
+            "title": title
         }
 
-        # Save chat file
-        chat_file = self._get_chat_file(project_id, chat_id)
-        with open(chat_file, 'w') as f:
-            json.dump(chat_data, f, indent=2)
+        response = (
+            self.supabase.table(self.table)
+            .insert(chat_data)
+            .execute()
+        )
 
-        # Update index
-        index = self._load_index(project_id)
-        index["chats"].append(chat_metadata)
-        self._save_index(project_id, index)
+        if response.data:
+            chat = response.data[0]
+            print(f"Created chat: {title} (ID: {chat['id']})")
+            return {
+                "id": chat["id"],
+                "title": chat["title"],
+                "created_at": chat["created_at"],
+                "updated_at": chat["updated_at"],
+                "message_count": 0
+            }
 
-        print(f"Created chat: {title} (ID: {chat_id})")
-
-        return chat_metadata
+        raise RuntimeError("Failed to create chat")
 
     def get_chat(self, project_id: str, chat_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -173,8 +115,7 @@ class ChatService:
 
         Educational Note: Filters out tool_use and tool_result messages
         from the response. These are internal messages used in the tool
-        chain and shouldn't be displayed to users. Studio signals are
-        included as-is for frontend to render active studio items.
+        chain and shouldn't be displayed to users.
 
         Args:
             project_id: The project UUID
@@ -183,30 +124,90 @@ class ChatService:
         Returns:
             Full chat data or None if not found
         """
-        chat_file = self._get_chat_file(project_id, chat_id)
+        # Get chat metadata
+        chat_response = (
+            self.supabase.table(self.table)
+            .select("*")
+            .eq("id", chat_id)
+            .eq("project_id", project_id)
+            .execute()
+        )
 
-        if not chat_file.exists():
+        if not chat_response.data:
             return None
 
-        try:
-            with open(chat_file, 'r') as f:
-                chat_data = json.load(f)
+        chat = chat_response.data[0]
 
-            # Filter out tool_use and tool_result messages for display
-            # These have content as arrays instead of strings
-            chat_data["messages"] = [
-                msg for msg in chat_data.get("messages", [])
-                if isinstance(msg.get("content"), str)
-            ]
+        # Get messages for this chat
+        messages_response = (
+            self.supabase.table(self.messages_table)
+            .select("*")
+            .eq("chat_id", chat_id)
+            .order("created_at", desc=False)
+            .execute()
+        )
 
-            # Ensure studio_signals exists (even if empty)
-            if "studio_signals" not in chat_data:
-                chat_data["studio_signals"] = []
+        messages = messages_response.data or []
 
-            return chat_data
-        except json.JSONDecodeError:
-            print(f"Warning: Corrupted chat file: {chat_id}")
-            return None
+        # Filter out tool_use and tool_result messages for display
+        # Keep only user and assistant messages with string content
+        display_messages = []
+        for msg in messages:
+            content = msg.get("content")
+            role = msg.get("role")
+
+            # Skip tool_use and tool_result messages
+            if role not in ["user", "assistant"]:
+                continue
+
+            # Extract text content - stored as {text: "..."} in JSONB
+            if isinstance(content, dict):
+                text_content = content.get("text", "")
+            elif isinstance(content, str):
+                text_content = content
+            else:
+                text_content = str(content) if content else ""
+
+            # Create a clean message object for frontend
+            display_messages.append({
+                "id": msg.get("id"),
+                "role": role,
+                "content": text_content,  # Always a string
+                "timestamp": msg.get("created_at"),  # Map created_at to timestamp
+                "model": msg.get("model"),
+                "citations": msg.get("citations", [])
+            })
+
+        # Get studio signals
+        signals_response = (
+            self.supabase.table(self.studio_signals_table)
+            .select("*")
+            .eq("chat_id", chat_id)
+            .order("created_at", desc=False)
+            .execute()
+        )
+
+        # Transform signals for frontend format
+        # Backend stores: source_ids: ["uuid1", "uuid2"]
+        # Frontend expects: sources: [{source_id: "...", chunk_ids: []}]
+        formatted_signals = []
+        for signal in (signals_response.data or []):
+            source_ids = signal.get("source_ids", []) or []
+            formatted_signal = {
+                "id": signal.get("id"),
+                "studio_item": signal.get("studio_item"),
+                "direction": signal.get("direction", ""),
+                "sources": [{"source_id": sid, "chunk_ids": []} for sid in source_ids],
+                "created_at": signal.get("created_at"),
+                "status": signal.get("status", "pending")
+            }
+            formatted_signals.append(formatted_signal)
+
+        chat["messages"] = display_messages
+        chat["studio_signals"] = formatted_signals
+        chat["message_count"] = len(messages)
+
+        return chat
 
     def get_chat_metadata(self, project_id: str, chat_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -222,12 +223,29 @@ class ChatService:
         Returns:
             Chat metadata or None if not found
         """
-        index = self._load_index(project_id)
+        response = (
+            self.supabase.table(self.table)
+            .select("id, title, created_at, updated_at")
+            .eq("id", chat_id)
+            .eq("project_id", project_id)
+            .execute()
+        )
 
-        for chat in index["chats"]:
-            if chat["id"] == chat_id:
-                return chat
-        return None
+        if not response.data:
+            return None
+
+        chat = response.data[0]
+
+        # Get message count
+        count_response = (
+            self.supabase.table(self.messages_table)
+            .select("id", count="exact")
+            .eq("chat_id", chat_id)
+            .execute()
+        )
+        chat["message_count"] = count_response.count or 0
+
+        return chat
 
     def update_chat(
         self,
@@ -249,43 +267,59 @@ class ChatService:
         Returns:
             Updated chat metadata or None if not found
         """
-        chat_file = self._get_chat_file(project_id, chat_id)
+        # Check if chat exists
+        existing = (
+            self.supabase.table(self.table)
+            .select("id")
+            .eq("id", chat_id)
+            .eq("project_id", project_id)
+            .execute()
+        )
 
-        if not chat_file.exists():
+        if not existing.data:
             return None
 
-        try:
-            with open(chat_file, 'r') as f:
-                chat_data = json.load(f)
+        # Filter allowed updates
+        allowed_fields = ["title"]
+        filtered_updates = {k: v for k, v in updates.items() if k in allowed_fields}
 
-            # Apply updates
-            for key, value in updates.items():
-                if key in ["title"]:  # Allowed updates
-                    chat_data[key] = value
+        if not filtered_updates:
+            return self.get_chat_metadata(project_id, chat_id)
 
-            chat_data["updated_at"] = datetime.now().isoformat()
+        # Update chat
+        response = (
+            self.supabase.table(self.table)
+            .update(filtered_updates)
+            .eq("id", chat_id)
+            .execute()
+        )
 
-            # Save chat file
-            with open(chat_file, 'w') as f:
-                json.dump(chat_data, f, indent=2)
-
-            # Update index
-            self._update_index_entry(project_id, chat_id, chat_data)
-
+        if response.data:
+            chat = response.data[0]
+            # Get message count
+            count_response = (
+                self.supabase.table(self.messages_table)
+                .select("id", count="exact")
+                .eq("chat_id", chat_id)
+                .execute()
+            )
             return {
-                "id": chat_data["id"],
-                "title": chat_data["title"],
-                "created_at": chat_data["created_at"],
-                "updated_at": chat_data["updated_at"],
-                "message_count": len(chat_data["messages"])
+                "id": chat["id"],
+                "title": chat["title"],
+                "created_at": chat["created_at"],
+                "updated_at": chat["updated_at"],
+                "message_count": count_response.count or 0
             }
 
-        except (json.JSONDecodeError, IOError):
-            return None
+        return None
 
     def delete_chat(self, project_id: str, chat_id: str) -> bool:
         """
         Delete a chat and all its messages.
+
+        Educational Note: Supabase cascades deletes automatically based on
+        foreign key constraints. Deleting a chat also deletes its messages
+        and studio signals.
 
         Args:
             project_id: The project UUID
@@ -294,64 +328,46 @@ class ChatService:
         Returns:
             True if deleted, False if not found
         """
-        chat_file = self._get_chat_file(project_id, chat_id)
+        # Check if chat exists
+        existing = (
+            self.supabase.table(self.table)
+            .select("id")
+            .eq("id", chat_id)
+            .eq("project_id", project_id)
+            .execute()
+        )
 
-        if not chat_file.exists():
+        if not existing.data:
             return False
 
-        # Delete chat file
-        chat_file.unlink()
-
-        # Remove from index
-        index = self._load_index(project_id)
-        index["chats"] = [c for c in index["chats"] if c["id"] != chat_id]
-        self._save_index(project_id, index)
+        # Delete the chat (messages and signals cascade automatically)
+        self.supabase.table(self.table).delete().eq("id", chat_id).execute()
 
         print(f"Deleted chat: {chat_id}")
         return True
 
-    def _update_index_entry(
-        self,
-        project_id: str,
-        chat_id: str,
-        chat_data: Dict[str, Any]
-    ):
-        """Update a chat's entry in the index."""
-        index = self._load_index(project_id)
-
-        for i, chat in enumerate(index["chats"]):
-            if chat["id"] == chat_id:
-                index["chats"][i] = {
-                    "id": chat_data["id"],
-                    "title": chat_data["title"],
-                    "created_at": chat_data["created_at"],
-                    "updated_at": chat_data["updated_at"],
-                    "message_count": len(chat_data["messages"])
-                }
-                break
-
-        self._save_index(project_id, index)
-
     def sync_chat_to_index(self, project_id: str, chat_id: str) -> bool:
         """
-        Sync a chat's metadata to the index.
+        Sync a chat's metadata (no-op for Supabase version).
 
-        Educational Note: Called after message_service adds messages
-        to ensure the index stays up to date.
+        Educational Note: In Supabase, the data is always in sync.
+        This method exists for API compatibility.
 
         Args:
             project_id: The project UUID
             chat_id: The chat UUID
 
         Returns:
-            True if successful
+            True if chat exists
         """
-        chat_data = self.get_chat(project_id, chat_id)
-        if not chat_data:
-            return False
-
-        self._update_index_entry(project_id, chat_id, chat_data)
-        return True
+        existing = (
+            self.supabase.table(self.table)
+            .select("id")
+            .eq("id", chat_id)
+            .eq("project_id", project_id)
+            .execute()
+        )
+        return bool(existing.data)
 
 
 # Singleton instance for easy import

@@ -154,11 +154,14 @@ class TaskService:
         # Wrapper function that handles status updates
         def task_wrapper():
             try:
+                print(f"DEBUG task_wrapper: Starting task {task_id}", flush=True)
                 # Update status to running
                 self._update_task(task_id, status="running", started_at=datetime.now().isoformat())
 
+                print(f"DEBUG task_wrapper: Executing callable for task {task_id}", flush=True)
                 # Execute the actual task
                 result = callable_func(*args, **kwargs)
+                print(f"DEBUG task_wrapper: Task {task_id} completed with result", flush=True)
 
                 # Update status to completed
                 self._update_task(
@@ -171,13 +174,16 @@ class TaskService:
 
             except Exception as e:
                 # Update status to failed
+                print(f"DEBUG task_wrapper: Task {task_id} EXCEPTION: {e}", flush=True)
+                import traceback
+                traceback.print_exc()
                 self._update_task(
                     task_id,
                     status="failed",
                     error=str(e),
                     completed_at=datetime.now().isoformat()
                 )
-                print(f"Task {task_id} failed: {e}")
+                print(f"Task {task_id} failed: {e}", flush=True)
 
             finally:
                 # Remove from futures tracking
