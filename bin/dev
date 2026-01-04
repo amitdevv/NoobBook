@@ -47,15 +47,12 @@ for arg in "$@"; do
     case $arg in
         --backend-only)
             BACKEND_ONLY=true
-            shift
             ;;
         --frontend-only)
             FRONTEND_ONLY=true
-            shift
             ;;
         --install)
             INSTALL_DEPS=true
-            shift
             ;;
         --help|-h)
             echo "Usage: bin/dev [options]"
