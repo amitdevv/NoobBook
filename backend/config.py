@@ -52,9 +52,9 @@ class Config:
         cls.TEMP_DIR.mkdir(exist_ok=True)
 
         # Log the configuration being used
-        print(f"📱 {cls.APP_NAME} v{cls.VERSION} initialized")
-        print(f"📁 Data directory: {cls.DATA_DIR}")
-        print(f"🔧 Debug mode: {cls.DEBUG}")
+        print(f"{cls.APP_NAME} v{cls.VERSION} initialized")
+        print(f"Data directory: {cls.DATA_DIR}")
+        print(f"Debug mode: {cls.DEBUG}")
 
 
 class DevelopmentConfig(Config):

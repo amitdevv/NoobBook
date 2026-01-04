@@ -65,13 +65,13 @@ if __name__ == '__main__':
     debug = config_name == 'development'
 
     print(f"""
-    ╔════════════════════════════════════════╗
-    ║       NoobBook Backend Server         ║
-    ╠════════════════════════════════════════╣
-    ║  Running on: http://localhost:{port}     ║
-    ║  Environment: {config_name:<24} ║
-    ║  Debug Mode: {str(debug):<26} ║
-    ╚════════════════════════════════════════╝
+    ========================================
+         NoobBook Backend Server
+    ========================================
+      Running on: http://localhost:{port}
+      Environment: {config_name}
+      Debug Mode: {debug}
+    ========================================
 
     Press CTRL+C to stop the server
     """)

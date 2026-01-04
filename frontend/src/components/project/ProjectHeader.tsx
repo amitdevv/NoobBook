@@ -323,7 +323,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
           variant="outline"
           size="sm"
           onClick={handleOpenMemory}
-          className="gap-2"
+          className="gap-2 bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8]"
         >
           <Brain size={16} />
           Memory
@@ -333,7 +333,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
           variant="outline"
           size="sm"
           onClick={handleOpenSettings}
-          className="gap-2"
+          className="gap-2 bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8]"
         >
           <Gear size={16} />
           Project Settings
@@ -343,7 +343,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
           variant="outline"
           size="sm"
           onClick={handleNewProject}
-          className="gap-2"
+          className="gap-2 bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8]"
         >
           <Plus size={16} />
           New Project
@@ -351,7 +351,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" className="h-8 w-8 border-stone-300">
+            <Button variant="outline" size="icon" className="h-8 w-8 bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8]">
               <DotsThreeVertical size={16} />
             </Button>
           </DropdownMenuTrigger>

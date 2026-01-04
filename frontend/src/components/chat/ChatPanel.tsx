@@ -382,7 +382,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
         onShowChatList={() => setShowChatList(true)}
       />
 
-      <ChatMessages messages={activeChat?.messages || []} sending={sending} projectId={projectId} />
+      <ChatMessages
+        messages={activeChat?.messages || []}
+        sending={sending}
+        projectId={projectId}
+      />
 
       <ChatInput
         message={message}

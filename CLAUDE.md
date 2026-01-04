@@ -4,6 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build & Run Commands
 
+### Quick Start (Recommended)
+Start both backend and frontend with one command:
+```bash
+python start.py
+```
+
+Stop both services:
+```bash
+python stop.py
+```
+
+These cross-platform scripts (Windows/Linux/macOS) handle both services automatically, display colored output, and manage process cleanup.
+
 ### Backend (Flask)
 ```bash
 cd backend
