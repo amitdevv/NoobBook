@@ -416,6 +416,57 @@ class ProjectService:
 
         return bool(response.data)
 
+    # ==================== User Memory Methods ====================
+
+    def get_user_memory(self) -> Optional[str]:
+        """
+        Get the user's global memory.
+
+        Educational Note: User memory persists across all projects
+        and stores global preferences like name, communication style, etc.
+
+        Returns:
+            User memory string or None if not found
+        """
+        response = (
+            self.supabase.table("users")
+            .select("memory")
+            .eq("id", DEFAULT_USER_ID)
+            .execute()
+        )
+
+        if not response.data:
+            return None
+
+        memory_data = response.data[0].get("memory", {})
+        return memory_data.get("memory") if memory_data else None
+
+    def update_user_memory(self, memory: str) -> bool:
+        """
+        Update the user's global memory.
+
+        Args:
+            memory: The memory content string
+
+        Returns:
+            True if updated successfully
+        """
+        from datetime import datetime
+
+        memory_data = {
+            "memory": memory,
+            "updated_at": datetime.now().isoformat()
+        }
+
+        response = (
+            self.supabase.table("users")
+            .update({"memory": memory_data})
+            .eq("id", DEFAULT_USER_ID)
+            .execute()
+        )
+
+        return bool(response.data)
+
     def _format_project_metadata(self, project: Dict[str, Any]) -> Dict[str, Any]:
         """
         Format project data to return only metadata fields.

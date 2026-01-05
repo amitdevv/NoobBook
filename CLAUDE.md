@@ -24,7 +24,7 @@ python -m venv venv
 source venv/bin/activate      # macOS/Linux
 # venv\Scripts\activate       # Windows
 pip install -r requirements.txt
-python run.py                  # Runs on http://localhost:5000
+python run.py                  # Runs on http://localhost:5001
 ```
 
 ### Frontend (React + Vite)
@@ -263,7 +263,7 @@ app/services/tools/               # Tool definitions (JSON schemas)
 ```
 
 ### API Endpoints
-Base URL: `http://localhost:5000/api/v1`
+Base URL: `http://localhost:5001/api/v1`
 
 **Projects**: GET/POST `/projects`, GET/PUT/DELETE `/projects/{id}`, GET `/projects/{id}/costs`, GET `/projects/{id}/memory`
 
@@ -302,7 +302,7 @@ Base URL: `http://localhost:5000/api/v1`
 
 Import files from Google Drive. OAuth 2.0 flow with `drive.readonly` scope. Tokens stored in `data/google_tokens.json`, auto-refresh on expiry. Google Workspace exports: Docs→DOCX, Sheets→CSV, Slides→PPTX.
 
-**Setup**: Create OAuth credentials in Google Cloud Console, add redirect URI `http://localhost:5000/api/v1/google/callback`.
+**Setup**: Create OAuth credentials in Google Cloud Console, add redirect URI `http://localhost:5001/api/v1/google/callback`.
 
 ## Voice Input (ElevenLabs)
 

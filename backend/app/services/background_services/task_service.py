@@ -3,7 +3,7 @@ Task Service - Background task management using ThreadPoolExecutor.
 
 Educational Note: This service manages background tasks without external
 dependencies like Celery or Redis. It uses Python's built-in ThreadPoolExecutor
-for concurrent execution and a JSON file for task tracking.
+for concurrent execution and Supabase for task tracking.
 
 Why ThreadPoolExecutor works for our use case:
 - Our tasks are I/O-bound (API calls, file operations)
@@ -14,18 +14,22 @@ Why ThreadPoolExecutor works for our use case:
 How it works:
 1. Task is submitted with a callable and arguments
 2. ThreadPoolExecutor runs it in a background thread
-3. Task status is tracked in JSON file
+3. Task status is tracked in Supabase background_tasks table
 4. Source status is updated directly by the task
+
+Storage: Supabase background_tasks table
 """
-import json
 import uuid
 import threading
 from concurrent.futures import ThreadPoolExecutor, Future
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, Any, Callable, Optional, List
 
-from config import Config
+
+def _get_supabase():
+    """Get Supabase client (lazy import to avoid circular imports)."""
+    from app.services.integrations.supabase.supabase_client import get_supabase
+    return get_supabase()
 
 
 class TaskService:
@@ -33,24 +37,21 @@ class TaskService:
     Service class for managing background tasks.
 
     Educational Note: This is a simple task queue implementation using
-    Python's built-in ThreadPoolExecutor. No external dependencies needed.
+    Python's built-in ThreadPoolExecutor with Supabase for persistence.
     """
 
     # Maximum concurrent background tasks
     MAX_WORKERS = 4
+    TABLE = "background_tasks"
 
     def __init__(self):
         """Initialize the task service."""
-        self.tasks_dir = Config.DATA_DIR / "tasks"
-        self.tasks_dir.mkdir(parents=True, exist_ok=True)
-        self.index_path = self.tasks_dir / "tasks_index.json"
-
         # Thread pool for executing tasks
         # Educational Note: ThreadPoolExecutor manages a pool of worker threads
         # Tasks are queued and executed as threads become available
         self._executor = ThreadPoolExecutor(max_workers=self.MAX_WORKERS)
 
-        # Lock for thread-safe JSON file operations
+        # Lock for thread-safe operations
         self._lock = threading.Lock()
 
         # Track running futures (for potential cancellation)
@@ -59,30 +60,8 @@ class TaskService:
         # Track cancelled tasks - workers check this to stop early
         self._cancelled_tasks: set = set()
 
-        # Initialize index file
-        self._ensure_index()
-
         # Clean up any stale tasks from previous runs
         self._cleanup_stale_tasks()
-
-    def _ensure_index(self) -> None:
-        """Ensure the tasks index file exists."""
-        if not self.index_path.exists():
-            self._save_index({"tasks": [], "last_updated": datetime.now().isoformat()})
-
-    def _load_index(self) -> Dict[str, Any]:
-        """Load the tasks index from JSON file."""
-        try:
-            with open(self.index_path, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            return {"tasks": [], "last_updated": datetime.now().isoformat()}
-
-    def _save_index(self, data: Dict[str, Any]) -> None:
-        """Save the tasks index to JSON file."""
-        data["last_updated"] = datetime.now().isoformat()
-        with open(self.index_path, "w") as f:
-            json.dump(data, f, indent=2)
 
     def _cleanup_stale_tasks(self) -> None:
         """
@@ -92,20 +71,25 @@ class TaskService:
         those tasks will be stuck in "running" or "pending" state forever.
         We mark them as failed on startup.
         """
-        with self._lock:
-            index = self._load_index()
-            stale_count = 0
+        try:
+            supabase = _get_supabase()
 
-            for task in index["tasks"]:
-                if task["status"] in ["pending", "running"]:
-                    task["status"] = "failed"
-                    task["error"] = "Server restarted while task was running"
-                    task["completed_at"] = datetime.now().isoformat()
-                    stale_count += 1
+            # Update all pending/running tasks to failed
+            response = (
+                supabase.table(self.TABLE)
+                .update({
+                    "status": "failed",
+                    "error": "Server restarted while task was running",
+                    "completed_at": datetime.now().isoformat()
+                })
+                .in_("status", ["pending", "running"])
+                .execute()
+            )
 
-            if stale_count > 0:
-                self._save_index(index)
-                print(f"Marked {stale_count} stale tasks as failed")
+            if response.data:
+                print(f"Marked {len(response.data)} stale tasks as failed")
+        except Exception as e:
+            print(f"Error cleaning up stale tasks: {e}")
 
     def submit_task(
         self,
@@ -113,6 +97,7 @@ class TaskService:
         target_id: str,
         callable_func: Callable,
         *args,
+        target_type: str = "source",
         **kwargs
     ) -> str:
         """
@@ -125,31 +110,30 @@ class TaskService:
             task_type: Type of task (e.g., "source_processing")
             target_id: ID of the target resource (e.g., source_id)
             callable_func: The function to execute
+            target_type: Type of target (source, studio_signal, chat)
             *args, **kwargs: Arguments to pass to the function
 
         Returns:
             task_id: Unique identifier for tracking the task
         """
         task_id = str(uuid.uuid4())
-        timestamp = datetime.now().isoformat()
 
-        # Create task record
+        # Create task record in Supabase
         task_record = {
             "id": task_id,
-            "type": task_type,
+            "task_type": task_type,
             "target_id": target_id,
+            "target_type": target_type,
             "status": "pending",
             "error": None,
-            "created_at": timestamp,
-            "started_at": None,
-            "completed_at": None,
+            "progress": 0,
         }
 
-        # Save to index
-        with self._lock:
-            index = self._load_index()
-            index["tasks"].append(task_record)
-            self._save_index(index)
+        try:
+            supabase = _get_supabase()
+            supabase.table(self.TABLE).insert(task_record).execute()
+        except Exception as e:
+            print(f"Error creating task record: {e}")
 
         # Wrapper function that handles status updates
         def task_wrapper():
@@ -167,6 +151,7 @@ class TaskService:
                 self._update_task(
                     task_id,
                     status="completed",
+                    progress=100,
                     completed_at=datetime.now().isoformat()
                 )
 
@@ -200,33 +185,51 @@ class TaskService:
         return task_id
 
     def _update_task(self, task_id: str, **updates) -> None:
-        """Update a task's fields in the index."""
-        with self._lock:
-            index = self._load_index()
-
-            for task in index["tasks"]:
-                if task["id"] == task_id:
-                    task.update(updates)
-                    break
-
-            self._save_index(index)
+        """Update a task's fields in Supabase."""
+        try:
+            supabase = _get_supabase()
+            supabase.table(self.TABLE).update(updates).eq("id", task_id).execute()
+        except Exception as e:
+            print(f"Error updating task {task_id}: {e}")
 
     def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
-        """Get a task's current status."""
-        with self._lock:
-            index = self._load_index()
-
-            for task in index["tasks"]:
-                if task["id"] == task_id:
-                    return task
-
-        return None
+        """Get a task's current status from Supabase."""
+        try:
+            supabase = _get_supabase()
+            response = (
+                supabase.table(self.TABLE)
+                .select("*")
+                .eq("id", task_id)
+                .execute()
+            )
+            if response.data:
+                task = response.data[0]
+                # Map Supabase column names to expected format
+                task["type"] = task.get("task_type", "")
+                return task
+            return None
+        except Exception as e:
+            print(f"Error getting task {task_id}: {e}")
+            return None
 
     def get_tasks_for_target(self, target_id: str) -> List[Dict[str, Any]]:
-        """Get all tasks for a specific target."""
-        with self._lock:
-            index = self._load_index()
-            return [t for t in index["tasks"] if t["target_id"] == target_id]
+        """Get all tasks for a specific target from Supabase."""
+        try:
+            supabase = _get_supabase()
+            response = (
+                supabase.table(self.TABLE)
+                .select("*")
+                .eq("target_id", target_id)
+                .execute()
+            )
+            tasks = response.data or []
+            # Map column names for compatibility
+            for task in tasks:
+                task["type"] = task.get("task_type", "")
+            return tasks
+        except Exception as e:
+            print(f"Error getting tasks for target {target_id}: {e}")
+            return []
 
     def cancel_task(self, task_id: str) -> bool:
         """
@@ -260,7 +263,7 @@ class TaskService:
             if cancelled:
                 print(f"Task {task_id} cancelled before it started")
 
-        # Update task status
+        # Update task status in Supabase
         self._update_task(
             task_id,
             status="cancelled",
@@ -332,8 +335,8 @@ class TaskService:
         """
         Remove completed/failed tasks older than specified hours.
 
-        Educational Note: Call this periodically to prevent the JSON file
-        from growing indefinitely.
+        Educational Note: Call this periodically to prevent the database
+        from growing indefinitely with old task records.
 
         Args:
             older_than_hours: Remove tasks completed more than this many hours ago
@@ -341,32 +344,33 @@ class TaskService:
         Returns:
             Number of tasks removed
         """
-        cutoff = datetime.now() - timedelta(hours=older_than_hours)
+        try:
+            supabase = _get_supabase()
+            cutoff = (datetime.now() - timedelta(hours=older_than_hours)).isoformat()
 
-        with self._lock:
-            index = self._load_index()
-            original_count = len(index["tasks"])
+            # Delete old completed/failed/cancelled tasks
+            response = (
+                supabase.table(self.TABLE)
+                .delete()
+                .in_("status", ["completed", "failed", "cancelled"])
+                .lt("completed_at", cutoff)
+                .execute()
+            )
 
-            # Keep tasks that are still running OR completed/cancelled recently
-            index["tasks"] = [
-                t for t in index["tasks"]
-                if t["status"] in ["pending", "running"]
-                or (
-                    t.get("completed_at")
-                    and datetime.fromisoformat(t["completed_at"]) > cutoff
-                )
-            ]
+            removed_count = len(response.data) if response.data else 0
 
-            # Also clean up cancelled tasks from the cancelled set
-            completed_task_ids = {t["id"] for t in index["tasks"]}
-            self._cancelled_tasks = self._cancelled_tasks.intersection(completed_task_ids)
-
-            removed_count = original_count - len(index["tasks"])
+            # Clean up cancelled tasks from in-memory set
             if removed_count > 0:
-                self._save_index(index)
+                # Get remaining task IDs
+                remaining = supabase.table(self.TABLE).select("id").execute()
+                remaining_ids = {t["id"] for t in (remaining.data or [])}
+                self._cancelled_tasks = self._cancelled_tasks.intersection(remaining_ids)
                 print(f"Cleaned up {removed_count} old tasks")
 
-        return removed_count
+            return removed_count
+        except Exception as e:
+            print(f"Error cleaning up old tasks: {e}")
+            return 0
 
     def shutdown(self, wait: bool = True) -> None:
         """

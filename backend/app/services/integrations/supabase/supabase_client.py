@@ -51,11 +51,14 @@ class SupabaseClient:
         """
         Initialize the Supabase client from environment variables.
 
-        Educational Note: We validate environment variables before creating
-        the client to provide clear error messages if configuration is missing.
+        Educational Note: We use the SERVICE_KEY (not anon key) for single-user mode
+        because it bypasses Row Level Security (RLS). This is safe for local/single-user
+        deployments. For multi-user production, use anon key with proper auth.
         """
         supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_ANON_KEY")
+        # Prefer service key for single-user mode (bypasses RLS)
+        # Fall back to anon key for backwards compatibility
+        supabase_key = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_ANON_KEY")
 
         if not supabase_url:
             raise ValueError(
@@ -65,14 +68,15 @@ class SupabaseClient:
 
         if not supabase_key:
             raise ValueError(
-                "SUPABASE_ANON_KEY environment variable is not set. "
-                "Please add it to your .env file."
+                "SUPABASE_SERVICE_KEY or SUPABASE_ANON_KEY environment variable is not set. "
+                "Please add SUPABASE_SERVICE_KEY to your .env file for single-user mode."
             )
 
         try:
             cls._instance = create_client(supabase_url, supabase_key)
             cls._initialized = True
-            print(f"✓ Supabase client initialized: {supabase_url}")
+            key_type = "service" if os.getenv("SUPABASE_SERVICE_KEY") else "anon"
+            print(f"✓ Supabase client initialized ({key_type} key): {supabase_url}")
         except Exception as e:
             raise RuntimeError(f"Failed to initialize Supabase client: {str(e)}")
 
@@ -84,7 +88,9 @@ class SupabaseClient:
         Returns:
             True if configured, False otherwise
         """
-        return bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_ANON_KEY"))
+        has_url = bool(os.getenv("SUPABASE_URL"))
+        has_key = bool(os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_ANON_KEY"))
+        return has_url and has_key
 
     @classmethod
     def reset(cls) -> None:

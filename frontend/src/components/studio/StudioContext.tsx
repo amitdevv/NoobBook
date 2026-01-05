@@ -98,11 +98,17 @@ export const StudioProvider: React.FC<StudioProviderProps> = ({
 
   // Trigger the actual generation workflow
   const triggerGeneration = useCallback(async (optionId: StudioItemId, signal: StudioSignal) => {
+    console.log('[StudioContext] triggerGeneration called:', { optionId, signal });
     setPickerOpen(false);
 
     const handler = generationHandlers.get(optionId);
+    console.log('[StudioContext] Handler for', optionId, ':', handler ? 'found' : 'NOT FOUND');
     if (handler) {
-      await handler(signal);
+      try {
+        await handler(signal);
+      } catch (error) {
+        console.error('[StudioContext] Handler threw error:', error);
+      }
     } else {
       console.warn(`No generation handler registered for: ${optionId}`);
     }
@@ -111,10 +117,12 @@ export const StudioProvider: React.FC<StudioProviderProps> = ({
   // Handle generation request from tools list
   // If multiple signals exist for an item, show picker. Otherwise generate directly.
   const handleGenerate = useCallback((optionId: StudioItemId, itemSignals: StudioSignal[]) => {
+    console.log('[StudioContext] handleGenerate called:', { optionId, itemSignals });
     if (itemSignals.length === 0) return;
 
     if (itemSignals.length === 1) {
       // Single signal - generate directly
+      console.log('[StudioContext] Triggering generation with signal:', itemSignals[0]);
       triggerGeneration(optionId, itemSignals[0]);
     } else {
       // Multiple signals - show picker

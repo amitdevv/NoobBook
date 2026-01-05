@@ -51,8 +51,11 @@ def load_index(project_id: str) -> Dict[str, Any]:
         .execute()
     )
 
+    # Map field names for frontend compatibility
+    sources = [_map_source_fields(source) for source in (response.data or [])]
+
     return {
-        "sources": response.data or [],
+        "sources": sources,
         "last_updated": datetime.now().isoformat()
     }
 
@@ -143,6 +146,23 @@ def remove_source_from_index(project_id: str, source_id: str) -> bool:
     return True
 
 
+def _map_source_fields(source: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Map Supabase column names to frontend field names.
+
+    Educational Note: The Supabase table uses `is_active` but the frontend
+    expects `active`. This function provides a consistent mapping.
+    """
+    if source is None:
+        return None
+
+    # Map is_active -> active for frontend compatibility
+    if "is_active" in source:
+        source["active"] = source.pop("is_active")
+
+    return source
+
+
 def get_source_from_index(project_id: str, source_id: str) -> Optional[Dict[str, Any]]:
     """
     Get a source's metadata from the index.
@@ -165,7 +185,7 @@ def get_source_from_index(project_id: str, source_id: str) -> Optional[Dict[str,
     )
 
     if response.data:
-        return response.data[0]
+        return _map_source_fields(response.data[0])
 
     return None
 
@@ -226,7 +246,7 @@ def update_source_in_index(
     )
 
     if response.data:
-        return response.data[0]
+        return _map_source_fields(response.data[0])
 
     return get_source_from_index(project_id, source_id)
 
@@ -251,4 +271,5 @@ def list_sources_from_index(project_id: str) -> List[Dict[str, Any]]:
         .execute()
     )
 
-    return response.data or []
+    # Map field names for frontend compatibility
+    return [_map_source_fields(source) for source in (response.data or [])]
