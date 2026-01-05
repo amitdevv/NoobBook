@@ -65,8 +65,12 @@ export const StudioProvider: React.FC<StudioProviderProps> = ({
   const validSourceIds = useMemo(() => {
     const ids = new Set<string>();
     signals.forEach(signal => {
-      signal.sources.forEach(source => {
-        ids.add(source.source_id);
+      // Safely handle signals that may not have sources array
+      const sources = signal.sources || [];
+      sources.forEach(source => {
+        if (source?.source_id) {
+          ids.add(source.source_id);
+        }
       });
     });
     return ids;

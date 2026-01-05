@@ -71,7 +71,9 @@ class FlowDiagramService:
         if not source:
             return ""
 
-        token_count = source.get("token_count", 0)
+        # Token count is stored in embedding_info
+        embedding_info = source.get("embedding_info", {}) or {}
+        token_count = embedding_info.get("token_count", 0) or 0
 
         # For small sources, read the processed file directly
         if token_count < max_tokens:

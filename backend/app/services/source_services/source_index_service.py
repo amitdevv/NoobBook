@@ -1,36 +1,39 @@
 """
-Source Index Service - CRUD operations for the sources index.
+Source Index Service - CRUD operations for sources using Supabase.
 
-Educational Note: This service manages the sources_index.json file which stores
-metadata for all sources in a project. Separating index operations from the
-main source_service keeps concerns focused and files smaller.
+Educational Note: This service manages source metadata in the Supabase `sources` table.
+Sources represent uploaded files (PDFs, images, audio, URLs, text) that users add to projects.
 
-The index structure:
-{
-    "sources": [
-        {
-            "id": "uuid",
-            "name": "...",
-            "status": "uploaded|processing|embedding|ready|error",
-            ... other metadata
-        }
-    ],
-    "last_updated": "ISO timestamp"
-}
+Source status flow: uploaded → processing → [embedding] → ready
+- uploaded: File received, not yet processed
+- processing: AI extraction in progress
+- embedding: Creating vector embeddings (for large sources)
+- ready: Fully processed and searchable
+- error: Processing failed
 """
-import json
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
-from app.utils.path_utils import get_sources_index_path
+from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+
+
+# Initialize Supabase client
+def _get_client():
+    """Get Supabase client, raising error if not configured."""
+    if not is_supabase_enabled():
+        raise RuntimeError(
+            "Supabase is not configured. Please add SUPABASE_URL and "
+            "SUPABASE_ANON_KEY to your .env file."
+        )
+    return get_supabase()
 
 
 def load_index(project_id: str) -> Dict[str, Any]:
     """
     Load the sources index for a project.
 
-    Educational Note: Returns empty structure if index doesn't exist.
-    This is safe to call for new projects.
+    Educational Note: Returns structure compatible with old JSON format
+    for backwards compatibility with existing code.
 
     Args:
         project_id: The project UUID
@@ -38,40 +41,35 @@ def load_index(project_id: str) -> Dict[str, Any]:
     Returns:
         Dict with "sources" list and "last_updated" timestamp
     """
-    index_path = get_sources_index_path(project_id)
+    client = _get_client()
 
-    if not index_path.exists():
-        return {
-            "sources": [],
-            "last_updated": datetime.now().isoformat()
-        }
+    response = (
+        client.table("sources")
+        .select("*")
+        .eq("project_id", project_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
 
-    try:
-        with open(index_path, 'r') as f:
-            return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
-        return {
-            "sources": [],
-            "last_updated": datetime.now().isoformat()
-        }
+    return {
+        "sources": response.data or [],
+        "last_updated": datetime.now().isoformat()
+    }
 
 
 def save_index(project_id: str, index_data: Dict[str, Any]) -> None:
     """
     Save the sources index for a project.
 
-    Educational Note: Updates last_updated timestamp automatically.
-    The get_sources_index_path function ensures the parent directory exists.
+    Educational Note: This is a no-op for Supabase - data is saved
+    immediately on insert/update. Kept for API compatibility.
 
     Args:
         project_id: The project UUID
-        index_data: The index data to save
+        index_data: The index data (ignored)
     """
-    index_path = get_sources_index_path(project_id)
-
-    index_data["last_updated"] = datetime.now().isoformat()
-    with open(index_path, 'w') as f:
-        json.dump(index_data, f, indent=2)
+    # No-op for Supabase - data is saved immediately
+    pass
 
 
 def add_source_to_index(project_id: str, source_metadata: Dict[str, Any]) -> None:
@@ -82,9 +80,35 @@ def add_source_to_index(project_id: str, source_metadata: Dict[str, Any]) -> Non
         project_id: The project UUID
         source_metadata: Complete source metadata dict
     """
-    index = load_index(project_id)
-    index["sources"].append(source_metadata)
-    save_index(project_id, index)
+    client = _get_client()
+
+    # Map metadata to Supabase columns
+    source_data = {
+        "id": source_metadata.get("id"),
+        "project_id": project_id,
+        "name": source_metadata.get("name"),
+        "description": source_metadata.get("description"),
+        "type": source_metadata.get("type"),
+        "status": source_metadata.get("status", "uploaded"),
+        "raw_file_path": source_metadata.get("raw_file_path"),
+        "processed_file_path": source_metadata.get("processed_file_path"),
+        "token_count": source_metadata.get("token_count"),
+        "page_count": source_metadata.get("page_count"),
+        "file_size": source_metadata.get("file_size"),
+        "embedding_info": source_metadata.get("embedding_info", {}),
+        "summary_info": source_metadata.get("summary_info", {}),
+        "processing_info": source_metadata.get("processing_info", {}),
+        "error_message": source_metadata.get("error_message"),
+        "url": source_metadata.get("url"),
+        "is_active": source_metadata.get("is_active", True),
+    }
+
+    # Remove None values to use DB defaults
+    source_data = {k: v for k, v in source_data.items() if v is not None}
+
+    client.table("sources").insert(source_data).execute()
+
+    print(f"  Added source to index: {source_metadata.get('name')} (ID: {source_metadata.get('id')})")
 
 
 def remove_source_from_index(project_id: str, source_id: str) -> bool:
@@ -98,16 +122,25 @@ def remove_source_from_index(project_id: str, source_id: str) -> bool:
     Returns:
         True if source was found and removed, False otherwise
     """
-    index = load_index(project_id)
-    original_count = len(index["sources"])
+    client = _get_client()
 
-    index["sources"] = [s for s in index["sources"] if s["id"] != source_id]
+    # Check if exists first
+    existing = (
+        client.table("sources")
+        .select("id")
+        .eq("id", source_id)
+        .eq("project_id", project_id)
+        .execute()
+    )
 
-    if len(index["sources"]) < original_count:
-        save_index(project_id, index)
-        return True
+    if not existing.data:
+        return False
 
-    return False
+    # Delete the source
+    client.table("sources").delete().eq("id", source_id).execute()
+
+    print(f"  Removed source from index: {source_id}")
+    return True
 
 
 def get_source_from_index(project_id: str, source_id: str) -> Optional[Dict[str, Any]]:
@@ -121,11 +154,18 @@ def get_source_from_index(project_id: str, source_id: str) -> Optional[Dict[str,
     Returns:
         Source metadata dict or None if not found
     """
-    index = load_index(project_id)
+    client = _get_client()
 
-    for source in index["sources"]:
-        if source["id"] == source_id:
-            return source
+    response = (
+        client.table("sources")
+        .select("*")
+        .eq("id", source_id)
+        .eq("project_id", project_id)
+        .execute()
+    )
+
+    if response.data:
+        return response.data[0]
 
     return None
 
@@ -149,22 +189,46 @@ def update_source_in_index(
     Returns:
         Updated source metadata or None if not found
     """
-    index = load_index(project_id)
+    client = _get_client()
 
-    for i, source in enumerate(index["sources"]):
-        if source["id"] == source_id:
-            # Apply updates
-            for key, value in updates.items():
-                if value is not None:
-                    source[key] = value
+    # Check if exists first
+    existing = (
+        client.table("sources")
+        .select("id")
+        .eq("id", source_id)
+        .eq("project_id", project_id)
+        .execute()
+    )
 
-            source["updated_at"] = datetime.now().isoformat()
-            index["sources"][i] = source
-            save_index(project_id, index)
+    if not existing.data:
+        return None
 
-            return source
+    # Filter to valid columns and remove None values
+    valid_columns = {
+        "name", "description", "type", "status", "raw_file_path",
+        "processed_file_path", "token_count", "page_count", "file_size",
+        "embedding_info", "summary_info", "processing_info", "error_message", "url", "is_active"
+    }
 
-    return None
+    update_data = {k: v for k, v in updates.items() if k in valid_columns and v is not None}
+
+    if not update_data:
+        # Return existing data if no updates
+        return get_source_from_index(project_id, source_id)
+
+    # Update the source
+    response = (
+        client.table("sources")
+        .update(update_data)
+        .eq("id", source_id)
+        .eq("project_id", project_id)
+        .execute()
+    )
+
+    if response.data:
+        return response.data[0]
+
+    return get_source_from_index(project_id, source_id)
 
 
 def list_sources_from_index(project_id: str) -> List[Dict[str, Any]]:
@@ -177,10 +241,14 @@ def list_sources_from_index(project_id: str) -> List[Dict[str, Any]]:
     Returns:
         List of source metadata dicts
     """
-    index = load_index(project_id)
+    client = _get_client()
 
-    return sorted(
-        index["sources"],
-        key=lambda s: s.get("created_at", ""),
-        reverse=True
+    response = (
+        client.table("sources")
+        .select("*")
+        .eq("project_id", project_id)
+        .order("created_at", desc=True)
+        .execute()
     )
+
+    return response.data or []

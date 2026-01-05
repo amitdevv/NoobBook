@@ -1,15 +1,15 @@
 """
-Message Service - Handles message persistence and retrieval for chat and agent conversations.
+Message Service - Handles message persistence and retrieval for chat conversations.
 
-Educational Note: This is a pure CRUD service for messages (chat and agent).
+Educational Note: This is a pure CRUD service for messages using Supabase.
 It handles storing and retrieving messages, building message arrays for API calls.
 
 Key Responsibilities:
-- Store messages to chat JSON files
+- Store messages to Supabase messages table
 - Retrieve message history
 - Build message arrays for Claude API calls
 - Support different message types (user, assistant, tool_result)
-- Store and retrieve agent execution logs (web_agent, etc.)
+- Store and retrieve agent execution logs (local files for debugging)
 
 For parsing Claude API responses (tool_use blocks, content extraction),
 see utils/claude_parsing_utils.py
@@ -23,99 +23,49 @@ from typing import Optional, Dict, List, Any
 from config import Config
 from app.utils import claude_parsing_utils
 from app.utils.path_utils import get_web_agent_dir, get_agents_dir
+from app.services.integrations.supabase import get_supabase, is_supabase_enabled
 
 
 class MessageService:
     """
-    Service class for message persistence and context management.
+    Service class for message persistence using Supabase.
 
-    Educational Note: Messages are stored in individual chat JSON files.
+    Educational Note: Messages are stored in the Supabase messages table.
     This service handles the format conversion between storage and API.
     """
 
     def __init__(self):
         """Initialize the message service."""
+        if not is_supabase_enabled():
+            raise RuntimeError(
+                "Supabase is not configured. Please add SUPABASE_URL and "
+                "SUPABASE_ANON_KEY to your .env file."
+            )
+        self.supabase = get_supabase()
+        self.table = "messages"
+        self.chats_table = "chats"
+        # Keep local storage for agent execution logs (debugging only)
         self.projects_dir = Config.PROJECTS_DIR
-
-    def _get_chat_file(self, project_id: str, chat_id: str) -> Path:
-        """Get the path to a chat's JSON file."""
-        return self.projects_dir / project_id / "chats" / f"{chat_id}.json"
-
-    def _load_chat_data(self, project_id: str, chat_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Load chat data from file.
-
-        Args:
-            project_id: The project UUID
-            chat_id: The chat UUID
-
-        Returns:
-            Chat data dict or None if not found
-        """
-        chat_file = self._get_chat_file(project_id, chat_id)
-
-        if not chat_file.exists():
-            print(f"  DEBUG: Chat file does not exist: {chat_file}")
-            return None
-
-        try:
-            with open(chat_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data
-        except json.JSONDecodeError as e:
-            print(f"  DEBUG: JSON decode error loading chat {chat_id}: {e}")
-            # Try to read raw content for debugging
-            try:
-                with open(chat_file, 'r', encoding='utf-8') as f:
-                    raw_content = f.read()
-                print(f"  DEBUG: File size: {len(raw_content)} chars")
-                print(f"  DEBUG: First 200 chars: {raw_content[:200]}")
-            except:
-                pass
-            return None
-
-    def _save_chat_data(self, project_id: str, chat_id: str, data: Dict[str, Any]) -> bool:
-        """
-        Save chat data to file.
-
-        Args:
-            project_id: The project UUID
-            chat_id: The chat UUID
-            data: Chat data to save
-
-        Returns:
-            True if successful
-        """
-        chat_file = self._get_chat_file(project_id, chat_id)
-
-        try:
-            with open(chat_file, 'w') as f:
-                json.dump(data, f, indent=2)
-            return True
-        except IOError as e:
-            print(f"  DEBUG: Failed to save chat {chat_id}: {e}")
-            return False
-        except Exception as e:
-            print(f"  DEBUG: Unexpected error saving chat {chat_id}: {e}")
-            return False
 
     def get_messages(self, project_id: str, chat_id: str) -> List[Dict[str, Any]]:
         """
         Get all messages from a chat.
 
         Args:
-            project_id: The project UUID
+            project_id: The project UUID (used for validation)
             chat_id: The chat UUID
 
         Returns:
             List of message dicts
         """
-        chat_data = self._load_chat_data(project_id, chat_id)
-        if not chat_data:
-            print(f"  DEBUG: get_messages - chat_data is None for chat {chat_id}")
-            return []
-        messages = chat_data.get("messages", [])
-        return messages
+        response = (
+            self.supabase.table(self.table)
+            .select("*")
+            .eq("chat_id", chat_id)
+            .order("created_at", desc=False)
+            .execute()
+        )
+        return response.data or []
 
     def add_message(
         self,
@@ -142,31 +92,94 @@ class MessageService:
         Returns:
             The created message dict, or None if chat not found
         """
-        chat_data = self._load_chat_data(project_id, chat_id)
-        if not chat_data:
+        # Verify chat exists
+        chat_check = (
+            self.supabase.table(self.chats_table)
+            .select("id")
+            .eq("id", chat_id)
+            .execute()
+        )
+
+        if not chat_check.data:
+            print(f"  DEBUG: Chat not found: {chat_id}")
             return None
 
-        # Create message
-        message = {
-            "id": str(uuid.uuid4()),
+        # Prepare content for JSONB storage
+        # If content is a string, wrap it in a dict for consistency
+        if isinstance(content, str):
+            db_content = {"text": content}
+        else:
+            db_content = content
+
+        # Create message data
+        message_data = {
+            "chat_id": chat_id,
             "role": role,
-            "content": content,
-            "timestamp": datetime.now().isoformat(),
+            "content": db_content
         }
 
         # Add optional metadata
         if metadata:
-            message.update(metadata)
+            if "model" in metadata:
+                message_data["model"] = metadata["model"]
+            if "tokens" in metadata:
+                message_data["tokens_input"] = metadata["tokens"].get("input", 0)
+                message_data["tokens_output"] = metadata["tokens"].get("output", 0)
+            if "citations" in metadata:
+                message_data["citations"] = metadata["citations"]
+            if "cost_usd" in metadata:
+                message_data["cost_usd"] = metadata["cost_usd"]
 
-        # Append to messages
-        chat_data["messages"].append(message)
-        chat_data["updated_at"] = datetime.now().isoformat()
-        chat_data["message_count"] = len(chat_data["messages"])
+        # Insert message
+        response = (
+            self.supabase.table(self.table)
+            .insert(message_data)
+            .execute()
+        )
 
-        # Save
-        self._save_chat_data(project_id, chat_id, chat_data)
+        if response.data:
+            message = response.data[0]
+            # Update chat's updated_at timestamp
+            self.supabase.table(self.chats_table).update({
+                "updated_at": datetime.now().isoformat()
+            }).eq("id", chat_id).execute()
 
-        return message
+            # Format message for frontend (extract text from JSONB)
+            return self._format_message_for_frontend(message)
+
+        return None
+
+    def _format_message_for_frontend(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Format a message for frontend consumption.
+
+        Educational Note: Content is stored as JSONB {"text": "..."} in Supabase
+        but frontend expects a plain string. This extracts the text.
+
+        Args:
+            message: Raw message from Supabase
+
+        Returns:
+            Message with content as string
+        """
+        content = message.get("content")
+
+        # Extract text from JSONB format
+        if isinstance(content, dict) and "text" in content:
+            text_content = content["text"]
+        elif isinstance(content, str):
+            text_content = content
+        else:
+            text_content = str(content) if content else ""
+
+        return {
+            "id": message.get("id"),
+            "role": message.get("role"),
+            "content": text_content,
+            "timestamp": message.get("created_at"),
+            "model": message.get("model"),
+            "citations": message.get("citations", [])
+        }
 
     def add_user_message(
         self,
@@ -285,9 +298,17 @@ class MessageService:
         # Convert to API format
         api_messages = []
         for msg in messages:
+            content = msg.get("content")
+            # If content is a dict with "text" key, extract it for simple messages
+            # Otherwise keep the full content (for tool_use/tool_result)
+            if isinstance(content, dict) and "text" in content and msg.get("role") in ["user", "assistant"]:
+                api_content = content["text"]
+            else:
+                api_content = content
+
             api_messages.append({
                 "role": msg["role"],
-                "content": msg["content"]
+                "content": api_content
             })
 
         # Add pending message if provided
@@ -340,21 +361,25 @@ class MessageService:
         Returns:
             True if successful
         """
-        chat_data = self._load_chat_data(project_id, chat_id)
-        if not chat_data:
-            return False
+        # Filter to allowed fields
+        allowed_fields = ["title"]
+        filtered_updates = {k: v for k, v in updates.items() if k in allowed_fields}
 
-        # Update fields
-        for key, value in updates.items():
-            if key != "messages":  # Don't allow message updates via this method
-                chat_data[key] = value
+        if not filtered_updates:
+            return True
 
-        chat_data["updated_at"] = datetime.now().isoformat()
+        response = (
+            self.supabase.table(self.chats_table)
+            .update(filtered_updates)
+            .eq("id", chat_id)
+            .execute()
+        )
 
-        return self._save_chat_data(project_id, chat_id, chat_data)
+        return bool(response.data)
 
     # =========================================================================
     # Agent Execution Logs - For storing agent debug/execution data
+    # (Kept as local files for debugging - not migrated to Supabase)
     # =========================================================================
 
     def _get_agent_dir(self, project_id: str, agent_name: str) -> Path:
@@ -392,11 +417,10 @@ class MessageService:
         metadata: Optional[Dict[str, Any]] = None
     ) -> Optional[str]:
         """
-        Save an agent execution log.
+        Save an agent execution log (local file for debugging).
 
-        Educational Note: Agent execution logs are stored separately from chat
-        messages. They capture the full message chain, tool calls, and results
-        for debugging and auditing agent behavior.
+        Educational Note: Agent execution logs are stored locally for debugging.
+        They capture the full message chain, tool calls, and results.
 
         Structure: data/projects/{project_id}/agents/{agent_name}/{execution_id}.json
 
