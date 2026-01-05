@@ -286,7 +286,7 @@ class AudioOverviewService:
                 progress=f"Generating script (step {iteration})..."
             )
 
-            print(f"    Iteration {iteration}/{self.MAX_ITERATIONS}")
+            print(f"    Iteration {iteration}/{max_iterations}")
 
             # Call Claude API
             response = claude_service.send_message(
