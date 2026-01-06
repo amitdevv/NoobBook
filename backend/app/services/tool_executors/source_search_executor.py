@@ -83,7 +83,7 @@ class SourceSearchExecutor:
                 "error": f"Source is not ready (status: {source.get('status')})"
             }
 
-        if not source.get("is_active", False):
+        if not source.get("active", False):
             return {
                 "success": False,
                 "error": "Source is not active"

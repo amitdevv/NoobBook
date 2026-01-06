@@ -6,6 +6,7 @@
 
 import { useState, useRef } from 'react';
 import { audioAPI, type AudioJob } from '@/lib/api/studio';
+import { API_HOST } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
 
@@ -27,8 +28,11 @@ export const useAudioGeneration = (projectId: string) => {
   };
 
   const handleAudioGeneration = async (signal: StudioSignal) => {
+    console.log('[useAudioGeneration] handleAudioGeneration called with signal:', signal);
     const sourceId = signal.sources[0]?.source_id;
+    console.log('[useAudioGeneration] Extracted sourceId:', sourceId);
     if (!sourceId) {
+      console.error('[useAudioGeneration] No source_id found in signal.sources:', signal.sources);
       showError('No source specified for audio generation.');
       return;
     }
@@ -94,7 +98,7 @@ export const useAudioGeneration = (projectId: string) => {
 
     // Set the source and play
     if (audioRef.current) {
-      audioRef.current.src = `http://localhost:5000${job.audio_url}`;
+      audioRef.current.src = `${API_HOST}${job.audio_url}`;
       audioRef.current.play();
       setPlayingJobId(job.id);
     }
@@ -126,7 +130,7 @@ export const useAudioGeneration = (projectId: string) => {
     if (!job.audio_url) return;
 
     try {
-      const response = await fetch(`http://localhost:5000${job.audio_url}`);
+      const response = await fetch(`${API_HOST}${job.audio_url}`);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
 

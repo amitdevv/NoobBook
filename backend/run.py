@@ -61,7 +61,7 @@ if __name__ == '__main__':
     Educational Note: We use socketio.run instead of app.run when
     using Flask-SocketIO for WebSocket support (real-time features).
     """
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 5001))
     debug = config_name == 'development'
 
     print(f"""

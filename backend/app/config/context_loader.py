@@ -44,7 +44,7 @@ class ContextLoader:
 
         active_sources = [
             source for source in all_sources
-            if source.get("status") == "ready" and source.get("is_active", False)
+            if source.get("status") == "ready" and source.get("active", False)
         ]
 
         return active_sources
