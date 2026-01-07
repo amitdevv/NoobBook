@@ -370,6 +370,324 @@ def delete_source_chunks(project_id: str, source_id: str) -> bool:
 
 
 # =============================================================================
+# STUDIO OUTPUTS (Generated content - PRDs, blogs, emails, etc.)
+# =============================================================================
+
+def _build_studio_path(project_id: str, job_type: str, job_id: str, filename: str) -> str:
+    """
+    Build storage path for studio outputs.
+    Pattern: {project_id}/{job_type}/{job_id}/{filename}
+    Example: abc123/prds/def456/def456.md
+    """
+    return f"{project_id}/{job_type}/{job_id}/{filename}"
+
+
+def upload_studio_file(
+    project_id: str,
+    job_type: str,
+    job_id: str,
+    filename: str,
+    content: str,
+    content_type: str = "text/plain; charset=utf-8"
+) -> Optional[str]:
+    """
+    Upload a studio output file to storage.
+
+    Args:
+        project_id: The project UUID
+        job_type: Type of studio output (prds, blogs, emails, etc.)
+        job_id: The job UUID
+        filename: Output filename (e.g., job_id.md)
+        content: File content as string
+        content_type: MIME type
+
+    Returns:
+        Storage path if successful, None otherwise
+    """
+    client = _get_client()
+    path = _build_studio_path(project_id, job_type, job_id, filename)
+
+    try:
+        # Try to upload (will fail if file exists)
+        client.storage.from_(BUCKET_STUDIO).upload(
+            path=path,
+            file=content.encode("utf-8"),
+            file_options={"content-type": content_type}
+        )
+        print(f"  Uploaded studio file: {path}")
+        return path
+    except Exception as e:
+        # If file exists, try to update it
+        if "Duplicate" in str(e) or "already exists" in str(e).lower():
+            try:
+                client.storage.from_(BUCKET_STUDIO).update(
+                    path=path,
+                    file=content.encode("utf-8"),
+                    file_options={"content-type": content_type}
+                )
+                print(f"  Updated studio file: {path}")
+                return path
+            except Exception as update_e:
+                print(f"  Error updating studio file: {update_e}")
+                return None
+        print(f"  Error uploading studio file: {e}")
+        return None
+
+
+def append_studio_file(
+    project_id: str,
+    job_type: str,
+    job_id: str,
+    filename: str,
+    content: str
+) -> Optional[str]:
+    """
+    Append content to an existing studio file.
+
+    Educational Note: Supabase Storage doesn't support append, so we
+    download existing content, append new content, then re-upload.
+
+    Args:
+        project_id: The project UUID
+        job_type: Type of studio output
+        job_id: The job UUID
+        filename: Output filename
+        content: Content to append
+
+    Returns:
+        Storage path if successful, None otherwise
+    """
+    # Download existing content
+    existing = download_studio_file(project_id, job_type, job_id, filename)
+
+    if existing is None:
+        # File doesn't exist, create new
+        return upload_studio_file(project_id, job_type, job_id, filename, content)
+
+    # Append and re-upload
+    new_content = existing + content
+    return upload_studio_file(project_id, job_type, job_id, filename, new_content)
+
+
+def download_studio_file(
+    project_id: str,
+    job_type: str,
+    job_id: str,
+    filename: str
+) -> Optional[str]:
+    """
+    Download a studio output file from storage.
+
+    Args:
+        project_id: The project UUID
+        job_type: Type of studio output
+        job_id: The job UUID
+        filename: Output filename
+
+    Returns:
+        File content as string or None if not found
+    """
+    client = _get_client()
+    path = _build_studio_path(project_id, job_type, job_id, filename)
+
+    try:
+        response = client.storage.from_(BUCKET_STUDIO).download(path)
+        return response.decode("utf-8")
+    except Exception as e:
+        print(f"  Error downloading studio file: {e}")
+        return None
+
+
+def delete_studio_file(
+    project_id: str,
+    job_type: str,
+    job_id: str,
+    filename: str
+) -> bool:
+    """Delete a studio output file from storage."""
+    client = _get_client()
+    path = _build_studio_path(project_id, job_type, job_id, filename)
+
+    try:
+        client.storage.from_(BUCKET_STUDIO).remove([path])
+        print(f"  Deleted studio file: {path}")
+        return True
+    except Exception as e:
+        print(f"  Error deleting studio file: {e}")
+        return False
+
+
+def delete_studio_job_files(project_id: str, job_type: str, job_id: str) -> bool:
+    """
+    Delete all files for a studio job.
+
+    Args:
+        project_id: The project UUID
+        job_type: Type of studio output
+        job_id: The job UUID
+
+    Returns:
+        True if successful
+    """
+    client = _get_client()
+    prefix = f"{project_id}/{job_type}/{job_id}"
+
+    try:
+        # List all files in the job folder
+        files = client.storage.from_(BUCKET_STUDIO).list(prefix)
+        if files:
+            paths = [f"{prefix}/{f['name']}" for f in files]
+            client.storage.from_(BUCKET_STUDIO).remove(paths)
+            print(f"  Deleted {len(paths)} studio files for job {job_id}")
+        return True
+    except Exception as e:
+        print(f"  Error deleting studio job files: {e}")
+        return False
+
+
+def upload_studio_binary(
+    project_id: str,
+    job_type: str,
+    job_id: str,
+    filename: str,
+    file_data: bytes,
+    content_type: str = "application/octet-stream"
+) -> Optional[str]:
+    """
+    Upload a binary file (image, video, etc.) to studio outputs in Supabase.
+
+    Args:
+        project_id: The project UUID
+        job_type: Type of studio output (blogs, etc.)
+        job_id: The job UUID
+        filename: Output filename (e.g., image.png)
+        file_data: Binary file data
+        content_type: MIME type (e.g., image/png)
+
+    Returns:
+        Storage path if successful, None otherwise
+    """
+    client = _get_client()
+    path = _build_studio_path(project_id, job_type, job_id, filename)
+
+    try:
+        client.storage.from_(BUCKET_STUDIO).upload(
+            path=path,
+            file=file_data,
+            file_options={"content-type": content_type}
+        )
+        print(f"  Uploaded studio binary: {path}")
+        return path
+    except Exception as e:
+        if "Duplicate" in str(e) or "already exists" in str(e).lower():
+            try:
+                client.storage.from_(BUCKET_STUDIO).update(
+                    path=path,
+                    file=file_data,
+                    file_options={"content-type": content_type}
+                )
+                print(f"  Updated studio binary: {path}")
+                return path
+            except Exception as update_e:
+                print(f"  Error updating studio binary: {update_e}")
+                return None
+        print(f"  Error uploading studio binary: {e}")
+        return None
+
+
+def download_studio_binary(
+    project_id: str,
+    job_type: str,
+    job_id: str,
+    filename: str
+) -> Optional[bytes]:
+    """
+    Download a binary file from Supabase studio outputs.
+
+    Args:
+        project_id: The project UUID
+        job_type: Type of studio output
+        job_id: The job UUID
+        filename: Output filename
+
+    Returns:
+        File bytes or None if not found
+    """
+    client = _get_client()
+    path = _build_studio_path(project_id, job_type, job_id, filename)
+
+    try:
+        response = client.storage.from_(BUCKET_STUDIO).download(path)
+        return response
+    except Exception as e:
+        print(f"  Error downloading studio binary: {e}")
+        return None
+
+
+def get_studio_public_url(
+    project_id: str,
+    job_type: str,
+    job_id: str,
+    filename: str
+) -> str:
+    """
+    Get the public URL for a studio file.
+
+    Educational Note: This returns a direct public URL if bucket is public,
+    otherwise use get_studio_signed_url for private buckets.
+
+    Args:
+        project_id: The project UUID
+        job_type: Type of studio output
+        job_id: The job UUID
+        filename: Output filename
+
+    Returns:
+        Public URL string
+    """
+    client = _get_client()
+    path = _build_studio_path(project_id, job_type, job_id, filename)
+
+    try:
+        response = client.storage.from_(BUCKET_STUDIO).get_public_url(path)
+        return response
+    except Exception as e:
+        print(f"  Error getting public URL: {e}")
+        return ""
+
+
+def get_studio_signed_url(
+    project_id: str,
+    job_type: str,
+    job_id: str,
+    filename: str,
+    expires_in: int = 3600
+) -> Optional[str]:
+    """
+    Get a signed URL for a studio file (for private buckets).
+
+    Args:
+        project_id: The project UUID
+        job_type: Type of studio output
+        job_id: The job UUID
+        filename: Output filename
+        expires_in: URL expiration time in seconds (default 1 hour)
+
+    Returns:
+        Signed URL or None
+    """
+    client = _get_client()
+    path = _build_studio_path(project_id, job_type, job_id, filename)
+
+    try:
+        response = client.storage.from_(BUCKET_STUDIO).create_signed_url(path, expires_in)
+        return response.get("signedURL")
+    except Exception as e:
+        print(f"  Error getting signed URL: {e}")
+        return None
+
+
+# =============================================================================
 # CLEANUP - Delete all files for a source
 # =============================================================================
 
