@@ -80,7 +80,7 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => onDownload(viewingBlogJob.id)}
-                className="flex items-center gap-1"
+                className="flex items-center gap-1 mr-4"
               >
                 <DownloadSimple size={14} />
                 Download
