@@ -15,16 +15,32 @@ Google Workspace File Exports:
 
 Regular files (PDF, images, etc.) are downloaded directly.
 
+Multi-user Support:
+- All Drive operations accept user_id for per-user Google connections
+- In single-user mode, user_id is None (uses default user)
+
 Routes:
 - GET  /google/files                              - List files from Drive
 - POST /projects/<id>/sources/google-import       - Import file to project
 """
 import uuid
+from typing import Optional
 from flask import jsonify, request, current_app
 from app.api.google import google_bp
 from app.services.integrations.google import google_drive_service
 from app.services.source_services import source_service
 from app.utils.path_utils import get_raw_dir
+
+
+def _get_current_user_id() -> Optional[str]:
+    """
+    Get the current user ID from the authenticated session.
+
+    Returns:
+        User ID string or None for default user
+    """
+    # TODO: For multi-user mode, extract user_id from JWT/session
+    return None  # Single-user mode: use default user
 
 
 @google_bp.route('/google/files', methods=['GET'])
@@ -55,11 +71,13 @@ def google_list_files():
         folder_id = request.args.get('folder_id')
         page_size = int(request.args.get('page_size', 50))
         page_token = request.args.get('page_token')
+        user_id = _get_current_user_id()
 
         result = google_drive_service.list_files(
             folder_id=folder_id,
             page_size=page_size,
-            page_token=page_token
+            page_token=page_token,
+            user_id=user_id
         )
 
         if result['success']:
@@ -113,9 +131,10 @@ def google_import_file(project_id):
 
         file_id = data['file_id']
         custom_name = data.get('name')
+        user_id = _get_current_user_id()
 
         # Get file info from Drive
-        file_info = google_drive_service.get_file_info(file_id)
+        file_info = google_drive_service.get_file_info(file_id, user_id=user_id)
         if not file_info['success']:
             return jsonify(file_info), 400
 
@@ -124,7 +143,7 @@ def google_import_file(project_id):
         mime_type = file.get('mimeType', '')
 
         # Determine file extension (handles Workspace file exports)
-        extension = google_drive_service.get_file_extension(file_id)
+        extension = google_drive_service.get_file_extension(file_id, user_id=user_id)
         if not extension:
             return jsonify({
                 'success': False,
@@ -149,7 +168,7 @@ def google_import_file(project_id):
         destination_path = raw_dir / stored_filename
 
         # Download/export file from Drive
-        success, message = google_drive_service.download_file(file_id, destination_path)
+        success, message = google_drive_service.download_file(file_id, destination_path, user_id=user_id)
         if not success:
             return jsonify({
                 'success': False,

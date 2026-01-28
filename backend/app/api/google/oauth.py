@@ -25,9 +25,28 @@ Routes:
 - GET  /google/callback   - Handle OAuth callback (redirects)
 - POST /google/disconnect - Remove stored tokens
 """
+from typing import Optional
 from flask import jsonify, request, redirect, current_app
 from app.api.google import google_bp
 from app.services.integrations.google import google_auth_service
+
+
+def _get_current_user_id() -> Optional[str]:
+    """
+    Get the current user ID from the authenticated session.
+
+    Educational Note: In single-user mode (service key), this returns None
+    which triggers the fallback to the default user in the database.
+    For multi-user mode, implement JWT/session extraction here.
+
+    Returns:
+        User ID string or None for default user
+    """
+    # TODO: For multi-user mode, extract user_id from JWT/session:
+    # token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    # user = supabase.auth.get_user(token)
+    # return user.id if user else None
+    return None  # Single-user mode: use default user
 
 
 @google_bp.route('/google/status', methods=['GET'])
@@ -48,8 +67,9 @@ def google_status():
         }
     """
     try:
+        user_id = _get_current_user_id()
         is_configured = google_auth_service.is_configured()
-        is_connected, email = google_auth_service.is_connected()
+        is_connected, email = google_auth_service.is_connected(user_id=user_id)
 
         return jsonify({
             'success': True,
@@ -91,7 +111,8 @@ def google_auth():
                 'error': 'Google OAuth not configured. Please add Client ID and Secret in App Settings.'
             }), 400
 
-        auth_url = google_auth_service.get_auth_url()
+        user_id = _get_current_user_id()
+        auth_url = google_auth_service.get_auth_url(user_id=user_id)
         if not auth_url:
             return jsonify({
                 'success': False,
@@ -181,7 +202,8 @@ def google_disconnect():
         { "success": true, "message": "Disconnected successfully" }
     """
     try:
-        success, message = google_auth_service.disconnect()
+        user_id = _get_current_user_id()
+        success, message = google_auth_service.disconnect(user_id=user_id)
 
         return jsonify({
             'success': success,

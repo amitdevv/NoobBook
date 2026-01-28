@@ -18,6 +18,11 @@ MIME Type Mapping:
 - application/vnd.google-apps.spreadsheet → Google Sheet
 - application/vnd.google-apps.presentation → Google Slides
 - application/vnd.google-apps.folder → Folder
+
+Multi-user Support:
+- All methods accept optional user_id parameter
+- If not provided, falls back to default user (single-user mode)
+- For multi-user mode, pass user_id from authenticated session
 """
 
 import os
@@ -93,37 +98,42 @@ class GoogleDriveService:
 
     def __init__(self):
         """Initialize the Google Drive service."""
-        self._service = None
+        self._service_cache = {}  # Cache per user_id
 
-    def _get_service(self):
+    def _get_service(self, user_id: Optional[str] = None):
         """
         Get or create the Google Drive API service.
 
         Educational Note: We lazy-load the service to avoid errors
         when credentials aren't available yet.
 
+        Args:
+            user_id: Optional user ID for multi-user support
+
         Returns:
             Drive API service or None
         """
-        creds = google_auth_service.get_credentials()
+        creds = google_auth_service.get_credentials(user_id=user_id)
         if not creds:
             return None
 
-        # Build service (cache it for reuse)
-        if self._service is None:
-            self._service = build('drive', 'v3', credentials=creds)
+        # Build service (cache per user_id for reuse)
+        cache_key = user_id or '_default'
+        if cache_key not in self._service_cache:
+            self._service_cache[cache_key] = build('drive', 'v3', credentials=creds)
 
-        return self._service
+        return self._service_cache[cache_key]
 
-    def is_connected(self) -> bool:
+    def is_connected(self, user_id: Optional[str] = None) -> bool:
         """Check if Google Drive is connected and accessible."""
-        return self._get_service() is not None
+        return self._get_service(user_id=user_id) is not None
 
     def list_files(
         self,
         folder_id: Optional[str] = None,
         page_size: int = 50,
-        page_token: Optional[str] = None
+        page_token: Optional[str] = None,
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         List files from Google Drive.
@@ -138,11 +148,12 @@ class GoogleDriveService:
             folder_id: Optional folder ID to list (None = root/all)
             page_size: Number of files per page (max 1000)
             page_token: Token for pagination
+            user_id: Optional user ID for multi-user support
 
         Returns:
             Dict with files list and pagination info
         """
-        service = self._get_service()
+        service = self._get_service(user_id=user_id)
         if not service:
             return {
                 'success': False,
@@ -215,17 +226,18 @@ class GoogleDriveService:
                 'error': f'Failed to list files: {str(e)}'
             }
 
-    def get_file_info(self, file_id: str) -> Dict[str, Any]:
+    def get_file_info(self, file_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Get detailed information about a specific file.
 
         Args:
             file_id: The Google Drive file ID
+            user_id: Optional user ID for multi-user support
 
         Returns:
             Dict with file information
         """
-        service = self._get_service()
+        service = self._get_service(user_id=user_id)
         if not service:
             return {
                 'success': False,
@@ -249,7 +261,7 @@ class GoogleDriveService:
                 'error': f'Failed to get file info: {str(e)}'
             }
 
-    def download_file(self, file_id: str, destination_path: Path) -> Tuple[bool, str]:
+    def download_file(self, file_id: str, destination_path: Path, user_id: Optional[str] = None) -> Tuple[bool, str]:
         """
         Download a file from Google Drive.
 
@@ -262,11 +274,12 @@ class GoogleDriveService:
         Args:
             file_id: The Google Drive file ID
             destination_path: Path where to save the file
+            user_id: Optional user ID for multi-user support
 
         Returns:
             Tuple of (success, message or error)
         """
-        service = self._get_service()
+        service = self._get_service(user_id=user_id)
         if not service:
             return False, 'Google Drive not connected'
 
@@ -389,7 +402,7 @@ class GoogleDriveService:
         except Exception as e:
             return False, f'Export failed: {str(e)}'
 
-    def get_file_extension(self, file_id: str) -> Optional[str]:
+    def get_file_extension(self, file_id: str, user_id: Optional[str] = None) -> Optional[str]:
         """
         Get the appropriate file extension for a Drive file.
 
@@ -398,11 +411,12 @@ class GoogleDriveService:
 
         Args:
             file_id: File ID
+            user_id: Optional user ID for multi-user support
 
         Returns:
             File extension (e.g., '.pdf', '.docx') or None
         """
-        service = self._get_service()
+        service = self._get_service(user_id=user_id)
         if not service:
             return None
 
