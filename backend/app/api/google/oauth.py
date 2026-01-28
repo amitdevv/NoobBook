@@ -7,16 +7,17 @@ sharing their password.
 
 The OAuth Dance:
 1. /google/status  - Check if we're configured and connected
-2. /google/auth    - Get the authorization URL
+2. /google/auth    - Get the authorization URL (includes user_id in state)
 3. (User visits Google, grants permission)
-4. /google/callback - Google redirects here with auth code
+4. /google/callback - Google redirects here with auth code + state (user_id)
 5. /google/disconnect - Remove stored tokens
 
 Security Considerations:
 - Never expose client secret to frontend
 - Use HTTPS in production for callback URL
-- Store refresh tokens securely
+- Store refresh tokens securely in Supabase (per-user)
 - Handle token expiration gracefully
+- State parameter carries user_id for multi-user support
 
 Routes:
 - GET  /google/status     - Check configuration and connection
@@ -36,7 +37,7 @@ def google_status():
 
     Educational Note: This endpoint checks two things:
     1. Is Google OAuth configured? (client ID + secret set in .env)
-    2. Is user connected? (valid tokens stored in google_tokens.json)
+    2. Is user connected? (valid tokens stored in Supabase users.google_tokens)
 
     Returns:
         {
@@ -116,9 +117,9 @@ def google_callback():
     Handle OAuth callback from Google.
 
     Educational Note: This is where the OAuth "dance" completes:
-    1. Google redirects here with ?code=AUTHORIZATION_CODE
+    1. Google redirects here with ?code=AUTHORIZATION_CODE&state=USER_ID
     2. We exchange the code for access + refresh tokens
-    3. Tokens are stored in data/google_tokens.json
+    3. Tokens are stored in Supabase users.google_tokens (per-user)
     4. We redirect user back to frontend with success/error
 
     Why redirect instead of JSON response?
@@ -128,6 +129,7 @@ def google_callback():
 
     Query Params:
         code: Authorization code from Google (on success)
+        state: User ID passed from get_auth_url (for multi-user support)
         error: Error message if user denied access
 
     Returns:
@@ -145,8 +147,12 @@ def google_callback():
         if not code:
             return redirect('http://localhost:5173?google_auth=error&message=No+authorization+code')
 
-        # Exchange code for tokens
-        success, message = google_auth_service.handle_callback(code)
+        # Get user_id from state parameter (for multi-user support)
+        # State was set in get_auth_url() to identify which user initiated OAuth
+        user_id = request.args.get('state')
+
+        # Exchange code for tokens, passing user_id for storage
+        success, message = google_auth_service.handle_callback(code, user_id=user_id if user_id else None)
 
         if success:
             current_app.logger.info(f"Google OAuth successful: {message}")
@@ -165,7 +171,7 @@ def google_disconnect():
     """
     Disconnect Google Drive by removing stored tokens.
 
-    Educational Note: This removes tokens from google_tokens.json.
+    Educational Note: This removes tokens from Supabase users.google_tokens.
     User will need to re-authenticate to use Google Drive again.
 
     Note: This does NOT revoke access at Google's end - user can

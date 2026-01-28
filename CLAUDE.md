@@ -206,67 +206,52 @@ The application has exactly **two core views**:
 - **Studio Panel**: Content generation features (planned)
 
 ### Data Structure
+
+#### Supabase Database (PostgreSQL)
+All user data is stored in Supabase with Row-Level Security (RLS) for multi-user isolation:
+
+| Table | Purpose |
+|-------|---------|
+| `users` | User accounts, global memory, settings, google_tokens |
+| `projects` | Project metadata, custom prompts, costs, project memory |
+| `sources` | Source metadata, status, file paths, token counts |
+| `chats` | Chat containers and metadata |
+| `messages` | Chat messages with JSONB content |
+| `chunks` | RAG text chunks with metadata |
+| `studio_signals` | AI-emitted signals for studio features |
+| `background_tasks` | Async task tracking |
+| `brand_assets` | Brand asset metadata |
+| `brand_config` | Project brand configuration |
+
+#### Supabase Storage (S3-compatible)
+| Bucket | Purpose |
+|--------|---------|
+| `raw-files` | Original uploaded files (PDFs, DOCX, images, audio) |
+| `processed-files` | Extracted/processed text content |
+| `chunks` | Text chunks for RAG |
+| `studio-outputs` | Generated content (audio, video, PDFs) |
+| `brand-assets` | Brand logos, icons, fonts |
+
+#### Local Files (Configuration & Debug Only)
 ```
 data/
-├── user_memory.json              # Global user memory (persists across all projects)
-├── google_tokens.json            # Google OAuth tokens (auto-created on connect)
-├── prompts/
-│   ├── default_prompt.json           # Global default system prompt
-│   ├── pdf_extraction_prompt.json    # PDF extraction prompt config
-│   ├── pptx_extraction_prompt.json   # PowerPoint extraction prompt config
-│   ├── image_extraction_prompt.json  # Image extraction prompt config
-│   ├── web_agent_prompt.json         # Web agent system prompt
-│   ├── summary_prompt.json           # Source summary generation prompt
-│   ├── memory_prompt.json            # Memory merge prompt config
-│   └── chat_naming_prompt.json       # Chat title generation prompt
-├── tasks/
-│   └── tasks_index.json              # Background task tracking
-└── projects/
-    ├── {project_id}.json
-    └── {project_id}/
-        ├── memory.json               # Project-specific memory (deleted with project)
-        ├── sources/
-        │   ├── sources_index.json    # Source metadata index (includes embedding_info, summary_info)
-        │   ├── raw/                  # Original uploaded files
-        │   │   ├── {file}.pdf
-        │   │   ├── {file}.docx
-        │   │   ├── {file}.pptx
-        │   │   ├── {file}.mp3        # Audio files (mp3, wav, m4a, etc.)
-        │   │   ├── {file}.png        # Image files (png, jpg, jpeg, webp)
-        │   │   ├── {name}.link       # URL sources (JSON with url, type)
-        │   │   └── {name}.txt        # Pasted text sources
-        │   ├── processed/            # Extracted/processed content
-        │   │   └── {source_id}.txt   # Extracted text with page markers
-        │   └── chunks/               # Chunked text for RAG (one folder per source)
-        │       └── {source_id}/
-        │           ├── {source_id}_chunk_1.txt
-        │           ├── {source_id}_chunk_2.txt
-        │           └── ...           # Each chunk has metadata header + text
-        ├── agents/                   # Agent execution logs
-        │   └── web_agent/
-        │       └── {execution_id}.json  # Full message chain + result for debudding purposes only
-        └── chats/
-            ├── chats_index.json
-            ├── {chat_id}.json
-            ├── api_1.json            # Debug log for 1st API call in chat for debudding purposes only
-            ├── api_2.json            # Debug log for 2nd API call (tool follow-up) for debudding purposes only
-            └── ...                   # Incrementing logs for each API call for debudding purposes only
+├── prompts/                      # System prompt configurations (not user data)
+│   ├── default_prompt.json
+│   ├── pdf_extraction_prompt.json
+│   ├── memory_prompt.json
+│   └── ...                       # Other prompt configs
+└── projects/{id}/agents/         # Debug logs only (optional)
+    └── web_agent/{execution_id}.json
 
 app/services/tools/               # Tool definitions (JSON schemas)
 ├── chat_tools/
-│   ├── source_search_tool.json   # search_sources tool for main chat RAG
-│   └── memory_tool.json          # store_memory tool for user/project memory
-├── pdf_tools/
-│   └── pdf_extraction.json       # submit_page_extraction tool
-├── pptx_tools/
-│   └── pptx_extraction.json      # submit_slide_extraction tool
-├── image_tools/
-│   └── image_extraction.json     # submit_image_extraction tool
+│   ├── source_search_tool.json
+│   └── memory_tool.json
+├── pdf_tools/, pptx_tools/, image_tools/
 └── web_agent/
-    ├── web_search.json           # Claude server tool (web_search_20250305)
-    ├── web_fetch.json            # Claude server tool (web_fetch_20250910, beta)
-    ├── tavily_search.json        # Custom tool for Tavily API fallback
-    └── return_search_result.json # Termination tool for agent completion
+    ├── web_search.json
+    ├── web_fetch.json
+    └── return_search_result.json
 ```
 
 ### API Endpoints
@@ -307,9 +292,11 @@ Base URL: `http://localhost:5001/api/v1`
 
 ## Google Drive Integration
 
-Import files from Google Drive. OAuth 2.0 flow with `drive.readonly` scope. Tokens stored in `data/google_tokens.json`, auto-refresh on expiry. Google Workspace exports: Docs→DOCX, Sheets→CSV, Slides→PPTX.
+Import files from Google Drive. OAuth 2.0 flow with `drive.readonly` scope. Tokens stored per-user in Supabase `users.google_tokens` column, auto-refresh on expiry. Google Workspace exports: Docs→DOCX, Sheets→CSV, Slides→PPTX.
 
 **Setup**: Create OAuth credentials in Google Cloud Console, add redirect URI `http://localhost:5001/api/v1/google/callback`.
+
+**Multi-user Support**: Each user has their own Google Drive connection. The OAuth state parameter carries user_id for proper token association.
 
 ## Voice Input (ElevenLabs)
 
