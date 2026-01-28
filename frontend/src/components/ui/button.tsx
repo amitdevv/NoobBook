@@ -9,14 +9,28 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        // Primary solid - Main CTA buttons (amber)
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        // Destructive - Delete/danger actions
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        // Outline - Subtle outline, standard shadcn style
         outline:
           "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        // Soft - Cream background with visible border (most common secondary action)
+        // Use this for: Choose Files, Memory, Brand Kit, Project Settings, etc.
+        soft:
+          "bg-[#e8e7e4] border border-stone-300 text-foreground hover:bg-[#dcdbd8] active:bg-[#d0cfcc]",
+        // Brand - Primary border with light amber background (highlighted secondary)
+        // Use this for: Important but not primary actions
+        brand:
+          "border-2 border-primary bg-primary/5 text-primary hover:bg-primary/10 active:bg-primary/15",
+        // Secondary - Very subtle background
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        // Ghost - No background until hover
         ghost: "hover:bg-accent hover:text-accent-foreground",
+        // Link - Text with underline on hover
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

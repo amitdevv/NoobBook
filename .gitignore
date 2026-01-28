@@ -71,3 +71,6 @@ build/
 
 #claude
 .claude
+
+# Personal sync notes
+gitsync.md

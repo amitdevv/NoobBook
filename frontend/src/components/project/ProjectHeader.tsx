@@ -37,7 +37,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '../ui/collapsible';
-import { ArrowLeft, DotsThreeVertical, Plus, Trash, FolderOpen, Gear, CircleNotch, CurrencyDollar, Brain, CaretDown, CaretRight } from '@phosphor-icons/react';
+import { ArrowLeft, DotsThreeVertical, Plus, Trash, FolderOpen, Gear, CircleNotch, CurrencyDollar, Brain, CaretDown, CaretRight, Palette } from '@phosphor-icons/react';
 import { chatsAPI, type PromptConfig } from '../../lib/api/chats';
 import { projectsAPI, type CostTracking, type MemoryData } from '../../lib/api';
 import { useToast, ToastContainer } from '../ui/toast';
@@ -57,6 +57,7 @@ interface ProjectHeaderProps {
   onBack: () => void;
   onDelete: () => void;
   costsVersion?: number; // Increment to trigger cost refresh
+  onNavigateToBrand?: (projectId: string) => void;
 }
 
 export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
@@ -64,6 +65,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   onBack,
   onDelete,
   costsVersion,
+  onNavigateToBrand,
 }) => {
   const { toasts, dismissToast, error } = useToast();
 
@@ -245,7 +247,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
       {/* Left side - Back button and project name */}
       <div className="flex items-center gap-3">
         <Button
-          variant="outline"
+          variant="soft"
           size="icon"
           onClick={onBack}
           className="h-8 w-8"
@@ -320,30 +322,42 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
       {/* Right side - Actions */}
       <div className="flex items-center gap-2">
         <Button
-          variant="outline"
+          variant="soft"
           size="sm"
           onClick={handleOpenMemory}
-          className="gap-2 bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8]"
+          className="gap-2"
         >
           <Brain size={16} />
           Memory
         </Button>
 
+        {onNavigateToBrand && (
+          <Button
+            variant="soft"
+            size="sm"
+            onClick={() => onNavigateToBrand(project.id)}
+            className="gap-2"
+          >
+            <Palette size={16} />
+            Brand Kit
+          </Button>
+        )}
+
         <Button
-          variant="outline"
+          variant="soft"
           size="sm"
           onClick={handleOpenSettings}
-          className="gap-2 bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8]"
+          className="gap-2"
         >
           <Gear size={16} />
           Project Settings
         </Button>
 
         <Button
-          variant="outline"
+          variant="soft"
           size="sm"
           onClick={handleNewProject}
-          className="gap-2 bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8]"
+          className="gap-2"
         >
           <Plus size={16} />
           New Project
@@ -351,7 +365,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" className="h-8 w-8 bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8]">
+            <Button variant="soft" size="icon" className="h-8 w-8">
               <DotsThreeVertical size={16} />
             </Button>
           </DropdownMenuTrigger>
@@ -525,9 +539,8 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="soft"
               onClick={() => setSettingsDialogOpen(false)}
-              className="bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8] active:bg-[#d0cfcc]"
             >
               Close
             </Button>
@@ -595,9 +608,8 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="soft"
               onClick={() => setMemoryDialogOpen(false)}
-              className="bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8] active:bg-[#d0cfcc]"
             >
               Close
             </Button>

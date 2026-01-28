@@ -149,11 +149,10 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({ onAddResearch, isAtLim
           />
           <Button
             type="button"
-            variant="outline"
+            variant="soft"
             size="icon"
             onClick={handleAddLink}
             disabled={isAtLimit || researching || !newLink.trim()}
-            className="bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8] active:bg-[#d0cfcc]"
           >
             <Plus size={16} />
           </Button>

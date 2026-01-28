@@ -313,7 +313,7 @@ function MindMapViewerInner({ nodes: mindMapNodes }: MindMapViewerProps) {
       <div className="px-4 py-2 bg-muted/30 border-b flex items-center justify-between gap-2 flex-shrink-0">
         <div className="flex items-center gap-1">
           <Button
-            variant="outline"
+            variant="soft"
             size="sm"
             onClick={expandAll}
             className="h-7 text-xs gap-1"
@@ -322,7 +322,7 @@ function MindMapViewerInner({ nodes: mindMapNodes }: MindMapViewerProps) {
             Expand All
           </Button>
           <Button
-            variant="outline"
+            variant="soft"
             size="sm"
             onClick={collapseAll}
             className="h-7 text-xs gap-1"

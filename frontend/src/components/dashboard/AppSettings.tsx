@@ -608,7 +608,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({ open, onOpenChange }) 
                       </div>
                       {googleStatus.connected ? (
                         <Button
-                          variant="outline"
+                          variant="soft"
                           size="sm"
                           onClick={handleGoogleDisconnect}
                           disabled={googleLoading}
@@ -667,7 +667,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({ open, onOpenChange }) 
         <DialogFooter className="flex-shrink-0 border-t pt-4">
           {Object.keys(modifiedKeys).length > 0 ? (
             <>
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+              <Button variant="soft" onClick={() => onOpenChange(false)} disabled={saving}>
                 Cancel
               </Button>
               <Button
@@ -688,7 +688,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({ open, onOpenChange }) 
               </Button>
             </>
           ) : (
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="soft" onClick={() => onOpenChange(false)}>
               Close
             </Button>
           )}

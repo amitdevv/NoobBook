@@ -80,10 +80,9 @@ export const LinkTab: React.FC<LinkTabProps> = ({ onAddUrl, isAtLimit }) => {
           />
           <Button
             size="icon"
-            variant="outline"
+            variant="soft"
             onClick={handleAddWebsite}
             disabled={isAtLimit || addingWebsite || !websiteUrl.trim()}
-            className="bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8] active:bg-[#d0cfcc]"
           >
             {addingWebsite ? (
               <CircleNotch size={16} className="animate-spin" />
@@ -113,10 +112,9 @@ export const LinkTab: React.FC<LinkTabProps> = ({ onAddUrl, isAtLimit }) => {
           />
           <Button
             size="icon"
-            variant="outline"
+            variant="soft"
             onClick={handleAddYoutube}
             disabled={isAtLimit || addingYoutube || !youtubeUrl.trim()}
-            className="bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8] active:bg-[#d0cfcc]"
           >
             {addingYoutube ? (
               <CircleNotch size={16} className="animate-spin" />

@@ -138,11 +138,10 @@ export const UploadTab: React.FC<UploadTabProps> = ({
               Drag & drop or choose files to upload
             </p>
             <Button
-              variant="outline"
+              variant="soft"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
               disabled={isAtLimit}
-              className="bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8] active:bg-[#d0cfcc]"
             >
               Choose Files
             </Button>

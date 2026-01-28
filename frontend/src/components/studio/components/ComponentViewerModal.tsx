@@ -136,7 +136,7 @@ export const ComponentViewerModal: React.FC<ComponentViewerModalProps> = ({
                     </Button>
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant="soft"
                       className="gap-1"
                       onClick={() => downloadComponent(component.preview_url, component.filename)}
                     >

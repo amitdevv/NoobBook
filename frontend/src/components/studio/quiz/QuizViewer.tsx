@@ -259,7 +259,7 @@ export function QuizViewer({ questions, topicSummary }: QuizViewerProps) {
 
             {/* Retry Button */}
             <div className="mt-6 flex justify-center">
-              <Button onClick={resetQuiz} variant="outline" className="gap-2">
+              <Button onClick={resetQuiz} variant="soft" className="gap-2">
                 <ArrowClockwise size={18} />
                 Retake Quiz
               </Button>
@@ -427,7 +427,7 @@ export function QuizViewer({ questions, topicSummary }: QuizViewerProps) {
       {/* Navigation footer */}
       <div className="px-4 py-3 bg-muted/30 border-t flex items-center justify-between gap-4 flex-shrink-0">
         <Button
-          variant="outline"
+          variant="soft"
           size="sm"
           onClick={goToPrev}
           disabled={currentIndex === 0}
@@ -438,7 +438,7 @@ export function QuizViewer({ questions, topicSummary }: QuizViewerProps) {
         </Button>
 
         <Button
-          variant="outline"
+          variant="soft"
           size="sm"
           onClick={() => setShowSummary(true)}
           className="text-muted-foreground"

@@ -104,7 +104,7 @@ export const SocialPostViewerModal: React.FC<SocialPostViewerModalProps> = ({
               <div className="px-3 pb-3">
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="soft"
                   className="w-full text-xs"
                   onClick={() => {
                     const fullText = `${post.copy}\n\n${post.hashtags.join(' ')}`;

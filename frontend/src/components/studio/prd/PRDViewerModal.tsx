@@ -71,7 +71,7 @@ export const PRDViewerModal: React.FC<PRDViewerModalProps> = ({
             </div>
             {viewingPRDJob && (
               <Button
-                variant="outline"
+                variant="soft"
                 size="sm"
                 onClick={() => onDownload(viewingPRDJob.id)}
                 className="flex items-center gap-1"

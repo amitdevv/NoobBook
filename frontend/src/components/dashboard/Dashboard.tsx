@@ -13,8 +13,20 @@ import { ToastContainer, useToast } from '../ui/toast';
  * This component manages the projects list and application settings.
  */
 
+/**
+ * Project type returned from API
+ */
+interface Project {
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  last_accessed: string;
+}
+
 interface DashboardProps {
-  onSelectProject: (project: any) => void;
+  onSelectProject: (project: Project) => void;
   onCreateNewProject: () => void;
   refreshTrigger?: number;
 }
@@ -41,7 +53,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <Button
-            variant="outline"
+            variant="soft"
             size="sm"
             onClick={() => setAppSettingsOpen(true)}
             className="gap-2"

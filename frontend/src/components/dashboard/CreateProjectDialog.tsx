@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { isAxiosError } from 'axios';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -12,9 +13,21 @@ import { projectsAPI } from '@/lib/api';
  * and form submission handling.
  */
 
+/**
+ * Project type returned from API
+ */
+interface Project {
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  last_accessed: string;
+}
+
 interface CreateProjectDialogProps {
   onClose: () => void;
-  onProjectCreated: (project: any) => void;
+  onProjectCreated: (project: Project) => void;
   editProject?: {
     id: string;
     name: string;
@@ -61,8 +74,12 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
       }
 
       onProjectCreated(response.data.project);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to save project');
+    } catch (err: unknown) {
+      if (isAxiosError(err)) {
+        setError(err.response?.data?.error || 'Failed to save project');
+      } else {
+        setError('Failed to save project');
+      }
       setLoading(false);
     }
   };
@@ -120,7 +137,7 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
           <CardFooter className="flex justify-end space-x-2">
             <Button
               type="button"
-              variant="outline"
+              variant="soft"
               onClick={onClose}
               disabled={loading}
             >

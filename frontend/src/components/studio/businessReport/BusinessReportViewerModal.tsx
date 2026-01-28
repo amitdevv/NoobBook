@@ -93,7 +93,7 @@ export const BusinessReportViewerModal: React.FC<BusinessReportViewerModalProps>
             </div>
             {viewingBusinessReportJob && (
               <Button
-                variant="outline"
+                variant="soft"
                 size="sm"
                 onClick={() => onDownload(viewingBusinessReportJob.id)}
                 className="flex items-center gap-1"

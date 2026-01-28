@@ -30,12 +30,14 @@ interface ProjectWorkspaceProps {
   };
   onBack: () => void;
   onDeleteProject: (projectId: string) => void;
+  onNavigateToBrand?: (projectId: string) => void;
 }
 
 export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   project,
   onBack,
-  onDeleteProject
+  onDeleteProject,
+  onNavigateToBrand,
 }) => {
   // Refs for programmatic panel control
   const leftPanelRef = useRef<ImperativePanelHandle>(null);
@@ -74,6 +76,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         onBack={onBack}
         onDelete={() => onDeleteProject(project.id)}
         costsVersion={costsVersion}
+        onNavigateToBrand={onNavigateToBrand}
       />
 
       {/* Main Content Area - Floating panels over background */}

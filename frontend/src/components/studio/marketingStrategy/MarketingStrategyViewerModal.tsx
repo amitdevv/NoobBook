@@ -71,7 +71,7 @@ export const MarketingStrategyViewerModal: React.FC<MarketingStrategyViewerModal
             </div>
             {viewingMarketingStrategyJob && (
               <Button
-                variant="outline"
+                variant="soft"
                 size="sm"
                 onClick={() => onDownload(viewingMarketingStrategyJob.id)}
                 className="flex items-center gap-1"
