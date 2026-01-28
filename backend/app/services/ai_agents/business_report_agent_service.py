@@ -13,7 +13,7 @@ from typing import Dict, Any, List
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
-from app.config import prompt_loader, tool_loader
+from app.config import prompt_loader, tool_loader, brand_context_loader
 from app.utils import claude_parsing_utils
 from app.services.data_services import message_service
 from app.services.studio_services import studio_index_service
@@ -81,6 +81,12 @@ class BusinessReportAgentService:
 
         messages = [{"role": "user", "content": user_message}]
 
+        # Load brand context if configured for business_report feature
+        brand_context = brand_context_loader.load_brand_context(project_id, "business_report")
+        system_prompt = config["system_prompt"]
+        if brand_context:
+            system_prompt = f"{system_prompt}\n\n{brand_context}"
+
         total_input_tokens = 0
         total_output_tokens = 0
         collected_charts = []
@@ -94,7 +100,7 @@ class BusinessReportAgentService:
 
             response = claude_service.send_message(
                 messages=messages,
-                system_prompt=config["system_prompt"],
+                system_prompt=system_prompt,
                 model=config["model"],
                 max_tokens=config["max_tokens"],
                 temperature=config["temperature"],
