@@ -1,25 +1,27 @@
--- NoobBook Single-User Migration
--- Run this in Supabase SQL Editor for single-user local deployment
--- Created: 2026-01-04
+-- NoobBook Database Initialization
+-- Run this SQL in Supabase SQL Editor for fresh setup
+-- Combines all migrations into a single file
 
 -- ============================================================================
 -- EXTENSIONS
 -- ============================================================================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "vector";
 
 -- ============================================================================
--- USERS TABLE (simplified for single-user)
+-- USERS TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT UNIQUE,
   memory JSONB DEFAULT '{}'::jsonb,
   settings JSONB DEFAULT '{}'::jsonb,
+  google_tokens JSONB DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create a default user for single-user mode
+-- Default user for single-user mode
 INSERT INTO users (id, email, memory, settings)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
@@ -115,7 +117,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
 
 -- ============================================================================
--- CHUNKS TABLE (for RAG)
+-- CHUNKS TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS chunks (
   id TEXT PRIMARY KEY,
@@ -169,6 +171,75 @@ CREATE TABLE IF NOT EXISTS studio_signals (
 CREATE INDEX IF NOT EXISTS idx_studio_signals_chat_id ON studio_signals(chat_id);
 
 -- ============================================================================
+-- BRAND ASSETS TABLE
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS brand_assets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  asset_type TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  mime_type TEXT,
+  file_size BIGINT,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  is_primary BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT valid_asset_type CHECK (asset_type IN ('logo', 'icon', 'font', 'image')),
+  CONSTRAINT name_not_empty CHECK (length(trim(name)) > 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_brand_assets_project_id ON brand_assets(project_id);
+CREATE INDEX IF NOT EXISTS idx_brand_assets_type ON brand_assets(asset_type);
+
+-- ============================================================================
+-- BRAND CONFIG TABLE
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS brand_config (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID UNIQUE NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  colors JSONB DEFAULT '{
+    "primary": "#000000",
+    "secondary": "#666666",
+    "accent": "#0066CC",
+    "background": "#FFFFFF",
+    "text": "#1A1A1A",
+    "custom": []
+  }'::jsonb,
+  typography JSONB DEFAULT '{
+    "heading_font": "Inter",
+    "body_font": "Inter",
+    "heading_sizes": {"h1": "2.5rem", "h2": "2rem", "h3": "1.5rem"},
+    "body_size": "1rem",
+    "line_height": "1.6"
+  }'::jsonb,
+  spacing JSONB DEFAULT '{
+    "base": "1rem",
+    "small": "0.5rem",
+    "large": "2rem",
+    "section": "4rem"
+  }'::jsonb,
+  guidelines TEXT,
+  best_practices JSONB DEFAULT '{"dos": [], "donts": []}'::jsonb,
+  voice JSONB DEFAULT '{"tone": "professional", "personality": [], "keywords": []}'::jsonb,
+  feature_settings JSONB DEFAULT '{
+    "infographic": true,
+    "presentation": true,
+    "mind_map": false,
+    "blog": true,
+    "email": true,
+    "ads_creative": true,
+    "social_post": true,
+    "prd": false,
+    "business_report": true
+  }'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================================
 -- UPDATED_AT TRIGGER FUNCTION
 -- ============================================================================
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -204,11 +275,17 @@ DROP TRIGGER IF EXISTS update_studio_signals_updated_at ON studio_signals;
 CREATE TRIGGER update_studio_signals_updated_at BEFORE UPDATE ON studio_signals
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_brand_assets_updated_at ON brand_assets;
+CREATE TRIGGER update_brand_assets_updated_at BEFORE UPDATE ON brand_assets
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_brand_config_updated_at ON brand_config;
+CREATE TRIGGER update_brand_config_updated_at BEFORE UPDATE ON brand_config
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- ============================================================================
 -- HELPER FUNCTIONS
 -- ============================================================================
-
--- Update project last_accessed
 CREATE OR REPLACE FUNCTION update_project_last_accessed(p_project_id UUID)
 RETURNS VOID AS $$
 BEGIN
@@ -216,7 +293,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Get project statistics
 CREATE OR REPLACE FUNCTION get_project_stats(p_project_id UUID)
 RETURNS JSON AS $$
 DECLARE
@@ -236,7 +312,89 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION is_google_connected(p_user_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM users
+    WHERE id = p_user_id
+    AND google_tokens IS NOT NULL
+    AND google_tokens->>'refresh_token' IS NOT NULL
+  );
+END;
+$$ LANGUAGE plpgsql;
+
 -- ============================================================================
--- DONE!
+-- STORAGE BUCKETS
 -- ============================================================================
--- Single-user migration complete. Default user ID: 00000000-0000-0000-0000-000000000001
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('raw-files', 'raw-files', false)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('processed-files', 'processed-files', false)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('chunks', 'chunks', false)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('studio-outputs', 'studio-outputs', false)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'brand-assets',
+  'brand-assets',
+  false,
+  52428800,
+  ARRAY[
+    'image/svg+xml',
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+    'image/x-icon',
+    'font/ttf',
+    'font/otf',
+    'font/woff',
+    'font/woff2',
+    'application/pdf'
+  ]
+) ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================================
+-- STORAGE POLICIES (Single-user mode - allow all)
+-- ============================================================================
+DO $$
+BEGIN
+  -- Raw files
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all on raw-files') THEN
+    CREATE POLICY "Allow all on raw-files" ON storage.objects FOR ALL
+    USING (bucket_id = 'raw-files') WITH CHECK (bucket_id = 'raw-files');
+  END IF;
+
+  -- Processed files
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all on processed-files') THEN
+    CREATE POLICY "Allow all on processed-files" ON storage.objects FOR ALL
+    USING (bucket_id = 'processed-files') WITH CHECK (bucket_id = 'processed-files');
+  END IF;
+
+  -- Chunks
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all on chunks') THEN
+    CREATE POLICY "Allow all on chunks" ON storage.objects FOR ALL
+    USING (bucket_id = 'chunks') WITH CHECK (bucket_id = 'chunks');
+  END IF;
+
+  -- Studio outputs
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all on studio-outputs') THEN
+    CREATE POLICY "Allow all on studio-outputs" ON storage.objects FOR ALL
+    USING (bucket_id = 'studio-outputs') WITH CHECK (bucket_id = 'studio-outputs');
+  END IF;
+
+  -- Brand assets
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all on brand-assets') THEN
+    CREATE POLICY "Allow all on brand-assets" ON storage.objects FOR ALL
+    USING (bucket_id = 'brand-assets') WITH CHECK (bucket_id = 'brand-assets');
+  END IF;
+END $$;
