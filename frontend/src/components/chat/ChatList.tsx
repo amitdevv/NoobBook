@@ -91,7 +91,7 @@ export const ChatList: React.FC<ChatListProps> = ({
 
       {/* New Chat Button - in controls section */}
       <div className="px-4 pt-4">
-        <Button onClick={onNewChat} variant="outline" className="w-full gap-2">
+        <Button onClick={onNewChat} variant="soft" className="w-full gap-2">
           <Plus size={16} />
           New Chat
         </Button>
@@ -182,7 +182,7 @@ export const ChatList: React.FC<ChatListProps> = ({
           />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+          <Button variant="soft" onClick={() => setRenameDialogOpen(false)}>
             Cancel
           </Button>
           <Button onClick={handleRenameSubmit} disabled={!renameValue.trim()}>

@@ -77,7 +77,7 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
             </div>
             {viewingBlogJob && (
               <Button
-                variant="outline"
+                variant="soft"
                 size="sm"
                 onClick={() => onDownload(viewingBlogJob.id)}
                 className="flex items-center gap-1 mr-4"

@@ -184,11 +184,30 @@ Focus Ring:  ring-2 ring-ring ring-offset-2 (amber-600)
 ```tsx
 Variants:
 - default:     bg-primary text-primary-foreground hover:bg-primary/90
+               → Primary CTA, solid amber background
+- soft:        bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8]
+               → Most common secondary action (cream bg, visible border)
+               → Use for: Choose Files, Memory, Brand Kit, Project Settings, etc.
+- brand:       border-2 border-primary bg-primary/5 text-primary hover:bg-primary/10
+               → Highlighted secondary (amber border, light amber bg)
 - destructive: bg-destructive text-destructive-foreground hover:bg-destructive/90
+               → Delete/danger actions
 - outline:     border border-input bg-background hover:bg-accent
+               → Subtle outline (use sparingly)
 - secondary:   bg-secondary text-secondary-foreground hover:bg-secondary/80
+               → Very subtle background
 - ghost:       hover:bg-accent hover:text-accent-foreground
+               → No background until hover
 - link:        text-primary underline-offset-4 hover:underline
+               → Text with underline
+
+When to use which:
+- default:  Primary page action (Create, Save, Submit)
+- soft:     Most buttons - visible, clickable, not overwhelming
+- brand:    Important but not primary (Upgrade, Try Feature)
+- outline:  Use sparingly - very subtle
+- ghost:    Icon-only buttons, menu items
+- link:     Inline text links
 
 Sizes:
 - default:     h-10 px-4 py-2

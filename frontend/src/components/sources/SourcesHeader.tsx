@@ -52,7 +52,7 @@ export const SourcesHeader: React.FC<SourcesHeaderProps> = ({
         <Button
           onClick={onAddClick}
           className="w-full gap-2"
-          variant="outline"
+          variant="soft"
           size="sm"
           disabled={isAtLimit}
         >

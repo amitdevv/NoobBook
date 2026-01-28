@@ -22,7 +22,7 @@ interface StudioSignalPickerProps {
   selectedSignals: StudioSignal[];
   onSelectSignal: (itemId: StudioItemId, signal: StudioSignal) => void;
   getItemTitle: (itemId: StudioItemId) => string;
-  getItemIcon: (itemId: StudioItemId) => React.ComponentType<any> | undefined;
+  getItemIcon: (itemId: StudioItemId) => React.ComponentType<{ size?: number; className?: string }> | undefined;
 }
 
 export const StudioSignalPicker: React.FC<StudioSignalPickerProps> = ({
@@ -55,7 +55,7 @@ export const StudioSignalPicker: React.FC<StudioSignalPickerProps> = ({
           {selectedSignals.map((signal) => (
             <Button
               key={signal.id}
-              variant="outline"
+              variant="soft"
               className="h-auto p-3 justify-start text-left flex flex-col items-start gap-1 w-full min-w-0"
               onClick={() => selectedItem && onSelectSignal(selectedItem, signal)}
             >

@@ -7,8 +7,26 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { Excalidraw, convertToExcalidrawElements } from '@excalidraw/excalidraw';
+import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import '@excalidraw/excalidraw/index.css';
 import type { ExcalidrawElement } from '@/lib/api/studio/wireframes';
+
+/**
+ * Skeleton element for convertToExcalidrawElements
+ * These are minimal element definitions that Excalidraw expands into full elements
+ */
+interface ElementSkeleton {
+  type: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  text?: string;
+  fontSize?: number;
+  strokeColor?: string;
+  backgroundColor?: string;
+  points?: number[][];
+}
 
 interface WireframeViewerProps {
   elements: ExcalidrawElement[];
@@ -18,15 +36,16 @@ interface WireframeViewerProps {
 export const WireframeViewer: React.FC<WireframeViewerProps> = ({
   elements,
 }) => {
-  const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
+  const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
 
   // Convert our skeleton elements to full Excalidraw elements once
   const excalidrawElements = useMemo(() => {
     console.log('[WireframeViewer] Input elements:', elements.length);
 
     // Create minimal skeleton elements - only what's needed
+    // Using 'as' assertion since convertToExcalidrawElements accepts flexible input
     const skeletons = elements.map((elem) => {
-      const base: any = {
+      const base: ElementSkeleton = {
         type: elem.type,
         x: elem.x ?? 0,
         y: elem.y ?? 0,
@@ -54,7 +73,9 @@ export const WireframeViewer: React.FC<WireframeViewerProps> = ({
     console.log('[WireframeViewer] First skeleton:', JSON.stringify(skeletons[0]));
 
     // Use Excalidraw's official conversion utility
-    const converted = convertToExcalidrawElements(skeletons);
+    // Cast to expected type - convertToExcalidrawElements accepts flexible skeleton input
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const converted = convertToExcalidrawElements(skeletons as any);
     console.log('[WireframeViewer] Converted elements:', converted.length);
     if (converted.length > 0) {
       console.log('[WireframeViewer] First converted:', JSON.stringify(converted[0]));

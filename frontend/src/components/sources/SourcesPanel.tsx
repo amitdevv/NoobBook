@@ -572,7 +572,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+            <Button variant="soft" onClick={() => setRenameDialogOpen(false)}>
               Cancel
             </Button>
             <Button onClick={handleRenameSubmit} disabled={!renameValue.trim()}>

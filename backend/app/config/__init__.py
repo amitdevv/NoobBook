@@ -7,6 +7,7 @@ configuration data for other services. They handle:
 - Prompt configurations (system prompts, model settings)
 - API tier settings (rate limits, worker counts)
 - Context building (sources, memory for chat prompts)
+- Brand context building (colors, typography, guidelines for studio prompts)
 
 These are NOT AI-powered services - they load configuration from files
 and environment variables.
@@ -16,10 +17,12 @@ Loaders:
 - prompt_loader: Load/save prompt configurations
 - tier_loader: API tier rate limit settings
 - context_loader: Build source and memory context for chat prompts
+- brand_context_loader: Build brand context for studio prompts
 """
 from app.config.tool_loader import tool_loader
 from app.config.prompt_loader import prompt_loader
 from app.config.context_loader import context_loader
+from app.config.brand_context_loader import brand_context_loader, load_brand_context
 from app.config.tier_loader import (
     get_tier,
     get_tier_config,
@@ -38,6 +41,8 @@ __all__ = [
     "tool_loader",
     "prompt_loader",
     "context_loader",
+    "brand_context_loader",
+    "load_brand_context",
     "get_tier",
     "get_tier_config",
     "get_all_tiers",

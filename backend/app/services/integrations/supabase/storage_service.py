@@ -21,6 +21,7 @@ BUCKET_RAW = "raw-files"
 BUCKET_PROCESSED = "processed-files"
 BUCKET_CHUNKS = "chunks"
 BUCKET_STUDIO = "studio-outputs"
+BUCKET_BRAND_ASSETS = "brand-assets"
 
 
 def _get_client():
@@ -715,3 +716,187 @@ def delete_source_files(project_id: str, source_id: str, filename: str) -> bool:
     results.append(delete_source_chunks(project_id, source_id))
 
     return all(results)
+
+
+# =============================================================================
+# BRAND ASSETS (Logos, icons, fonts, images for brand kit)
+# =============================================================================
+
+def _build_brand_path(project_id: str, asset_id: str, filename: str) -> str:
+    """
+    Build storage path for brand assets.
+    Pattern: {project_id}/brand/{asset_id}/{filename}
+    Example: abc123/brand/def456/logo.svg
+    """
+    return f"{project_id}/brand/{asset_id}/{filename}"
+
+
+def upload_brand_asset(
+    project_id: str,
+    asset_id: str,
+    filename: str,
+    file_data: bytes,
+    content_type: str = "application/octet-stream"
+) -> Optional[str]:
+    """
+    Upload a brand asset file to storage.
+
+    Args:
+        project_id: The project UUID
+        asset_id: The brand asset UUID
+        filename: Asset filename (e.g., logo.svg)
+        file_data: File bytes
+        content_type: MIME type
+
+    Returns:
+        Storage path if successful, None otherwise
+    """
+    client = _get_client()
+    path = _build_brand_path(project_id, asset_id, filename)
+
+    try:
+        client.storage.from_(BUCKET_BRAND_ASSETS).upload(
+            path=path,
+            file=file_data,
+            file_options={"content-type": content_type}
+        )
+        print(f"  Uploaded brand asset: {path}")
+        return path
+    except Exception as e:
+        # If file exists, try to update it
+        if "Duplicate" in str(e) or "already exists" in str(e).lower():
+            try:
+                client.storage.from_(BUCKET_BRAND_ASSETS).update(
+                    path=path,
+                    file=file_data,
+                    file_options={"content-type": content_type}
+                )
+                print(f"  Updated brand asset: {path}")
+                return path
+            except Exception as update_e:
+                print(f"  Error updating brand asset: {update_e}")
+                return None
+        print(f"  Error uploading brand asset: {e}")
+        return None
+
+
+def download_brand_asset(
+    project_id: str,
+    asset_id: str,
+    filename: str
+) -> Optional[bytes]:
+    """
+    Download a brand asset file from storage.
+
+    Args:
+        project_id: The project UUID
+        asset_id: The brand asset UUID
+        filename: Asset filename
+
+    Returns:
+        File bytes or None if not found
+    """
+    client = _get_client()
+    path = _build_brand_path(project_id, asset_id, filename)
+
+    try:
+        response = client.storage.from_(BUCKET_BRAND_ASSETS).download(path)
+        return response
+    except Exception as e:
+        print(f"  Error downloading brand asset: {e}")
+        return None
+
+
+def delete_brand_asset(
+    project_id: str,
+    asset_id: str,
+    filename: str
+) -> bool:
+    """
+    Delete a brand asset file from storage.
+
+    Args:
+        project_id: The project UUID
+        asset_id: The brand asset UUID
+        filename: Asset filename
+
+    Returns:
+        True if successful
+    """
+    client = _get_client()
+    path = _build_brand_path(project_id, asset_id, filename)
+
+    try:
+        client.storage.from_(BUCKET_BRAND_ASSETS).remove([path])
+        print(f"  Deleted brand asset: {path}")
+        return True
+    except Exception as e:
+        print(f"  Error deleting brand asset: {e}")
+        return False
+
+
+def get_brand_asset_url(
+    project_id: str,
+    asset_id: str,
+    filename: str,
+    expires_in: int = 3600
+) -> Optional[str]:
+    """
+    Get a signed URL for a brand asset (for private bucket access).
+
+    Args:
+        project_id: The project UUID
+        asset_id: The brand asset UUID
+        filename: Asset filename
+        expires_in: URL expiration time in seconds (default 1 hour)
+
+    Returns:
+        Signed URL or None
+    """
+    client = _get_client()
+    path = _build_brand_path(project_id, asset_id, filename)
+
+    try:
+        response = client.storage.from_(BUCKET_BRAND_ASSETS).create_signed_url(path, expires_in)
+        return response.get("signedURL")
+    except Exception as e:
+        print(f"  Error getting brand asset signed URL: {e}")
+        return None
+
+
+def delete_project_brand_assets(project_id: str) -> bool:
+    """
+    Delete all brand assets for a project.
+
+    Args:
+        project_id: The project UUID
+
+    Returns:
+        True if successful
+    """
+    client = _get_client()
+    prefix = f"{project_id}/brand"
+
+    try:
+        # List all files in the project's brand folder
+        files = client.storage.from_(BUCKET_BRAND_ASSETS).list(prefix)
+        if files:
+            # Need to handle nested folders (each asset has its own folder)
+            all_paths = []
+            for item in files:
+                if item.get("id"):  # It's a folder
+                    folder_name = item.get("name", "")
+                    folder_path = f"{prefix}/{folder_name}"
+                    folder_files = client.storage.from_(BUCKET_BRAND_ASSETS).list(folder_path)
+                    for f in folder_files:
+                        all_paths.append(f"{folder_path}/{f['name']}")
+                else:  # It's a file
+                    all_paths.append(f"{prefix}/{item['name']}")
+
+            if all_paths:
+                client.storage.from_(BUCKET_BRAND_ASSETS).remove(all_paths)
+                print(f"  Deleted {len(all_paths)} brand assets for project {project_id}")
+        return True
+    except Exception as e:
+        print(f"  Error deleting project brand assets: {e}")
+        return False

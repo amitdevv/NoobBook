@@ -18,6 +18,7 @@ export type { MemoryData, ModelCostBreakdown, CostTracking } from './projects';
 export * from './chats';
 export * from './settings';
 export * from './sources';
+export * from './brand';
 
 // Studio APIs are accessed via '@/lib/api/studio' for better organization
 // Example: import { audioAPI } from '@/lib/api/studio';

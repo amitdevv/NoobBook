@@ -27,7 +27,7 @@ export const StudioToolItem: React.FC<StudioToolItemProps> = ({
   
   return (
     <Button
-      variant="outline"
+      variant="soft"
       className={cn(
         'h-8 px-2 py-1 justify-start text-left relative text-xs',
         isActive

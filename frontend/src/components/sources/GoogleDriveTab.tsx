@@ -204,7 +204,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
           Add your Google Client ID and Client Secret in App Settings to enable Google Drive
           integration.
         </p>
-        <Button variant="outline" size="sm" className="bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8] active:bg-[#d0cfcc]">
+        <Button variant="soft" size="sm">
           <Gear size={16} className="mr-2" />
           Open Settings
         </Button>
@@ -221,7 +221,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
         <p className="text-sm text-muted-foreground mb-4 max-w-sm">
           Connect your Google account in App Settings to import files from Google Drive.
         </p>
-        <Button variant="outline" size="sm" className="bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8] active:bg-[#d0cfcc]">
+        <Button variant="soft" size="sm">
           <Gear size={16} className="mr-2" />
           Open Settings
         </Button>
@@ -234,7 +234,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
       {/* Header: Back button + Breadcrumb */}
       <div className="flex items-center gap-2">
         {folderStack.length > 1 && (
-          <Button variant="ghost" size="sm" onClick={handleBack} className="bg-[#e8e7e4] hover:bg-[#dcdbd8] active:bg-[#d0cfcc]">
+          <Button variant="soft" size="sm" onClick={handleBack}>
             <ArrowLeft size={16} />
           </Button>
         )}
@@ -288,9 +288,9 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
             {!searchQuery && nextPageToken && (
               <div className="p-3">
                 <Button
-                  variant="outline"
+                  variant="soft"
                   size="sm"
-                  className="w-full bg-[#e8e7e4] border-stone-300 hover:bg-[#dcdbd8] active:bg-[#d0cfcc]"
+                  className="w-full"
                   onClick={handleLoadMore}
                   disabled={loadingMore}
                 >

@@ -116,7 +116,7 @@ export const EmailViewerModal: React.FC<EmailViewerModalProps> = ({
               </Button>
               <Button
                 size="sm"
-                variant="outline"
+                variant="soft"
                 className="gap-1"
                 onClick={() => {
                   if (viewingEmailJob.html_url) {
