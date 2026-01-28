@@ -8,7 +8,7 @@ import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
 import { Badge } from '../../ui/badge';
-import { Plus, X, CircleNotch, Check } from '@phosphor-icons/react';
+import { Plus, X, CircleNotch, Check, PencilSimple, Trash } from '@phosphor-icons/react';
 import { brandAPI, type BrandVoice, type BestPractices } from '../../../lib/api/brand';
 
 interface GuidelinesSectionProps {
@@ -35,6 +35,12 @@ export const GuidelinesSection: React.FC<GuidelinesSectionProps> = ({ projectId 
   const [newKeyword, setNewKeyword] = useState('');
   const [newDo, setNewDo] = useState('');
   const [newDont, setNewDont] = useState('');
+
+  // Edit states
+  const [editingDoIndex, setEditingDoIndex] = useState<number | null>(null);
+  const [editingDontIndex, setEditingDontIndex] = useState<number | null>(null);
+  const [editDoValue, setEditDoValue] = useState('');
+  const [editDontValue, setEditDontValue] = useState('');
 
   const loadConfig = async () => {
     try {
@@ -138,6 +144,47 @@ export const GuidelinesSection: React.FC<GuidelinesSectionProps> = ({ projectId 
       ...prev,
       donts: prev.donts.filter((_, i) => i !== index),
     }));
+  };
+
+  // Edit functions
+  const startEditDo = (index: number) => {
+    setEditingDoIndex(index);
+    setEditDoValue(bestPractices.dos[index]);
+  };
+
+  const saveEditDo = () => {
+    if (editingDoIndex === null || !editDoValue.trim()) return;
+    setBestPractices((prev) => ({
+      ...prev,
+      dos: prev.dos.map((item, i) => (i === editingDoIndex ? editDoValue.trim() : item)),
+    }));
+    setEditingDoIndex(null);
+    setEditDoValue('');
+  };
+
+  const cancelEditDo = () => {
+    setEditingDoIndex(null);
+    setEditDoValue('');
+  };
+
+  const startEditDont = (index: number) => {
+    setEditingDontIndex(index);
+    setEditDontValue(bestPractices.donts[index]);
+  };
+
+  const saveEditDont = () => {
+    if (editingDontIndex === null || !editDontValue.trim()) return;
+    setBestPractices((prev) => ({
+      ...prev,
+      donts: prev.donts.map((item, i) => (i === editingDontIndex ? editDontValue.trim() : item)),
+    }));
+    setEditingDontIndex(null);
+    setEditDontValue('');
+  };
+
+  const cancelEditDont = () => {
+    setEditingDontIndex(null);
+    setEditDontValue('');
   };
 
   if (loading) {
@@ -279,15 +326,48 @@ export const GuidelinesSection: React.FC<GuidelinesSectionProps> = ({ projectId 
               {bestPractices.dos.map((item, index) => (
                 <li
                   key={index}
-                  className="flex items-start gap-2 text-sm bg-green-50 p-2 rounded"
+                  className="flex items-start gap-2 text-sm bg-green-50 dark:bg-green-950/30 p-3 rounded border border-green-200 dark:border-green-800"
                 >
-                  <span className="flex-1">{item}</span>
-                  <button
-                    onClick={() => removeDo(index)}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    <X size={14} />
-                  </button>
+                  {editingDoIndex === index ? (
+                    <div className="flex-1 flex gap-2">
+                      <Input
+                        value={editDoValue}
+                        onChange={(e) => setEditDoValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveEditDo();
+                          if (e.key === 'Escape') cancelEditDo();
+                        }}
+                        autoFocus
+                        className="h-8 text-sm"
+                      />
+                      <Button variant="soft" size="sm" onClick={saveEditDo} className="h-8 px-2">
+                        <Check size={14} />
+                      </Button>
+                      <Button variant="soft" size="sm" onClick={cancelEditDo} className="h-8 px-2">
+                        <X size={14} />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="flex-1">{item}</span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => startEditDo(index)}
+                          className="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-green-100 dark:hover:bg-green-900"
+                          title="Edit"
+                        >
+                          <PencilSimple size={14} />
+                        </button>
+                        <button
+                          onClick={() => removeDo(index)}
+                          className="p-1 text-muted-foreground hover:text-destructive rounded hover:bg-red-100 dark:hover:bg-red-900"
+                          title="Delete"
+                        >
+                          <Trash size={14} />
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
@@ -311,15 +391,48 @@ export const GuidelinesSection: React.FC<GuidelinesSectionProps> = ({ projectId 
               {bestPractices.donts.map((item, index) => (
                 <li
                   key={index}
-                  className="flex items-start gap-2 text-sm bg-red-50 p-2 rounded"
+                  className="flex items-start gap-2 text-sm bg-red-50 dark:bg-red-950/30 p-3 rounded border border-red-200 dark:border-red-800"
                 >
-                  <span className="flex-1">{item}</span>
-                  <button
-                    onClick={() => removeDont(index)}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    <X size={14} />
-                  </button>
+                  {editingDontIndex === index ? (
+                    <div className="flex-1 flex gap-2">
+                      <Input
+                        value={editDontValue}
+                        onChange={(e) => setEditDontValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveEditDont();
+                          if (e.key === 'Escape') cancelEditDont();
+                        }}
+                        autoFocus
+                        className="h-8 text-sm"
+                      />
+                      <Button variant="soft" size="sm" onClick={saveEditDont} className="h-8 px-2">
+                        <Check size={14} />
+                      </Button>
+                      <Button variant="soft" size="sm" onClick={cancelEditDont} className="h-8 px-2">
+                        <X size={14} />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="flex-1">{item}</span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => startEditDont(index)}
+                          className="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-red-100 dark:hover:bg-red-900"
+                          title="Edit"
+                        >
+                          <PencilSimple size={14} />
+                        </button>
+                        <button
+                          onClick={() => removeDont(index)}
+                          className="p-1 text-muted-foreground hover:text-destructive rounded hover:bg-red-100 dark:hover:bg-red-900"
+                          title="Delete"
+                        >
+                          <Trash size={14} />
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>

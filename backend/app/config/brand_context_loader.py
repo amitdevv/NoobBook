@@ -151,9 +151,15 @@ class BrandContextLoader:
         if typography.get("body_font"):
             lines.append(f"- **Body Font**: {typography['body_font']}")
 
+        if typography.get("heading_weight"):
+            lines.append(f"- **Heading Weight**: {typography['heading_weight']}")
+        if typography.get("body_weight"):
+            lines.append(f"- **Body Weight**: {typography['body_weight']}")
+
         heading_sizes = typography.get("heading_sizes", {})
         if heading_sizes:
-            lines.append(f"- **Heading Sizes**: H1={heading_sizes.get('h1', '2.5rem')}, H2={heading_sizes.get('h2', '2rem')}, H3={heading_sizes.get('h3', '1.5rem')}")
+            sizes = [f"H{i}={heading_sizes.get(f'h{i}', 'auto')}" for i in range(1, 7) if heading_sizes.get(f'h{i}')]
+            lines.append(f"- **Heading Sizes**: {', '.join(sizes)}")
 
         if typography.get("body_size"):
             lines.append(f"- **Body Size**: {typography['body_size']}")
