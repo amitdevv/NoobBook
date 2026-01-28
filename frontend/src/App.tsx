@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { Dashboard, CreateProjectDialog } from './components/dashboard';
 import { ProjectWorkspace } from './components/project';
 import { BrandPage } from './components/brand/BrandPage';
@@ -29,17 +29,18 @@ interface Project {
 interface AppContentProps {
   showCreateDialog: boolean;
   setShowCreateDialog: (show: boolean) => void;
-  selectedProject: Project | null;
-  setSelectedProject: (project: Project | null) => void;
   refreshTrigger: number;
   setRefreshTrigger: (fn: (prev: number) => number) => void;
 }
 
+/**
+ * AppContent Component
+ * Educational Note: Handles the Dashboard view only.
+ * Project workspace is now handled by /projects/:projectId route.
+ */
 function AppContent({
   showCreateDialog,
   setShowCreateDialog,
-  selectedProject,
-  setSelectedProject,
   refreshTrigger,
   setRefreshTrigger,
 }: AppContentProps) {
@@ -48,41 +49,14 @@ function AppContent({
   const handleProjectCreated = (project: Project) => {
     console.log('Project created/updated:', project);
     setShowCreateDialog(false);
-    // Trigger refresh of project list
     setRefreshTrigger(prev => prev + 1);
   };
 
   const handleSelectProject = (project: Project) => {
-    console.log('Project selected:', project);
-    setSelectedProject(project);
+    // Navigate to project URL - this updates the browser URL
+    // and triggers the ProjectWorkspaceRoute to load
+    navigate(`/projects/${project.id}`);
   };
-
-  const handleDeleteProject = async (projectId: string) => {
-    try {
-      await projectsAPI.delete(projectId);
-      console.log('Project deleted successfully');
-      setSelectedProject(null);
-      setRefreshTrigger(prev => prev + 1);
-    } catch (error) {
-      console.error('Failed to delete project:', error);
-    }
-  };
-
-  const handleNavigateToBrand = (projectId: string) => {
-    navigate(`/projects/${projectId}/brand`);
-  };
-
-  // If a project is selected, show the project workspace
-  if (selectedProject) {
-    return (
-      <ProjectWorkspace
-        project={selectedProject}
-        onBack={() => setSelectedProject(null)}
-        onDeleteProject={handleDeleteProject}
-        onNavigateToBrand={handleNavigateToBrand}
-      />
-    );
-  }
 
   return (
     <>
@@ -102,9 +76,80 @@ function AppContent({
   );
 }
 
+/**
+ * ProjectWorkspaceRoute Component
+ * Educational Note: Wrapper that loads project from URL param and renders workspace.
+ * This allows direct navigation to /projects/:projectId and proper URL-based routing.
+ */
+function ProjectWorkspaceRoute({
+  setRefreshTrigger,
+}: {
+  setRefreshTrigger: (fn: (prev: number) => number) => void;
+}) {
+  const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
+  const [project, setProject] = useState<Project | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadProject = async () => {
+      if (!projectId) {
+        navigate('/');
+        return;
+      }
+
+      try {
+        const response = await projectsAPI.get(projectId);
+        setProject(response.data.project);
+      } catch (error) {
+        console.error('Failed to load project:', error);
+        navigate('/');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProject();
+  }, [projectId, navigate]);
+
+  const handleDeleteProject = async (id: string) => {
+    try {
+      await projectsAPI.delete(id);
+      setRefreshTrigger(prev => prev + 1);
+      navigate('/');
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+    }
+  };
+
+  const handleNavigateToBrand = (id: string) => {
+    navigate(`/projects/${id}/brand`);
+  };
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (!project) {
+    return null;
+  }
+
+  return (
+    <ProjectWorkspace
+      project={project}
+      onBack={() => navigate('/')}
+      onDeleteProject={handleDeleteProject}
+      onNavigateToBrand={handleNavigateToBrand}
+    />
+  );
+}
+
 function App() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   return (
@@ -113,15 +158,23 @@ function App() {
         {/* Brand Kit Page - Full page for brand management */}
         <Route path="/projects/:projectId/brand" element={<BrandPage />} />
 
-        {/* Main App - Dashboard and Project Workspace */}
+        {/* Project Workspace - URL-based routing */}
+        <Route
+          path="/projects/:projectId"
+          element={
+            <ProjectWorkspaceRoute
+              setRefreshTrigger={setRefreshTrigger}
+            />
+          }
+        />
+
+        {/* Dashboard - Home/root route */}
         <Route
           path="*"
           element={
             <AppContent
               showCreateDialog={showCreateDialog}
               setShowCreateDialog={setShowCreateDialog}
-              selectedProject={selectedProject}
-              setSelectedProject={setSelectedProject}
               refreshTrigger={refreshTrigger}
               setRefreshTrigger={setRefreshTrigger}
             />

@@ -53,9 +53,9 @@ export const BrandPage: React.FC = () => {
   }, [projectId]);
 
   const handleBack = () => {
-    // Navigate back to project workspace
-    // For now, navigate to root since we'll set up routing
-    navigate(-1);
+    // Navigate back to project workspace with project ID in URL
+    // This ensures the project state is preserved
+    navigate(`/projects/${projectId}`);
   };
 
   if (loading) {
