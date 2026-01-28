@@ -11,13 +11,13 @@
 -- ADD GOOGLE TOKENS COLUMN TO USERS TABLE
 -- ============================================================================
 
--- Add google_tokens JSONB column to store OAuth credentials per user
+-- Add google_tokens JSONB column to store user-specific OAuth tokens
+-- Note: App credentials (client_id, client_secret) are NOT stored here
+-- They come from environment variables for security
 -- Structure: {
 --   "token": "access_token_here",
 --   "refresh_token": "refresh_token_here",
 --   "token_uri": "https://oauth2.googleapis.com/token",
---   "client_id": "client_id_here",
---   "client_secret": "client_secret_here",
 --   "scopes": ["https://www.googleapis.com/auth/drive.readonly"],
 --   "google_email": "user@gmail.com",
 --   "saved_at": "2026-01-28T12:00:00.000Z"

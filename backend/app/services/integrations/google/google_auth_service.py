@@ -329,12 +329,19 @@ class GoogleAuthService:
             if not token_data:
                 return None
 
+            # Get client_id and client_secret from env vars, not from DB
+            # Security: app credentials should never be stored in the database
+            client_config = self._get_client_config()
+            if not client_config:
+                return None
+            web_config = client_config['web']
+
             return Credentials(
                 token=token_data.get('token'),
                 refresh_token=token_data.get('refresh_token'),
-                token_uri=token_data.get('token_uri'),
-                client_id=token_data.get('client_id'),
-                client_secret=token_data.get('client_secret'),
+                token_uri=token_data.get('token_uri', 'https://oauth2.googleapis.com/token'),
+                client_id=web_config['client_id'],
+                client_secret=web_config['client_secret'],
                 scopes=token_data.get('scopes')
             )
         except Exception as e:
@@ -345,9 +352,9 @@ class GoogleAuthService:
         """
         Save credentials to Supabase for a user.
 
-        Educational Note: We save all credential components so we can
-        reconstruct the Credentials object later, including the refresh
-        token for getting new access tokens.
+        Educational Note: We only store user-specific tokens (access token,
+        refresh token, scopes). App credentials (client_id, client_secret)
+        are NOT stored in the database for security - they come from env vars.
 
         Args:
             credentials: The Credentials object to save
@@ -356,12 +363,12 @@ class GoogleAuthService:
         # Get user email for reference
         email = self._get_user_email(credentials)
 
+        # Only store user-specific tokens, NOT app credentials
+        # Security: client_id and client_secret should only live in env vars
         token_data = {
             'token': credentials.token,
             'refresh_token': credentials.refresh_token,
             'token_uri': credentials.token_uri,
-            'client_id': credentials.client_id,
-            'client_secret': credentials.client_secret,
             'scopes': credentials.scopes,
             'google_email': email,
             'saved_at': datetime.now().isoformat()
