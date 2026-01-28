@@ -100,8 +100,9 @@ Website: [noobbooklm.com](https://noobbooklm.com)
 - Studio content generation (audio, video, documents, design)
 
 ### Current Scope
-- JSON file storage (no database)
-- Single-user local deployment
+- Self-hosted Supabase (PostgreSQL + Storage + Auth)
+- Multi-user with team collaboration support
+- RLS policies for data isolation per user
 - API key management via UI
 
 ### Code Philosophy
