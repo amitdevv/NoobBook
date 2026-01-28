@@ -26,7 +26,16 @@ DEFAULT_COLORS = {
 DEFAULT_TYPOGRAPHY = {
     "heading_font": "Inter",
     "body_font": "Inter",
-    "heading_sizes": {"h1": "2.5rem", "h2": "2rem", "h3": "1.5rem"},
+    "heading_weight": "700",
+    "body_weight": "400",
+    "heading_sizes": {
+        "h1": "2.5rem",
+        "h2": "2rem",
+        "h3": "1.5rem",
+        "h4": "1.25rem",
+        "h5": "1.125rem",
+        "h6": "1rem"
+    },
     "body_size": "1rem",
     "line_height": "1.6"
 }

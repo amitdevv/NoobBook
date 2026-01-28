@@ -1,17 +1,36 @@
 /**
  * TypographySection Component
- * Educational Note: Manages brand typography configuration (fonts, sizes).
+ * Educational Note: Manages brand typography configuration (fonts, sizes, weights).
+ * Includes font picker dropdowns with popular fonts organized by category.
  */
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '../../ui/select';
 import { CircleNotch, Check } from '@phosphor-icons/react';
-import { brandAPI, type Typography, getDefaultTypography } from '../../../lib/api/brand';
+import {
+  brandAPI,
+  type Typography,
+  type FontWeight,
+  getDefaultTypography,
+  POPULAR_FONTS,
+  FONT_WEIGHTS,
+} from '../../../lib/api/brand';
 
 interface TypographySectionProps {
   projectId: string;
 }
+
+type HeadingLevel = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 
 export const TypographySection: React.FC<TypographySectionProps> = ({ projectId }) => {
   const [typography, setTypography] = useState<Typography>(getDefaultTypography());
@@ -24,7 +43,17 @@ export const TypographySection: React.FC<TypographySectionProps> = ({ projectId 
       setLoading(true);
       const response = await brandAPI.getConfig(projectId);
       if (response.data.success) {
-        setTypography(response.data.config.typography);
+        // Merge with defaults to handle missing h4, h5, h6 from older configs
+        const loadedTypography = response.data.config.typography;
+        const defaults = getDefaultTypography();
+        setTypography({
+          ...defaults,
+          ...loadedTypography,
+          heading_sizes: {
+            ...defaults.heading_sizes,
+            ...loadedTypography.heading_sizes,
+          },
+        });
       }
     } catch (error) {
       console.error('Failed to load typography:', error);
@@ -56,12 +85,21 @@ export const TypographySection: React.FC<TypographySectionProps> = ({ projectId 
     setTypography((prev) => ({ ...prev, [field]: value }));
   };
 
-  const updateHeadingSize = (level: 'h1' | 'h2' | 'h3', value: string) => {
+  const updateHeadingSize = (level: HeadingLevel, value: string) => {
     setTypography((prev) => ({
       ...prev,
       heading_sizes: { ...prev.heading_sizes, [level]: value },
     }));
   };
+
+  // Group fonts by category for the dropdown
+  const fontsByCategory = POPULAR_FONTS.reduce((acc, font) => {
+    if (!acc[font.category]) {
+      acc[font.category] = [];
+    }
+    acc[font.category].push(font.name);
+    return acc;
+  }, {} as Record<string, string[]>);
 
   if (loading) {
     return (
@@ -77,7 +115,7 @@ export const TypographySection: React.FC<TypographySectionProps> = ({ projectId 
         <div>
           <h2 className="text-xl font-semibold">Typography</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure fonts and text sizing for your brand.
+            Configure fonts, weights, and text sizing for your brand.
           </p>
         </div>
         <Button onClick={handleSave} disabled={saving} className="gap-2">
@@ -104,27 +142,114 @@ export const TypographySection: React.FC<TypographySectionProps> = ({ projectId 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="headingFont">Heading Font</Label>
-            <Input
-              id="headingFont"
+            <Select
               value={typography.heading_font}
-              onChange={(e) => updateField('heading_font', e.target.value)}
-              placeholder="Inter, sans-serif"
-            />
+              onValueChange={(value) => updateField('heading_font', value)}
+            >
+              <SelectTrigger id="headingFont">
+                <SelectValue placeholder="Select a font" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(fontsByCategory).map(([category, fonts]) => (
+                  <SelectGroup key={category}>
+                    <SelectLabel>{category}</SelectLabel>
+                    {fonts.map((font) => (
+                      <SelectItem key={font} value={font} style={{ fontFamily: font }}>
+                        {font}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
             <p className="text-xs text-muted-foreground">
-              Used for H1, H2, H3, and other headings
+              Used for H1-H6 headings
             </p>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="bodyFont">Body Font</Label>
-            <Input
-              id="bodyFont"
+            <Select
               value={typography.body_font}
-              onChange={(e) => updateField('body_font', e.target.value)}
-              placeholder="Inter, sans-serif"
-            />
+              onValueChange={(value) => updateField('body_font', value)}
+            >
+              <SelectTrigger id="bodyFont">
+                <SelectValue placeholder="Select a font" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(fontsByCategory).map(([category, fonts]) => (
+                  <SelectGroup key={category}>
+                    <SelectLabel>{category}</SelectLabel>
+                    {fonts.map((font) => (
+                      <SelectItem key={font} value={font} style={{ fontFamily: font }}>
+                        {font}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
             <p className="text-xs text-muted-foreground">
               Used for paragraphs and body text
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Font Weights */}
+      <div className="bg-card border rounded-lg p-6 space-y-6">
+        <h3 className="font-medium">Font Weights</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="headingWeight">Heading Weight</Label>
+            <Select
+              value={typography.heading_weight}
+              onValueChange={(value) => updateField('heading_weight', value as FontWeight)}
+            >
+              <SelectTrigger id="headingWeight">
+                <SelectValue placeholder="Select weight" />
+              </SelectTrigger>
+              <SelectContent>
+                {FONT_WEIGHTS.map((weight) => (
+                  <SelectItem
+                    key={weight.value}
+                    value={weight.value}
+                    style={{ fontWeight: weight.value }}
+                  >
+                    {weight.label} ({weight.value})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Weight applied to all headings
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="bodyWeight">Body Weight</Label>
+            <Select
+              value={typography.body_weight}
+              onValueChange={(value) => updateField('body_weight', value as FontWeight)}
+            >
+              <SelectTrigger id="bodyWeight">
+                <SelectValue placeholder="Select weight" />
+              </SelectTrigger>
+              <SelectContent>
+                {FONT_WEIGHTS.map((weight) => (
+                  <SelectItem
+                    key={weight.value}
+                    value={weight.value}
+                    style={{ fontWeight: weight.value }}
+                  >
+                    {weight.label} ({weight.value})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Weight applied to body text
             </p>
           </div>
         </div>
@@ -134,36 +259,18 @@ export const TypographySection: React.FC<TypographySectionProps> = ({ projectId 
       <div className="bg-card border rounded-lg p-6 space-y-6">
         <h3 className="font-medium">Heading Sizes</h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="h1Size">H1 Size</Label>
-            <Input
-              id="h1Size"
-              value={typography.heading_sizes.h1}
-              onChange={(e) => updateHeadingSize('h1', e.target.value)}
-              placeholder="2.5rem"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="h2Size">H2 Size</Label>
-            <Input
-              id="h2Size"
-              value={typography.heading_sizes.h2}
-              onChange={(e) => updateHeadingSize('h2', e.target.value)}
-              placeholder="2rem"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="h3Size">H3 Size</Label>
-            <Input
-              id="h3Size"
-              value={typography.heading_sizes.h3}
-              onChange={(e) => updateHeadingSize('h3', e.target.value)}
-              placeholder="1.5rem"
-            />
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as HeadingLevel[]).map((level) => (
+            <div key={level} className="space-y-2">
+              <Label htmlFor={`${level}Size`}>{level.toUpperCase()} Size</Label>
+              <Input
+                id={`${level}Size`}
+                value={typography.heading_sizes[level]}
+                onChange={(e) => updateHeadingSize(level, e.target.value)}
+                placeholder={level === 'h1' ? '2.5rem' : level === 'h2' ? '2rem' : '1.5rem'}
+              />
+            </div>
+          ))}
         </div>
       </div>
 
@@ -206,7 +313,7 @@ export const TypographySection: React.FC<TypographySectionProps> = ({ projectId 
             style={{
               fontFamily: typography.heading_font,
               fontSize: typography.heading_sizes.h1,
-              fontWeight: 'bold',
+              fontWeight: typography.heading_weight,
               lineHeight: '1.2',
             }}
           >
@@ -216,7 +323,7 @@ export const TypographySection: React.FC<TypographySectionProps> = ({ projectId 
             style={{
               fontFamily: typography.heading_font,
               fontSize: typography.heading_sizes.h2,
-              fontWeight: 'bold',
+              fontWeight: typography.heading_weight,
               lineHeight: '1.3',
             }}
           >
@@ -226,15 +333,46 @@ export const TypographySection: React.FC<TypographySectionProps> = ({ projectId 
             style={{
               fontFamily: typography.heading_font,
               fontSize: typography.heading_sizes.h3,
-              fontWeight: 'bold',
+              fontWeight: typography.heading_weight,
               lineHeight: '1.4',
             }}
           >
             Heading 3
           </h3>
+          <h4
+            style={{
+              fontFamily: typography.heading_font,
+              fontSize: typography.heading_sizes.h4,
+              fontWeight: typography.heading_weight,
+              lineHeight: '1.4',
+            }}
+          >
+            Heading 4
+          </h4>
+          <h5
+            style={{
+              fontFamily: typography.heading_font,
+              fontSize: typography.heading_sizes.h5,
+              fontWeight: typography.heading_weight,
+              lineHeight: '1.4',
+            }}
+          >
+            Heading 5
+          </h5>
+          <h6
+            style={{
+              fontFamily: typography.heading_font,
+              fontSize: typography.heading_sizes.h6,
+              fontWeight: typography.heading_weight,
+              lineHeight: '1.4',
+            }}
+          >
+            Heading 6
+          </h6>
           <p
             style={{
               fontSize: typography.body_size,
+              fontWeight: typography.body_weight,
               lineHeight: typography.line_height,
             }}
           >

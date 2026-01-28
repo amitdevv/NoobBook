@@ -57,20 +57,78 @@ export interface ColorPalette {
 }
 
 /**
+ * Font Weight Options
+ * Educational Note: Standard CSS font weight values.
+ */
+export type FontWeight = '300' | '400' | '500' | '600' | '700' | '800';
+
+/**
  * Typography Configuration
- * Educational Note: Defines font families and sizing for consistent text styling.
+ * Educational Note: Defines font families, weights, and sizing for consistent text styling.
  */
 export interface Typography {
   heading_font: string;
   body_font: string;
+  heading_weight: FontWeight;
+  body_weight: FontWeight;
   heading_sizes: {
     h1: string;
     h2: string;
     h3: string;
+    h4: string;
+    h5: string;
+    h6: string;
   };
   body_size: string;
   line_height: string;
 }
+
+/**
+ * Popular Font Options
+ * Educational Note: Curated list of web-safe and Google Fonts for brand typography.
+ */
+export const POPULAR_FONTS = [
+  // Sans-Serif (Modern, Clean)
+  { name: 'Inter', category: 'Sans-Serif' },
+  { name: 'Roboto', category: 'Sans-Serif' },
+  { name: 'Open Sans', category: 'Sans-Serif' },
+  { name: 'Lato', category: 'Sans-Serif' },
+  { name: 'Montserrat', category: 'Sans-Serif' },
+  { name: 'Poppins', category: 'Sans-Serif' },
+  { name: 'Nunito', category: 'Sans-Serif' },
+  { name: 'Work Sans', category: 'Sans-Serif' },
+  { name: 'DM Sans', category: 'Sans-Serif' },
+  { name: 'Plus Jakarta Sans', category: 'Sans-Serif' },
+  // Serif (Traditional, Elegant)
+  { name: 'Playfair Display', category: 'Serif' },
+  { name: 'Merriweather', category: 'Serif' },
+  { name: 'Lora', category: 'Serif' },
+  { name: 'Source Serif Pro', category: 'Serif' },
+  { name: 'PT Serif', category: 'Serif' },
+  { name: 'Libre Baskerville', category: 'Serif' },
+  // Display (Headlines, Impact)
+  { name: 'Oswald', category: 'Display' },
+  { name: 'Bebas Neue', category: 'Display' },
+  { name: 'Anton', category: 'Display' },
+  { name: 'Archivo Black', category: 'Display' },
+  // System Fonts
+  { name: 'system-ui', category: 'System' },
+  { name: 'Arial', category: 'System' },
+  { name: 'Helvetica', category: 'System' },
+  { name: 'Georgia', category: 'System' },
+] as const;
+
+/**
+ * Font Weight Options with Labels
+ */
+export const FONT_WEIGHTS = [
+  { value: '300', label: 'Light' },
+  { value: '400', label: 'Regular' },
+  { value: '500', label: 'Medium' },
+  { value: '600', label: 'Semibold' },
+  { value: '700', label: 'Bold' },
+  { value: '800', label: 'Extra Bold' },
+] as const;
 
 /**
  * Spacing Configuration
@@ -349,7 +407,16 @@ export function getDefaultTypography(): Typography {
   return {
     heading_font: 'Inter',
     body_font: 'Inter',
-    heading_sizes: { h1: '2.5rem', h2: '2rem', h3: '1.5rem' },
+    heading_weight: '700',
+    body_weight: '400',
+    heading_sizes: {
+      h1: '2.5rem',
+      h2: '2rem',
+      h3: '1.5rem',
+      h4: '1.25rem',
+      h5: '1.125rem',
+      h6: '1rem'
+    },
     body_size: '1rem',
     line_height: '1.6'
   };
