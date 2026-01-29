@@ -89,3 +89,15 @@
     -moz-osx-font-smoothing: grayscale;
   }
 }
+
+/* Smooth panel collapse/expand animation
+ * Targets react-resizable-panels flex properties.
+ * ease-out gives a natural deceleration — fast start, smooth stop. */
+[data-panel] {
+  transition: flex-basis 300ms ease-out, flex-grow 300ms ease-out, flex-shrink 300ms ease-out;
+}
+
+/* Disable transition during drag resize so manual resizing stays snappy */
+[data-panel-group]:has([data-resize-handle-state="drag"]) [data-panel] {
+  transition: none !important;
+}
