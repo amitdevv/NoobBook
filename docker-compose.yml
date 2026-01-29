@@ -49,11 +49,11 @@ services:
     entrypoint: >
       sh -c '
         echo "Waiting for Supabase database..."
-        until pg_isready -h supabase-db -p 5432 -U supabase_admin 2>/dev/null; do
+        until pg_isready -h supabase-db -p 5432 -U postgres 2>/dev/null; do
           sleep 2
         done
         echo "Running database migrations..."
-        PGPASSWORD=$${PGPASSWORD} psql -h supabase-db -p 5432 -U supabase_admin -d postgres -f /init.sql
+        PGPASSWORD=$${PGPASSWORD} psql -h supabase-db -p 5432 -U postgres -d postgres -f /init.sql
         echo "Migration complete."
       '
     networks:
