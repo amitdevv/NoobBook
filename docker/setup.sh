@@ -162,7 +162,16 @@ if [ ! -f "$NOOBBOOK_ENV" ]; then
         warn "Edit docker/.env and add your API keys before the app will work."
     fi
 else
-    info "NoobBook .env already exists, skipping..."
+    info "NoobBook .env already exists, ensuring Supabase keys are set..."
+    # shellcheck disable=SC1090
+    source "$SUPABASE_ENV"
+    # Always inject Supabase keys in case the file was created before secrets were generated
+    if grep -q '^SUPABASE_ANON_KEY=$' "$NOOBBOOK_ENV" 2>/dev/null; then
+        replace_env_var "$NOOBBOOK_ENV" "SUPABASE_ANON_KEY" "$ANON_KEY"
+        replace_env_var "$NOOBBOOK_ENV" "SUPABASE_SERVICE_KEY" "$SERVICE_ROLE_KEY"
+        replace_env_var "$NOOBBOOK_ENV" "POSTGRES_PASSWORD" "$POSTGRES_PASSWORD"
+        success "Supabase keys injected into existing .env"
+    fi
 fi
 
 # ---- Step 4: Create Docker network ----
