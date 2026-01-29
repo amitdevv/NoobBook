@@ -82,3 +82,7 @@ docker/supabase/volumes/db/data/
 docker/supabase/volumes/storage/
 docker/supabase/volumes/snippets/
 docker/supabase/volumes/functions/
+
+# Unignore vendored Supabase config files matched by "logs/" rule above
+!docker/supabase/volumes/logs/
+!docker/supabase/volumes/logs/vector.yml
