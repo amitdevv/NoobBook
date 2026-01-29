@@ -94,7 +94,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               collapsedSize={4}
               onCollapse={() => setLeftPanelOpen(false)}
               onExpand={() => setLeftPanelOpen(true)}
-              className="bg-card"
+              className="bg-card overflow-hidden"
             >
               <div className="h-full flex flex-col relative">
                 <SourcesPanel
@@ -143,7 +143,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               collapsedSize={4}
               onCollapse={() => setRightPanelOpen(false)}
               onExpand={() => setRightPanelOpen(true)}
-              className="bg-card"
+              className="bg-card overflow-hidden"
             >
               <div className="h-full flex flex-col relative">
                 <StudioPanel
