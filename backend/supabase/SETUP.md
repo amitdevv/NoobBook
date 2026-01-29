@@ -1,18 +1,108 @@
 # Supabase Self-Hosting Setup
 
-Guide to run NoobBook with a self-hosted Supabase instance on your own server (bare metal, VPS, or Docker host).
+Run NoobBook with a self-hosted Supabase instance using Docker.
 
 > **Note:** Supabase is required — the app will not start without it. There is no JSON file fallback.
 
-## Prerequisites
+## Quick Start (Docker)
+
+### Prerequisites
 
 - Docker and Docker Compose
 - Git
 - Minimum: 4 GB RAM, 2 CPU cores, 50 GB SSD (8 GB RAM recommended)
 
-## 1. Set Up Supabase
+### 3 Commands
 
-Clone the official repo and copy the Docker setup to a separate directory (keeps your config safe from repo updates):
+```bash
+# 1. Copy the env template and add your API keys
+cp docker/.env.example docker/.env
+nano docker/.env
+
+# 2. Run the setup script (generates secrets, starts everything)
+bash docker/setup.sh
+
+# 3. Open NoobBook
+open http://localhost
+```
+
+That's it. The setup script handles:
+- Generating all Supabase secrets (JWT, passwords, tokens)
+- Creating the Docker network
+- Starting Supabase (13 services)
+- Waiting for the API gateway to become healthy
+- Running database migrations (`init.sql`)
+- Building and starting NoobBook (backend + frontend)
+
+### What You Need in `docker/.env`
+
+Only the API keys — everything else is auto-generated:
+
+```bash
+# Required
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+PINECONE_API_KEY=...
+PINECONE_INDEX_NAME=...
+
+# Optional
+ELEVENLABS_API_KEY=...          # Audio features
+TAVILY_API_KEY=...              # Web search fallback
+GOOGLE_CLIENT_ID=...            # Google Drive import
+GOOGLE_CLIENT_SECRET=...
+```
+
+### Managing the Setup
+
+```bash
+bash docker/stop.sh             # Stop all services (data preserved)
+docker compose up -d             # Restart NoobBook only
+bash docker/setup.sh            # Re-run setup (idempotent, skips existing .env)
+bash docker/reset.sh            # Stop all services
+bash docker/reset.sh -v         # Stop + delete ALL data (destructive)
+```
+
+### Default Endpoints
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| NoobBook | `http://localhost` | Main application |
+| Backend API | `http://localhost:5001/api/v1` | Flask API (also proxied via nginx) |
+| Supabase API Gateway | `http://localhost:8000` | Kong gateway (internal) |
+
+### Architecture
+
+```
+Browser → nginx:80
+  ├── /            → static React build
+  ├── /api/*       → proxy to backend:5001
+  └── /socket.io/* → proxy to backend:5001 (WebSocket)
+
+backend:5001 → supabase-kong:8000 (Supabase API gateway)
+```
+
+All containers share the `noobbook-network` Docker network. The single nginx port eliminates CORS issues.
+
+### Data Persistence
+
+| Data | Location | Survives restart? |
+|------|----------|-------------------|
+| PostgreSQL | Supabase Docker volume | Yes |
+| Uploaded files | Supabase storage volume | Yes |
+| Prompt configs | `noobbook-backend-data` volume | Yes |
+| Generated secrets | `docker/.env`, `docker/supabase/.env` | Yes (on host) |
+
+Only `bash docker/reset.sh -v` destroys data.
+
+---
+
+## Manual Setup (Without the Script)
+
+If you prefer to set up each piece yourself, or need to connect to an existing Supabase instance.
+
+### 1. Set Up Supabase
+
+Clone the official repo and copy the Docker setup:
 
 ```bash
 git clone --depth 1 https://github.com/supabase/supabase
@@ -22,11 +112,11 @@ cp supabase/docker/.env.example supabase-project/.env
 cd supabase-project
 ```
 
-## 2. Configure Environment
+### 2. Configure Environment
 
 Edit the `.env` file in your `supabase-project` directory.
 
-### Required: Database & Auth Keys
+#### Database & Auth Keys
 
 ```bash
 POSTGRES_PASSWORD=your-super-secret-password          # Letters + numbers only (avoid special chars)
@@ -37,14 +127,9 @@ SERVICE_ROLE_KEY=your-generated-service-role-key       # JWT with service_role (
 
 Generate `ANON_KEY` and `SERVICE_ROLE_KEY` at: https://supabase.com/docs/guides/self-hosting#api-keys
 
-Or use the built-in script:
-```bash
-sh ./utils/generate-keys.sh
-```
+#### Service Secrets
 
-### Required: Service Secrets
-
-These are needed for Supabase internal services to start healthy:
+Required for Supabase internal services:
 
 ```bash
 SECRET_KEY_BASE=your-64-char-secret                   # Realtime & Supavisor
@@ -63,18 +148,14 @@ openssl rand -base64 24     # LOGFLARE_PUBLIC_ACCESS_TOKEN
 openssl rand -base64 24     # LOGFLARE_PRIVATE_ACCESS_TOKEN
 ```
 
-### Required: Dashboard Access
-
-Protects Supabase Studio UI with basic auth:
+#### Dashboard Access
 
 ```bash
 DASHBOARD_USERNAME=admin
-DASHBOARD_PASSWORD=your-dashboard-password            # Alphanumeric, min one letter
+DASHBOARD_PASSWORD=your-dashboard-password
 ```
 
-### Required for Remote Access (skip if localhost only)
-
-If running on a remote server (not localhost), set these so auth redirects and API calls work:
+#### Remote Access (skip if localhost only)
 
 ```bash
 SUPABASE_PUBLIC_URL=http://your-server-ip:8000
@@ -82,33 +163,18 @@ API_EXTERNAL_URL=http://your-server-ip:8000
 SITE_URL=http://your-server-ip:5173
 ```
 
-## 3. Start Supabase
+### 3. Start Supabase
 
 ```bash
 docker compose pull
 docker compose up -d
+docker compose ps    # Verify all services show Up (healthy)
 ```
 
-Verify all services are healthy:
-```bash
-docker compose ps
-```
-
-All services should show `Up (healthy)` within a minute.
-
-### Default Endpoints
-
-| Service | URL | Purpose |
-|---------|-----|---------|
-| API Gateway (Kong) | `http://localhost:8000` | REST API + Studio dashboard |
-| PostgreSQL | `localhost:5432` | Direct database access |
-
-> Studio dashboard is accessed through the API gateway at port 8000. Log in with the `DASHBOARD_USERNAME` and `DASHBOARD_PASSWORD` you set above.
-
-## 4. Run NoobBook Migrations
+### 4. Run NoobBook Migrations
 
 **Option A — Via Supabase Studio (recommended):**
-1. Open `http://localhost:8000` (or your server IP)
+1. Open `http://localhost:8000`
 2. Go to SQL Editor
 3. Paste the contents of `init.sql`
 4. Run the query
@@ -120,64 +186,51 @@ psql -h localhost -p 5432 -U postgres -d postgres -f init.sql
 
 This creates all tables, indexes, triggers, storage buckets, and the default single-user account.
 
-### About pgvector
+#### About pgvector
 
 `init.sql` includes `CREATE EXTENSION IF NOT EXISTS "vector"`. If your Supabase version doesn't support pgvector, comment out that line — the app works without it (semantic search falls back to keyword search).
 
-## 5. Configure NoobBook Backend
+### 5. Configure NoobBook Backend
 
 Add these to `backend/.env`:
 
 ```bash
-# Supabase (required)
 SUPABASE_URL=http://localhost:8000
-SUPABASE_SERVICE_KEY=your-service-role-key      # Same key from step 2
-SUPABASE_ANON_KEY=your-anon-key                 # Same key from step 2
+SUPABASE_SERVICE_KEY=your-service-role-key
+SUPABASE_ANON_KEY=your-anon-key
 ```
 
 If running on a remote server, replace `localhost` with your server IP/domain.
 
-> **Single-user mode:** The backend uses `SUPABASE_SERVICE_KEY` which bypasses Row Level Security. This is correct for single-user deployments. Multi-user support requires auth middleware (not yet implemented).
+> **Single-user mode:** The backend uses `SUPABASE_SERVICE_KEY` which bypasses Row Level Security. This is correct for single-user deployments.
 
-## 6. Verify Setup
+### 6. Start NoobBook
 
-```sql
--- Check tables exist
-SELECT table_name FROM information_schema.tables
-WHERE table_schema = 'public';
-
--- Check storage buckets created
-SELECT id, name FROM storage.buckets;
-
--- Check default user exists
-SELECT id, email FROM users;
--- Expected: 00000000-0000-0000-0000-000000000001 | local@noobbook.local
-```
-
-Then start NoobBook:
 ```bash
 bin/dev
 ```
 
 The backend should print `✓ Supabase client initialized (service key): http://localhost:8000` on startup.
 
-## 7. Google Drive (Optional)
+---
 
-If you want Google Drive import, note that OAuth callback URLs are currently hardcoded to `localhost:5001` (backend) and `localhost:5173` (frontend). Register this in Google Cloud Console:
+## Google Drive (Optional)
+
+OAuth callback URLs are currently hardcoded to `localhost:5001` (backend) and `localhost:5173` (frontend). Register in Google Cloud Console:
 
 ```
 Redirect URI: http://localhost:5001/api/v1/google/callback
 ```
 
-For remote servers, these URLs in the code would need to be updated to match your server address.
+For remote servers, update the URLs in the code to match your server address.
 
 ## Deploying with Coolify
 
 Coolify doesn't have a one-click Supabase template. Deploy as a custom Docker Compose service:
 
 1. Create a new service in Coolify and choose "Docker Compose"
-2. Point it to the Supabase `docker-compose.yml` from step 1
-3. Add all environment variables from step 2 in Coolify's service settings
+2. Point it to the Supabase `docker-compose.yml`
+3. Add all environment variables in Coolify's service settings
 4. Deploy NoobBook as a separate service, with `SUPABASE_URL` pointing to the Supabase service's internal URL
 
 ## File Structure
@@ -236,7 +289,7 @@ docker compose logs <service-name>   # Check specific service logs
 docker compose logs analytics        # Logflare often fails first if tokens missing
 ```
 
-Most startup failures are due to missing secrets from step 2. All five service secrets are required.
+Most startup failures are due to missing secrets. All five service secrets are required.
 
 ### pgvector extension not available
 
@@ -248,7 +301,6 @@ Most startup failures are due to missing secrets from step 2. All five service s
 ### Storage policies conflict
 
 ```sql
--- Drop existing policies first, then re-run init.sql
 DROP POLICY IF EXISTS "Allow all on raw-files" ON storage.objects;
 DROP POLICY IF EXISTS "Allow all on processed-files" ON storage.objects;
 DROP POLICY IF EXISTS "Allow all on chunks" ON storage.objects;
@@ -259,24 +311,27 @@ DROP POLICY IF EXISTS "Allow all on brand-assets" ON storage.objects;
 ### Connection refused
 
 ```bash
-docker compose ps                    # Are containers running?
-docker compose down && docker compose up -d   # Restart everything
+docker compose ps                                    # Are containers running?
+docker compose down && docker compose up -d          # Restart everything
 ```
 
 ### Backend says "Supabase is not configured"
 
-Check `backend/.env` has all three variables set:
+Check `backend/.env` (manual setup) or `docker/.env` (Docker setup) has:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_KEY`
 - `SUPABASE_ANON_KEY`
 
-At minimum, `SUPABASE_URL` and one of the keys must be present.
-
 ## Stopping / Removing
 
 ```bash
-docker compose down          # Stop services (data preserved)
-docker compose down -v       # Stop + delete volumes (destroys data)
-rm -rf volumes/db/data       # Delete PostgreSQL data
-rm -rf volumes/storage       # Delete stored files
+# Docker setup
+bash docker/stop.sh              # Stop all services (data preserved)
+bash docker/reset.sh -v          # Stop + delete ALL data
+
+# Manual setup
+docker compose down              # Stop services (data preserved)
+docker compose down -v           # Stop + delete volumes (destroys data)
+rm -rf volumes/db/data           # Delete PostgreSQL data
+rm -rf volumes/storage           # Delete stored files
 ```

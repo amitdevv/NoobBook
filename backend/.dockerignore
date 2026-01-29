@@ -1,0 +1,14 @@
+venv/
+myvenv/
+__pycache__/
+*.pyc
+.env
+data/projects/
+data/tasks/
+data/temp/
+data/user_memory.json
+tests/
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
