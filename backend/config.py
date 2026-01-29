@@ -51,10 +51,19 @@ class Config:
         cls.PROJECTS_DIR.mkdir(exist_ok=True)
         cls.TEMP_DIR.mkdir(exist_ok=True)
 
+        # Merge ALLOWED_ORIGINS env var into CORS origins (works in all environments)
+        extra = os.getenv('ALLOWED_ORIGINS', '').strip()
+        if extra:
+            origins = list(app.config.get('CORS_ALLOWED_ORIGINS', []))
+            origins.extend([o.strip() for o in extra.split(',') if o.strip()])
+            # Deduplicate while preserving order
+            app.config['CORS_ALLOWED_ORIGINS'] = list(dict.fromkeys(origins))
+
         # Log the configuration being used
         print(f"{cls.APP_NAME} v{cls.VERSION} initialized")
         print(f"Data directory: {cls.DATA_DIR}")
         print(f"Debug mode: {cls.DEBUG}")
+        print(f"CORS origins: {app.config['CORS_ALLOWED_ORIGINS']}")
 
 
 class DevelopmentConfig(Config):
