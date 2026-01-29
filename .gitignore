@@ -74,3 +74,11 @@ build/
 
 # Personal sync notes
 gitsync.md
+
+# Docker (generated env files and Supabase data volumes)
+docker/.env
+docker/supabase/.env
+docker/supabase/volumes/db/data/
+docker/supabase/volumes/storage/
+docker/supabase/volumes/snippets/
+docker/supabase/volumes/functions/

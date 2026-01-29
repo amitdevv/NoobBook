@@ -7,11 +7,15 @@
 
 import axios from 'axios';
 
-// Base host URL (without /api/v1 path) - used for file URLs, static assets
-export const API_HOST = import.meta.env.VITE_API_HOST || 'http://localhost:5001';
+// Base host URL (without /api/v1 path) - used for file URLs, static assets.
+// When VITE_API_HOST is set to "" (Docker via nginx proxy), same-origin requests
+// are used. When unset (local dev), falls back to localhost:5001.
+const envHost = import.meta.env.VITE_API_HOST;
+export const API_HOST = envHost !== undefined ? envHost : 'http://localhost:5001';
 
 // Full API URL (with /api/v1 path) - used for API requests
-const API_BASE_URL = import.meta.env.VITE_API_URL || `${API_HOST}/api/v1`;
+const envApiUrl = import.meta.env.VITE_API_URL;
+const API_BASE_URL = envApiUrl !== undefined ? envApiUrl : `${API_HOST}/api/v1`;
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
