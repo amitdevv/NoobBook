@@ -12,6 +12,7 @@ Images are returned as bytes for direct upload to Supabase Storage.
 import os
 import io
 import tempfile
+from pathlib import Path
 from typing import Dict, Any, List
 from datetime import datetime
 
