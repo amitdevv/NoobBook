@@ -167,15 +167,11 @@ class SocialPostsService:
                 )
 
                 if storage_path:
-                    # Get public URL
-                    public_url = storage_service.get_studio_public_url(
-                        project_id=project_id,
-                        job_type="social_posts",
-                        job_id=job_id,
-                        filename=filename
-                    )
+                    # Use backend API path instead of Supabase internal URL
+                    # (Supabase runs on Docker-internal hostname, not accessible from browser)
+                    api_path = f"/api/v1/projects/{project_id}/studio/social/{job_id}/{filename}"
                     post_info["image"] = {"filename": filename}
-                    post_info["image_url"] = public_url
+                    post_info["image_url"] = api_path
                     post_info["storage_path"] = storage_path
                     print(f"    Uploaded: {filename}")
 

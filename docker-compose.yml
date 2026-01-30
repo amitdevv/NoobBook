@@ -19,6 +19,7 @@ services:
       - ALLOWED_ORIGINS=http://localhost
     volumes:
       - backend-data:/app/data
+      - ./docker/.env:/app/.env
     networks:
       - noobbook-network
     depends_on:

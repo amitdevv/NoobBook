@@ -1,9 +1,9 @@
 """
-Studio Index Service - Core index management for studio generation jobs.
+Studio Index Service - Core CRUD for studio generation jobs via Supabase.
 
-Educational Note: This service manages a studio_index.json file that tracks
-all studio content generation jobs. Similar to sources_index.json but for
-generated content.
+Educational Note: This service manages studio content generation jobs
+(audio, video, presentations, etc.) in a Supabase `studio_jobs` table,
+replacing the previous local studio_index.json file approach.
 
 Job Status Flow:
     pending -> processing -> ready
@@ -12,9 +12,9 @@ Job Status Flow:
 The frontend polls the status endpoint to know when content is ready.
 
 Architecture:
-    This file contains ONLY the core index management functions (load/save).
-    Individual job type management (create, update, get, list, delete) is
-    organized into separate modules in the jobs/ subfolder:
+    This file provides generic CRUD (create_job, update_job, get_job,
+    list_jobs, delete_job) that all 18 job modules delegate to.
+    Each job module defines its own JOB_TYPE and default fields.
 
     jobs/
     ├── audio_jobs.py
@@ -33,95 +33,233 @@ Architecture:
     ├── presentation_jobs.py
     ├── prd_jobs.py
     ├── marketing_strategy_jobs.py
+    ├── blog_jobs.py
     └── business_report_jobs.py
 """
-import json
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, List, Any, Optional
 
-from app.utils.path_utils import get_studio_dir
+from app.services.integrations.supabase import get_supabase, is_supabase_enabled
 
 
-# =============================================================================
-# Core Index Management Functions
-# =============================================================================
-
-def _get_index_path(project_id: str) -> Path:
-    """Get the studio index file path for a project."""
-    return get_studio_dir(project_id) / "studio_index.json"
+# Top-level columns in the studio_jobs table (everything else goes into job_data JSONB)
+_TOP_COLUMNS = {
+    "status", "progress", "error_message", "started_at", "completed_at",
+    "source_name", "direction", "source_id",
+}
 
 
-def load_index(project_id: str) -> Dict[str, Any]:
+def _get_client():
+    """Get Supabase client, raising error if not configured."""
+    if not is_supabase_enabled():
+        raise RuntimeError("Supabase is not configured.")
+    return get_supabase()
+
+
+def _map_job(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
-    Load the studio index for a project.
+    Flatten a Supabase row back to the dict format job modules expect.
 
-    Returns empty structure if index doesn't exist.
-    Handles migration for existing indexes missing new job types.
+    Educational Note: The studio_jobs table stores type-specific fields in a
+    JSONB column (job_data). This function merges those back into the top-level
+    dict so callers see the same flat structure they had with the old JSON files.
     """
-    index_path = _get_index_path(project_id)
+    if not row:
+        return None
+    result = {**row}
+    job_data = result.pop("job_data", {}) or {}
+    result.update(job_data)
+    # Rename error_message -> error for backwards compat with modules that use "error"
+    if "error_message" in result and "error" not in result:
+        result["error"] = result.pop("error_message")
+    return result
 
-    default_index = {
-        "audio_jobs": [],
-        "ad_jobs": [],
-        "flash_card_jobs": [],
-        "mind_map_jobs": [],
-        "quiz_jobs": [],
-        "social_post_jobs": [],
-        "infographic_jobs": [],
-        "email_jobs": [],
-        "website_jobs": [],
-        "component_jobs": [],
-        "video_jobs": [],
-        "flow_diagram_jobs": [],
-        "wireframe_jobs": [],
-        "presentation_jobs": [],
-        "prd_jobs": [],
-        "marketing_strategy_jobs": [],
-        "blog_jobs": [],
-        "business_report_jobs": [],
-        "last_updated": datetime.now().isoformat()
+
+def create_job(
+    project_id: str,
+    job_type: str,
+    job_data: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """
+    Insert a new studio job into Supabase.
+
+    Args:
+        project_id: The project UUID
+        job_type: Job type string (e.g., 'audio', 'video')
+        job_data: All job fields — top-level columns are extracted,
+                  everything else goes into the JSONB job_data column
+
+    Returns:
+        The created job record (flattened) or None on failure
+    """
+    client = _get_client()
+
+    # Extract top-level columns from job_data
+    row = {
+        "project_id": project_id,
+        "job_type": job_type,
+        "id": job_data.pop("id"),
+        "source_id": job_data.pop("source_id", None),
+        "source_name": job_data.pop("source_name", None),
+        "direction": job_data.pop("direction", None),
+        "status": job_data.pop("status", "pending"),
+        "progress": job_data.pop("progress", None),
+        "error_message": job_data.pop("error", job_data.pop("error_message", None)),
+        "started_at": job_data.pop("started_at", None),
+        "completed_at": job_data.pop("completed_at", None),
     }
 
-    if not index_path.exists():
-        return default_index
+    # Remove fields the DB manages automatically
+    job_data.pop("created_at", None)
+    job_data.pop("updated_at", None)
 
-    try:
-        with open(index_path, 'r') as f:
-            data = json.load(f)
+    # Everything remaining goes into job_data JSONB
+    row["job_data"] = job_data
 
-            # Ensure all job arrays exist (migration for existing indexes)
-            needs_save = False
-            job_types = [
-                "audio_jobs", "ad_jobs", "flash_card_jobs", "mind_map_jobs",
-                "quiz_jobs", "social_post_jobs", "infographic_jobs", "email_jobs",
-                "website_jobs", "component_jobs", "video_jobs", "flow_diagram_jobs",
-                "wireframe_jobs", "presentation_jobs", "prd_jobs", "marketing_strategy_jobs",
-                "blog_jobs", "business_report_jobs"
-            ]
-
-            for job_type in job_types:
-                if job_type not in data:
-                    data[job_type] = []
-                    needs_save = True
-
-            # Persist the migration if we added missing keys
-            if needs_save:
-                save_index(project_id, data)
-
-            return data
-    except (json.JSONDecodeError, FileNotFoundError):
-        return default_index
+    response = client.table("studio_jobs").insert(row).execute()
+    return _map_job(response.data[0]) if response.data else None
 
 
-def save_index(project_id: str, index_data: Dict[str, Any]) -> None:
-    """Save the studio index for a project."""
-    index_path = _get_index_path(project_id)
-    index_path.parent.mkdir(parents=True, exist_ok=True)
+def update_job(
+    project_id: str,
+    job_id: str,
+    **updates
+) -> Optional[Dict[str, Any]]:
+    """
+    Update a studio job.
 
-    index_data["last_updated"] = datetime.now().isoformat()
-    with open(index_path, 'w') as f:
-        json.dump(index_data, f, indent=2)
+    Args:
+        project_id: The project UUID
+        job_id: The job UUID
+        **updates: Fields to update — top-level columns update directly,
+                   other fields merge into job_data JSONB
+
+    Returns:
+        Updated job record (flattened) or None if not found
+    """
+    client = _get_client()
+
+    # Separate top-level columns from job_data fields
+    top_level = {}
+    job_data_updates = {}
+
+    for k, v in updates.items():
+        if v is not None:
+            if k == "error":
+                # Map "error" back to "error_message" column
+                top_level["error_message"] = v
+            elif k in _TOP_COLUMNS:
+                top_level[k] = v
+            else:
+                job_data_updates[k] = v
+
+    # Merge job_data updates via fetch-merge-update
+    if job_data_updates:
+        current = get_job(project_id, job_id)
+        if not current:
+            return None
+        # Rebuild current job_data (fields not in top-level columns)
+        current_job_data = {}
+        for k, v in current.items():
+            if k not in _TOP_COLUMNS and k not in {
+                "id", "project_id", "job_type", "created_at",
+                "updated_at", "error", "error_message", "job_data",
+            }:
+                current_job_data[k] = v
+        merged = {**current_job_data, **job_data_updates}
+        top_level["job_data"] = merged
+
+    if not top_level:
+        return get_job(project_id, job_id)
+
+    response = (
+        client.table("studio_jobs")
+        .update(top_level)
+        .eq("id", job_id)
+        .eq("project_id", project_id)
+        .execute()
+    )
+    return _map_job(response.data[0]) if response.data else None
+
+
+def get_job(
+    project_id: str,
+    job_id: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Get a single studio job.
+
+    Args:
+        project_id: The project UUID
+        job_id: The job UUID
+
+    Returns:
+        Job record (flattened) or None if not found
+    """
+    client = _get_client()
+    response = (
+        client.table("studio_jobs")
+        .select("*")
+        .eq("id", job_id)
+        .eq("project_id", project_id)
+        .execute()
+    )
+    return _map_job(response.data[0]) if response.data else None
+
+
+def list_jobs(
+    project_id: str,
+    job_type: str,
+    source_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    List studio jobs by type, optionally filtered by source.
+
+    Args:
+        project_id: The project UUID
+        job_type: Job type string
+        source_id: Optional source UUID to filter by
+
+    Returns:
+        List of job records (flattened), newest first
+    """
+    client = _get_client()
+    query = (
+        client.table("studio_jobs")
+        .select("*")
+        .eq("project_id", project_id)
+        .eq("job_type", job_type)
+        .order("created_at", desc=True)
+    )
+    if source_id:
+        query = query.eq("source_id", source_id)
+
+    response = query.execute()
+    return [_map_job(row) for row in (response.data or [])]
+
+
+def delete_job(
+    project_id: str,
+    job_id: str
+) -> bool:
+    """
+    Delete a studio job.
+
+    Args:
+        project_id: The project UUID
+        job_id: The job UUID
+
+    Returns:
+        True if a row was deleted
+    """
+    client = _get_client()
+    response = (
+        client.table("studio_jobs")
+        .delete()
+        .eq("id", job_id)
+        .eq("project_id", project_id)
+        .execute()
+    )
+    return bool(response.data)
 
 
 # =============================================================================

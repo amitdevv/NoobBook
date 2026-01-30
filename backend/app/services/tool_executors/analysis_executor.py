@@ -11,13 +11,15 @@ The AI agent writes pandas code based on user questions,
 making it flexible for any analysis task.
 """
 
+import io
 import uuid
 from typing import Dict, Any, Tuple
 
 import pandas as pd
 import numpy as np
 
-from app.utils.path_utils import get_raw_dir, get_ai_images_dir
+from app.utils.path_utils import get_raw_dir
+from app.services.integrations.supabase import storage_service
 
 
 class AnalysisExecutor:
@@ -119,39 +121,48 @@ class AnalysisExecutor:
             # Load the DataFrame
             df = self._load_dataframe(project_id, source_id)
 
-            # Setup images directory
-            images_dir = get_ai_images_dir(project_id)
-
             def custom_savefig(*args, **kwargs):
                 """
-                Intercept savefig to save plots to ai_outputs/images folder.
+                Intercept savefig to upload plots to Supabase Storage.
 
                 Educational Note: We ALWAYS use auto-generated unique names to avoid
                 conflicts and caching issues. Whatever filename Claude passes is ignored.
+                Plots are rendered to an in-memory buffer and uploaded to Supabase
+                Storage (studio-outputs bucket) instead of local disk.
                 """
                 # Always use auto-generated unique name (full UUID for uniqueness)
                 plot_id = str(uuid.uuid4())
                 plot_filename = f"{source_id}_plot_{plot_id}.png"
-                plot_path = images_dir / plot_filename
 
                 kwargs.setdefault('dpi', 150)
                 kwargs.setdefault('bbox_inches', 'tight')
+                kwargs.setdefault('format', 'png')
 
                 try:
+                    buf = io.BytesIO()
                     # Determine if called as fig.savefig(filename) or plt.savefig(filename)
                     if args and isinstance(args[0], Figure):
                         # Called as fig.savefig() - first arg is figure instance
-                        original_fig_savefig(args[0], plot_path, **kwargs)
+                        original_fig_savefig(args[0], buf, **kwargs)
                     else:
                         # Called as plt.savefig() - ignore any filename arg
-                        original_plt_savefig(plot_path, **kwargs)
+                        original_plt_savefig(buf, **kwargs)
 
-                    # Verify file actually exists before claiming success
-                    if plot_path.exists() and plot_path.stat().st_size > 0:
-                        saved_plots.append(plot_filename)
-                        print(f"  Plot saved: {plot_filename}")
+                    buf.seek(0)
+                    image_data = buf.read()
+
+                    if image_data:
+                        # Upload to Supabase Storage
+                        result = storage_service.upload_ai_image(
+                            project_id, plot_filename, image_data
+                        )
+                        if result:
+                            saved_plots.append(plot_filename)
+                            print(f"  Plot uploaded: {plot_filename}")
+                        else:
+                            print(f"  ERROR: Plot upload failed: {plot_filename}")
                     else:
-                        print(f"  ERROR: Plot failed to save: {plot_filename}")
+                        print(f"  ERROR: Plot rendered empty: {plot_filename}")
 
                 except Exception as save_error:
                     print(f"  ERROR saving plot: {save_error}")

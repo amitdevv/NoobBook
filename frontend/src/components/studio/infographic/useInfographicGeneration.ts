@@ -4,7 +4,7 @@
  * Handles state management, API calls, and polling.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { infographicsAPI, checkGeminiStatus, type InfographicJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
@@ -17,6 +17,8 @@ export const useInfographicGeneration = (projectId: string) => {
   const [currentInfographicJob, setCurrentInfographicJob] = useState<InfographicJob | null>(null);
   const [isGeneratingInfographic, setIsGeneratingInfographic] = useState(false);
   const [viewingInfographicJob, setViewingInfographicJob] = useState<InfographicJob | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Load saved infographic jobs from backend
@@ -49,7 +51,9 @@ export const useInfographicGeneration = (projectId: string) => {
     try {
       const geminiStatus = await checkGeminiStatus();
       if (!geminiStatus.configured) {
-        showError('Gemini API key not configured. Please add it in App Settings.');
+        if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
+        setConfigError('Add your Gemini API key in App Settings to generate infographics with images.');
+        configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         setIsGeneratingInfographic(false);
         return;
       }
@@ -98,6 +102,7 @@ export const useInfographicGeneration = (projectId: string) => {
     isGeneratingInfographic,
     viewingInfographicJob,
     setViewingInfographicJob,
+    configError,
     loadSavedJobs,
     handleInfographicGeneration,
   };

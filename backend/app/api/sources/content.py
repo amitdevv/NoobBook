@@ -46,10 +46,9 @@ Routes:
 - GET /projects/<id>/ai-images/<filename> - Serve AI image
 - GET /projects/<id>/sources/<source_id>/processed - Get processed text content
 """
-from flask import jsonify, current_app, send_file
+from flask import jsonify, current_app, Response
 from app.api.sources import sources_bp
 from app.utils.citation_utils import get_chunk_content
-from app.utils.path_utils import get_ai_images_dir
 from app.services.source_services import source_service
 from app.services.integrations.supabase import storage_service
 
@@ -144,10 +143,10 @@ def get_ai_image(project_id: str, filename: str):
         - 404 if image not found
     """
     try:
-        images_dir = get_ai_images_dir(project_id)
-        image_path = images_dir / filename
+        # Download image from Supabase Storage
+        image_data = storage_service.download_ai_image(project_id, filename)
 
-        if not image_path.exists():
+        if not image_data:
             return jsonify({
                 'success': False,
                 'error': f'Image not found: {filename}'
@@ -165,10 +164,7 @@ def get_ai_image(project_id: str, filename: str):
         }
         mime_type = mime_types.get(extension, 'image/png')
 
-        return send_file(
-            image_path,
-            mimetype=mime_type
-        )
+        return Response(image_data, mimetype=mime_type)
 
     except Exception as e:
         current_app.logger.error(f"Error serving AI image: {e}")

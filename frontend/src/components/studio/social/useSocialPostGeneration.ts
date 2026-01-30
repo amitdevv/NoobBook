@@ -4,7 +4,7 @@
  * Handles state management, API calls, and polling.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { socialPostsAPI, checkGeminiStatus, type SocialPostJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
@@ -17,6 +17,8 @@ export const useSocialPostGeneration = (projectId: string) => {
   const [currentSocialPostJob, setCurrentSocialPostJob] = useState<SocialPostJob | null>(null);
   const [isGeneratingSocialPosts, setIsGeneratingSocialPosts] = useState(false);
   const [viewingSocialPostJob, setViewingSocialPostJob] = useState<SocialPostJob | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Load saved social post jobs from backend
@@ -46,7 +48,10 @@ export const useSocialPostGeneration = (projectId: string) => {
     try {
       const geminiStatus = await checkGeminiStatus();
       if (!geminiStatus.configured) {
-        showError('Gemini API key not configured. Please add it in App Settings.');
+        // Show inline banner so the user clearly sees what's missing
+        if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
+        setConfigError('Add your Gemini API key in App Settings to generate social posts with images.');
+        configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         setIsGeneratingSocialPosts(false);
         return;
       }
@@ -95,6 +100,7 @@ export const useSocialPostGeneration = (projectId: string) => {
     isGeneratingSocialPosts,
     viewingSocialPostJob,
     setViewingSocialPostJob,
+    configError,
     loadSavedJobs,
     handleSocialPostGeneration,
   };

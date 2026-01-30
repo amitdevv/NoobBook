@@ -9,6 +9,7 @@ import { useEmailGeneration } from '../email/useEmailGeneration';
 import { EmailListItem } from '../email/EmailListItem';
 import { EmailProgressIndicator } from '../email/EmailProgressIndicator';
 import { EmailViewerModal } from '../email/EmailViewerModal';
+import { ConfigErrorBanner } from '../shared/ConfigErrorBanner';
 
 export const EmailSection: React.FC = () => {
   const { projectId, registerGenerationHandler } = useStudioContext();
@@ -19,6 +20,7 @@ export const EmailSection: React.FC = () => {
     isGeneratingEmail,
     viewingEmailJob,
     setViewingEmailJob,
+    configError,
     loadSavedJobs,
     handleEmailGeneration,
   } = useEmailGeneration(projectId);
@@ -37,12 +39,14 @@ export const EmailSection: React.FC = () => {
     registerGenerationHandler('email_templates', handleGenerate);
   }, [registerGenerationHandler, handleGenerate]);
 
-  if (filteredJobs.length === 0 && !isGeneratingEmail) {
+  if (filteredJobs.length === 0 && !isGeneratingEmail && !configError) {
     return null;
   }
 
   return (
     <>
+      <ConfigErrorBanner message={configError} />
+
       {isGeneratingEmail && (
         <EmailProgressIndicator currentEmailJob={currentEmailJob} />
       )}
