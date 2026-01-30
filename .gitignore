@@ -77,6 +77,7 @@ gitsync.md
 
 # Docker (generated env files and Supabase data volumes)
 docker/.env
+docker/.env.save
 docker/supabase/.env
 docker/supabase/volumes/db/data/
 docker/supabase/volumes/storage/
@@ -86,3 +87,4 @@ docker/supabase/volumes/functions/
 # Unignore vendored Supabase config files matched by "logs/" rule above
 !docker/supabase/volumes/logs/
 !docker/supabase/volumes/logs/vector.yml
+docker/supabase/volumes/minio/

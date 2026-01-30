@@ -1,0 +1,18 @@
+{
+  "name": "jira_list_projects",
+  "description": "List all Jira projects that the user has access to. Use this to discover what projects exist before searching for issues. Returns project keys, names, and descriptions.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "search_query": {
+        "type": "string",
+        "description": "Optional search query to filter projects by name or key"
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Maximum number of projects to return (default: 50)"
+      }
+    },
+    "required": []
+  }
+}

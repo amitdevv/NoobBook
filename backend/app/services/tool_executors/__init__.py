@@ -18,6 +18,9 @@ Executors:
 - email_agent_executor: Handles email template generation (background task)
 - website_agent_executor: Handles website generation (background task)
 - presentation_agent_executor: Handles presentation generation (background task)
+
+Note: Knowledge base integrations (Jira, Notion, GitHub) are handled directly by
+knowledge_base_service without separate executors.
 """
 from app.services.tool_executors.memory_executor import memory_executor
 from app.services.tool_executors.source_search_executor import source_search_executor

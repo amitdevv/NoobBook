@@ -1,0 +1,34 @@
+{
+  "name": "jira_search_issues",
+  "description": "Search for Jira issues using filters or JQL (Jira Query Language). Returns issue summaries with key, status, type, assignee, and other metadata. Use this after discovering available projects with jira_list_projects. For detailed information about a specific issue, use jira_get_issue.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "project_key": {
+        "type": "string",
+        "description": "Filter by project key (e.g., 'PROJ', 'ENG'). Optional but recommended to narrow results."
+      },
+      "jql": {
+        "type": "string",
+        "description": "Custom JQL query string. If provided, overrides all other filter parameters. Example: 'project = PROJ AND status = Open'"
+      },
+      "status": {
+        "type": "string",
+        "description": "Filter by issue status (e.g., 'Open', 'In Progress', 'Done')"
+      },
+      "assignee": {
+        "type": "string",
+        "description": "Filter by assignee username"
+      },
+      "issue_type": {
+        "type": "string",
+        "description": "Filter by issue type (e.g., 'Bug', 'Story', 'Task', 'Epic')"
+      },
+      "max_results": {
+        "type": "integer",
+        "description": "Maximum number of issues to return (default: 50, max: 100)"
+      }
+    },
+    "required": []
+  }
+}

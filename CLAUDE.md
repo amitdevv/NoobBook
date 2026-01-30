@@ -92,6 +92,10 @@ ELEVENLABS_API_KEY=...          # Audio features
 TAVILY_API_KEY=...              # Web search fallback
 GOOGLE_CLIENT_ID=...            # Google Drive import
 GOOGLE_CLIENT_SECRET=...
+JIRA_DOMAIN=...                 # Jira integration (https://your-company.atlassian.net)
+JIRA_EMAIL=...                  # Jira user email
+JIRA_API_KEY=...                # Jira API token
+NOTION_API_KEY=...              # Notion integration
 ANTHROPIC_TIER=1                # 1-4, controls rate limits
 ```
 

@@ -1,0 +1,14 @@
+{
+  "name": "jira_get_project",
+  "description": "Get detailed information about a specific Jira project by its key. Returns project metadata including name, description, lead, project type, and available issue types. Use this after listing projects to understand project structure before searching for issues.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "project_key": {
+        "type": "string",
+        "description": "The Jira project key (e.g., 'PROJ', 'ENG', 'SALES')"
+      }
+    },
+    "required": ["project_key"]
+  }
+}

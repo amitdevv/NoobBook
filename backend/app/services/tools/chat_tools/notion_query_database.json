@@ -1,0 +1,22 @@
+{
+  "name": "notion_query_database",
+  "description": "Query a Notion database to retrieve pages (rows) with optional filtering. Returns pages with their property values. Use notion_get_database_schema first to understand available properties. For complex filters, use Notion's filter format (see Notion API docs).",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "database_id": {
+        "type": "string",
+        "description": "The Notion database ID (32-character hex string or UUID format)"
+      },
+      "filter_conditions": {
+        "type": "object",
+        "description": "Optional filter object in Notion API format. Example: {\"property\": \"Status\", \"select\": {\"equals\": \"Done\"}}. Omit to return all pages."
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Maximum number of pages to return (default: 20, max: 100)"
+      }
+    },
+    "required": ["database_id"]
+  }
+}
