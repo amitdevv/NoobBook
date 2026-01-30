@@ -79,6 +79,12 @@ bash docker/reset.sh -v       # Stop + delete ALL data (destructive)
 | Backend API | `http://localhost:5001/api/v1` |
 | Supabase Studio | `http://localhost:8000` |
 
+**Supabase Studio login:** The setup script auto-generates the dashboard password. To find it:
+```bash
+grep DASHBOARD docker/supabase/.env
+```
+Default username is `supabase`.
+
 ### Option B: Local Development (Without Docker for the App)
 
 You still need Supabase running. Either use Docker for just Supabase, or connect to a Supabase Cloud instance.

@@ -689,6 +689,109 @@ def get_studio_signed_url(
 
 
 # =============================================================================
+# AI IMAGES (Generated charts/plots from analysis)
+# =============================================================================
+
+def upload_ai_image(
+    project_id: str,
+    filename: str,
+    file_data: bytes,
+    content_type: str = "image/png"
+) -> Optional[str]:
+    """
+    Upload an AI-generated image to the studio-outputs bucket.
+
+    Educational Note: AI-generated images (e.g., matplotlib charts from
+    CSV analysis) are stored in Supabase Storage instead of local disk.
+    Path pattern: {project_id}/ai-images/{filename}
+
+    Args:
+        project_id: The project UUID
+        filename: Image filename (e.g., source_id_plot_uuid.png)
+        file_data: Image bytes
+        content_type: MIME type (default image/png)
+
+    Returns:
+        Storage path if successful, None otherwise
+    """
+    client = _get_client()
+    path = f"{project_id}/ai-images/{filename}"
+
+    try:
+        client.storage.from_(BUCKET_STUDIO).upload(
+            path=path,
+            file=file_data,
+            file_options={"content-type": content_type}
+        )
+        print(f"  Uploaded AI image: {path}")
+        return path
+    except Exception as e:
+        if "Duplicate" in str(e) or "already exists" in str(e).lower():
+            try:
+                client.storage.from_(BUCKET_STUDIO).update(
+                    path=path,
+                    file=file_data,
+                    file_options={"content-type": content_type}
+                )
+                print(f"  Updated AI image: {path}")
+                return path
+            except Exception as update_e:
+                print(f"  Error updating AI image: {update_e}")
+                return None
+        print(f"  Error uploading AI image: {e}")
+        return None
+
+
+def download_ai_image(project_id: str, filename: str) -> Optional[bytes]:
+    """
+    Download an AI-generated image from the studio-outputs bucket.
+
+    Args:
+        project_id: The project UUID
+        filename: Image filename
+
+    Returns:
+        Image bytes or None if not found
+    """
+    client = _get_client()
+    path = f"{project_id}/ai-images/{filename}"
+
+    try:
+        response = client.storage.from_(BUCKET_STUDIO).download(path)
+        return response
+    except Exception as e:
+        print(f"  Error downloading AI image: {e}")
+        return None
+
+
+def get_ai_image_url(
+    project_id: str,
+    filename: str,
+    expires_in: int = 3600
+) -> Optional[str]:
+    """
+    Get a signed URL for an AI-generated image.
+
+    Args:
+        project_id: The project UUID
+        filename: Image filename
+        expires_in: URL expiration in seconds (default 1 hour)
+
+    Returns:
+        Signed URL or None
+    """
+    client = _get_client()
+    path = f"{project_id}/ai-images/{filename}"
+
+    try:
+        response = client.storage.from_(BUCKET_STUDIO).create_signed_url(path, expires_in)
+        return response.get("signedURL")
+    except Exception as e:
+        print(f"  Error getting AI image URL: {e}")
+        return None
+
+
+# =============================================================================
 # CLEANUP - Delete all files for a source
 # =============================================================================
 

@@ -8,7 +8,11 @@ Unlike email templates (single file), websites have multiple files created itera
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
-from app.services.studio_services.studio_index_service import load_index, save_index
+from app.services.studio_services.studio_index_service import (
+    create_job, update_job, get_job, list_jobs, delete_job
+)
+
+JOB_TYPE = "website"
 
 
 def create_website_job(
@@ -19,56 +23,43 @@ def create_website_job(
     direction: str
 ) -> None:
     """
-    Create a new website generation job in the index.
+    Create a new website generation job in Supabase.
 
     Educational Note: Tracks website generation with multi-file support.
     Unlike email templates (single HTML file), websites have multiple files
     (HTML pages, CSS, JS) that are created iteratively.
     """
-    index = load_index(project_id)
-
-    job = {
+    job_data = {
         "id": job_id,
         "source_id": source_id,
         "source_name": source_name,
         "direction": direction,
-        "status": "pending",  # pending -> processing -> ready | error
+        "status": "pending",
+        "progress": "Initializing...",
+        "error": None,
         "status_message": "Initializing...",
         "error_message": None,
-
-        # Plan
-        "site_type": None,  # portfolio, business, blog, landing, corporate, etc.
+        "site_type": None,
         "site_name": None,
-        "pages": [],  # [{filename, page_title, description}]
-        "features": [],  # [animations_scroll, gallery_grid, contact_form, etc.]
-        "design_system": None,  # {primary_color, secondary_color, etc.}
-        "navigation_style": None,  # fixed, sticky, static
-        "images_needed": [],  # [{purpose, description, aspect_ratio}]
+        "pages": [],
+        "features": [],
+        "design_system": None,
+        "navigation_style": None,
+        "images_needed": [],
         "layout_notes": None,
-
-        # Generated content
-        "images": [],  # [{purpose, filename, placeholder, url}]
-        "files": [],  # [index.html, about.html, styles.css, script.js]
-        "pages_created": [],  # [index.html, about.html, contact.html, ...]
-        "features_implemented": [],  # Actual features implemented
-        "cdn_libraries_used": [],  # [Tailwind CSS, Font Awesome, etc.]
+        "images": [],
+        "files": [],
+        "pages_created": [],
+        "features_implemented": [],
+        "cdn_libraries_used": [],
         "summary": None,
-
-        # URLs
-        "preview_url": None,  # URL to preview website (serves index.html)
-        "download_url": None,  # URL to download ZIP
-
-        # Metadata
+        "preview_url": None,
+        "download_url": None,
         "iterations": None,
         "input_tokens": None,
         "output_tokens": None,
-        "created_at": datetime.now().isoformat(),
-        "started_at": None,
-        "completed_at": None
     }
-
-    index["website_jobs"].append(job)
-    save_index(project_id, index)
+    create_job(project_id, JOB_TYPE, job_data)
 
 
 def update_website_job(
@@ -80,31 +71,19 @@ def update_website_job(
     Update a website job with new information.
 
     Educational Note: Flexible updates for any job fields during
-    the agent's iterative workflow.
+    the agent's iterative workflow. Unlike other job modules, this
+    accepts ALL provided fields (including those with None/falsy values)
+    to match the original behavior.
     """
-    index = load_index(project_id)
-
-    for job in index["website_jobs"]:
-        if job["id"] == job_id:
-            # Update all provided fields
-            for key, value in updates.items():
-                if key in job:
-                    job[key] = value
-            break
-
-    save_index(project_id, index)
+    # Website jobs originally used `if key in job` not `if value is not None`,
+    # so we pass all updates through. The generic update_job filters by
+    # `if v is not None`, so we need to handle None values specially.
+    update_job(project_id, job_id, **updates)
 
 
 def get_website_job(project_id: str, job_id: str) -> Optional[Dict[str, Any]]:
     """Get a specific website job by ID."""
-    index = load_index(project_id)
-    jobs = index.get("website_jobs", [])
-
-    for job in jobs:
-        if job["id"] == job_id:
-            return job
-
-    return None
+    return get_job(project_id, job_id)
 
 
 def list_website_jobs(project_id: str, source_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -113,31 +92,14 @@ def list_website_jobs(project_id: str, source_id: Optional[str] = None) -> List[
 
     Returns jobs sorted by created_at descending (newest first).
     """
-    index = load_index(project_id)
-    jobs = index.get("website_jobs", [])
-
-    # Filter by source if provided
-    if source_id:
-        jobs = [j for j in jobs if j.get("source_id") == source_id]
-
-    # Sort by created_at descending
-    return sorted(jobs, key=lambda j: j.get("created_at", ""), reverse=True)
+    return list_jobs(project_id, JOB_TYPE, source_id)
 
 
 def delete_website_job(project_id: str, job_id: str) -> bool:
     """
-    Delete a website job from the index.
+    Delete a website job.
 
     Returns:
         True if job was found and deleted
     """
-    index = load_index(project_id)
-    original_count = len(index["website_jobs"])
-
-    index["website_jobs"] = [j for j in index["website_jobs"] if j["id"] != job_id]
-
-    if len(index["website_jobs"]) < original_count:
-        save_index(project_id, index)
-        return True
-
-    return False
+    return delete_job(project_id, job_id)

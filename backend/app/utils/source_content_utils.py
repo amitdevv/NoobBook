@@ -3,12 +3,14 @@ Source Content Utilities - Shared functions for loading source content.
 
 Used by multiple agents (blog, website, etc.) to get source content
 with smart sampling for large sources.
-"""
 
-import os
+Educational Note: Content is loaded from Supabase Storage (processed files
+and chunks), not from local disk. All writes already go to Supabase;
+this module switches the read path to match.
+"""
 from typing import Optional
 
-from app.utils.path_utils import get_sources_dir
+from app.services.integrations.supabase import storage_service
 
 
 def get_source_content(
@@ -39,44 +41,30 @@ def get_source_content(
         if not source:
             return "Error: Source not found"
 
-        sources_dir = get_sources_dir(project_id)
-        processed_path = os.path.join(sources_dir, "processed", f"{source_id}.txt")
+        # Download processed content from Supabase Storage
+        full_content = storage_service.download_processed_file(project_id, source_id)
 
-        if not os.path.exists(processed_path):
+        if not full_content:
             return f"Source: {source.get('name', 'Unknown')}\n(Content not yet processed)"
-
-        with open(processed_path, "r", encoding="utf-8") as f:
-            full_content = f.read()
 
         # Small source: return all
         if len(full_content) < max_chars:
             return full_content
 
-        # Large source: try to sample chunks
-        chunks_dir = os.path.join(sources_dir, "chunks", source_id)
-        if not os.path.exists(chunks_dir):
-            return full_content[:max_chars] + "\n\n[Content truncated...]"
+        # Large source: try to sample chunks from Supabase Storage
+        all_chunks = storage_service.list_source_chunks(project_id, source_id)
 
-        chunk_files = sorted([
-            f for f in os.listdir(chunks_dir)
-            if f.endswith(".txt") and f.startswith(source_id)
-        ])
-
-        if not chunk_files:
+        if not all_chunks:
             return full_content[:max_chars] + "\n\n[Content truncated...]"
 
         # Sample chunks evenly distributed
-        if len(chunk_files) <= max_chunks:
-            selected_chunks = chunk_files
+        if len(all_chunks) <= max_chunks:
+            selected_chunks = all_chunks
         else:
-            step = len(chunk_files) / max_chunks
-            selected_chunks = [chunk_files[int(i * step)] for i in range(max_chunks)]
+            step = len(all_chunks) / max_chunks
+            selected_chunks = [all_chunks[int(i * step)] for i in range(max_chunks)]
 
-        sampled_content = []
-        for chunk_file in selected_chunks:
-            chunk_path = os.path.join(chunks_dir, chunk_file)
-            with open(chunk_path, "r", encoding="utf-8") as f:
-                sampled_content.append(f.read())
+        sampled_content = [chunk["text"] for chunk in selected_chunks]
 
         return "\n\n".join(sampled_content)
 

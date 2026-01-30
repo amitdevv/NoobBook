@@ -68,7 +68,16 @@ bash docker/reset.sh -v         # Stop + delete ALL data (destructive)
 |---------|-----|---------|
 | NoobBook | `http://localhost` | Main application |
 | Backend API | `http://localhost:5001/api/v1` | Flask API (also proxied via nginx) |
-| Supabase API Gateway | `http://localhost:8000` | Kong gateway (internal) |
+| Supabase Studio | `http://localhost:8000` | Database admin UI |
+
+### Supabase Studio Login
+
+The setup script auto-generates the dashboard password. To find your credentials:
+```bash
+grep DASHBOARD docker/supabase/.env
+```
+
+The default username is `supabase`. The password is randomly generated per setup.
 
 ### Architecture
 
@@ -247,6 +256,7 @@ supabase/
     00006_user_roles.sql
     00007_brand_assets.sql
     00008_google_oauth_tokens.sql
+    00009_studio_jobs.sql
 ```
 
 - **Fresh setup:** Run `init.sql` (combines all migrations)
@@ -264,6 +274,7 @@ supabase/
 | chunks | RAG text chunks |
 | background_tasks | Async task tracking |
 | studio_signals | Studio feature signals |
+| studio_jobs | Studio content generation jobs (audio, video, quiz, etc.) |
 | brand_assets | Brand asset metadata |
 | brand_config | Brand configuration |
 

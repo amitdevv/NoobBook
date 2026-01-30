@@ -4,7 +4,7 @@
  * Handles state management, API calls, and polling.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { adsAPI, checkGeminiStatus, type AdJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
@@ -17,6 +17,8 @@ export const useAdGeneration = (projectId: string) => {
   const [currentAdJob, setCurrentAdJob] = useState<AdJob | null>(null);
   const [isGeneratingAd, setIsGeneratingAd] = useState(false);
   const [viewingAdJob, setViewingAdJob] = useState<AdJob | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Load saved ad jobs from backend
@@ -46,7 +48,9 @@ export const useAdGeneration = (projectId: string) => {
     try {
       const geminiStatus = await checkGeminiStatus();
       if (!geminiStatus.configured) {
-        showError('Gemini API key not configured. Please add it in App Settings.');
+        if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
+        setConfigError('Add your Gemini API key in App Settings to generate ad creatives with images.');
+        configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         setIsGeneratingAd(false);
         return;
       }
@@ -95,6 +99,7 @@ export const useAdGeneration = (projectId: string) => {
     isGeneratingAd,
     viewingAdJob,
     setViewingAdJob,
+    configError,
     loadSavedJobs,
     handleAdGeneration,
   };

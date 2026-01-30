@@ -138,13 +138,9 @@ class BlogToolExecutor:
             if not storage_path:
                 return f"Error uploading image for {purpose}: Failed to upload to storage"
 
-            # Get public URL for the image
-            public_url = storage_service.get_studio_public_url(
-                project_id=project_id,
-                job_type="blogs",
-                job_id=job_id,
-                filename=filename
-            )
+            # Use backend API path instead of Supabase internal URL
+            # (Supabase runs on Docker-internal hostname, not accessible from browser)
+            api_url = f"/api/v1/projects/{project_id}/studio/blogs/{job_id}/{filename}"
 
             image_info = {
                 "purpose": purpose,
@@ -152,7 +148,7 @@ class BlogToolExecutor:
                 "filename": filename,
                 "placeholder": f"IMAGE_{image_index}",
                 "alt_text": alt_text,
-                "url": public_url,
+                "url": api_url,
                 "storage_path": storage_path
             }
             generated_images.append(image_info)
@@ -213,13 +209,8 @@ class BlogToolExecutor:
             if not storage_path:
                 raise Exception("Failed to upload markdown to storage")
 
-            # Get public URL for the markdown
-            markdown_url = storage_service.get_studio_public_url(
-                project_id=project_id,
-                job_type="blogs",
-                job_id=job_id,
-                filename=markdown_filename
-            )
+            # Use backend API path instead of Supabase internal URL
+            markdown_url = f"/api/v1/projects/{project_id}/studio/blogs/{job_id}/{markdown_filename}"
 
             print(f"      Uploaded: {markdown_filename}")
 

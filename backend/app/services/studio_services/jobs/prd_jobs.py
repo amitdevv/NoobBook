@@ -11,7 +11,11 @@ The markdown output can be rendered nicely on frontend and exported to PDF.
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
-from app.services.studio_services.studio_index_service import load_index, save_index
+from app.services.studio_services.studio_index_service import (
+    create_job, update_job, get_job, list_jobs, delete_job
+)
+
+JOB_TYPE = "prd"
 
 
 def create_prd_job(
@@ -21,146 +25,46 @@ def create_prd_job(
     source_name: str,
     direction: str
 ) -> Dict[str, Any]:
-    """
-    Create a new PRD generation job.
-
-    Args:
-        project_id: The project UUID
-        job_id: Unique job identifier
-        source_id: Source being processed
-        source_name: Name of the source
-        direction: User's direction for the PRD
-
-    Returns:
-        The created job record
-    """
-    job = {
+    job_data = {
         "id": job_id,
         "source_id": source_id,
         "source_name": source_name,
         "direction": direction,
-        "status": "pending",  # pending -> processing -> ready | error
+        "status": "pending",
+        "progress": "Initializing...",
+        "error": None,
         "status_message": "Initializing...",
         "error_message": None,
-
-        # Plan fields
         "document_title": None,
         "product_name": None,
         "target_audience": None,
-        "planned_sections": [],  # [{section_id, title, description}]
+        "planned_sections": [],
         "planning_notes": None,
-
-        # Progress tracking
         "sections_written": 0,
         "total_sections": 0,
         "current_section": None,
-
-        # Generated content
         "markdown_file": None,
         "markdown_filename": None,
-
-        # URLs
         "preview_url": None,
         "download_url": None,
-
-        # Metadata
         "iterations": None,
         "input_tokens": None,
         "output_tokens": None,
-        "created_at": datetime.now().isoformat(),
-        "started_at": None,
-        "completed_at": None
     }
-
-    index = load_index(project_id)
-    print(f"[StudioIndex] Creating PRD job {job_id}, existing jobs: {len(index.get('prd_jobs', []))}")
-    index["prd_jobs"].append(job)
-    save_index(project_id, index)
-    print(f"[StudioIndex] Saved index with {len(index['prd_jobs'])} PRD jobs")
-
-    return job
+    return create_job(project_id, JOB_TYPE, job_data)
 
 
-def update_prd_job(
-    project_id: str,
-    job_id: str,
-    **updates
-) -> Optional[Dict[str, Any]]:
-    """
-    Update a PRD job's fields.
-
-    Args:
-        project_id: The project UUID
-        job_id: The job ID to update
-        **updates: Fields to update
-
-    Returns:
-        Updated job record or None if not found
-    """
-    index = load_index(project_id)
-
-    for i, job in enumerate(index["prd_jobs"]):
-        if job["id"] == job_id:
-            for key, value in updates.items():
-                if value is not None:
-                    job[key] = value
-            job["updated_at"] = datetime.now().isoformat()
-            index["prd_jobs"][i] = job
-            save_index(project_id, index)
-            return job
-
-    return None
+def update_prd_job(project_id: str, job_id: str, **updates) -> Optional[Dict[str, Any]]:
+    return update_job(project_id, job_id, **updates)
 
 
 def get_prd_job(project_id: str, job_id: str) -> Optional[Dict[str, Any]]:
-    """Get a PRD job by ID."""
-    index = load_index(project_id)
-    jobs = index.get("prd_jobs", [])
-    print(f"[StudioIndex] Looking for PRD job {job_id}, found {len(jobs)} jobs")
-
-    for job in jobs:
-        if job["id"] == job_id:
-            return job
-
-    print(f"[StudioIndex] PRD job {job_id} NOT FOUND. Available IDs: {[j['id'][:8] for j in jobs]}")
-    return None
+    return get_job(project_id, job_id)
 
 
 def list_prd_jobs(project_id: str, source_id: Optional[str] = None) -> List[Dict[str, Any]]:
-    """
-    List PRD jobs, optionally filtered by source.
-
-    Args:
-        project_id: The project UUID
-        source_id: Optional source ID to filter by
-
-    Returns:
-        List of PRD jobs (newest first)
-    """
-    index = load_index(project_id)
-    jobs = index.get("prd_jobs", [])
-
-    if source_id:
-        jobs = [j for j in jobs if j.get("source_id") == source_id]
-
-    # Sort by created_at descending
-    return sorted(jobs, key=lambda j: j.get("created_at", ""), reverse=True)
+    return list_jobs(project_id, JOB_TYPE, source_id)
 
 
 def delete_prd_job(project_id: str, job_id: str) -> bool:
-    """
-    Delete a PRD job from the index.
-
-    Returns:
-        True if job was found and deleted
-    """
-    index = load_index(project_id)
-    original_count = len(index.get("prd_jobs", []))
-
-    index["prd_jobs"] = [j for j in index.get("prd_jobs", []) if j["id"] != job_id]
-
-    if len(index["prd_jobs"]) < original_count:
-        save_index(project_id, index)
-        return True
-
-    return False
+    return delete_job(project_id, job_id)

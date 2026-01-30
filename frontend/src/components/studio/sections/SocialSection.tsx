@@ -10,6 +10,7 @@ import { useSocialPostGeneration } from '../social/useSocialPostGeneration';
 import { SocialPostListItem } from '../social/SocialPostListItem';
 import { SocialPostProgressIndicator } from '../social/SocialPostProgressIndicator';
 import { SocialPostViewerModal } from '../social/SocialPostViewerModal';
+import { ConfigErrorBanner } from '../shared/ConfigErrorBanner';
 
 export const SocialSection: React.FC = () => {
   const { projectId, signals, registerGenerationHandler } = useStudioContext();
@@ -20,6 +21,7 @@ export const SocialSection: React.FC = () => {
     isGeneratingSocialPosts,
     viewingSocialPostJob,
     setViewingSocialPostJob,
+    configError,
     loadSavedJobs,
     handleSocialPostGeneration,
   } = useSocialPostGeneration(projectId);
@@ -38,12 +40,14 @@ export const SocialSection: React.FC = () => {
     registerGenerationHandler('social', handleGenerate);
   }, [registerGenerationHandler, handleGenerate]);
 
-  if (!hasSocialSignal && savedSocialPostJobs.length === 0 && !isGeneratingSocialPosts) {
+  if (!hasSocialSignal && savedSocialPostJobs.length === 0 && !isGeneratingSocialPosts && !configError) {
     return null;
   }
 
   return (
     <>
+      <ConfigErrorBanner message={configError} />
+
       {isGeneratingSocialPosts && (
         <SocialPostProgressIndicator currentSocialPostJob={currentSocialPostJob} />
       )}

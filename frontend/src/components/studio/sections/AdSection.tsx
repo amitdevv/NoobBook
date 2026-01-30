@@ -10,6 +10,7 @@ import { useAdGeneration } from '../ads/useAdGeneration';
 import { AdListItem } from '../ads/AdListItem';
 import { AdProgressIndicator } from '../ads/AdProgressIndicator';
 import { AdViewerModal } from '../ads/AdViewerModal';
+import { ConfigErrorBanner } from '../shared/ConfigErrorBanner';
 
 export const AdSection: React.FC = () => {
   const { projectId, signals, registerGenerationHandler } = useStudioContext();
@@ -20,6 +21,7 @@ export const AdSection: React.FC = () => {
     isGeneratingAd,
     viewingAdJob,
     setViewingAdJob,
+    configError,
     loadSavedJobs,
     handleAdGeneration,
   } = useAdGeneration(projectId);
@@ -39,13 +41,15 @@ export const AdSection: React.FC = () => {
     registerGenerationHandler('ads_creative', handleGenerate);
   }, [registerGenerationHandler, handleGenerate]);
 
-  // Only show if we have ad signal and jobs, or generating
-  if (!hasAdSignal && savedAdJobs.length === 0 && !isGeneratingAd) {
+  // Only show if we have ad signal and jobs, or generating, or config error
+  if (!hasAdSignal && savedAdJobs.length === 0 && !isGeneratingAd && !configError) {
     return null;
   }
 
   return (
     <>
+      <ConfigErrorBanner message={configError} />
+
       {isGeneratingAd && (
         <AdProgressIndicator currentAdJob={currentAdJob} />
       )}

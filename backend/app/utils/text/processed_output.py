@@ -37,10 +37,8 @@ The page markers (=== TYPE PAGE N of M ===) are recognized by:
 - citation_utils.py for extracting page content for citations
 """
 from datetime import datetime
-from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-from app.utils.path_utils import get_processed_dir
 from app.utils.text.page_markers import build_page_marker, SOURCE_TYPE_DISPLAY
 
 
@@ -157,31 +155,24 @@ def save_processed_text(
     project_id: str,
     source_id: str,
     content: str
-) -> Path:
+) -> None:
     """
-    Save processed text content to the processed/ folder.
+    No-op — processed files are saved to Supabase Storage by each processor.
 
-    Educational Note: All processed sources are saved as .txt files
-    in data/projects/{project_id}/sources/processed/{source_id}.txt
-
-    This centralizes the file writing logic so processors don't need
-    to handle paths themselves.
+    Educational Note: Previously saved to local disk at
+    data/projects/{project_id}/sources/processed/{source_id}.txt.
+    Now all processors upload directly to Supabase Storage via
+    storage_service.upload_processed_file(), so this local save is unnecessary.
 
     Args:
         project_id: The project UUID
         source_id: The source UUID
-        content: The processed text content to save
+        content: The processed text content (unused)
 
     Returns:
-        Path to the saved file
+        None
     """
-    processed_dir = get_processed_dir(project_id)
-    processed_path = processed_dir / f"{source_id}.txt"
-
-    with open(processed_path, "w", encoding="utf-8") as f:
-        f.write(content)
-
-    return processed_path
+    return None
 
 
 def build_and_save_processed_output(
@@ -221,11 +212,10 @@ def build_and_save_processed_output(
         metadata=metadata
     )
 
-    path = save_processed_text(project_id, source_id, content)
-
+    # No local save — processors upload to Supabase Storage directly
     return {
         "content": content,
-        "path": path,
+        "path": None,
         "total_pages": len(pages),
         "character_count": len(content)
     }

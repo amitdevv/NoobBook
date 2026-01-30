@@ -9,6 +9,7 @@ import { useInfographicGeneration } from '../infographic/useInfographicGeneratio
 import { InfographicListItem } from '../infographic/InfographicListItem';
 import { InfographicProgressIndicator } from '../infographic/InfographicProgressIndicator';
 import { InfographicViewerModal } from '../infographic/InfographicViewerModal';
+import { ConfigErrorBanner } from '../shared/ConfigErrorBanner';
 
 export const InfographicSection: React.FC = () => {
   const { projectId, registerGenerationHandler } = useStudioContext();
@@ -19,6 +20,7 @@ export const InfographicSection: React.FC = () => {
     isGeneratingInfographic,
     viewingInfographicJob,
     setViewingInfographicJob,
+    configError,
     loadSavedJobs,
     handleInfographicGeneration,
   } = useInfographicGeneration(projectId);
@@ -37,12 +39,14 @@ export const InfographicSection: React.FC = () => {
     registerGenerationHandler('infographics', handleGenerate);
   }, [registerGenerationHandler, handleGenerate]);
 
-  if (filteredJobs.length === 0 && !isGeneratingInfographic) {
+  if (filteredJobs.length === 0 && !isGeneratingInfographic && !configError) {
     return null;
   }
 
   return (
     <>
+      <ConfigErrorBanner message={configError} />
+
       {isGeneratingInfographic && (
         <InfographicProgressIndicator currentInfographicJob={currentInfographicJob} />
       )}

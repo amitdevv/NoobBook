@@ -398,3 +398,41 @@ BEGIN
     USING (bucket_id = 'brand-assets') WITH CHECK (bucket_id = 'brand-assets');
   END IF;
 END $$;
+
+-- ============================================================================
+-- STUDIO JOBS TABLE (replaces studio_index.json)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS studio_jobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    job_type TEXT NOT NULL,
+    source_id UUID,
+    source_name TEXT,
+    direction TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    progress TEXT,
+    error_message TEXT,
+    job_data JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_studio_jobs_project_id ON studio_jobs(project_id);
+CREATE INDEX IF NOT EXISTS idx_studio_jobs_project_type ON studio_jobs(project_id, job_type);
+CREATE INDEX IF NOT EXISTS idx_studio_jobs_status ON studio_jobs(status);
+
+CREATE OR REPLACE FUNCTION update_studio_jobs_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_studio_jobs_updated_at ON studio_jobs;
+CREATE TRIGGER trigger_studio_jobs_updated_at
+    BEFORE UPDATE ON studio_jobs
+    FOR EACH ROW
+    EXECUTE FUNCTION update_studio_jobs_updated_at();

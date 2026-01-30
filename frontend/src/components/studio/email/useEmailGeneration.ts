@@ -4,7 +4,7 @@
  * Handles state management, API calls, and polling.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { emailsAPI, checkGeminiStatus, type EmailJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
@@ -17,6 +17,8 @@ export const useEmailGeneration = (projectId: string) => {
   const [currentEmailJob, setCurrentEmailJob] = useState<EmailJob | null>(null);
   const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
   const [viewingEmailJob, setViewingEmailJob] = useState<EmailJob | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Load saved email jobs from backend
@@ -50,7 +52,9 @@ export const useEmailGeneration = (projectId: string) => {
       // Check Gemini status (email agent uses Gemini for images)
       const geminiStatus = await checkGeminiStatus();
       if (!geminiStatus.configured) {
-        showError('Gemini API key not configured. Please add it in App Settings.');
+        if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
+        setConfigError('Add your Gemini API key in App Settings to generate email templates with images.');
+        configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         setIsGeneratingEmail(false);
         return;
       }
@@ -99,6 +103,7 @@ export const useEmailGeneration = (projectId: string) => {
     isGeneratingEmail,
     viewingEmailJob,
     setViewingEmailJob,
+    configError,
     loadSavedJobs,
     handleEmailGeneration,
   };
