@@ -300,16 +300,15 @@ def list_source_chunks(project_id: str, source_id: str) -> List[Dict[str, Any]]:
         if not files:
             return []
 
-        chunks = []
-        for file_info in files:
-            filename = file_info.get("name", "")
-            if not filename.endswith(".txt"):
-                continue
+        # Filter to .txt files only
+        txt_files = [f for f in files if f.get("name", "").endswith(".txt")]
+        if not txt_files:
+            return []
 
-            # Extract chunk_id from filename (remove .txt)
-            chunk_id = filename[:-4]
-
-            # Download chunk content
+        def _download_chunk(file_info):
+            """Download a single chunk file and parse its metadata."""
+            filename = file_info["name"]
+            chunk_id = filename[:-4]  # Remove .txt
             path = f"{prefix}/{filename}"
             try:
                 response = client.storage.from_(BUCKET_CHUNKS).download(path)
@@ -325,15 +324,22 @@ def list_source_chunks(project_id: str, source_id: str) -> List[Dict[str, Any]]:
                     except (IndexError, ValueError):
                         pass
 
-                chunks.append({
+                return {
                     "chunk_id": chunk_id,
                     "text": text,
                     "page_number": page_number,
                     "source_id": source_id
-                })
+                }
             except Exception as e:
                 print(f"  Error downloading chunk {chunk_id}: {e}")
-                continue
+                return None
+
+        # Download chunks concurrently to avoid N+1 sequential requests
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            results = list(executor.map(_download_chunk, txt_files))
+
+        chunks = [r for r in results if r is not None]
 
         # Sort by chunk_id for consistent ordering
         chunks.sort(key=lambda c: c.get("chunk_id", ""))

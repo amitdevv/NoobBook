@@ -155,17 +155,18 @@ def update_job(
     # Merge job_data updates via fetch-merge-update
     if job_data_updates:
         current = get_job(project_id, job_id)
-        if current:
-            # Rebuild current job_data (fields not in top-level columns)
-            current_job_data = {}
-            for k, v in current.items():
-                if k not in _TOP_COLUMNS and k not in {
-                    "id", "project_id", "job_type", "created_at",
-                    "updated_at", "error", "error_message", "job_data",
-                }:
-                    current_job_data[k] = v
-            merged = {**current_job_data, **job_data_updates}
-            top_level["job_data"] = merged
+        if not current:
+            return None
+        # Rebuild current job_data (fields not in top-level columns)
+        current_job_data = {}
+        for k, v in current.items():
+            if k not in _TOP_COLUMNS and k not in {
+                "id", "project_id", "job_type", "created_at",
+                "updated_at", "error", "error_message", "job_data",
+            }:
+                current_job_data[k] = v
+        merged = {**current_job_data, **job_data_updates}
+        top_level["job_data"] = merged
 
     if not top_level:
         return get_job(project_id, job_id)
