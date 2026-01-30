@@ -79,7 +79,7 @@ class TaskService:
                 supabase.table(self.TABLE)
                 .update({
                     "status": "failed",
-                    "error": "Server restarted while task was running",
+                    "error_message": "Server restarted while task was running",
                     "completed_at": datetime.now().isoformat()
                 })
                 .in_("status", ["pending", "running"])
@@ -125,7 +125,7 @@ class TaskService:
             "target_id": target_id,
             "target_type": target_type,
             "status": "pending",
-            "error": None,
+            "error_message": None,
             "progress": 0,
         }
 
@@ -165,7 +165,7 @@ class TaskService:
                 self._update_task(
                     task_id,
                     status="failed",
-                    error=str(e),
+                    error_message=str(e),
                     completed_at=datetime.now().isoformat()
                 )
                 print(f"Task {task_id} failed: {e}", flush=True)
@@ -267,7 +267,7 @@ class TaskService:
         self._update_task(
             task_id,
             status="cancelled",
-            error="Cancelled by user",
+            error_message="Cancelled by user",
             completed_at=datetime.now().isoformat()
         )
 

@@ -53,6 +53,19 @@ sudo apt install libreoffice ffmpeg
 npx playwright install
 ```
 
+### Docker with Self-Hosted Supabase (macOS)
+For running the full stack with self-hosted Supabase on macOS, see **[docker/MAC_SETUP.md](docker/MAC_SETUP.md)**.
+
+Quick start:
+```bash
+cd docker
+cp .env.example .env
+# Edit .env with your API keys
+./setup.sh
+```
+
+This starts 16 containers including PostgreSQL, Supabase services, and MinIO for storage.
+
 ### Testing
 ```bash
 # Backend tests

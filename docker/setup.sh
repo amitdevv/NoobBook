@@ -10,10 +10,13 @@
 #   2. Generates Supabase secrets (JWT, passwords, tokens)
 #   3. Creates .env files from templates
 #   4. Creates the shared Docker network
-#   5. Starts Supabase
-#   6. Waits for Kong (API gateway) to become healthy
-#   7. Builds and starts NoobBook (backend + frontend + migration)
-#   8. Prints access URLs
+#   5. Creates edge functions placeholder (prevents container crash)
+#   6. Starts Supabase
+#   7. Waits for Kong (API gateway) to become healthy
+#   8. Creates MinIO storage bucket (for macOS compatibility)
+#   9. Builds and starts NoobBook (backend + frontend + migration)
+#   10. Waits for database migration
+#   11. Prints access URLs
 # =============================================================================
 
 set -euo pipefail
@@ -193,7 +196,22 @@ else
     info "Docker network noobbook-network already exists"
 fi
 
-# ---- Step 5: Start Supabase ----
+# ---- Step 5: Create edge functions placeholder ----
+# This prevents the edge-functions container from crashing on startup
+FUNCTIONS_DIR="$SCRIPT_DIR/supabase/volumes/functions/main"
+if [ ! -f "$FUNCTIONS_DIR/index.ts" ]; then
+    info "Creating edge functions placeholder..."
+    mkdir -p "$FUNCTIONS_DIR"
+    cat > "$FUNCTIONS_DIR/index.ts" << 'EOF'
+// Placeholder edge function - not used by NoobBook
+// This file exists to prevent the edge-functions container from crashing
+
+Deno.serve(() => new Response("Edge Functions not used by NoobBook"));
+EOF
+    success "Edge functions placeholder created"
+fi
+
+# ---- Step 6: Start Supabase ----
 info "Starting Supabase services..."
 $COMPOSE -f "$SCRIPT_DIR/supabase/docker-compose.yml" --env-file "$SUPABASE_ENV" up -d
 
@@ -219,11 +237,22 @@ if [ $ELAPSED -ge $TIMEOUT ]; then
     error "Supabase did not become healthy within ${TIMEOUT}s. Check: docker logs supabase-kong"
 fi
 
-# ---- Step 7: Build and start NoobBook ----
+# ---- Step 8: Create MinIO storage bucket ----
+# macOS Docker doesn't support xattr, so we use MinIO for S3-compatible storage
+info "Creating MinIO storage bucket..."
+sleep 5  # Wait for MinIO to be fully ready
+if docker exec supabase-minio mc alias set local http://localhost:9000 supabase supabase123 >/dev/null 2>&1; then
+    docker exec supabase-minio mc mb local/storage --ignore-existing >/dev/null 2>&1
+    success "MinIO storage bucket ready"
+else
+    warn "Could not configure MinIO - storage may not work correctly"
+fi
+
+# ---- Step 9: Build and start NoobBook ----
 info "Building and starting NoobBook..."
 $COMPOSE -f "$ROOT_DIR/docker-compose.yml" --env-file "$NOOBBOOK_ENV" up -d --build
 
-# ---- Step 8: Wait for migration ----
+# ---- Step 10: Wait for migration ----
 info "Waiting for database migration to complete..."
 $COMPOSE -f "$ROOT_DIR/docker-compose.yml" --env-file "$NOOBBOOK_ENV" logs -f migrate 2>&1 | while read -r line; do
     echo "  $line"
@@ -235,7 +264,7 @@ $COMPOSE -f "$ROOT_DIR/docker-compose.yml" --env-file "$NOOBBOOK_ENV" logs -f mi
     fi
 done
 
-# ---- Step 9: Print summary ----
+# ---- Step 11: Print summary ----
 echo ""
 echo -e "${GREEN}============================================${NC}"
 echo -e "${GREEN}  NoobBook is running!${NC}"
@@ -244,6 +273,7 @@ echo ""
 echo -e "  App:              ${CYAN}http://localhost${NC}"
 echo -e "  Backend API:      ${CYAN}http://localhost:5001/api/v1${NC}"
 echo -e "  Supabase API:     ${CYAN}http://localhost:8000${NC}"
+echo -e "  MinIO Console:    ${CYAN}http://localhost:9001${NC}  (supabase/supabase123)"
 echo ""
 echo -e "  Stop:   ${YELLOW}bash docker/stop.sh${NC}"
 echo -e "  Reset:  ${YELLOW}bash docker/reset.sh${NC}"
