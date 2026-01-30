@@ -1,5 +1,5 @@
 """
-URL Upload Handler - Manages URL source uploads.
+URL Upload Handler - Manages URL source uploads to Supabase Storage.
 
 Educational Note: URLs are stored as .link files containing JSON with the URL
 and metadata. The actual content fetching/processing happens in a separate step
@@ -17,7 +17,7 @@ from typing import Optional, Dict, Any
 
 from app.services.source_services import source_index_service
 from app.services.background_services import task_service
-from app.utils.path_utils import get_raw_dir
+from app.services.integrations.supabase import storage_service
 
 
 def upload_url(
@@ -29,8 +29,8 @@ def upload_url(
     """
     Add a URL source (website or YouTube link) to a project.
 
-    Educational Note: URLs are stored as .link files containing JSON
-    with the URL and metadata. The actual content fetching/processing
+    Educational Note: URLs are uploaded to Supabase Storage as .link files
+    containing JSON with the URL and metadata. The actual content fetching
     happens in a separate processing step.
 
     Args:
@@ -67,10 +67,9 @@ def upload_url(
     is_youtube = 'youtube.com' in url.lower() or 'youtu.be' in url.lower()
     link_type = 'youtube' if is_youtube else 'website'
 
-    # Generate source ID and paths
+    # Generate source ID and filename
     source_id = str(uuid.uuid4())
     stored_filename = f"{source_id}.link"
-    raw_dir = get_raw_dir(project_id)
 
     # Create link file with URL data
     link_data = {
@@ -80,36 +79,50 @@ def upload_url(
         "fetched_at": None
     }
 
-    file_path = raw_dir / stored_filename
-    with open(file_path, 'w') as f:
-        json.dump(link_data, f, indent=2)
+    # Convert to bytes for upload
+    file_data = json.dumps(link_data, indent=2).encode('utf-8')
+    file_size = len(file_data)
 
-    file_size = file_path.stat().st_size
+    # Upload to Supabase Storage
+    storage_path = storage_service.upload_raw_file(
+        project_id=project_id,
+        source_id=source_id,
+        filename=stored_filename,
+        file_data=file_data,
+        content_type="application/json"
+    )
 
-    # Create source metadata
-    timestamp = datetime.now().isoformat()
+    if not storage_path:
+        raise ValueError("Failed to upload URL to storage")
+
+    # Create source metadata (matching text_upload.py format)
+    # Type is YOUTUBE for YouTube links, LINK for websites
+    source_type = "YOUTUBE" if is_youtube else "LINK"
     source_metadata = {
         "id": source_id,
         "project_id": project_id,
         "name": name or url,
-        "original_filename": url,
         "description": description,
-        "category": "link",
-        "mime_type": "application/json",
-        "file_extension": ".link",
-        "file_size": file_size,
-        "stored_filename": stored_filename,
+        "type": source_type,
+        "url": url,  # Store the URL directly in the url column
         "status": "uploaded",
-        "active": False,
-        "processing_info": {"link_type": link_type},
-        "created_at": timestamp,
-        "updated_at": timestamp
+        "raw_file_path": storage_path,
+        "file_size": file_size,
+        "is_active": False,
+        "embedding_info": {
+            "original_filename": url,
+            "mime_type": "application/json",
+            "file_extension": ".link",
+            "stored_filename": stored_filename,
+            "source_type": "url"
+        },
+        "processing_info": {"link_type": link_type}
     }
 
-    # Add to index
+    # Add to Supabase sources table
     source_index_service.add_source_to_index(project_id, source_metadata)
 
-    print(f"Added URL source: {url} ({source_id})")
+    print(f"Uploaded URL source to Supabase: {url} ({source_id})")
 
     # Submit background processing task
     _submit_processing_task(project_id, source_id)
@@ -124,12 +137,19 @@ def _submit_processing_task(project_id: str, source_id: str) -> None:
     Educational Note: URL content extraction runs in background thread
     so it doesn't block the API response.
     """
-    from app.services.source_services.source_processing import source_processing_service
+    try:
+        from app.services.source_services.source_processing import source_processing_service
+        from app.services.source_services import source_service
 
-    task_service.submit_task(
-        "source_processing",
-        source_id,
-        source_processing_service.process_source,
-        project_id,
-        source_id
-    )
+        task_id = task_service.submit_task(
+            "source_processing",
+            source_id,
+            source_processing_service.process_source,
+            project_id,
+            source_id
+        )
+
+        # Update status to "processing" immediately
+        source_service.update_source(project_id, source_id, status="processing")
+    except Exception as e:
+        print(f"ERROR: Failed to submit URL processing task: {e}")

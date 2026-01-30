@@ -220,6 +220,8 @@ services:
         condition: service_started
       imgproxy:
         condition: service_started
+      minio:
+        condition: service_healthy
     environment:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
@@ -228,11 +230,17 @@ services:
       DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       REQUEST_ALLOW_X_FORWARDED_PATH: "true"
       FILE_SIZE_LIMIT: 52428800
-      STORAGE_BACKEND: file
-      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      # Use S3/MinIO backend for macOS Docker compatibility (xattr not supported)
+      STORAGE_BACKEND: s3
+      STORAGE_S3_BUCKET: storage
+      STORAGE_S3_ENDPOINT: http://minio:9000
+      STORAGE_S3_FORCE_PATH_STYLE: "true"
+      STORAGE_S3_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: supabase
+      AWS_SECRET_ACCESS_KEY: supabase123
       TENANT_ID: stub
       REGION: stub
-      GLOBAL_S3_BUCKET: stub
+      GLOBAL_S3_BUCKET: storage
       ENABLE_IMAGE_TRANSFORMATION: "true"
       IMGPROXY_URL: http://imgproxy:5001
     networks:
@@ -242,19 +250,25 @@ services:
     container_name: supabase-imgproxy
     image: darthsim/imgproxy:v3.30.1
     restart: unless-stopped
-    volumes:
-      - ./volumes/storage:/var/lib/storage:z
     healthcheck:
       test: ["CMD", "imgproxy", "health"]
       timeout: 5s
       interval: 5s
       retries: 3
+    depends_on:
+      minio:
+        condition: service_healthy
     environment:
       IMGPROXY_BIND: ":5001"
-      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
       IMGPROXY_USE_ETAG: "true"
       IMGPROXY_ENABLE_WEBP_DETECTION: ${IMGPROXY_ENABLE_WEBP_DETECTION}
       IMGPROXY_MAX_SRC_RESOLUTION: 16.8
+      # S3/MinIO configuration for image transformation
+      IMGPROXY_USE_S3: "true"
+      AWS_ACCESS_KEY_ID: supabase
+      AWS_SECRET_ACCESS_KEY: supabase123
+      IMGPROXY_S3_ENDPOINT: http://minio:9000
+      IMGPROXY_S3_REGION: us-east-1
     networks:
       - noobbook-network
 
@@ -453,6 +467,29 @@ services:
         "-c",
         "/app/bin/migrate && /app/bin/supavisor eval \"$$(cat /etc/pooler/pooler.exs)\" && /app/bin/server"
       ]
+    networks:
+      - noobbook-network
+
+  # MinIO for S3-compatible storage (macOS Docker fix for xattr issue)
+  minio:
+    container_name: supabase-minio
+    image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./volumes/minio/data:/data
+    environment:
+      MINIO_ROOT_USER: supabase
+      MINIO_ROOT_PASSWORD: supabase123
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - noobbook-network
 
