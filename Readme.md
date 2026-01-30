@@ -144,7 +144,7 @@ Generate content from your sources using AI agents:
 Frontend (React + Vite)
     |
     v
-Backend API (Flask)
+Backend API (Flask + SocketIO)
     |
     ├── Source Processing (upload, extract, chunk, embed)
     ├── Chat Service (RAG search, Claude API, citations)
@@ -152,7 +152,7 @@ Backend API (Flask)
     └── Integrations (Claude, OpenAI, Pinecone, ElevenLabs, Gemini)
     |
     v
-Data Storage (JSON files)
+Supabase (PostgreSQL + S3 Storage + Auth)
 ```
 
 **AI Services:**
@@ -165,39 +165,131 @@ Data Storage (JSON files)
 
 ---
 
-## Running Locally
+## Getting Started
 
 ### Prerequisites
 
-```bash
-# macOS
-brew install libreoffice ffmpeg
-npx playwright install
+| Requirement | Install |
+|-------------|---------|
+| **Python 3.10+** | `brew install python3` (macOS) / `sudo apt install python3 python3-venv` (Ubuntu) |
+| **Node.js 18+** | `brew install node` (macOS) / [nodesource](https://github.com/nodesource/distributions) (Ubuntu) |
+| **Docker & Docker Compose** | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/) |
+| **LibreOffice** (optional) | `brew install libreoffice` / `sudo apt install libreoffice` — for DOCX/PPTX |
+| **FFmpeg** (optional) | `brew install ffmpeg` / `sudo apt install ffmpeg` — for audio |
 
-# Ubuntu/Debian
-sudo apt install libreoffice ffmpeg
-npx playwright install
+### API Keys
+
+You'll need these before the app will work:
+
+| Key | Where to get it | Required? |
+|-----|-----------------|-----------|
+| `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com/) | Yes |
+| `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com/) | Yes |
+| `PINECONE_API_KEY` + `PINECONE_INDEX_NAME` | [pinecone.io](https://www.pinecone.io/) | Yes |
+| `ELEVENLABS_API_KEY` | [elevenlabs.io](https://elevenlabs.io/) | No — audio features |
+| `TAVILY_API_KEY` | [tavily.com](https://tavily.com/) | No — web search fallback |
+| `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | [Google Cloud Console](https://console.cloud.google.com/) | No — Google Drive import |
+
+---
+
+### Option A: Docker Setup (Recommended)
+
+One script starts everything — Supabase, database migrations, backend, and frontend.
+
+```bash
+# 1. Clone and switch to develop
+git clone https://github.com/amitdevv/NoobBook.git
+cd NoobBook
+git checkout develop
+
+# 2. Copy env template and add your API keys
+cp docker/.env.example docker/.env
+nano docker/.env    # Add ANTHROPIC_API_KEY, OPENAI_API_KEY, PINECONE_API_KEY, PINECONE_INDEX_NAME
+
+# 3. Run setup (generates Supabase secrets, starts everything)
+bash docker/setup.sh
+
+# 4. Open NoobBook
+open http://localhost
 ```
 
-### macOS / Linux
+**Manage Docker setup:**
+```bash
+bash docker/stop.sh           # Stop all services (data preserved)
+bash docker/setup.sh          # Re-run (idempotent, safe to re-run)
+bash docker/reset.sh          # Stop all services
+bash docker/reset.sh -v       # Stop + delete ALL data (destructive)
+```
+
+| Service | URL |
+|---------|-----|
+| NoobBook | `http://localhost` |
+| Backend API | `http://localhost:5001/api/v1` |
+| Supabase Studio | `http://localhost:8000` |
+
+---
+
+### Option B: Local Development
+
+Run backend and frontend locally, but you still need Supabase running (via Docker or Supabase Cloud).
+
+**Step 1: Start Supabase**
 
 ```bash
-# First time setup (creates venv, installs dependencies)
-bin/setup
+# Self-hosted via Docker
+cp docker/supabase/.env.example docker/supabase/.env
+# Edit docker/supabase/.env (see backend/supabase/SETUP.md for details)
+docker network create noobbook-network
+docker compose -f docker/supabase/docker-compose.yml --env-file docker/supabase/.env up -d
 
-# Run both backend and frontend
-bin/dev
+# Or use Supabase Cloud — get keys from https://app.supabase.com/project/_/settings/api
+```
+
+**Step 2: Run database migrations**
+
+```bash
+# Via psql
+psql -h localhost -p 5432 -U postgres -d postgres -f backend/supabase/init.sql
+
+# Or via Supabase Studio → SQL Editor → paste contents of init.sql → Run
+```
+
+**Step 3: Configure environment**
+
+```bash
+cp backend/.env.template backend/.env
+nano backend/.env
+```
+
+Add your API keys AND Supabase keys:
+```bash
+# Required API keys
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+PINECONE_API_KEY=...
+PINECONE_INDEX_NAME=...
+
+# Required Supabase keys (app won't start without these)
+SUPABASE_URL=http://localhost:8000
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_KEY=your-service-role-key
+```
+
+**Step 4: Install and run**
+
+macOS / Linux:
+```bash
+bin/setup                     # First time — creates venv, installs all deps
+bin/dev                       # Starts backend (:5001) + frontend (:5173)
 
 # Options
-bin/dev --backend-only    # Only Flask server
-bin/dev --frontend-only   # Only Vite server
-bin/dev --install         # Update deps before starting
+bin/dev --backend-only        # Only Flask server
+bin/dev --frontend-only       # Only Vite server
+bin/dev --install             # Update deps before starting
 ```
 
-### Windows
-
+Windows:
 ```bash
-# First time setup
 cd backend
 python -m venv venv
 venv\Scripts\activate
@@ -206,26 +298,16 @@ pip install -r requirements.txt
 cd ../frontend
 npm install
 
-# Run both servers
-python start.py
-
-# Stop servers
-python stop.py
+python start.py               # Starts both servers
+python stop.py                 # Stops both servers
 ```
 
-### API Keys
+**Step 5: Install Playwright (for web scraping)**
+```bash
+npx playwright install
+```
 
-Create `backend/.env` or configure in **Dashboard -> Settings**:
-
-**Required:**
-- `ANTHROPIC_API_KEY` - Claude API
-- `OPENAI_API_KEY` - Embeddings
-- `PINECONE_API_KEY` + `PINECONE_INDEX_NAME` - Vector database
-
-**Optional:**
-- `ELEVENLABS_API_KEY` - Audio features
-- `TAVILY_API_KEY` - Web search
-- `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` - Google Drive import
+For the full Supabase setup guide, see [`backend/supabase/SETUP.md`](backend/supabase/SETUP.md).
 
 ---
 
@@ -236,7 +318,8 @@ Create `backend/.env` or configure in **Dashboard -> Settings**:
 | Frontend | React + Vite + TypeScript |
 | UI | shadcn/ui + Tailwind CSS |
 | Icons | Phosphor Icons |
-| Backend | Python Flask |
+| Backend | Python Flask + SocketIO |
+| Database | Supabase (PostgreSQL + S3 Storage + Auth) |
 | AI/LLM | Claude (Anthropic), OpenAI Embeddings |
 | Vector DB | Pinecone |
 | Audio | ElevenLabs |
