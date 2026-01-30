@@ -6,8 +6,8 @@ The service handles video generation requests and file downloads.
 """
 import os
 import time
+import tempfile
 from typing import Dict, Any, Optional
-from pathlib import Path
 
 
 class GoogleVideoService:
@@ -45,18 +45,20 @@ class GoogleVideoService:
         """Check if VEO_API_KEY is set."""
         return bool(self.api_key)
 
-    def generate_video(
+    def generate_video_bytes(
         self,
         prompt: str,
         aspect_ratio: str = "16:9",
         duration_seconds: int = 8,
         number_of_videos: int = 1,
         person_generation: str = "ALLOW_ALL",
-        output_dir: Path = None,
         on_progress: Optional[callable] = None
     ) -> Dict[str, Any]:
         """
-        Generate video(s) using Google Veo 2.0.
+        Generate video(s) and return as bytes (for Supabase upload).
+
+        Educational Note: The Google SDK's .save(filepath) only writes to disk,
+        so we use a temp directory internally and read the bytes back.
 
         Args:
             prompt: Text prompt describing the video to generate
@@ -64,24 +66,23 @@ class GoogleVideoService:
             duration_seconds: 5-8 seconds
             number_of_videos: 1-4 videos
             person_generation: "ALLOW_ALL" or other policy
-            output_dir: Directory to save generated videos
             on_progress: Optional callback for progress updates
 
         Returns:
-            Dict with success status and video file paths
+            Dict with success status and video bytes:
+            {
+                "success": True,
+                "videos": [{"filename": str, "video_bytes": bytes, "uri": str, "index": int}]
+            }
         """
         if not self.is_configured():
-            return {
-                "success": False,
-                "error": "VEO_API_KEY not configured"
-            }
+            return {"success": False, "error": "VEO_API_KEY not configured"}
 
         try:
             from google.genai import types
 
             client = self._get_client()
 
-            # Configure video generation
             video_config = types.GenerateVideosConfig(
                 aspect_ratio=aspect_ratio,
                 number_of_videos=number_of_videos,
@@ -89,8 +90,7 @@ class GoogleVideoService:
                 person_generation=person_generation,
             )
 
-            # Start generation operation
-            print(f"[VideoService] Starting video generation: {prompt[:50]}...")
+            print(f"[VideoService] Starting video generation (bytes): {prompt[:50]}...")
             operation = client.models.generate_videos(
                 model=self.MODEL,
                 prompt=prompt,
@@ -99,7 +99,7 @@ class GoogleVideoService:
 
             # Poll for completion
             poll_count = 0
-            max_polls = 120  # 20 minutes max (10 sec intervals)
+            max_polls = 120
 
             while not operation.done:
                 poll_count += 1
@@ -118,55 +118,39 @@ class GoogleVideoService:
                 time.sleep(10)
                 operation = client.operations.get(operation)
 
-            # Get result
             result = operation.result
             if not result:
-                return {
-                    "success": False,
-                    "error": "No result returned from video generation"
-                }
+                return {"success": False, "error": "No result returned from video generation"}
 
             generated_videos = result.generated_videos
             if not generated_videos:
-                return {
-                    "success": False,
-                    "error": "No videos were generated"
-                }
+                return {"success": False, "error": "No videos were generated"}
 
-            # Download videos
             print(f"[VideoService] Generated {len(generated_videos)} video(s)")
             video_files = []
 
-            for idx, generated_video in enumerate(generated_videos):
-                video_uri = generated_video.video.uri
-                print(f"[VideoService] Downloading: {video_uri}")
+            # Save to temp directory and read bytes back
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                for idx, generated_video in enumerate(generated_videos):
+                    video_uri = generated_video.video.uri
+                    print(f"[VideoService] Downloading: {video_uri}")
 
-                # Download file
-                client.files.download(file=generated_video.video)
+                    client.files.download(file=generated_video.video)
 
-                # Save to output directory
-                if output_dir:
-                    output_dir.mkdir(parents=True, exist_ok=True)
                     filename = f"video_{idx + 1}.mp4"
-                    file_path = output_dir / filename
-                    generated_video.video.save(str(file_path))
-                    print(f"[VideoService] Saved: {file_path}")
+                    tmp_path = os.path.join(tmp_dir, filename)
+                    generated_video.video.save(tmp_path)
+
+                    with open(tmp_path, 'rb') as f:
+                        video_bytes = f.read()
+
+                    print(f"[VideoService] Read {len(video_bytes)} bytes for {filename}")
 
                     video_files.append({
                         "filename": filename,
-                        "path": str(file_path),
+                        "video_bytes": video_bytes,
                         "uri": video_uri,
                         "index": idx + 1
-                    })
-                else:
-                    # Just save with default name
-                    filename = f"video_{idx}.mp4"
-                    generated_video.video.save(filename)
-                    video_files.append({
-                        "filename": filename,
-                        "path": filename,
-                        "uri": video_uri,
-                        "index": idx
                     })
 
             return {
@@ -179,10 +163,7 @@ class GoogleVideoService:
             print(f"[VideoService] Error: {e}")
             import traceback
             traceback.print_exc()
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
 
 # Singleton instance

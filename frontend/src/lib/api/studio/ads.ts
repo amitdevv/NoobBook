@@ -134,8 +134,8 @@ export const adsAPI = {
   /**
    * Get the full URL for an ad creative image
    */
-  getCreativeUrl(projectId: string, filename: string): string {
-    return `${API_BASE_URL}/projects/${projectId}/studio/creatives/${filename}`;
+  getCreativeUrl(projectId: string, jobId: string, filename: string): string {
+    return `${API_BASE_URL}/projects/${projectId}/studio/creatives/${jobId}/${filename}`;
   },
 
   /**

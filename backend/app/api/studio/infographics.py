@@ -23,15 +23,17 @@ Routes:
 - POST /projects/<id>/studio/infographic           - Start generation
 - GET  /projects/<id>/studio/infographic-jobs/<id> - Job status
 - GET  /projects/<id>/studio/infographic-jobs      - List jobs
-- GET  /projects/<id>/studio/infographics/<file>   - Serve image file
+- GET  /projects/<id>/studio/infographics/<job_id>/<file> - Serve image file
 """
+import io
 import uuid
 from flask import jsonify, request, current_app, send_file
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
-from app.services.studio_services.infographic_service import infographic_service, get_studio_infographics_dir
+from app.services.studio_services.infographic_service import infographic_service
 from app.services.source_services import source_index_service
 from app.services.integrations.google.imagen_service import imagen_service
+from app.services.integrations.supabase import storage_service
 from app.services.background_services.task_service import task_service
 
 
@@ -178,41 +180,28 @@ def list_infographic_jobs(project_id: str):
         }), 500
 
 
-@studio_bp.route('/projects/<project_id>/studio/infographics/<filename>', methods=['GET'])
-def get_infographic_file(project_id: str, filename: str):
+@studio_bp.route('/projects/<project_id>/studio/infographics/<job_id>/<filename>', methods=['GET'])
+def get_infographic_file(project_id: str, job_id: str, filename: str):
     """
-    Serve an infographic image file.
+    Serve an infographic image file from Supabase Storage.
 
     Response:
         - Image file (png/jpg) with appropriate headers
     """
     try:
-        infographics_dir = get_studio_infographics_dir(project_id)
-        filepath = infographics_dir / filename
+        data = storage_service.download_studio_binary(
+            project_id, "infographics", job_id, filename
+        )
 
-        if not filepath.exists():
+        if not data:
             return jsonify({
                 'success': False,
                 'error': f'Infographic not found: {filename}'
             }), 404
 
-        # Validate the file is within the expected directory (security)
-        try:
-            filepath.resolve().relative_to(infographics_dir.resolve())
-        except ValueError:
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file path'
-            }), 400
-
-        # Determine mimetype
         mimetype = 'image/png' if filename.endswith('.png') else 'image/jpeg'
 
-        return send_file(
-            filepath,
-            mimetype=mimetype,
-            as_attachment=False
-        )
+        return send_file(io.BytesIO(data), mimetype=mimetype, as_attachment=False)
 
     except Exception as e:
         current_app.logger.error(f"Error serving infographic file: {e}")

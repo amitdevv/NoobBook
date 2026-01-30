@@ -20,8 +20,7 @@ Output Formats:
 - pcm_16000: Raw PCM for processing
 """
 import os
-from pathlib import Path
-from typing import Optional, Generator, Union
+from typing import Optional, Generator
 from datetime import datetime
 
 
@@ -126,30 +125,39 @@ class TTSService:
 
         return chunks
 
-    def generate_audio(
+    def generate_audio_bytes(
         self,
         text: str,
-        output_path: Path,
         voice_id: Optional[str] = None,
         model_id: Optional[str] = None,
         output_format: Optional[str] = None
     ) -> dict:
         """
-        Generate audio from text and save to file.
+        Generate audio from text and return bytes directly (no disk write).
 
-        Educational Note: This method converts text to speech and saves the
-        resulting audio to a file. It uses the ElevenLabs SDK's convert method
-        which returns audio bytes directly.
+        Educational Note: Generates audio and returns raw bytes directly
+        instead of writing to a file. Used for Supabase Storage uploads.
 
         Args:
             text: The text to convert to speech
-            output_path: Path to save the audio file
             voice_id: ElevenLabs voice ID (uses default if not specified)
             model_id: TTS model to use (uses multilingual_v2 by default)
             output_format: Audio format (uses mp3_44100_128 by default)
 
         Returns:
-            Dict with success status, file path, and metadata
+            Dict with success status and audio bytes:
+            {
+                "success": True,
+                "audio_bytes": bytes,
+                "file_size_bytes": int,
+                "character_count": int,
+                "word_count": int,
+                "estimated_duration_seconds": float,
+                "voice_id": str,
+                "model_id": str,
+                "output_format": str,
+                "generated_at": str
+            }
         """
         if not text or not text.strip():
             return {
@@ -160,9 +168,8 @@ class TTSService:
         try:
             client = self._get_client()
 
-            print(f"Generating audio: {len(text)} characters")
+            print(f"Generating audio bytes: {len(text)} characters")
 
-            # Use defaults if not specified
             voice = voice_id or self.DEFAULT_VOICE_ID
             model = model_id or self.DEFAULT_MODEL
             fmt = output_format or self.DEFAULT_OUTPUT_FORMAT
@@ -184,27 +191,19 @@ class TTSService:
                 chunk_bytes = b"".join(audio_generator)
                 all_audio_bytes.append(chunk_bytes)
 
-            # Ensure output directory exists
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Combine all audio chunks
-            # Educational Note: MP3 files can be concatenated directly
+            # Combine all audio chunks (MP3 files can be concatenated directly)
             audio_bytes = b"".join(all_audio_bytes)
 
-            with open(output_path, "wb") as f:
-                f.write(audio_bytes)
-
-            # Calculate duration estimate (rough: ~150 words/min, ~5 chars/word)
-            # This is approximate - actual duration depends on voice and model
+            # Calculate duration estimate
             word_count = len(text.split())
             estimated_duration_seconds = (word_count / 150) * 60
 
-            print(f"Audio saved to: {output_path}")
+            print(f"Audio generated: {len(audio_bytes)} bytes")
             print(f"Estimated duration: {estimated_duration_seconds:.0f} seconds")
 
             return {
                 "success": True,
-                "file_path": str(output_path),
+                "audio_bytes": audio_bytes,
                 "file_size_bytes": len(audio_bytes),
                 "character_count": len(text),
                 "word_count": word_count,
@@ -216,17 +215,10 @@ class TTSService:
             }
 
         except ValueError as e:
-            # API key not configured
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
         except Exception as e:
-            print(f"Error generating audio: {e}")
-            return {
-                "success": False,
-                "error": f"TTS generation failed: {str(e)}"
-            }
+            print(f"Error generating audio bytes: {e}")
+            return {"success": False, "error": f"TTS generation failed: {str(e)}"}
 
     def generate_audio_stream(
         self,

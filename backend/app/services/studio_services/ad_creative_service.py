@@ -12,7 +12,6 @@ Flow:
 - Output: 3 ad creative images saved to disk
 """
 import json
-from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
 
@@ -20,15 +19,7 @@ from app.services.integrations.claude import claude_service
 from app.services.integrations.google.imagen_service import imagen_service
 from app.services.studio_services import studio_index_service
 from app.config import prompt_loader
-from app.utils.path_utils import get_studio_dir
-
-
-def get_studio_creatives_dir(project_id: str) -> Path:
-    """Get the directory for ad creative images."""
-    studio_dir = get_studio_dir(project_id)
-    creatives_dir = studio_dir / "creatives"
-    creatives_dir.mkdir(parents=True, exist_ok=True)
-    return creatives_dir
+from app.services.integrations.supabase import storage_service
 
 
 class AdCreativeService:
@@ -114,7 +105,6 @@ class AdCreativeService:
         )
 
         # Step 2: Generate images with Gemini
-        creatives_dir = get_studio_creatives_dir(project_id)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         all_images = []
 
@@ -133,19 +123,29 @@ class AdCreativeService:
                 progress=f"Generating {prompt_type} image ({i+1}/{len(prompts)})..."
             )
 
-            # Generate single image for this prompt
-            result = imagen_service.generate_images(
+            # Generate single image as bytes
+            result = imagen_service.generate_image_bytes(
                 prompt=prompt_text,
-                output_dir=creatives_dir,
-                num_images=1,
                 filename_prefix=f"ad_{job_id[:8]}_{prompt_type}_{timestamp}"
             )
 
-            if result.get("success") and result.get("images"):
-                image_info = result["images"][0]
-                image_info["type"] = prompt_type
-                image_info["prompt"] = prompt_text
-                all_images.append(image_info)
+            if result.get("success"):
+                image_bytes = result["image_bytes"]
+                filename = result["filename"]
+
+                # Upload to Supabase Storage
+                storage_path = storage_service.upload_studio_binary(
+                    project_id, "creatives", job_id, filename, image_bytes, "image/png"
+                )
+                if storage_path:
+                    image_info = {
+                        "filename": filename,
+                        "content_type": "image/png",
+                        "size_bytes": len(image_bytes),
+                        "type": prompt_type,
+                        "prompt": prompt_text
+                    }
+                    all_images.append(image_info)
 
         if not all_images:
             studio_index_service.update_ad_job(
@@ -162,9 +162,9 @@ class AdCreativeService:
         # Step 3: Update job as complete
         duration = (datetime.now() - started_at).total_seconds()
 
-        # Build image URLs
+        # Build image URLs (include job_id for Supabase storage path)
         for img in all_images:
-            img["url"] = f"/api/v1/projects/{project_id}/studio/creatives/{img['filename']}"
+            img["url"] = f"/api/v1/projects/{project_id}/studio/creatives/{job_id}/{img['filename']}"
 
         studio_index_service.update_ad_job(
             project_id, job_id,

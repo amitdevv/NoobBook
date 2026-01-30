@@ -7,13 +7,12 @@ Educational Note: This is a simple service (not an agent) that:
 3. Saves videos and updates job status
 """
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, Any
 
 from app.services.integrations.google.video_service import google_video_service
 from app.services.ai_services.video_prompt_service import video_prompt_service
 from app.services.studio_services import studio_index_service
-from app.utils.path_utils import get_studio_dir
+from app.services.integrations.supabase import storage_service
 
 
 class VideoService:
@@ -84,11 +83,6 @@ class VideoService:
             generated_prompt=video_prompt
         )
 
-        # Prepare output directory
-        studio_dir = get_studio_dir(project_id)
-        video_dir = Path(studio_dir) / "videos" / job_id
-        video_dir.mkdir(parents=True, exist_ok=True)
-
         # Progress callback
         def on_progress(message: str):
             studio_index_service.update_video_job(
@@ -96,13 +90,12 @@ class VideoService:
                 status_message=message
             )
 
-        # Step 2: Generate video(s) using Google Veo
-        result = google_video_service.generate_video(
+        # Step 2: Generate video(s) using Google Veo (returns bytes)
+        result = google_video_service.generate_video_bytes(
             prompt=video_prompt,
             aspect_ratio=aspect_ratio,
             duration_seconds=duration_seconds,
             number_of_videos=number_of_videos,
-            output_dir=video_dir,
             on_progress=on_progress
         )
 
@@ -115,16 +108,24 @@ class VideoService:
             )
             return result
 
-        # Success - update job
+        # Upload videos to Supabase Storage
         videos = result["videos"]
-        print(f"[VideoService] Generated {len(videos)} video(s)")
+        print(f"[VideoService] Generated {len(videos)} video(s), uploading to storage...")
 
         # Build video info for job
         video_info = []
         for video in videos:
+            # Upload each video to Supabase Storage
+            storage_path = storage_service.upload_studio_binary(
+                project_id, "videos", job_id,
+                video["filename"], video["video_bytes"], "video/mp4"
+            )
+            if not storage_path:
+                print(f"[VideoService] Warning: Failed to upload {video['filename']}")
+                continue
+
             video_info.append({
                 "filename": video["filename"],
-                "path": video["path"],
                 "uri": video["uri"],
                 "preview_url": f"/api/v1/projects/{project_id}/studio/videos/{job_id}/preview/{video['filename']}",
                 "download_url": f"/api/v1/projects/{project_id}/studio/videos/{job_id}/download/{video['filename']}"

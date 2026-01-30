@@ -164,8 +164,8 @@ export const audioAPI = {
   /**
    * Get the full URL for an audio file
    */
-  getAudioUrl(projectId: string, filename: string): string {
-    return `${API_BASE_URL}/projects/${projectId}/studio/audio/${filename}`;
+  getAudioUrl(projectId: string, jobId: string, filename: string): string {
+    return `${API_BASE_URL}/projects/${projectId}/studio/audio/${jobId}/${filename}`;
   },
 
   /**

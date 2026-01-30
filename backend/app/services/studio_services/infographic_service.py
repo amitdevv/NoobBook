@@ -9,7 +9,6 @@ Infographics are visual summaries that organize information in an
 educational, easy-to-scan format with icons, sections, and visual flow.
 """
 import json
-from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
 
@@ -19,19 +18,10 @@ from app.services.source_services import source_index_service
 from app.services.studio_services import studio_index_service
 from app.config import prompt_loader
 from app.services.integrations.supabase import storage_service
-from app.utils.path_utils import get_studio_dir
 
 
 # Infographic aspect ratio - landscape for modal display
 INFOGRAPHIC_ASPECT_RATIO = "16:9"
-
-
-def get_studio_infographics_dir(project_id: str) -> Path:
-    """Get the directory for infographic images."""
-    studio_dir = get_studio_dir(project_id)
-    infographics_dir = studio_dir / "infographics"
-    infographics_dir.mkdir(parents=True, exist_ok=True)
-    return infographics_dir
 
 
 class InfographicService:
@@ -183,22 +173,33 @@ class InfographicService:
                 progress="Generating infographic image..."
             )
 
-            infographics_dir = get_studio_infographics_dir(project_id)
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
-            image_result = imagen_service.generate_images(
+            image_result = imagen_service.generate_image_bytes(
                 prompt=image_prompt,
-                output_dir=infographics_dir,
-                num_images=1,
                 filename_prefix=f"infographic_{job_id[:8]}_{timestamp}",
                 aspect_ratio=INFOGRAPHIC_ASPECT_RATIO
             )
 
-            if not image_result.get("success") or not image_result.get("images"):
+            if not image_result.get("success"):
                 raise ValueError(image_result.get("error", "Failed to generate image"))
 
-            image_info = image_result["images"][0]
-            image_url = f"/api/v1/projects/{project_id}/studio/infographics/{image_info['filename']}"
+            # Upload image bytes to Supabase Storage
+            image_bytes = image_result["image_bytes"]
+            filename = image_result["filename"]
+
+            storage_path = storage_service.upload_studio_binary(
+                project_id, "infographics", job_id, filename, image_bytes, "image/png"
+            )
+            if not storage_path:
+                raise ValueError("Failed to upload infographic image to storage")
+
+            image_info = {
+                "filename": filename,
+                "content_type": "image/png",
+                "size_bytes": len(image_bytes)
+            }
+            image_url = f"/api/v1/projects/{project_id}/studio/infographics/{job_id}/{filename}"
 
             # Calculate generation time
             duration = (datetime.now() - started_at).total_seconds()

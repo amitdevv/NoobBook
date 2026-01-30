@@ -8,13 +8,11 @@ Educational Note: This executor handles two tools for the audio overview agent:
 The agent reads content incrementally and writes script sections as it goes,
 ensuring the script covers all source material even for large sources.
 """
-from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 
 from app.services.source_services import source_index_service
 from app.services.integrations.supabase import storage_service
-from app.utils.path_utils import get_studio_scripts_dir
 
 
 class StudioAudioExecutor:
@@ -41,7 +39,7 @@ class StudioAudioExecutor:
         tool_name: str,
         tool_input: Dict[str, Any],
         project_id: str,
-        script_path: Optional[Path] = None
+        job_id: Optional[str] = None
     ) -> Tuple[str, bool]:
         """
         Execute a studio audio tool.
@@ -50,7 +48,7 @@ class StudioAudioExecutor:
             tool_name: The tool to execute
             tool_input: The tool input parameters
             project_id: The project UUID
-            script_path: Path for script file (required for write_script_section)
+            job_id: The job UUID (required for write_script_section, used as Supabase path)
 
         Returns:
             Tuple of (result_string, is_complete)
@@ -59,7 +57,7 @@ class StudioAudioExecutor:
         if tool_name == "read_source_content":
             return self._execute_read_source(tool_input, project_id)
         elif tool_name == "write_script_section":
-            return self._execute_write_script(tool_input, project_id, script_path)
+            return self._execute_write_script(tool_input, project_id, job_id)
         else:
             return f"Unknown tool: {tool_name}", False
 
@@ -200,15 +198,18 @@ class StudioAudioExecutor:
         self,
         tool_input: Dict[str, Any],
         project_id: str,
-        script_path: Optional[Path]
+        job_id: Optional[str]
     ) -> Tuple[str, bool]:
         """
         Execute write_script_section tool.
 
+        Educational Note: Script sections are stored in Supabase Storage under
+        the studio-outputs bucket at: {project_id}/audio/{job_id}/script.txt
+
         Args:
             tool_input: Contains section_number, operation, script_content, is_final
             project_id: The project UUID
-            script_path: Path to write the script file
+            job_id: The job UUID (used as Supabase storage path)
 
         Returns:
             Tuple of (result_string, is_complete)
@@ -222,24 +223,26 @@ class StudioAudioExecutor:
         if not script_content:
             return "Error: script_content is required", False
 
-        if not script_path:
-            # Use default path if not provided
-            scripts_dir = get_studio_scripts_dir(project_id)
-            script_path = scripts_dir / f"script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        if not job_id:
+            return "Error: job_id is required for script storage", False
+
+        script_filename = "script.txt"
 
         try:
-            # Ensure directory exists
-            script_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Write or append
+            # Write or append to Supabase Storage
             if operation == "write":
-                script_path.write_text(script_content, encoding='utf-8')
+                storage_service.upload_studio_file(
+                    project_id, "audio", job_id, script_filename,
+                    script_content, "text/plain; charset=utf-8"
+                )
                 result = f"Section {section_number} written to script."
             else:  # append
-                with open(script_path, 'a', encoding='utf-8') as f:
-                    # Add separator between sections
-                    f.write("\n\n")
-                    f.write(script_content)
+                # Append with separator between sections
+                content_to_append = "\n\n" + script_content
+                storage_service.append_studio_file(
+                    project_id, "audio", job_id, script_filename,
+                    content_to_append
+                )
                 result = f"Section {section_number} appended to script."
 
             if is_final:

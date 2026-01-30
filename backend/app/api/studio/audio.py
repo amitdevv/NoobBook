@@ -21,18 +21,19 @@ Routes:
 - POST /projects/<id>/studio/audio-overview  - Start generation
 - GET  /projects/<id>/studio/jobs/<id>       - Job status
 - GET  /projects/<id>/studio/jobs            - List jobs
-- GET  /projects/<id>/studio/audio/<file>    - Serve audio file
+- GET  /projects/<id>/studio/audio/<job_id>/<file> - Serve audio file
 - GET  /studio/tts/status                    - Check TTS config
 - GET  /studio/tts/voices                    - List available voices
 """
+import io
 import uuid
 from flask import jsonify, request, current_app, send_file
 from app.api.studio import studio_bp
 from app.services.studio_services import audio_overview_service, studio_index_service
 from app.services.source_services import source_index_service
 from app.services.integrations.elevenlabs import tts_service
+from app.services.integrations.supabase import storage_service
 from app.services.background_services.task_service import task_service
-from app.utils.path_utils import get_studio_audio_dir
 
 
 @studio_bp.route('/projects/<project_id>/studio/audio-overview', methods=['POST'])
@@ -183,10 +184,10 @@ def list_audio_jobs(project_id: str):
         }), 500
 
 
-@studio_bp.route('/projects/<project_id>/studio/audio/<filename>', methods=['GET'])
-def get_audio_file(project_id: str, filename: str):
+@studio_bp.route('/projects/<project_id>/studio/audio/<job_id>/<filename>', methods=['GET'])
+def get_audio_file(project_id: str, job_id: str, filename: str):
     """
-    Serve an audio file from the studio audio directory.
+    Serve an audio file from Supabase Storage.
 
     Educational Note: This endpoint serves generated audio files for playback.
     The frontend can use this URL as the src for an <audio> element.
@@ -195,29 +196,17 @@ def get_audio_file(project_id: str, filename: str):
         - Audio file (mp3) with appropriate headers for streaming
     """
     try:
-        audio_dir = get_studio_audio_dir(project_id)
-        audio_path = audio_dir / filename
+        data = storage_service.download_studio_binary(
+            project_id, "audio", job_id, filename
+        )
 
-        if not audio_path.exists():
+        if not data:
             return jsonify({
                 'success': False,
                 'error': f'Audio file not found: {filename}'
             }), 404
 
-        # Validate the file is within the expected directory (security)
-        try:
-            audio_path.resolve().relative_to(audio_dir.resolve())
-        except ValueError:
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file path'
-            }), 400
-
-        return send_file(
-            audio_path,
-            mimetype='audio/mpeg',
-            as_attachment=False
-        )
+        return send_file(io.BytesIO(data), mimetype='audio/mpeg', as_attachment=False)
 
     except Exception as e:
         current_app.logger.error(f"Error serving audio file: {e}")

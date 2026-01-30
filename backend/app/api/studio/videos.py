@@ -26,11 +26,11 @@ Routes:
 - GET  /projects/<id>/studio/videos/<id>/preview/<file>     - Preview video
 - GET  /projects/<id>/studio/videos/<id>/download/<file>    - Download video
 """
-from pathlib import Path
+import io
 from flask import jsonify, request, current_app, send_file
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
-from app.utils.path_utils import get_studio_dir
+from app.services.integrations.supabase import storage_service
 
 
 @studio_bp.route('/projects/<project_id>/studio/videos', methods=['POST'])
@@ -172,35 +172,22 @@ def list_video_jobs(project_id: str):
 @studio_bp.route('/projects/<project_id>/studio/videos/<job_id>/preview/<filename>', methods=['GET'])
 def preview_video(project_id: str, job_id: str, filename: str):
     """
-    Preview a generated video file.
+    Preview a generated video file from Supabase Storage.
 
     Returns the video file for playback in browser.
     """
     try:
-        # Get video directory
-        video_dir = Path(get_studio_dir(project_id)) / "videos" / job_id
-        filepath = video_dir / filename
+        data = storage_service.download_studio_binary(
+            project_id, "videos", job_id, filename
+        )
 
-        if not filepath.exists():
+        if not data:
             return jsonify({
                 'success': False,
                 'error': 'Video file not found'
             }), 404
 
-        # Security check - ensure file is within video directory
-        try:
-            filepath.resolve().relative_to(video_dir.resolve())
-        except ValueError:
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file path'
-            }), 400
-
-        return send_file(
-            filepath,
-            mimetype='video/mp4',
-            as_attachment=False
-        )
+        return send_file(io.BytesIO(data), mimetype='video/mp4', as_attachment=False)
 
     except Exception as e:
         current_app.logger.error(f"Error serving video preview: {e}")
@@ -213,32 +200,23 @@ def preview_video(project_id: str, job_id: str, filename: str):
 @studio_bp.route('/projects/<project_id>/studio/videos/<job_id>/download/<filename>', methods=['GET'])
 def download_video(project_id: str, job_id: str, filename: str):
     """
-    Download a generated video file.
+    Download a generated video file from Supabase Storage.
 
     Returns the video file as an attachment.
     """
     try:
-        # Get video directory
-        video_dir = Path(get_studio_dir(project_id)) / "videos" / job_id
-        filepath = video_dir / filename
+        data = storage_service.download_studio_binary(
+            project_id, "videos", job_id, filename
+        )
 
-        if not filepath.exists():
+        if not data:
             return jsonify({
                 'success': False,
                 'error': 'Video file not found'
             }), 404
 
-        # Security check - ensure file is within video directory
-        try:
-            filepath.resolve().relative_to(video_dir.resolve())
-        except ValueError:
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file path'
-            }), 400
-
         return send_file(
-            filepath,
+            io.BytesIO(data),
             mimetype='video/mp4',
             as_attachment=True,
             download_name=filename

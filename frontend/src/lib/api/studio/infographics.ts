@@ -148,8 +148,8 @@ export const infographicsAPI = {
   /**
    * Get the full URL for an infographic image
    */
-  getImageUrl(projectId: string, filename: string): string {
-    return `${API_BASE_URL}/projects/${projectId}/studio/infographics/${filename}`;
+  getImageUrl(projectId: string, jobId: string, filename: string): string {
+    return `${API_BASE_URL}/projects/${projectId}/studio/infographics/${jobId}/${filename}`;
   },
 
   /**

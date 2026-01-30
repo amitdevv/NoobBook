@@ -22,15 +22,17 @@ Routes:
 - POST /projects/<id>/studio/ad-creative        - Start generation
 - GET  /projects/<id>/studio/ad-jobs/<id>       - Job status
 - GET  /projects/<id>/studio/ad-jobs            - List jobs
-- GET  /projects/<id>/studio/creatives/<file>   - Serve image file
+- GET  /projects/<id>/studio/creatives/<job_id>/<file> - Serve image file
 - GET  /studio/gemini/status                    - Check Gemini config
 """
+import io
 import uuid
 from flask import jsonify, request, current_app, send_file
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
-from app.services.studio_services.ad_creative_service import ad_creative_service, get_studio_creatives_dir
+from app.services.studio_services.ad_creative_service import ad_creative_service
 from app.services.integrations.google.imagen_service import imagen_service
+from app.services.integrations.supabase import storage_service
 from app.services.background_services.task_service import task_service
 
 
@@ -164,41 +166,28 @@ def list_ad_jobs(project_id: str):
         }), 500
 
 
-@studio_bp.route('/projects/<project_id>/studio/creatives/<filename>', methods=['GET'])
-def get_creative_file(project_id: str, filename: str):
+@studio_bp.route('/projects/<project_id>/studio/creatives/<job_id>/<filename>', methods=['GET'])
+def get_creative_file(project_id: str, job_id: str, filename: str):
     """
-    Serve an ad creative image file.
+    Serve an ad creative image file from Supabase Storage.
 
     Response:
         - Image file (png/jpg) with appropriate headers
     """
     try:
-        creatives_dir = get_studio_creatives_dir(project_id)
-        filepath = creatives_dir / filename
+        data = storage_service.download_studio_binary(
+            project_id, "creatives", job_id, filename
+        )
 
-        if not filepath.exists():
+        if not data:
             return jsonify({
                 'success': False,
                 'error': f'Creative file not found: {filename}'
             }), 404
 
-        # Validate the file is within the expected directory (security)
-        try:
-            filepath.resolve().relative_to(creatives_dir.resolve())
-        except ValueError:
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file path'
-            }), 400
-
-        # Determine mimetype
         mimetype = 'image/png' if filename.endswith('.png') else 'image/jpeg'
 
-        return send_file(
-            filepath,
-            mimetype=mimetype,
-            as_attachment=False
-        )
+        return send_file(io.BytesIO(data), mimetype=mimetype, as_attachment=False)
 
     except Exception as e:
         current_app.logger.error(f"Error serving creative file: {e}")

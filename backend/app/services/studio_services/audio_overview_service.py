@@ -15,7 +15,6 @@ Tools:
 - write_script_section: Writes/appends script sections, signals completion
 """
 import uuid
-from pathlib import Path
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
@@ -26,7 +25,7 @@ from app.services.studio_services import studio_index_service
 from app.services.tool_executors.studio_audio_executor import studio_audio_executor
 from app.config import prompt_loader, tool_loader
 from app.utils import claude_parsing_utils
-from app.utils.path_utils import get_studio_scripts_dir, get_studio_audio_dir
+from app.services.integrations.supabase import storage_service
 
 
 class AudioOverviewService:
@@ -117,14 +116,10 @@ class AudioOverviewService:
 
         print(f"  Source: {source_name} ({token_count} tokens, large={is_large})")
 
-        # Step 2: Setup paths
-        scripts_dir = get_studio_scripts_dir(project_id)
-        audio_dir = get_studio_audio_dir(project_id)
-
+        # Step 2: Setup filenames for Supabase Storage
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        script_path = scripts_dir / f"script_{source_id[:8]}_{timestamp}.txt"
+        script_filename = "script.txt"
         audio_filename = f"audio_{source_id[:8]}_{timestamp}.mp3"
-        audio_path = audio_dir / audio_filename
 
         # Update progress
         studio_index_service.update_audio_job(
@@ -132,7 +127,7 @@ class AudioOverviewService:
             progress="Generating script..."
         )
 
-        # Step 3: Generate script via agentic loop
+        # Step 3: Generate script via agentic loop (writes to Supabase Storage)
         script_result = self._generate_script(
             project_id=project_id,
             source_id=source_id,
@@ -140,7 +135,6 @@ class AudioOverviewService:
             token_count=token_count,
             is_large=is_large,
             direction=direction,
-            script_path=script_path,
             job_id=job_id
         )
 
@@ -153,21 +147,28 @@ class AudioOverviewService:
             )
             return script_result
 
-        print(f"  Script generated: {script_path.name}")
+        print(f"  Script generated in Supabase Storage")
 
         # Update progress
         studio_index_service.update_audio_job(
             project_id, job_id,
-            progress="Converting to audio...",
-            script_path=str(script_path)
+            progress="Converting to audio..."
         )
 
-        # Step 4: Convert script to audio
-        script_text = script_path.read_text(encoding='utf-8')
-        audio_result = tts_service.generate_audio(
-            text=script_text,
-            output_path=audio_path
+        # Step 4: Read script from Supabase and convert to audio bytes
+        script_text = storage_service.download_studio_file(
+            project_id, "audio", job_id, script_filename
         )
+        if not script_text:
+            studio_index_service.update_audio_job(
+                project_id, job_id,
+                status="error",
+                error="Script file not found in storage after generation",
+                completed_at=datetime.now().isoformat()
+            )
+            return {"success": False, "error": "Script file not found in storage"}
+
+        audio_result = tts_service.generate_audio_bytes(text=script_text)
 
         if not audio_result.get("success"):
             studio_index_service.update_audio_job(
@@ -178,21 +179,33 @@ class AudioOverviewService:
             )
             return {
                 "success": False,
-                "error": f"TTS conversion failed: {audio_result.get('error')}",
-                "script_path": str(script_path)
+                "error": f"TTS conversion failed: {audio_result.get('error')}"
             }
 
-        print(f"  Audio generated: {audio_path.name}")
+        # Upload audio bytes to Supabase Storage
+        audio_bytes = audio_result["audio_bytes"]
+        storage_path = storage_service.upload_studio_binary(
+            project_id, "audio", job_id, audio_filename, audio_bytes, "audio/mpeg"
+        )
+        if not storage_path:
+            studio_index_service.update_audio_job(
+                project_id, job_id,
+                status="error",
+                error="Failed to upload audio to storage",
+                completed_at=datetime.now().isoformat()
+            )
+            return {"success": False, "error": "Failed to upload audio to storage"}
+
+        print(f"  Audio uploaded: {audio_filename}")
 
         # Step 5: Update job as complete
         duration = (datetime.now() - started_at).total_seconds()
-        audio_url = f"/api/v1/projects/{project_id}/studio/audio/{audio_filename}"
+        audio_url = f"/api/v1/projects/{project_id}/studio/audio/{job_id}/{audio_filename}"
 
         studio_index_service.update_audio_job(
             project_id, job_id,
             status="ready",
             progress="Complete",
-            audio_path=str(audio_path),
             audio_filename=audio_filename,
             audio_url=audio_url,
             audio_info={
@@ -208,10 +221,8 @@ class AudioOverviewService:
         return {
             "success": True,
             "job_id": job_id,
-            "audio_path": str(audio_path),
             "audio_filename": audio_filename,
             "audio_url": audio_url,
-            "script_path": str(script_path),
             "source_id": source_id,
             "source_name": source_name,
             "direction": direction,
@@ -234,14 +245,14 @@ class AudioOverviewService:
         token_count: int,
         is_large: bool,
         direction: str,
-        script_path: Path,
         job_id: str
     ) -> Dict[str, Any]:
         """
         Generate script using agentic loop.
 
         Educational Note: The agent reads source content and writes script sections
-        until it signals completion with is_final=True.
+        until it signals completion with is_final=True. Script is stored in
+        Supabase Storage at: {project_id}/audio/{job_id}/script.txt
 
         Args:
             project_id: The project UUID
@@ -250,8 +261,7 @@ class AudioOverviewService:
             token_count: Token count of the source
             is_large: Whether source is large (needs chunked reading)
             direction: User's direction for the script
-            script_path: Path to write the script file
-            job_id: Job ID for progress updates
+            job_id: Job ID for progress updates and Supabase storage path
 
         Returns:
             Dict with success status, iterations, and usage stats
@@ -328,7 +338,7 @@ class AudioOverviewService:
                         tool_name=tool_name,
                         tool_input=tool_input,
                         project_id=project_id,
-                        script_path=script_path
+                        job_id=job_id
                     )
 
                     tool_results.append({
@@ -370,7 +380,7 @@ class AudioOverviewService:
             if last_batch_seen or full_content_seen:
                 iterations_since_last_batch += 1
                 # Give Claude 2 extra iterations to finish properly
-                if iterations_since_last_batch >= 2 and script_path.exists():
+                if iterations_since_last_batch >= 2 and storage_service.download_studio_file(project_id, "audio", job_id, "script.txt"):
                     reason = "last batch" if last_batch_seen else "full content"
                     print(f"    Forcing completion after {iteration} iterations ({reason} seen)")
                     return {
@@ -387,7 +397,7 @@ class AudioOverviewService:
             if claude_parsing_utils.is_end_turn(response) and not tool_results:
                 print(f"    Unexpected end_turn at iteration {iteration}")
                 # Try to use whatever script was written
-                if script_path.exists():
+                if storage_service.download_studio_file(project_id, "audio", job_id, "script.txt"):
                     return {
                         "success": True,
                         "iterations": iteration,
@@ -406,7 +416,7 @@ class AudioOverviewService:
 
         # Max iterations reached
         print(f"    Max iterations reached ({max_iterations})")
-        if script_path.exists():
+        if storage_service.download_studio_file(project_id, "audio", job_id, "script.txt"):
             return {
                 "success": True,
                 "iterations": max_iterations,
