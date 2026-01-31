@@ -9,7 +9,7 @@ base tools (Jira, Notion, GitHub, etc.). It handles:
 
 This keeps main_chat_service.py clean by centralizing all KB integration logic.
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Callable, Tuple
 
 from app.config import tool_loader
 from app.services.integrations.knowledge_bases.jira import jira_service
@@ -36,20 +36,34 @@ class KnowledgeBaseService:
     GITHUB_TOOLS = []  # Future: ["github_search_prs", "github_get_issue", ...]
 
     def __init__(self):
-        """Initialize the service with lazy-loaded tool definitions."""
-        # Jira tools (lazy-loaded)
-        self._jira_list_projects_tool = None
-        self._jira_search_issues_tool = None
-        self._jira_get_issue_tool = None
-        self._jira_get_project_tool = None
+        """Initialize the service with lazy-loaded tool definitions and dispatch table."""
+        # Single cache for all tool definitions (lazy-loaded)
+        self._tool_cache: Dict[str, Dict[str, Any]] = {}
 
-        # Notion tools (lazy-loaded)
-        self._notion_search_tool = None
-        self._notion_read_page_tool = None
-        self._notion_get_database_schema_tool = None
-        self._notion_query_database_tool = None
+        # Dispatch table: maps tool name -> (executor_method, )
+        # Each executor handles calling the service + formatting the result
+        self._dispatch: Dict[str, Callable[[Dict[str, Any]], str]] = {
+            # Jira tools
+            "jira_list_projects": self._execute_jira_list_projects,
+            "jira_search_issues": self._execute_jira_search_issues,
+            "jira_get_issue": self._execute_jira_get_issue,
+            "jira_get_project": self._execute_jira_get_project,
+            # Notion tools
+            "notion_search": self._execute_notion_search,
+            "notion_read_page": self._execute_notion_read_page,
+            "notion_get_database_schema": self._execute_notion_get_database_schema,
+            "notion_query_database": self._execute_notion_query_database,
+        }
 
-        # Future: GitHub tools
+    def _get_tool(self, tool_name: str) -> Dict[str, Any]:
+        """
+        Load a tool definition by name (cached).
+
+        All knowledge base tools live in the 'chat_tools' category.
+        """
+        if tool_name not in self._tool_cache:
+            self._tool_cache[tool_name] = tool_loader.load_tool("chat_tools", tool_name)
+        return self._tool_cache[tool_name]
 
     def get_available_tools(self) -> List[Dict[str, Any]]:
         """
@@ -66,25 +80,15 @@ class KnowledgeBaseService:
 
         # Add Jira tools if configured
         if jira_service.is_configured():
-            tools.extend([
-                self._get_jira_list_projects_tool(),
-                self._get_jira_search_issues_tool(),
-                self._get_jira_get_issue_tool(),
-                self._get_jira_get_project_tool()
-            ])
+            tools.extend([self._get_tool(name) for name in self.JIRA_TOOLS])
 
         # Add Notion tools if configured
         if notion_service.is_configured():
-            tools.extend([
-                self._get_notion_search_tool(),
-                self._get_notion_read_page_tool(),
-                self._get_notion_get_database_schema_tool(),
-                self._get_notion_query_database_tool()
-            ])
+            tools.extend([self._get_tool(name) for name in self.NOTION_TOOLS])
 
         # Future: Add GitHub tools if configured
         # if github_service.is_configured():
-        #     tools.extend([...])
+        #     tools.extend([self._get_tool(name) for name in self.GITHUB_TOOLS])
 
         return tools
 
@@ -98,11 +102,7 @@ class KnowledgeBaseService:
         Returns:
             True if this service handles the tool
         """
-        return (
-            tool_name in self.JIRA_TOOLS or
-            tool_name in self.NOTION_TOOLS or
-            tool_name in self.GITHUB_TOOLS
-        )
+        return tool_name in self._dispatch
 
     def execute(
         self,
@@ -114,8 +114,9 @@ class KnowledgeBaseService:
         """
         Execute a knowledge base tool.
 
-        Educational Note: Calls service methods directly and formats results.
-        No separate executors needed for simple API integrations.
+        Educational Note: Uses a dispatch table to route tool calls to the
+        appropriate executor. No separate executors needed for simple API
+        integrations.
 
         Args:
             project_id: The project UUID
@@ -126,34 +127,12 @@ class KnowledgeBaseService:
         Returns:
             Formatted result string for Claude
         """
-        # Route to Jira service
-        if tool_name == "jira_list_projects":
-            return self._execute_jira_list_projects(tool_input)
-        elif tool_name == "jira_search_issues":
-            return self._execute_jira_search_issues(tool_input)
-        elif tool_name == "jira_get_issue":
-            return self._execute_jira_get_issue(tool_input)
-        elif tool_name == "jira_get_project":
-            return self._execute_jira_get_project(tool_input)
+        executor = self._dispatch.get(tool_name)
+        if executor:
+            return executor(tool_input)
+        return f"Unknown knowledge base tool: {tool_name}"
 
-        # Route to Notion service
-        elif tool_name == "notion_search":
-            return self._execute_notion_search(tool_input)
-        elif tool_name == "notion_read_page":
-            return self._execute_notion_read_page(tool_input)
-        elif tool_name == "notion_get_database_schema":
-            return self._execute_notion_get_database_schema(tool_input)
-        elif tool_name == "notion_query_database":
-            return self._execute_notion_query_database(tool_input)
-
-        # Future: Route to GitHub service
-        # elif tool_name in self.GITHUB_TOOLS:
-        #     return self._execute_github_tool(tool_name, tool_input)
-
-        else:
-            return f"Unknown knowledge base tool: {tool_name}"
-
-    # Jira Tool Implementations
+    # --- Jira formatters ---
 
     def _execute_jira_list_projects(self, tool_input: Dict[str, Any]) -> str:
         """List Jira projects."""
@@ -315,33 +294,7 @@ class KnowledgeBaseService:
 
         return "\n".join(lines)
 
-    # Tool definition loaders (lazy-loaded, cached)
-
-    def _get_jira_list_projects_tool(self) -> Dict[str, Any]:
-        """Load jira_list_projects tool definition (cached)."""
-        if self._jira_list_projects_tool is None:
-            self._jira_list_projects_tool = tool_loader.load_tool("chat_tools", "jira_list_projects")
-        return self._jira_list_projects_tool
-
-    def _get_jira_search_issues_tool(self) -> Dict[str, Any]:
-        """Load jira_search_issues tool definition (cached)."""
-        if self._jira_search_issues_tool is None:
-            self._jira_search_issues_tool = tool_loader.load_tool("chat_tools", "jira_search_issues")
-        return self._jira_search_issues_tool
-
-    def _get_jira_get_issue_tool(self) -> Dict[str, Any]:
-        """Load jira_get_issue tool definition (cached)."""
-        if self._jira_get_issue_tool is None:
-            self._jira_get_issue_tool = tool_loader.load_tool("chat_tools", "jira_get_issue")
-        return self._jira_get_issue_tool
-
-    def _get_jira_get_project_tool(self) -> Dict[str, Any]:
-        """Load jira_get_project tool definition (cached)."""
-        if self._jira_get_project_tool is None:
-            self._jira_get_project_tool = tool_loader.load_tool("chat_tools", "jira_get_project")
-        return self._jira_get_project_tool
-
-    # Notion Tool Implementations
+    # --- Notion formatters ---
 
     def _execute_notion_search(self, tool_input: Dict[str, Any]) -> str:
         """Search Notion pages and databases."""
@@ -467,32 +420,6 @@ class KnowledgeBaseService:
                 lines.append("")
 
         return "\n".join(lines)
-
-    # Notion Tool Loaders
-
-    def _get_notion_search_tool(self) -> Dict[str, Any]:
-        """Load notion_search tool definition (cached)."""
-        if self._notion_search_tool is None:
-            self._notion_search_tool = tool_loader.load_tool("chat_tools", "notion_search")
-        return self._notion_search_tool
-
-    def _get_notion_read_page_tool(self) -> Dict[str, Any]:
-        """Load notion_read_page tool definition (cached)."""
-        if self._notion_read_page_tool is None:
-            self._notion_read_page_tool = tool_loader.load_tool("chat_tools", "notion_read_page")
-        return self._notion_read_page_tool
-
-    def _get_notion_get_database_schema_tool(self) -> Dict[str, Any]:
-        """Load notion_get_database_schema tool definition (cached)."""
-        if self._notion_get_database_schema_tool is None:
-            self._notion_get_database_schema_tool = tool_loader.load_tool("chat_tools", "notion_get_database_schema")
-        return self._notion_get_database_schema_tool
-
-    def _get_notion_query_database_tool(self) -> Dict[str, Any]:
-        """Load notion_query_database tool definition (cached)."""
-        if self._notion_query_database_tool is None:
-            self._notion_query_database_tool = tool_loader.load_tool("chat_tools", "notion_query_database")
-        return self._notion_query_database_tool
 
 
 # Singleton instance

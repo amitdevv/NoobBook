@@ -138,7 +138,7 @@ class NotionService:
                 "property": "object"
             }
 
-        # Make search request
+        # TODO: Add pagination support (has_more / start_cursor) for large workspaces
         result = self._make_request('search', method='POST', json_data=payload)
 
         if not result['success']:
@@ -199,6 +199,9 @@ class NotionService:
         page = page_result['data']
 
         # Get page blocks (content)
+        # Limitation: Only fetches top-level blocks. Nested children (e.g. items
+        # inside toggles, columns, or synced blocks) are not recursively fetched.
+        # TODO: Add pagination support (has_more / next_cursor) for pages with 100+ blocks
         blocks_result = self._make_request(f'blocks/{page_id}/children')
         if not blocks_result['success']:
             return blocks_result

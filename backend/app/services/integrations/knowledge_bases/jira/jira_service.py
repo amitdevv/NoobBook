@@ -224,6 +224,7 @@ class JiraService:
             Dict with 'success' flag and either 'issues' list or 'error'
         """
         # Cap max_results
+        # TODO: Add pagination support to fetch beyond the first page of results
         max_results = min(max_results, 100)
 
         # Build JQL query if not provided
@@ -231,11 +232,11 @@ class JiraService:
             jql_parts = []
 
             if project_key:
-                jql_parts.append(f"project = {project_key}")
+                jql_parts.append(f'project = "{project_key}"')
             if status:
                 jql_parts.append(f'status = "{status}"')
             if assignee:
-                jql_parts.append(f"assignee = {assignee}")
+                jql_parts.append(f'assignee = "{assignee}"')
             if issue_type:
                 jql_parts.append(f'type = "{issue_type}"')
 
@@ -308,7 +309,10 @@ class JiraService:
         issue = result['data']
         fields = issue.get('fields', {})
 
-        # Format description (handle rich text)
+        # Format description (handle Atlassian Document Format rich text)
+        # Limitation: Only extracts text from paragraph > text nodes.
+        # Other ADF node types (headings, lists, tables, code blocks, media, etc.)
+        # are silently dropped. Expand this if richer extraction is needed.
         description = fields.get('description')
         if isinstance(description, dict):
             content = description.get('content', [])
@@ -347,7 +351,7 @@ class JiraService:
 
                 for comment in comments:
                     body = comment.get('body', '')
-                    # Handle rich text format
+                    # Handle ADF rich text format (same paragraph > text limitation as above)
                     if isinstance(body, dict):
                         content = body.get('content', [])
                         text_parts = []
