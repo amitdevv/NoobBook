@@ -16,6 +16,7 @@ import { parseCitations } from '../../lib/citations';
 import { CitationBadge } from './CitationBadge';
 import { Separator } from '../ui/separator';
 import { sourcesAPI } from '../../lib/api/sources';
+import { getAuthUrl } from '../../lib/api/client';
 import { Button } from '../ui/button';
 import {
   Tooltip,
@@ -304,7 +305,7 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, projectId }) => {
       /\[\[image:([^\]]+)\]\]/g,
       (_match, filename) => {
         const imageUrl = sourcesAPI.getAIImageUrl(projectId, filename);
-        return `![${filename}](${imageUrl})`;
+        return `![${filename}](${getAuthUrl(imageUrl)})`;
       }
     );
 

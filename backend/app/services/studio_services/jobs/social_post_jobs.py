@@ -18,7 +18,8 @@ def create_social_post_job(
     project_id: str,
     job_id: str,
     topic: str,
-    direction: str
+    direction: str,
+    platforms: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     job_data = {
         "id": job_id,
@@ -27,6 +28,7 @@ def create_social_post_job(
         "progress": "Initializing...",
         "error": None,
         "topic": topic,
+        "platforms": platforms or ["linkedin", "instagram", "twitter"],
         "posts": [],
         "topic_summary": None,
         "post_count": 0,

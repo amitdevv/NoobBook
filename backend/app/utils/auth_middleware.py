@@ -30,7 +30,7 @@ def get_current_user_id() -> Optional[str]:
 
 def validate_token() -> Optional[str]:
     """
-    Validate the JWT from the Authorization header and return the user_id.
+    Validate the JWT from the Authorization header (or ?token= query param) and return the user_id.
 
     Returns:
         User ID string on success, None on failure
@@ -38,13 +38,19 @@ def validate_token() -> Optional[str]:
     Educational Note: We call supabase.auth.get_user(jwt) which contacts
     the Supabase Auth server to verify the token signature and expiration.
     The SERVICE_KEY client has permission to validate any user's token.
+
+    Query param fallback: Browser elements like <img>, <video>, <audio>, and <iframe>
+    can't send Authorization headers. For these, the frontend appends ?token=JWT
+    to the URL. We only check the query param when no Authorization header is present.
     """
     auth_header = request.headers.get('Authorization', '')
 
-    if not auth_header.startswith('Bearer '):
-        return None
+    if auth_header.startswith('Bearer '):
+        token = auth_header[7:]  # Strip "Bearer "
+    else:
+        # Fallback: check query parameter for browser elements (img, video, iframe, etc.)
+        token = request.args.get('token', '')
 
-    token = auth_header[7:]  # Strip "Bearer "
     if not token:
         return None
 

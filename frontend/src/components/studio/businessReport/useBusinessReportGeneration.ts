@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import { businessReportsAPI, type BusinessReportJob, type BusinessReportType } from '@/lib/api/studio';
+import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
 
@@ -94,7 +95,7 @@ export const useBusinessReportGeneration = (projectId: string) => {
 
   const downloadBusinessReport = (jobId: string) => {
     const url = businessReportsAPI.getDownloadUrl(projectId, jobId);
-    window.open(url, '_blank');
+    window.open(getAuthUrl(url), '_blank');
   };
 
   return {

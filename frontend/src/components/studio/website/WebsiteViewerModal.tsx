@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '../../ui/dialog';
 import { websitesAPI, type WebsiteJob } from '@/lib/api/studio';
+import { getAuthUrl } from '@/lib/api/client';
 
 interface WebsiteViewerModalProps {
   projectId: string;
@@ -28,8 +29,8 @@ export const WebsiteViewerModal: React.FC<WebsiteViewerModalProps> = ({
 }) => {
   if (!viewingWebsiteJob) return null;
 
-  const previewUrl = websitesAPI.getPreviewUrl(projectId, viewingWebsiteJob.id);
-  const downloadUrl = websitesAPI.getDownloadUrl(projectId, viewingWebsiteJob.id);
+  const previewUrl = getAuthUrl(websitesAPI.getPreviewUrl(projectId, viewingWebsiteJob.id));
+  const downloadUrl = getAuthUrl(websitesAPI.getDownloadUrl(projectId, viewingWebsiteJob.id));
 
   const handleDownload = () => {
     const link = document.createElement('a');

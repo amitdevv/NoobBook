@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import { blogsAPI, type BlogJob, type BlogType } from '@/lib/api/studio';
+import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
 
@@ -88,7 +89,7 @@ export const useBlogGeneration = (projectId: string) => {
 
   const downloadBlog = (jobId: string) => {
     const url = blogsAPI.getDownloadUrl(projectId, jobId);
-    window.open(url, '_blank');
+    window.open(getAuthUrl(url), '_blank');
   };
 
   return {

@@ -16,7 +16,7 @@ import { Button } from '../../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { SquaresFour, Copy, DownloadSimple, Check } from '@phosphor-icons/react';
 import { type ComponentJob } from '@/lib/api/studio';
-import { API_HOST } from '@/lib/api/client';
+import { getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
 
 interface ComponentViewerModalProps {
@@ -36,7 +36,7 @@ export const ComponentViewerModal: React.FC<ComponentViewerModalProps> = ({
   const copyToClipboard = async (previewUrl: string, index: number) => {
     try {
       // Fetch the HTML content from the preview URL
-      const response = await fetch(`${API_HOST}${previewUrl}`);
+      const response = await fetch(getAuthUrl(previewUrl));
       const htmlContent = await response.text();
 
       await navigator.clipboard.writeText(htmlContent);
@@ -51,7 +51,7 @@ export const ComponentViewerModal: React.FC<ComponentViewerModalProps> = ({
 
   const downloadComponent = (previewUrl: string, filename: string) => {
     const link = document.createElement('a');
-    link.href = `${API_HOST}${previewUrl}`;
+    link.href = getAuthUrl(previewUrl);
     link.download = filename;
     link.click();
   };
@@ -95,7 +95,7 @@ export const ComponentViewerModal: React.FC<ComponentViewerModalProps> = ({
                   {/* Preview iframe */}
                   <div className="relative rounded-lg overflow-hidden border bg-gray-50 dark:bg-gray-900">
                     <iframe
-                      src={`${API_HOST}${component.preview_url}`}
+                      src={getAuthUrl(component.preview_url)}
                       className="w-full h-[500px]"
                       title={`${component.variation_name} preview`}
                       sandbox="allow-same-origin allow-scripts"

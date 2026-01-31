@@ -78,4 +78,23 @@ api.interceptors.response.use(
   }
 );
 
+/**
+ * Build an authenticated URL for browser elements that can't send Authorization headers.
+ *
+ * Educational Note: Elements like <img>, <video>, <audio>, and <iframe> make their own
+ * HTTP requests without axios interceptors. We append the JWT as a query parameter
+ * so the backend auth middleware can validate it. The backend checks ?token= as a
+ * fallback when no Authorization header is present.
+ *
+ * @param url - Absolute URL or path starting with /api/. If it's a full URL (starts with http),
+ *              the token is appended directly. If it's a path, API_HOST is prepended first.
+ */
+export function getAuthUrl(url: string): string {
+  const token = localStorage.getItem('noobbook_access_token');
+  const fullUrl = url.startsWith('http') ? url : `${API_HOST}${url}`;
+  if (!token) return fullUrl;
+  const separator = fullUrl.includes('?') ? '&' : '?';
+  return `${fullUrl}${separator}token=${token}`;
+}
+
 export { API_BASE_URL };

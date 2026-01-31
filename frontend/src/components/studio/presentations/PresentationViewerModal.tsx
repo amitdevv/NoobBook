@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from '../../ui/dialog';
 import { presentationsAPI, type PresentationJob } from '@/lib/api/studio';
+import { getAuthUrl } from '@/lib/api/client';
 
 interface PresentationViewerModalProps {
   projectId: string;
@@ -49,12 +50,12 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
     if (viewingPresentationJob && viewingPresentationJob.screenshots?.length > 0) {
       const screenshot = viewingPresentationJob.screenshots[currentSlide - 1];
       if (screenshot && screenshot.screenshot_file) {
-        // API_BASE_URL already includes /api/v1 path
-        const url = presentationsAPI.getScreenshotUrl(
+        // API_BASE_URL already includes /api/v1 path, getAuthUrl adds JWT for browser element auth
+        const url = getAuthUrl(presentationsAPI.getScreenshotUrl(
           projectId,
           viewingPresentationJob.id,
           screenshot.screenshot_file
-        );
+        ));
         setScreenshotUrl(url);
       }
     }
@@ -81,12 +82,12 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
       onDownloadPptx(viewingPresentationJob.id);
     } else {
       const link = document.createElement('a');
-      // API_BASE_URL already includes /api/v1 path
-      link.href = presentationsAPI.getDownloadUrl(
+      // API_BASE_URL already includes /api/v1 path, getAuthUrl adds JWT for browser element auth
+      link.href = getAuthUrl(presentationsAPI.getDownloadUrl(
         projectId,
         viewingPresentationJob.id,
         'pptx'
-      );
+      ));
       link.click();
     }
   };

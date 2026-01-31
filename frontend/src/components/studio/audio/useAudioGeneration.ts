@@ -6,7 +6,7 @@
 
 import { useState, useRef } from 'react';
 import { audioAPI, type AudioJob } from '@/lib/api/studio';
-import { API_HOST } from '@/lib/api/client';
+import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
 
@@ -98,7 +98,7 @@ export const useAudioGeneration = (projectId: string) => {
 
     // Set the source and play
     if (audioRef.current) {
-      audioRef.current.src = `${API_HOST}${job.audio_url}`;
+      audioRef.current.src = getAuthUrl(job.audio_url);
       audioRef.current.play();
       setPlayingJobId(job.id);
     }
@@ -130,7 +130,7 @@ export const useAudioGeneration = (projectId: string) => {
     if (!job.audio_url) return;
 
     try {
-      const response = await fetch(`${API_HOST}${job.audio_url}`);
+      const response = await fetch(getAuthUrl(job.audio_url));
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
 

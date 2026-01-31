@@ -55,10 +55,11 @@ class SocialPostsService:
         project_id: str,
         job_id: str,
         topic: str,
-        direction: str = ""
+        direction: str = "",
+        platforms: List[str] | None = None
     ) -> Dict[str, Any]:
         """
-        Generate social media posts for multiple platforms.
+        Generate social media posts for selected platforms.
 
         Educational Note: This is the main orchestrator that:
         1. Uses Claude to generate copy + image prompts per platform
@@ -70,10 +71,13 @@ class SocialPostsService:
             job_id: The job ID for status tracking
             topic: The topic/content to create posts about
             direction: Additional context/direction from the user
+            platforms: List of platforms to generate for (default: all 3)
 
         Returns:
             Dict with success status, posts data, and metadata
         """
+        if platforms is None:
+            platforms = ["linkedin", "instagram", "twitter"]
         started_at = datetime.now()
 
         # Update job to processing
@@ -92,7 +96,8 @@ class SocialPostsService:
             project_id=project_id,
             topic=topic,
             direction=direction,
-            job_id=job_id
+            job_id=job_id,
+            platforms=platforms
         )
 
         if not content_result.get("success"):
@@ -106,7 +111,10 @@ class SocialPostsService:
 
         posts_data = content_result.get("posts", [])
         topic_summary = content_result.get("topic_summary", "")
-        print(f"  Generated content for {len(posts_data)} platforms")
+
+        # Safety filter: only keep posts for requested platforms
+        posts_data = [p for p in posts_data if p.get("platform", "").lower() in platforms]
+        print(f"  Generated content for {len(posts_data)} platforms (requested: {platforms})")
 
         # Update progress
         studio_index_service.update_social_post_job(
@@ -224,7 +232,8 @@ class SocialPostsService:
         project_id: str,
         topic: str,
         direction: str,
-        job_id: str
+        job_id: str,
+        platforms: List[str] | None = None
     ) -> Dict[str, Any]:
         """
         Generate social media content using Claude.
@@ -232,12 +241,28 @@ class SocialPostsService:
         Educational Note: Claude creates platform-specific copy and image prompts
         tailored to each platform's style, tone, and image dimensions.
         """
+        if platforms is None:
+            platforms = ["linkedin", "instagram", "twitter"]
+
         config = self._load_config()
+
+        # Format platform names for the prompt (e.g., "LinkedIn, Instagram, and Twitter")
+        platform_display = {
+            "linkedin": "LinkedIn",
+            "instagram": "Instagram",
+            "twitter": "Twitter",
+        }
+        platform_names = [platform_display.get(p, p) for p in platforms]
+        if len(platform_names) > 1:
+            platforms_str = ", ".join(platform_names[:-1]) + " and " + platform_names[-1]
+        else:
+            platforms_str = platform_names[0]
 
         # Build user message
         user_message = config["user_message"].format(
             topic=topic,
-            direction=direction or "Create engaging social media posts for this topic."
+            direction=direction or "Create engaging social media posts for this topic.",
+            platforms=platforms_str
         )
 
         messages = [{"role": "user", "content": user_message}]
