@@ -28,6 +28,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { ScrollArea } from '../ui/scroll-area';
+import { getAuthUrl } from '../../lib/api/client';
 import {
   Tooltip,
   TooltipContent,
@@ -341,7 +342,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
    */
   const handleDownloadSource = (sourceId: string) => {
     const url = sourcesAPI.getDownloadUrl(projectId, sourceId);
-    window.open(url, '_blank');
+    window.open(getAuthUrl(url), '_blank');
   };
 
   /**

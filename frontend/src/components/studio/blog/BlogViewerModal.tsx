@@ -16,7 +16,7 @@ import { Button } from '../../ui/button';
 import { ScrollArea } from '../../ui/scroll-area';
 import { Article, DownloadSimple, SpinnerGap, Image as ImageIcon } from '@phosphor-icons/react';
 import { blogsAPI, type BlogJob } from '@/lib/api/studio';
-import { API_HOST } from '@/lib/api/client';
+import { getAuthUrl } from '@/lib/api/client';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -129,8 +129,9 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
                     // Style images with proper API URL
                     img: ({ src, alt }) => {
                       // Handle IMAGE_N placeholders or direct URLs
+                      // getAuthUrl handles both /api/ paths and full URLs
                       const imageSrc = src?.startsWith('/api/')
-                        ? `${API_HOST}${src}`
+                        ? getAuthUrl(src)
                         : src;
                       return (
                         <figure className="my-4">

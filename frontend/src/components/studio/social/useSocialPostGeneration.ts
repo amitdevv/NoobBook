@@ -19,6 +19,7 @@ export const useSocialPostGeneration = (projectId: string) => {
   const [viewingSocialPostJob, setViewingSocialPostJob] = useState<SocialPostJob | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['linkedin', 'instagram', 'twitter']);
 
   /**
    * Load saved social post jobs from backend
@@ -59,7 +60,8 @@ export const useSocialPostGeneration = (projectId: string) => {
       const startResponse = await socialPostsAPI.startGeneration(
         projectId,
         topic,
-        signal.direction
+        signal.direction,
+        selectedPlatforms
       );
 
       if (!startResponse.success || !startResponse.job_id) {
@@ -101,6 +103,8 @@ export const useSocialPostGeneration = (projectId: string) => {
     viewingSocialPostJob,
     setViewingSocialPostJob,
     configError,
+    selectedPlatforms,
+    setSelectedPlatforms,
     loadSavedJobs,
     handleSocialPostGeneration,
   };

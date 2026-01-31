@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import { presentationsAPI, type PresentationJob } from '@/lib/api/studio';
+import { getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
 
@@ -91,10 +92,10 @@ export const usePresentationGeneration = (projectId: string) => {
    * Download presentation as PPTX
    */
   const downloadPresentation = (jobId: string) => {
-    // API_BASE_URL already includes /api/v1 path
+    // API_BASE_URL already includes /api/v1 path, getAuthUrl adds JWT for browser element auth
     const downloadUrl = presentationsAPI.getDownloadUrl(projectId, jobId, 'pptx');
     const link = document.createElement('a');
-    link.href = downloadUrl;
+    link.href = getAuthUrl(downloadUrl);
     link.click();
   };
 
@@ -102,10 +103,10 @@ export const usePresentationGeneration = (projectId: string) => {
    * Download presentation source as ZIP
    */
   const downloadPresentationSource = (jobId: string) => {
-    // API_BASE_URL already includes /api/v1 path
+    // API_BASE_URL already includes /api/v1 path, getAuthUrl adds JWT for browser element auth
     const downloadUrl = presentationsAPI.getDownloadUrl(projectId, jobId, 'zip');
     const link = document.createElement('a');
-    link.href = downloadUrl;
+    link.href = getAuthUrl(downloadUrl);
     link.click();
   };
 

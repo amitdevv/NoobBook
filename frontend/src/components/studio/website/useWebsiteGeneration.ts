@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { websitesAPI, type WebsiteJob } from '@/lib/api/studio';
-import { API_HOST } from '@/lib/api/client';
+import { getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
 
@@ -101,7 +101,7 @@ export const useWebsiteGeneration = (projectId: string) => {
   const downloadWebsite = (jobId: string) => {
     const downloadUrl = websitesAPI.getDownloadUrl(projectId, jobId);
     const link = document.createElement('a');
-    link.href = `${API_HOST}${downloadUrl}`;
+    link.href = getAuthUrl(downloadUrl);
     link.click();
   };
 

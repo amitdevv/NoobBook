@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import { prdsAPI, type PRDJob } from '@/lib/api/studio';
+import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
 
@@ -76,7 +77,7 @@ export const usePRDGeneration = (projectId: string) => {
 
   const downloadPRD = (jobId: string) => {
     const url = prdsAPI.getDownloadUrl(projectId, jobId);
-    window.open(url, '_blank');
+    window.open(getAuthUrl(url), '_blank');
   };
 
   return {
