@@ -29,6 +29,7 @@ Routes:
 from flask import request, jsonify
 from app.api.projects import projects_bp
 from app.services.data_services import project_service
+from app.utils.auth_middleware import get_current_user_id
 
 
 @projects_bp.route('/projects', methods=['GET'])
@@ -47,7 +48,7 @@ def list_projects():
         }
     """
     try:
-        projects = project_service.list_all_projects()
+        projects = project_service.list_all_projects(user_id=get_current_user_id())
         return jsonify({
             "success": True,
             "projects": projects,
@@ -102,7 +103,8 @@ def create_project():
         # Create the project
         project = project_service.create_project(
             name=name,
-            description=data.get('description', '')
+            description=data.get('description', ''),
+            user_id=get_current_user_id()
         )
 
         return jsonify({
@@ -141,7 +143,7 @@ def get_project(project_id):
         }
     """
     try:
-        project = project_service.get_project(project_id)
+        project = project_service.get_project(project_id, user_id=get_current_user_id())
 
         if not project:
             return jsonify({
@@ -199,7 +201,8 @@ def update_project(project_id):
         updated_project = project_service.update_project(
             project_id=project_id,
             name=data.get('name'),
-            description=data.get('description')
+            description=data.get('description'),
+            user_id=get_current_user_id()
         )
 
         if not updated_project:
@@ -250,7 +253,7 @@ def delete_project(project_id):
         }
     """
     try:
-        success = project_service.delete_project(project_id)
+        success = project_service.delete_project(project_id, user_id=get_current_user_id())
 
         if not success:
             return jsonify({
@@ -295,7 +298,7 @@ def open_project(project_id):
         }
     """
     try:
-        project = project_service.open_project(project_id)
+        project = project_service.open_project(project_id, user_id=get_current_user_id())
 
         if not project:
             return jsonify({

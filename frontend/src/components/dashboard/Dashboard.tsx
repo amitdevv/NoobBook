@@ -4,8 +4,9 @@ import { AppSettings } from './AppSettings';
 import { Button } from '../ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { Gear, Ghost, Sparkle, GithubLogo, YoutubeLogo, BookOpen } from '@phosphor-icons/react';
+import { Gear, Ghost, Sparkle, GithubLogo, YoutubeLogo, BookOpen, SignOut } from '@phosphor-icons/react';
 import { ToastContainer, useToast } from '../ui/toast';
+import { useAuth } from '@/hooks/useAuth';
 
 /**
  * Dashboard Component
@@ -38,6 +39,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const { toasts, dismissToast } = useToast();
+  const { user, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-background">
@@ -52,15 +54,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <h1 className="text-lg font-semibold">NoobBook</h1>
           </div>
 
-          <Button
-            variant="soft"
-            size="sm"
-            onClick={() => setAppSettingsOpen(true)}
-            className="gap-2"
-          >
-            <Gear size={16} />
-            App Settings
-          </Button>
+          <div className="flex items-center gap-2">
+            {user && (
+              <span className="text-xs text-muted-foreground hidden sm:inline">
+                {user.email}
+              </span>
+            )}
+            <Button
+              variant="soft"
+              size="sm"
+              onClick={() => setAppSettingsOpen(true)}
+              className="gap-2"
+            >
+              <Gear size={16} />
+              App Settings
+            </Button>
+            <Button
+              variant="soft"
+              size="sm"
+              onClick={logout}
+              className="gap-2"
+            >
+              <SignOut size={16} />
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 

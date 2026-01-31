@@ -7,6 +7,7 @@ and easier to maintain.
 
 Blueprint Architecture:
 - api_bp: Main API blueprint (registered at /api/v1 in app factory)
+  - auth_bp: Authentication (signup, login, logout, session)
   - projects_bp: Project CRUD, costs, memory
   - chats_bp: Chat CRUD operations
   - messages_bp: Message sending (AI interaction)
@@ -18,32 +19,61 @@ Blueprint Architecture:
   - studio_bp: Studio management and collaboration
   - brand_bp: Brand assets and configuration
 
-Nested blueprints are registered without url_prefix since routes
-already include full paths like '/projects/<id>/chats'.
+Authentication: A before_request hook on api_bp validates JWT tokens
+for ALL routes except /auth/* endpoints. This protects every endpoint
+without needing @require_auth on each route.
 """
-from flask import Blueprint
+from flask import Blueprint, request, jsonify, g
 
 # Create the main API blueprint
 api_bp = Blueprint('api', __name__)
+
+# =============================================================================
+# Authentication - Protect all routes except /auth/*
+# =============================================================================
+# Educational Note: before_request runs before every request to any route
+# under api_bp. We skip auth endpoints (login, signup, refresh) since those
+# are public. All other routes require a valid JWT token.
+
+from app.utils.auth_middleware import validate_token  # noqa: E402
+
+@api_bp.before_request
+def authenticate_request():
+    """Validate JWT for all API requests except auth endpoints."""
+    # Skip authentication for auth routes (login, signup, refresh)
+    if request.path.startswith('/api/v1/auth/'):
+        return None
+
+    user_id = validate_token()
+
+    if not user_id:
+        return jsonify({"success": False, "error": "Authentication required"}), 401
+
+    # Attach user_id to request context for use in route handlers
+    g.user_id = user_id
+    return None
+
 
 # =============================================================================
 # Register Nested Blueprints (Modular)
 # =============================================================================
 # These blueprints have their own folders with __init__.py and routes.py
 
-from app.api.chats import chats_bp
-from app.api.messages import messages_bp
-from app.api.prompts import prompts_bp
-from app.api.google import google_bp
-from app.api.projects import projects_bp
-from app.api.transcription import transcription_bp
-from app.api.settings import settings_bp
-from app.api.sources import sources_bp
-from app.api.studio import studio_bp
-from app.api.brand import brand_bp
+from app.api.auth import auth_bp  # noqa: E402
+from app.api.chats import chats_bp  # noqa: E402
+from app.api.messages import messages_bp  # noqa: E402
+from app.api.prompts import prompts_bp  # noqa: E402
+from app.api.google import google_bp  # noqa: E402
+from app.api.projects import projects_bp  # noqa: E402
+from app.api.transcription import transcription_bp  # noqa: E402
+from app.api.settings import settings_bp  # noqa: E402
+from app.api.sources import sources_bp  # noqa: E402
+from app.api.studio import studio_bp  # noqa: E402
+from app.api.brand import brand_bp  # noqa: E402
 
 # Register nested blueprints with the main api blueprint
 # No url_prefix needed - routes already have full paths
+api_bp.register_blueprint(auth_bp)
 api_bp.register_blueprint(chats_bp)
 api_bp.register_blueprint(messages_bp)
 api_bp.register_blueprint(prompts_bp)

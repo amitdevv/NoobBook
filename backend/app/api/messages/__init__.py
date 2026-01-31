@@ -12,10 +12,23 @@ The message flow:
 4. Tool use loop executes until Claude returns final response
 5. Both user message and assistant response are stored and returned
 """
-from flask import Blueprint
+from flask import Blueprint, request
 
 # Create blueprint for message operations
 messages_bp = Blueprint('messages', __name__)
+
+
+# Verify project ownership for all message routes
+from app.utils.auth_middleware import verify_project_access  # noqa: E402
+
+@messages_bp.before_request
+def check_project_access():
+    project_id = request.view_args.get('project_id') if request.view_args else None
+    if project_id:
+        denied = verify_project_access(project_id)
+        if denied:
+            return denied
+
 
 # Import routes to register them with the blueprint
 from app.api.messages import routes  # noqa: F401
