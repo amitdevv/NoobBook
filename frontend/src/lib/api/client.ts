@@ -8,6 +8,17 @@
 import axios from 'axios';
 import type { AxiosError } from 'axios';
 
+// ==================== Default Axios Auth Interceptor ====================
+// Some API files (settings, sources, chats, studio) use raw axios instead
+// of the `api` instance below. This ensures ALL axios requests get the token.
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem('noobbook_access_token');
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 // Base host URL (without /api/v1 path) - used for file URLs, static assets.
 // When VITE_API_HOST is set to "" (Docker via nginx proxy), same-origin requests
 // are used. When unset (local dev), falls back to localhost:5001.
