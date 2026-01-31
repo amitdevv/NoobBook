@@ -23,6 +23,7 @@ from app.services.tool_executors import source_search_executor
 from app.services.tool_executors import memory_executor
 from app.services.tool_executors import csv_analyzer_agent_executor
 from app.services.tool_executors import studio_signal_executor
+from app.services.integrations.knowledge_bases import knowledge_base_service
 from app.services.ai_services.chat_naming_service import chat_naming_service
 from app.services.background_services import task_service
 from app.utils import claude_parsing_utils
@@ -78,6 +79,7 @@ class MainChatService:
         Educational Note: Memory and studio_signal tools are always available.
         Search tool is only available when there are active non-CSV sources.
         CSV analyzer tool is available when there are CSV sources.
+        Knowledge base tools (Jira, Notion, GitHub) are added if configured.
 
         Args:
             has_active_sources: Whether project has active non-CSV sources
@@ -97,6 +99,9 @@ class MainChatService:
 
         if has_csv_sources:
             tools.append(self._get_csv_analyzer_tool())
+
+        # Add all configured knowledge base tools (Jira, Notion, GitHub, etc.)
+        tools.extend(knowledge_base_service.get_available_tools())
 
         return tools
 
@@ -185,6 +190,15 @@ class MainChatService:
                 return result.get("message", "Studio signals activated")
             else:
                 return f"Error: {result.get('message', 'Unknown error')}"
+
+        elif knowledge_base_service.can_handle(tool_name):
+            # Route to knowledge base service (Jira, Notion, GitHub, etc.)
+            return knowledge_base_service.execute(
+                project_id=project_id,
+                chat_id=chat_id,
+                tool_name=tool_name,
+                tool_input=tool_input
+            )
 
         else:
             return f"Unknown tool: {tool_name}"

@@ -1,0 +1,14 @@
+{
+  "name": "notion_read_page",
+  "description": "Read the full content of a specific Notion page. Returns the page's text content extracted from all blocks. Use this after finding a page ID via notion_search.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "page_id": {
+        "type": "string",
+        "description": "The Notion page ID (32-character hex string or UUID format)"
+      }
+    },
+    "required": ["page_id"]
+  }
+}

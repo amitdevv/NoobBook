@@ -1,0 +1,23 @@
+{
+  "name": "notion_search",
+  "description": "Search across all Notion pages and databases that the integration has access to. Returns basic information about matching pages and databases. Use this to discover what content exists before reading specific pages or querying databases.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query string. If not provided, returns all accessible pages and databases."
+      },
+      "filter_type": {
+        "type": "string",
+        "enum": ["page", "database"],
+        "description": "Filter results by type: 'page' for pages only, 'database' for databases only. Omit to return both."
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Maximum number of results to return (default: 20, max: 100)"
+      }
+    },
+    "required": []
+  }
+}

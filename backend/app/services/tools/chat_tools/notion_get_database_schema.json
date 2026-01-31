@@ -1,0 +1,14 @@
+{
+  "name": "notion_get_database_schema",
+  "description": "Get the schema (structure) of a Notion database including all properties and their types. Use this to understand the database structure before querying it. Returns property names and types (title, text, number, select, multi_select, date, checkbox, etc.).",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "database_id": {
+        "type": "string",
+        "description": "The Notion database ID (32-character hex string or UUID format)"
+      }
+    },
+    "required": ["database_id"]
+  }
+}
