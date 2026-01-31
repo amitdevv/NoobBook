@@ -19,10 +19,23 @@ Configuration (colors, typography, guidelines):
 - PUT    /projects/<id>/brand/config/typography - Update typography only
 - PUT    /projects/<id>/brand/config/guidelines - Update guidelines only
 """
-from flask import Blueprint
+from flask import Blueprint, request
 
 # Create blueprint for brand operations
 brand_bp = Blueprint('brand', __name__)
+
+
+# Verify project ownership for all brand routes
+from app.utils.auth_middleware import verify_project_access  # noqa: E402
+
+@brand_bp.before_request
+def check_project_access():
+    project_id = request.view_args.get('project_id') if request.view_args else None
+    if project_id:
+        denied = verify_project_access(project_id)
+        if denied:
+            return denied
+
 
 # Import routes to register them with the blueprint
 from app.api.brand import routes  # noqa: F401

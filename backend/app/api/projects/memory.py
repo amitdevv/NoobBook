@@ -34,6 +34,7 @@ from flask import jsonify
 from app.api.projects import projects_bp
 from app.services.data_services import project_service
 from app.services.ai_services.memory_service import memory_service
+from app.utils.auth_middleware import get_current_user_id
 
 
 @projects_bp.route('/projects/<project_id>/memory', methods=['GET'])
@@ -65,7 +66,7 @@ def get_project_memory(project_id):
     """
     try:
         # Verify project exists
-        project = project_service.get_project(project_id)
+        project = project_service.get_project(project_id, user_id=get_current_user_id())
         if not project:
             return jsonify({
                 "success": False,

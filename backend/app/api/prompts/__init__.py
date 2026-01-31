@@ -19,10 +19,24 @@ Why System Prompts Matter:
 - They provide context about the user's sources
 - They're the foundation of prompt engineering
 """
-from flask import Blueprint
+from flask import Blueprint, request
 
 # Create blueprint for prompt management
 prompts_bp = Blueprint('prompts', __name__)
+
+
+# Verify project ownership for prompt routes that have a project_id
+# (skips global routes like /prompts/default and /prompts/all)
+from app.utils.auth_middleware import verify_project_access  # noqa: E402
+
+@prompts_bp.before_request
+def check_project_access():
+    project_id = request.view_args.get('project_id') if request.view_args else None
+    if project_id:
+        denied = verify_project_access(project_id)
+        if denied:
+            return denied
+
 
 # Import routes to register them with the blueprint
 from app.api.prompts import routes  # noqa: F401

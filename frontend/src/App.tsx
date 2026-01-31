@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-rout
 import { Dashboard, CreateProjectDialog } from './components/dashboard';
 import { ProjectWorkspace } from './components/project';
 import { BrandPage } from './components/brand/BrandPage';
+import { LoginPage, ProtectedRoute } from './components/auth';
+import { AuthProvider } from './hooks/useAuth';
 import { projectsAPI } from './lib/api';
 
 /**
@@ -154,33 +156,42 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Brand Kit Page - Full page for brand management */}
-        <Route path="/projects/:projectId/brand" element={<BrandPage />} />
+      <AuthProvider>
+        <Routes>
+          {/* Public route - Login/Signup */}
+          <Route path="/login" element={<LoginPage />} />
 
-        {/* Project Workspace - URL-based routing */}
-        <Route
-          path="/projects/:projectId"
-          element={
-            <ProjectWorkspaceRoute
-              setRefreshTrigger={setRefreshTrigger}
-            />
-          }
-        />
+          {/* Protected routes - require authentication */}
+          <Route path="/projects/:projectId/brand" element={
+            <ProtectedRoute><BrandPage /></ProtectedRoute>
+          } />
 
-        {/* Dashboard - Home/root route */}
-        <Route
-          path="*"
-          element={
-            <AppContent
-              showCreateDialog={showCreateDialog}
-              setShowCreateDialog={setShowCreateDialog}
-              refreshTrigger={refreshTrigger}
-              setRefreshTrigger={setRefreshTrigger}
-            />
-          }
-        />
-      </Routes>
+          <Route
+            path="/projects/:projectId"
+            element={
+              <ProtectedRoute>
+                <ProjectWorkspaceRoute
+                  setRefreshTrigger={setRefreshTrigger}
+                />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="*"
+            element={
+              <ProtectedRoute>
+                <AppContent
+                  showCreateDialog={showCreateDialog}
+                  setShowCreateDialog={setShowCreateDialog}
+                  refreshTrigger={refreshTrigger}
+                  setRefreshTrigger={setRefreshTrigger}
+                />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

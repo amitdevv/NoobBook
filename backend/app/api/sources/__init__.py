@@ -42,10 +42,23 @@ Why Chunking?
 - Smaller chunks = more precise retrieval
 - Each chunk can be cited independently
 """
-from flask import Blueprint
+from flask import Blueprint, request
 
 # Create blueprint for source management
 sources_bp = Blueprint('sources', __name__)
+
+
+# Verify project ownership for all source routes that have a project_id
+from app.utils.auth_middleware import verify_project_access  # noqa: E402
+
+@sources_bp.before_request
+def check_project_access():
+    project_id = request.view_args.get('project_id') if request.view_args else None
+    if project_id:
+        denied = verify_project_access(project_id)
+        if denied:
+            return denied
+
 
 # Import routes to register them with the blueprint
 from app.api.sources import routes  # noqa: F401
