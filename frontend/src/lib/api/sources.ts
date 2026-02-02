@@ -61,7 +61,7 @@ export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 // Allowed file extensions by category
 export const ALLOWED_EXTENSIONS = {
-  document: ['.pdf', '.txt', '.docx', '.pptx'],
+  document: ['.pdf', '.txt', '.docx', '.pptx', '.md', '.json', '.html', '.xml'],
   image: ['.jpeg', '.jpg', '.png', '.gif', '.webp'],
   audio: ['.mp3', '.wav', '.m4a', '.aac', '.flac'],
   data: ['.csv'],
@@ -99,8 +99,8 @@ export interface ProcessedContent {
  * Audio, image, and CSV files are excluded.
  */
 export const VIEWABLE_EXTENSIONS = [
-  '.pdf', '.txt', '.docx', '.pptx',  // Documents
-  '.link', '.research',               // Web content
+  '.pdf', '.txt', '.docx', '.pptx', '.md', '.json', '.html', '.xml',  // Documents
+  '.link', '.research',                                                 // Web content
 ];
 
 export const NON_VIEWABLE_EXTENSIONS = [

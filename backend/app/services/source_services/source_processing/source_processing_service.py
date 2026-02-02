@@ -47,6 +47,10 @@ class SourceProcessingService:
     PROCESSOR_MAP = {
         ".pdf": "pdf",
         ".txt": "text",
+        ".md": "text",
+        ".json": "text",
+        ".html": "text",
+        ".xml": "text",
         ".docx": "docx",
         ".csv": "csv",  # CSV files (including Google Sheets exports)
         ".jpeg": "image",

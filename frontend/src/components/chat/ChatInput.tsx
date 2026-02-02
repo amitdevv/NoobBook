@@ -92,6 +92,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         {/* Textarea - no border, blends with container */}
         <Textarea
           ref={textareaRef}
+          autoFocus
           placeholder={
             isRecording
               ? 'Listening...'

@@ -3,7 +3,14 @@ import { isAxiosError } from 'axios';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { projectsAPI } from '@/lib/api';
 
 /**
@@ -85,21 +92,21 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit}>
-          <CardHeader>
-            <CardTitle>
+          <DialogHeader>
+            <DialogTitle>
               {editProject ? 'Edit Project' : 'Create New Project'}
-            </CardTitle>
-            <CardDescription>
+            </DialogTitle>
+            <DialogDescription>
               {editProject
                 ? 'Update your project details'
                 : 'Start a new project to organize your research and notes'}
-            </CardDescription>
-          </CardHeader>
+            </DialogDescription>
+          </DialogHeader>
 
-          <CardContent className="space-y-4">
+          <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="name">
                 Project Name *
@@ -132,9 +139,9 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
                 {error}
               </div>
             )}
-          </CardContent>
+          </div>
 
-          <CardFooter className="flex justify-end space-x-2">
+          <DialogFooter>
             <Button
               type="button"
               variant="soft"
@@ -149,9 +156,9 @@ export const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
                 : (editProject ? 'Update Project' : 'Create Project')
               }
             </Button>
-          </CardFooter>
+          </DialogFooter>
         </form>
-      </Card>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
