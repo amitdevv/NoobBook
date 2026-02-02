@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   sourcesAPI,
   MAX_SOURCES,
+  isSourceViewable,
   type Source,
 } from '../../lib/api/sources';
 import { useToast, ToastContainer } from '../ui/toast';
@@ -39,13 +40,20 @@ import {
   File,
   FilePdf,
   FileDoc,
+  FilePpt,
+  FileCsv,
+  FileHtml,
+  FilePng,
+  FileJpg,
   FileText,
+  MarkdownLogo,
+  Table,
   Link,
   Image,
   MusicNote,
-  Video,
   YoutubeLogo,
   CaretRight,
+  Plus,
 } from '@phosphor-icons/react';
 
 interface SourcesPanelProps {
@@ -56,27 +64,50 @@ interface SourcesPanelProps {
 }
 
 /**
- * Get icon component based on source file type
+ * Get icon component for a source in the collapsed sidebar.
+ * Educational Note: Mirrors the logic in SourceItem.tsx — extracts extension from
+ * source.name (most reliable), falls back to embedding_info.file_extension, then
+ * the backend `type` field.
  */
-const getSourceIcon = (source: Source) => {
-  const ext = source.file_extension?.toLowerCase() || '';
-  const name = source.name?.toLowerCase() || '';
+const getSourceIcon = (source: Source): typeof File => {
+  // 1. Extract extension from source name (most reliable — persists across processing)
+  const name = source.name || '';
+  const lastDot = name.lastIndexOf('.');
+  const nameExtension = lastDot > 0 ? name.substring(lastDot).toLowerCase() : '';
 
-  // Check for YouTube links
-  if (source.category === 'link' && (name.includes('youtube') || name.includes('youtu.be'))) {
-    return YoutubeLogo;
+  // 2. Also check embedding_info (available on fresh uploads before processing overwrites it)
+  const embeddingExtension = ((source.embedding_info as Record<string, string>)?.file_extension || '').toLowerCase();
+
+  const fileExtension = nameExtension || embeddingExtension;
+
+  // Map extension to icon
+  switch (fileExtension) {
+    case '.pdf': return FilePdf;
+    case '.docx': return FileDoc;
+    case '.pptx': return FilePpt;
+    case '.txt': return FileText;
+    case '.csv': return FileCsv;
+    case '.md': return MarkdownLogo;
+    case '.html': return FileHtml;
+    case '.json': case '.xml': return FileText;
+    case '.mp3': case '.wav': case '.m4a': case '.aac': case '.flac': return MusicNote;
+    case '.jpg': case '.jpeg': return FileJpg;
+    case '.png': return FilePng;
+    case '.gif': case '.webp': return Image;
   }
 
-  // Check by file extension
-  if (ext.includes('pdf')) return FilePdf;
-  if (ext.includes('doc') || ext.includes('docx')) return FileDoc;
-  if (ext.includes('txt') || ext.includes('text')) return FileText;
-  if (ext.includes('png') || ext.includes('jpg') || ext.includes('jpeg') || ext.includes('webp')) return Image;
-  if (ext.includes('mp3') || ext.includes('wav') || ext.includes('m4a')) return MusicNote;
-  if (ext.includes('mp4') || ext.includes('mov')) return Video;
-  if (source.category === 'link') return Link;
-
-  return File;
+  // 3. Fall back to backend `type` field (for URLs, pasted text, etc.)
+  const sourceType = (source as unknown as Record<string, unknown>).type as string;
+  switch (sourceType) {
+    case 'YOUTUBE': return YoutubeLogo;
+    case 'LINK': case 'RESEARCH': return Link;
+    case 'TEXT': return FileText;
+    case 'AUDIO': return MusicNote;
+    case 'IMAGE': return Image;
+    case 'DATA': return Table;
+    case 'DOCUMENT': return FileText;
+    default: return File;
+  }
 };
 
 export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollapsed, onExpand, onSourcesChange }) => {
@@ -447,91 +478,114 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
   const sourcesCount = sources.length;
   const isAtLimit = sourcesCount >= MAX_SOURCES;
 
-  // Collapsed view - show icon bar with source icons
-  if (isCollapsed) {
-    return (
-      <TooltipProvider delayDuration={100}>
-        <div className="h-full flex flex-col items-center py-3 bg-card">
-          {/* Sources header icon */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={onExpand}
-                className="p-2 rounded-lg hover:bg-muted transition-colors mb-2"
-              >
-                <Books size={20} className="text-primary" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>Sources</p>
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Expand button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={onExpand}
-                className="p-1.5 rounded-lg hover:bg-muted transition-colors mb-3"
-              >
-                <CaretRight size={14} className="text-muted-foreground" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>Expand panel</p>
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Source icons */}
-          <ScrollArea className="flex-1 w-full">
-            <div className="flex flex-col items-center gap-1 px-1">
-              {sources.map((source) => {
-                const IconComponent = getSourceIcon(source);
-                return (
-                  <Tooltip key={source.id}>
-                    <TooltipTrigger asChild>
-                      <button className="p-2 rounded-lg hover:bg-muted transition-colors w-full flex justify-center">
-                        <IconComponent size={18} className="text-muted-foreground" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p className="max-w-[200px] truncate">{source.name}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </div>
-          </ScrollArea>
-        </div>
-      </TooltipProvider>
-    );
-  }
-
   return (
     <>
-      <div className="flex flex-col h-full">
-        <SourcesHeader
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          onAddClick={() => setSheetOpen(true)}
-          isAtLimit={isAtLimit}
-        />
+      {/* Collapsed view - show icon bar with source icons */}
+      {isCollapsed ? (
+        <TooltipProvider delayDuration={100}>
+          <div className="h-full flex flex-col items-center py-3 bg-card">
+            {/* Sources header icon */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onExpand}
+                  className="p-2.5 rounded-lg hover:bg-muted transition-colors mb-2"
+                >
+                  <Books size={24} className="text-primary" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Sources</p>
+              </TooltipContent>
+            </Tooltip>
 
-        <SourcesList
-          sources={sources}
-          loading={loading}
-          searchQuery={searchQuery}
-          onDownload={handleDownloadSource}
-          onDelete={handleDeleteSource}
-          onRename={handleRenameSource}
-          onToggleActive={handleToggleActive}
-          onCancelProcessing={handleCancelProcessing}
-          onRetryProcessing={handleRetryProcessing}
-          onViewProcessed={handleViewProcessed}
-        />
+            {/* Expand button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onExpand}
+                  className="p-2 rounded-lg hover:bg-muted transition-colors mb-3"
+                >
+                  <CaretRight size={16} className="text-muted-foreground" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Expand panel</p>
+              </TooltipContent>
+            </Tooltip>
 
-        <SourcesFooter sourcesCount={sourcesCount} totalSize={totalSize} />
-      </div>
+            {/* Add source button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setSheetOpen(true)}
+                  disabled={isAtLimit}
+                  className={`p-2.5 rounded-lg hover:bg-muted transition-colors mb-1 ${isAtLimit ? 'opacity-30 cursor-default' : ''}`}
+                >
+                  <Plus size={20} className="text-muted-foreground" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Add sources</p>
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Source icons */}
+            <ScrollArea className="flex-1 w-full">
+              <div className="flex flex-col items-center gap-1.5 px-1">
+                {sources.map((source) => {
+                  const IconComponent = getSourceIcon(source);
+                  return (
+                    <Tooltip key={source.id}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => {
+                            if (isSourceViewable(source)) {
+                              handleViewProcessed(source.id);
+                            } else {
+                              onExpand?.();
+                            }
+                          }}
+                          className="p-2.5 rounded-lg hover:bg-muted transition-colors w-full flex justify-center"
+                        >
+                          <IconComponent size={22} weight="bold" className="text-muted-foreground" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p className="max-w-[200px] truncate">{source.name}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          </div>
+        </TooltipProvider>
+      ) : (
+        <div className="flex flex-col h-full">
+          <SourcesHeader
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onAddClick={() => setSheetOpen(true)}
+            isAtLimit={isAtLimit}
+          />
+
+          <SourcesList
+            sources={sources}
+            loading={loading}
+            searchQuery={searchQuery}
+            onDownload={handleDownloadSource}
+            onDelete={handleDeleteSource}
+            onRename={handleRenameSource}
+            onToggleActive={handleToggleActive}
+            onCancelProcessing={handleCancelProcessing}
+            onRetryProcessing={handleRetryProcessing}
+            onViewProcessed={handleViewProcessed}
+          />
+
+          <SourcesFooter sourcesCount={sourcesCount} totalSize={totalSize} />
+        </div>
+      )}
 
       <AddSourcesSheet
         open={sheetOpen}

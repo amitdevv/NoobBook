@@ -22,14 +22,14 @@ export const PresentationListItem: React.FC<PresentationListItemProps> = ({
   return (
     <div
       onClick={onOpen}
-      className="flex items-start gap-2 p-2 rounded hover:bg-amber-500/10 cursor-pointer transition-colors"
+      className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-amber-500/10 cursor-pointer transition-colors"
     >
-      <Presentation size={12} weight="duotone" className="text-amber-600 mt-0.5 flex-shrink-0" />
+      <Presentation size={16} weight="duotone" className="text-amber-600 mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium text-gray-900 truncate">
           {job.presentation_title || 'Presentation'}
         </p>
-        <p className="text-[10px] text-gray-500 truncate">
+        <p className="text-[11px] text-gray-500 truncate">
           {job.total_slides || job.slides_created || 0} slides
           {job.presentation_type && ` • ${job.presentation_type}`}
         </p>
@@ -37,10 +37,10 @@ export const PresentationListItem: React.FC<PresentationListItemProps> = ({
       {/* Download PPTX button */}
       <button
         onClick={onDownload}
-        className="p-1 hover:bg-amber-600/20 rounded transition-colors"
+        className="p-1.5 hover:bg-amber-600/20 rounded transition-colors"
         title="Download PPTX"
       >
-        <DownloadSimple size={12} className="text-amber-600" />
+        <DownloadSimple size={14} className="text-amber-600" />
       </button>
     </div>
   );

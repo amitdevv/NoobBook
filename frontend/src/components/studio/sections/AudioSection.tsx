@@ -20,13 +20,22 @@ export const AudioSection: React.FC = () => {
     currentAudioJob,
     isGeneratingAudio,
     playingJobId,
+    isPaused,
+    currentTime,
+    duration,
     audioRef,
     handleAudioEnd,
+    handleTimeUpdate,
+    handleLoadedMetadata,
     loadSavedJobs,
     handleAudioGeneration,
     playAudio,
     pauseAudio,
+    seekTo,
+    playbackRate,
+    cyclePlaybackRate,
     downloadAudio,
+    formatDuration,
   } = useAudioGeneration(projectId);
 
   // Filter jobs by valid source IDs using O(1) Set lookup
@@ -57,6 +66,8 @@ export const AudioSection: React.FC = () => {
       <audio
         ref={audioRef}
         onEnded={handleAudioEnd}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
         className="hidden"
       />
 
@@ -71,9 +82,16 @@ export const AudioSection: React.FC = () => {
           key={job.id}
           job={job}
           playingJobId={playingJobId}
+          isPaused={isPaused}
+          currentTime={currentTime}
+          duration={duration}
           onPlay={playAudio}
           onPause={pauseAudio}
+          onSeek={seekTo}
+          playbackRate={playbackRate}
+          onCycleSpeed={cyclePlaybackRate}
           onDownload={downloadAudio}
+          formatDuration={formatDuration}
         />
       ))}
     </>

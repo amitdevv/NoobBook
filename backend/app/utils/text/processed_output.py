@@ -52,6 +52,7 @@ SOURCE_METADATA_KEYS = {
     "AUDIO": ["model_used", "language", "duration", "diarization_enabled", "character_count", "token_count"],
     "LINK": ["url", "title", "content_type", "character_count", "token_count"],
     "YOUTUBE": ["url", "video_id", "language", "is_auto_generated", "duration", "segment_count", "character_count", "token_count"],
+    "RESEARCH": ["topic", "link_count", "character_count", "token_count"],
 }
 
 
