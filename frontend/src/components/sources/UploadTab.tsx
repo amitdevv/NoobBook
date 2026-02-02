@@ -148,7 +148,7 @@ export const UploadTab: React.FC<UploadTabProps> = ({
           </>
         )}
         <p className="text-xs text-muted-foreground mt-4">
-          Supported: PDF, TXT, DOCX, PPTX, Audio (MP3, WAV, M4A, AAC, FLAC), Images, CSV
+          Supported: PDF, TXT, DOCX, PPTX, MD, JSON, HTML, XML, Audio (MP3, WAV, M4A, AAC, FLAC), Images, CSV
         </p>
         <p className="text-xs text-muted-foreground">
           Images: max 5MB each

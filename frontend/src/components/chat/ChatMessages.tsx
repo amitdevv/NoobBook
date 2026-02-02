@@ -10,7 +10,7 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { User, Robot, CircleNotch, FileText, Copy, Check, DownloadSimple } from '@phosphor-icons/react';
+import { User, Ghost, CircleNotch, FileText, Copy, Check, DownloadSimple } from '@phosphor-icons/react';
 import type { Message } from '../../lib/api/chats';
 import { parseCitations } from '../../lib/citations';
 import { CitationBadge } from './CitationBadge';
@@ -355,10 +355,8 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, projectId }) => {
   return (
     <div className="flex justify-start w-full max-w-full overflow-hidden">
       <div className="max-w-[85%] min-w-0 flex gap-3 overflow-hidden">
-        <div className="flex-shrink-0">
-          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-            <Robot size={16} className="text-primary-foreground" />
-          </div>
+        <div className="flex-shrink-0 mt-1">
+          <Ghost size={28} weight="bold" className="text-primary hover:scale-110 hover:rotate-6 transition-transform duration-200 cursor-pointer" />
         </div>
         <div className="bg-muted/50 rounded-2xl rounded-tl-sm px-4 py-3 min-w-0 overflow-hidden flex-1">
           <p className="text-xs font-medium text-muted-foreground mb-2">NoobBook</p>
@@ -415,7 +413,7 @@ const LoadingIndicator: React.FC = () => (
     <div className="max-w-[85%] flex gap-3">
       <div className="flex-shrink-0">
         <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-          <Robot size={16} className="text-primary-foreground" />
+          <Ghost size={16} weight="fill" className="text-primary-foreground" />
         </div>
       </div>
       <div className="bg-muted/50 rounded-2xl rounded-tl-sm px-4 py-3">
