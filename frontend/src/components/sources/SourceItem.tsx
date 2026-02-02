@@ -20,7 +20,6 @@ import {
   Table,
   Trash,
   DownloadSimple,
-  Link,
   CircleNotch,
   Warning,
   CheckCircle,
