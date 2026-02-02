@@ -6,7 +6,8 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Sparkle, CircleNotch } from '@phosphor-icons/react';
+import { Sparkle } from '@phosphor-icons/react';
+import { Skeleton } from '../ui/skeleton';
 import { chatsAPI } from '@/lib/api/chats';
 import type { Chat, ChatMetadata, StudioSignal } from '@/lib/api/chats';
 import { sourcesAPI, type Source } from '@/lib/api/sources';
@@ -332,10 +333,28 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
             Ask questions about your sources or request analysis
           </p>
         </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <CircleNotch size={32} className="mx-auto mb-4 text-muted-foreground animate-spin" />
-            <p className="text-sm text-muted-foreground">Loading chats...</p>
+        <div className="flex-1 p-6 space-y-4">
+          {/* Skeleton message bubbles mimicking a chat conversation */}
+          <div className="flex justify-end">
+            <Skeleton className="h-10 w-2/3 rounded-2xl" />
+          </div>
+          <div className="flex justify-start gap-3">
+            <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Skeleton className="h-8 w-1/2 rounded-2xl" />
+          </div>
+          <div className="flex justify-start gap-3">
+            <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-4/5" />
+            </div>
           </div>
         </div>
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />

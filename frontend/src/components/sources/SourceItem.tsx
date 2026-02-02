@@ -10,12 +10,16 @@ import React from 'react';
 import {
   FileText,
   File,
+  FilePdf,
+  FileDoc,
+  FilePpt,
+  FileCsv,
+  FileTxt,
   MusicNote,
   Image,
   Table,
   Trash,
   DownloadSimple,
-  Link,
   CircleNotch,
   Warning,
   CheckCircle,
@@ -23,6 +27,8 @@ import {
   PencilSimple,
   Stop,
   ArrowClockwise,
+  YoutubeLogo,
+  Globe,
 } from '@phosphor-icons/react';
 import {
   DropdownMenu,
@@ -46,10 +52,50 @@ interface SourceItemProps {
 }
 
 /**
- * Get the appropriate icon component for a source category
+ * Get the appropriate icon component based on file extension and category.
+ * Uses specific icons per file type for better visual distinction.
  */
-const getCategoryIconComponent = (category: string) => {
-  switch (category) {
+const getSourceIcon = (source: Source) => {
+  const ext = source.file_extension?.toLowerCase() || '';
+
+  // File-type specific icons
+  switch (ext) {
+    case '.pdf':
+      return FilePdf;
+    case '.docx':
+    case '.doc':
+      return FileDoc;
+    case '.pptx':
+    case '.ppt':
+      return FilePpt;
+    case '.csv':
+      return FileCsv;
+    case '.txt':
+      return FileTxt;
+    case '.link':
+      // Distinguish YouTube from website links using processing metadata
+      if (source.processing_info?.link_type === 'youtube') {
+        return YoutubeLogo;
+      }
+      return Globe;
+    case '.mp3':
+    case '.wav':
+    case '.m4a':
+    case '.aac':
+    case '.flac':
+      return MusicNote;
+    case '.png':
+    case '.jpg':
+    case '.jpeg':
+    case '.gif':
+    case '.webp':
+      return Image;
+    default:
+      break;
+  }
+
+  // Fallback to category-based icons
+  switch (source.category) {
     case 'document':
       return FileText;
     case 'audio':
@@ -59,7 +105,7 @@ const getCategoryIconComponent = (category: string) => {
     case 'data':
       return Table;
     case 'link':
-      return Link;
+      return Globe;
     default:
       return File;
   }
@@ -128,7 +174,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   onRetryProcessing,
   onViewProcessed,
 }) => {
-  const Icon = getCategoryIconComponent(source.category);
+  const Icon = getSourceIcon(source);
   const statusDisplay = getStatusDisplay(source.status);
   // "processing" or "embedding" are actively working - show spinner and allow cancel
   const isProcessing = source.status === 'processing';

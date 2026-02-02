@@ -169,6 +169,15 @@ class MessageService:
             text_content = content["text"]
         elif isinstance(content, str):
             text_content = content
+        elif isinstance(content, list):
+            # Content blocks from Claude API (e.g. [{"type":"text","text":"..."},{"type":"tool_use",...}])
+            # Extract only the text blocks, skip tool_use/tool_result blocks
+            text_parts = [
+                block.get("text", "")
+                for block in content
+                if isinstance(block, dict) and block.get("type") == "text"
+            ]
+            text_content = "\n".join(text_parts) if text_parts else ""
         else:
             text_content = str(content) if content else ""
 
