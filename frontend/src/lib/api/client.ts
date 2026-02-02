@@ -122,19 +122,23 @@ api.interceptors.response.use(
             localStorage.setItem('noobbook_refresh_token', newRefreshToken);
           }
 
+          // Reset flag BEFORE processing pending requests and retrying.
+          // If isRefreshing stays true until finally, new 401s that arrive
+          // during processPendingRequests() or the retry would incorrectly queue.
+          isRefreshing = false;
+
           // Retry the original request with the new token
           originalRequest.headers.Authorization = `Bearer ${access_token}`;
           processPendingRequests(access_token);
           return api(originalRequest);
         } catch (refreshError) {
           // Refresh failed — clear tokens and redirect to login
+          isRefreshing = false;
           processPendingRequests(null, refreshError);
           localStorage.removeItem('noobbook_access_token');
           localStorage.removeItem('noobbook_refresh_token');
           window.location.href = '/login';
           return Promise.reject(refreshError);
-        } finally {
-          isRefreshing = false;
         }
       } else {
         // No refresh token available — redirect to login
