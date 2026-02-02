@@ -26,9 +26,15 @@ export const LinkTab: React.FC<LinkTabProps> = ({ onAddUrl, isAtLimit }) => {
   const handleAddWebsite = async () => {
     if (!websiteUrl.trim()) return;
 
+    let url = websiteUrl.trim();
+    // Auto-prepend https:// if no protocol specified
+    if (!/^https?:\/\//i.test(url)) {
+      url = `https://${url}`;
+    }
+
     setAddingWebsite(true);
     try {
-      await onAddUrl(websiteUrl.trim());
+      await onAddUrl(url);
       setWebsiteUrl('');
     } finally {
       setAddingWebsite(false);
@@ -41,9 +47,15 @@ export const LinkTab: React.FC<LinkTabProps> = ({ onAddUrl, isAtLimit }) => {
   const handleAddYoutube = async () => {
     if (!youtubeUrl.trim()) return;
 
+    let url = youtubeUrl.trim();
+    // Auto-prepend https:// if no protocol specified
+    if (!/^https?:\/\//i.test(url)) {
+      url = `https://${url}`;
+    }
+
     setAddingYoutube(true);
     try {
-      await onAddUrl(youtubeUrl.trim());
+      await onAddUrl(url);
       setYoutubeUrl('');
     } finally {
       setAddingYoutube(false);

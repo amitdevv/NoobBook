@@ -56,21 +56,92 @@ api.interceptors.request.use(
 );
 
 // ==================== Response Interceptor ====================
-// Handles 401 errors by redirecting to login (except for auth endpoints)
+// Handles 401 errors by attempting token refresh before redirecting to login.
+// Educational Note: When an access token expires mid-session, the first 401
+// triggers a refresh attempt using the stored refresh token. If the refresh
+// succeeds, the original request is retried transparently. A flag + queue
+// prevent multiple simultaneous refresh attempts — subsequent 401s wait for
+// the first refresh to complete, then retry with the new token.
+let isRefreshing = false;
+let pendingRequests: Array<{
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+}> = [];
+
+function processPendingRequests(token: string | null, error?: unknown) {
+  pendingRequests.forEach(({ resolve, reject }) => {
+    if (token) {
+      resolve(token);
+    } else {
+      reject(error);
+    }
+  });
+  pendingRequests = [];
+}
+
 api.interceptors.response.use(
   (response) => {
     console.log('API Response:', response.status, response.config.url);
     return response;
   },
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
     const status = error.response?.status;
-    const url = error.config?.url || '';
+    const originalRequest = error.config;
+    const url = originalRequest?.url || '';
 
-    // On 401 from non-auth endpoints, clear tokens and redirect to login
-    if (status === 401 && !url.includes('/auth/')) {
-      localStorage.removeItem('noobbook_access_token');
-      localStorage.removeItem('noobbook_refresh_token');
-      window.location.href = '/login';
+    // Only attempt refresh for 401s on non-auth endpoints
+    if (status === 401 && !url.includes('/auth/') && originalRequest) {
+      // If a refresh is already in progress, queue this request
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          pendingRequests.push({
+            resolve: (token: string) => {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+              resolve(api(originalRequest));
+            },
+            reject: (err: unknown) => reject(err),
+          });
+        });
+      }
+
+      isRefreshing = true;
+      const refreshToken = localStorage.getItem('noobbook_refresh_token');
+
+      if (refreshToken) {
+        try {
+          // Use raw axios to avoid triggering this interceptor again
+          const refreshResponse = await axios.post(
+            `${API_BASE_URL}/auth/refresh`,
+            { refresh_token: refreshToken }
+          );
+
+          const { access_token, refresh_token: newRefreshToken } = refreshResponse.data;
+
+          localStorage.setItem('noobbook_access_token', access_token);
+          if (newRefreshToken) {
+            localStorage.setItem('noobbook_refresh_token', newRefreshToken);
+          }
+
+          // Retry the original request with the new token
+          originalRequest.headers.Authorization = `Bearer ${access_token}`;
+          processPendingRequests(access_token);
+          return api(originalRequest);
+        } catch (refreshError) {
+          // Refresh failed — clear tokens and redirect to login
+          processPendingRequests(null, refreshError);
+          localStorage.removeItem('noobbook_access_token');
+          localStorage.removeItem('noobbook_refresh_token');
+          window.location.href = '/login';
+          return Promise.reject(refreshError);
+        } finally {
+          isRefreshing = false;
+        }
+      } else {
+        // No refresh token available — redirect to login
+        isRefreshing = false;
+        localStorage.removeItem('noobbook_access_token');
+        window.location.href = '/login';
+      }
     }
 
     console.error('Response Error:', status, (error.response?.data as any));

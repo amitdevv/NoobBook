@@ -4,7 +4,7 @@
  * Includes playback state management with a shared audio element.
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { audioAPI, type AudioJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
@@ -17,6 +17,9 @@ export const useAudioGeneration = (projectId: string) => {
   const [currentAudioJob, setCurrentAudioJob] = useState<AudioJob | null>(null);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [playingJobId, setPlayingJobId] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const loadSavedJobs = async () => {
@@ -119,7 +122,56 @@ export const useAudioGeneration = (projectId: string) => {
    */
   const handleAudioEnd = () => {
     setPlayingJobId(null);
+    setCurrentTime(0);
   };
+
+  /**
+   * Handle audio time update - tracks current playback position
+   */
+  const handleTimeUpdate = useCallback(() => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
+  }, []);
+
+  /**
+   * Handle audio metadata loaded - captures total duration
+   */
+  const handleLoadedMetadata = useCallback(() => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
+    }
+  }, []);
+
+  /**
+   * Seek to a specific time position in the audio
+   */
+  const seekTo = useCallback((time: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
+  }, []);
+
+  /**
+   * Cycle playback speed through 1x → 1.5x → 2x → 1x
+   */
+  const cyclePlaybackRate = useCallback(() => {
+    const rates = [1, 1.5, 2];
+    const currentIndex = rates.indexOf(playbackRate);
+    const nextRate = rates[(currentIndex + 1) % rates.length];
+    setPlaybackRate(nextRate);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = nextRate;
+    }
+  }, [playbackRate]);
+
+  // Sync playback rate when audio element changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate, playingJobId]);
 
   /**
    * Download audio file
@@ -161,13 +213,20 @@ export const useAudioGeneration = (projectId: string) => {
     currentAudioJob,
     isGeneratingAudio,
     playingJobId,
+    currentTime,
+    duration,
+    playbackRate,
     audioRef,
     handleAudioEnd,
+    handleTimeUpdate,
+    handleLoadedMetadata,
     loadSavedJobs,
     handleAudioGeneration,
     playAudio,
     pauseAudio,
     downloadAudio,
     formatDuration,
+    seekTo,
+    cyclePlaybackRate,
   };
 };

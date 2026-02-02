@@ -51,6 +51,10 @@ def upload_url(
 
     url = url.strip()
 
+    # Auto-prepend https:// if no protocol specified (safety net for frontend)
+    if not re.match(r'^https?://', url, re.IGNORECASE):
+        url = f"https://{url}"
+
     # Check if it looks like a URL
     url_pattern = re.compile(
         r'^https?://'

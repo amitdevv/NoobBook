@@ -204,14 +204,29 @@ const MessageActions: React.FC<MessageActionsProps> = ({ content }) => {
    * Educational Note: Uses modern Clipboard API with visual feedback
    */
   const handleCopy = async () => {
+    // Remove citation markers for cleaner copied text
+    const cleanContent = content.replace(/\[\[cite:[^\]]+\]\]/g, '');
+
     try {
-      // Remove citation markers for cleaner copied text
-      const cleanContent = content.replace(/\[\[cite:[^\]]+\]\]/g, '');
       await navigator.clipboard.writeText(cleanContent);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
+    } catch {
+      // Fallback for non-HTTPS or restricted contexts (e.g. iframe, older browsers)
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = cleanContent;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (fallbackErr) {
+        console.error('Failed to copy:', fallbackErr);
+      }
     }
   };
 
@@ -489,7 +504,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({ messages,
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden"
+      className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden bg-background"
     >
       <div className="py-6 px-6 space-y-4 w-full">
         {messages.map((msg) => (
