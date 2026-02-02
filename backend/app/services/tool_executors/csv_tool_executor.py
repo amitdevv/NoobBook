@@ -14,12 +14,14 @@ raw folder using project_id and source_id.
 import csv
 import io
 import re
+from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 from collections import Counter
 from datetime import datetime
 import statistics
 
 from app.utils.path_utils import get_raw_dir
+from app.services.integrations.supabase import storage_service
 
 
 class CSVToolExecutor:
@@ -57,7 +59,8 @@ class CSVToolExecutor:
         self,
         tool_input: Dict[str, Any],
         project_id: str,
-        source_id: str
+        source_id: str,
+        csv_file_path: Optional[str] = None
     ) -> Tuple[Dict[str, Any], bool]:
         """
         Execute CSV analysis tool.
@@ -66,6 +69,8 @@ class CSVToolExecutor:
             tool_input: Tool parameters from Claude (operation, column, etc.)
             project_id: Project ID for file path
             source_id: Source ID (file is {source_id}.csv in raw folder)
+            csv_file_path: Optional explicit path to the CSV file (e.g. temp directory
+                           during processing). Falls back to get_raw_dir() if not provided.
 
         Returns:
             Tuple of (result_dict, is_termination)
@@ -73,18 +78,27 @@ class CSVToolExecutor:
         operation = tool_input.get("operation", "summary")
 
         try:
-            # Read CSV file from raw folder
-            raw_dir = get_raw_dir(project_id)
-            csv_path = raw_dir / f"{source_id}.csv"
+            # Use explicit path if provided, otherwise fall back to raw folder
+            if csv_file_path:
+                csv_path = Path(csv_file_path)
+            else:
+                raw_dir = get_raw_dir(project_id)
+                csv_path = raw_dir / f"{source_id}.csv"
 
-            if not csv_path.exists():
-                return {
-                    "success": False,
-                    "error": f"CSV file not found: {csv_path}"
-                }, False
-
-            with open(csv_path, "r", encoding="utf-8") as f:
-                csv_content = f.read()
+            if csv_path.exists():
+                with open(csv_path, "r", encoding="utf-8") as f:
+                    csv_content = f.read()
+            else:
+                # Fallback: download from Supabase Storage (where files live after upload)
+                csv_bytes = storage_service.download_raw_file(
+                    project_id, source_id, f"{source_id}.csv"
+                )
+                if csv_bytes is None:
+                    return {
+                        "success": False,
+                        "error": f"CSV file not found locally or in storage: {source_id}.csv"
+                    }, False
+                csv_content = csv_bytes.decode("utf-8")
 
             # Parse CSV content
             data = self._parse_csv(csv_content)

@@ -65,7 +65,9 @@ class AnalysisExecutor:
         Load CSV into DataFrame with caching.
 
         Educational Note: We cache the DataFrame to avoid re-reading
-        the file on every query during an analysis session.
+        the file on every query during an analysis session. Files are
+        checked locally first, then downloaded from Supabase Storage
+        as a fallback (since raw files live in Storage after upload).
         """
         cache_key = f"{project_id}_{source_id}"
 
@@ -73,10 +75,18 @@ class AnalysisExecutor:
             raw_dir = get_raw_dir(project_id)
             csv_path = raw_dir / f"{source_id}.csv"
 
-            if not csv_path.exists():
-                raise FileNotFoundError(f"CSV file not found: {csv_path}")
-
-            self._df_cache[cache_key] = pd.read_csv(csv_path)
+            if csv_path.exists():
+                self._df_cache[cache_key] = pd.read_csv(csv_path)
+            else:
+                # Fallback: download from Supabase Storage (where files live after upload)
+                csv_bytes = storage_service.download_raw_file(
+                    project_id, source_id, f"{source_id}.csv"
+                )
+                if csv_bytes is None:
+                    raise FileNotFoundError(
+                        f"CSV file not found locally or in storage: {source_id}.csv"
+                    )
+                self._df_cache[cache_key] = pd.read_csv(io.BytesIO(csv_bytes))
 
         return self._df_cache[cache_key].copy()
 

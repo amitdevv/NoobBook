@@ -49,7 +49,8 @@ def process_csv(
     print(f"[CSV Processor] Analyzing {source_name} with AI service...")
     analysis_result = csv_service.analyze_csv(
         project_id=project_id,
-        source_id=source_id
+        source_id=source_id,
+        csv_file_path=str(raw_file_path)
     )
 
     if not analysis_result.get("success"):

@@ -161,12 +161,26 @@ class ChatService:
                 continue
 
             # Extract text content - stored as {text: "..."} in JSONB
+            # Educational Note: Content can also be a list of content blocks
+            # (tool_use responses) — extract only text blocks from those.
             if isinstance(content, dict):
                 text_content = content.get("text", "")
             elif isinstance(content, str):
                 text_content = content
+            elif isinstance(content, list):
+                # Extract only text blocks, skip tool_use/tool_result blocks
+                text_parts = [
+                    block.get("text", "")
+                    for block in content
+                    if isinstance(block, dict) and block.get("type") == "text"
+                ]
+                text_content = "\n\n".join(part for part in text_parts if part.strip())
             else:
                 text_content = str(content) if content else ""
+
+            # Skip messages with no displayable text (pure tool_use/tool_result)
+            if not text_content.strip():
+                continue
 
             # Create a clean message object for frontend
             display_messages.append({

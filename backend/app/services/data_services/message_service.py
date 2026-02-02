@@ -165,19 +165,23 @@ class MessageService:
         content = message.get("content")
 
         # Extract text from JSONB format
+        # Educational Note: Content can be stored as:
+        # - {"text": "..."} for simple messages
+        # - A string (legacy)
+        # - A list of content blocks (tool_use responses from Claude)
+        #   e.g. [{"type": "text", "text": "..."}, {"type": "tool_use", ...}]
         if isinstance(content, dict) and "text" in content:
             text_content = content["text"]
         elif isinstance(content, str):
             text_content = content
         elif isinstance(content, list):
-            # Content blocks from Claude API (e.g. [{"type":"text","text":"..."},{"type":"tool_use",...}])
-            # Extract only the text blocks, skip tool_use/tool_result blocks
+            # Extract only text blocks, skip tool_use/tool_result blocks
             text_parts = [
                 block.get("text", "")
                 for block in content
                 if isinstance(block, dict) and block.get("type") == "text"
             ]
-            text_content = "\n".join(text_parts) if text_parts else ""
+            text_content = "\n\n".join(part for part in text_parts if part.strip())
         else:
             text_content = str(content) if content else ""
 

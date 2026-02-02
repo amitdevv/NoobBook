@@ -59,11 +59,11 @@ export const StudioToolsList: React.FC = () => {
       <div key={category}>
         <div className="flex items-center gap-1.5 mb-1.5">
           <Icon
-            size={12}
+            size={16}
             className={hasActiveItems ? 'text-primary' : 'text-muted-foreground'}
           />
           <h3
-            className={`text-[10px] font-medium uppercase tracking-wider ${
+            className={`text-[10px] font-semibold uppercase tracking-wider ${
               hasActiveItems ? 'text-primary' : 'text-muted-foreground'
             }`}
           >

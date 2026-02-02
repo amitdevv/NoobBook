@@ -273,12 +273,13 @@ class SourceProcessingService:
         if not source:
             return {"success": False, "error": "Source not found"}
 
-        # Can only retry if status is uploaded or error (not processing/embedding)
-        if source["status"] in ["processing", "embedding"]:
-            return {"success": False, "error": "Source is already processing"}
-
         if source["status"] == "ready":
             return {"success": False, "error": "Source is already processed"}
+
+        # If source is stuck in processing/embedding (e.g. server restart, crashed task),
+        # cancel any stale tasks before retrying
+        if source["status"] in ["processing", "embedding"]:
+            task_service.cancel_tasks_for_target(source_id)
 
         # Verify raw file exists in Supabase Storage
         embedding_info = source.get("embedding_info", {})

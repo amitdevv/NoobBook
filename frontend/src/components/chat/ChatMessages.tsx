@@ -10,7 +10,7 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { User, Ghost, CircleNotch, FileText, Copy, Check, DownloadSimple } from '@phosphor-icons/react';
+import { Ghost, FileText, Copy, Check, DownloadSimple } from '@phosphor-icons/react';
 import type { Message } from '../../lib/api/chats';
 import { parseCitations } from '../../lib/citations';
 import { CitationBadge } from './CitationBadge';
@@ -158,14 +158,9 @@ const markdownComponents: Record<string, React.FC<any>> = {
  */
 const UserMessage: React.FC<{ content: string }> = ({ content }) => (
   <div className="flex justify-end w-full">
-    <div className="max-w-[80%] min-w-0 flex gap-3">
+    <div className="max-w-[80%] min-w-0">
       <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-4 py-2 min-w-0">
         <p className="text-sm whitespace-pre-wrap break-words">{content}</p>
-      </div>
-      <div className="flex-shrink-0">
-        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-          <User size={16} />
-        </div>
       </div>
     </div>
   </div>
@@ -427,16 +422,15 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, projectId }) => {
 const LoadingIndicator: React.FC = () => (
   <div className="flex justify-start">
     <div className="max-w-[85%] flex gap-3">
-      <div className="flex-shrink-0">
-        <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-          <Ghost size={16} weight="fill" className="text-primary-foreground" />
-        </div>
+      <div className="flex-shrink-0 mt-1">
+        <Ghost size={28} weight="bold" className="text-primary" />
       </div>
       <div className="bg-muted/50 rounded-2xl rounded-tl-sm px-4 py-3">
         <p className="text-xs font-medium text-muted-foreground mb-2">NoobBook</p>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <CircleNotch size={16} className="animate-spin" />
-          Thinking...
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-primary/60 animate-[bounce_1.4s_ease-in-out_infinite]" />
+          <span className="h-2 w-2 rounded-full bg-primary/60 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
+          <span className="h-2 w-2 rounded-full bg-primary/60 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
         </div>
       </div>
     </div>
@@ -504,7 +498,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({ messages,
       onScroll={handleScroll}
       className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden bg-background"
     >
-      <div className="py-6 px-6 space-y-4 w-full">
+      <div className="pt-6 pb-2 px-6 space-y-4 w-full">
         {messages.map((msg) => (
           <div key={msg.id}>
             {msg.role === 'user' ? (

@@ -22,24 +22,24 @@ export const VideoListItem: React.FC<VideoListItemProps> = ({
   return (
     <div
       onClick={onOpen}
-      className="flex items-start gap-2 p-2 rounded hover:bg-orange-500/10 cursor-pointer transition-colors"
+      className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-orange-500/10 cursor-pointer transition-colors"
     >
-      <PlayCircle size={12} weight="duotone" className="text-orange-600 mt-0.5 flex-shrink-0" />
+      <PlayCircle size={16} weight="duotone" className="text-orange-600 mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium text-gray-900 truncate">
           {job.source_name || 'Video'}
         </p>
-        <p className="text-[10px] text-gray-500 truncate">
+        <p className="text-[11px] text-gray-500 truncate">
           {job.videos.length} video{job.videos.length > 1 ? 's' : ''} • {job.aspect_ratio} • {job.duration_seconds}s
         </p>
       </div>
       {/* Download button */}
       <button
         onClick={onDownload}
-        className="p-1 hover:bg-orange-600/20 rounded transition-colors"
+        className="p-1.5 hover:bg-orange-600/20 rounded transition-colors"
         title="Download Video"
       >
-        <DownloadSimple size={12} className="text-orange-600" />
+        <DownloadSimple size={14} className="text-orange-600" />
       </button>
     </div>
   );

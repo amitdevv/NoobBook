@@ -4,7 +4,7 @@
  * Includes playback state management with a shared audio element.
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { audioAPI, type AudioJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
@@ -17,10 +17,13 @@ export const useAudioGeneration = (projectId: string) => {
   const [currentAudioJob, setCurrentAudioJob] = useState<AudioJob | null>(null);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [playingJobId, setPlayingJobId] = useState<string | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 1.75, 2] as const;
 
   const loadSavedJobs = async () => {
     const audioResponse = await audioAPI.listJobs(projectId);
@@ -51,11 +54,7 @@ export const useAudioGeneration = (projectId: string) => {
         return;
       }
 
-      const startResponse = await audioAPI.startGeneration(
-        projectId,
-        sourceId,
-        signal.direction
-      );
+      const startResponse = await audioAPI.startGeneration(projectId, sourceId, signal.direction);
 
       if (!startResponse.success || !startResponse.job_id) {
         showError(startResponse.error || 'Failed to start audio generation.');
@@ -88,96 +87,72 @@ export const useAudioGeneration = (projectId: string) => {
     }
   };
 
-  /**
-   * Play a specific audio job
-   */
   const playAudio = (job: AudioJob) => {
     if (!job.audio_url) return;
 
-    // Stop current playback if different job
-    if (audioRef.current && playingJobId !== job.id) {
-      audioRef.current.pause();
+    if (audioRef.current && playingJobId === job.id && isPaused) {
+      audioRef.current.play();
+      setIsPaused(false);
+      return;
     }
 
-    // Set the source and play
+    if (audioRef.current && playingJobId !== job.id) {
+      audioRef.current.pause();
+      setCurrentTime(0);
+      setDuration(0);
+    }
+
     if (audioRef.current) {
       audioRef.current.src = getAuthUrl(job.audio_url);
       audioRef.current.play();
       setPlayingJobId(job.id);
+      setIsPaused(false);
     }
   };
 
-  /**
-   * Pause current playback
-   */
   const pauseAudio = () => {
     if (audioRef.current) {
       audioRef.current.pause();
     }
-    setPlayingJobId(null);
+    setIsPaused(true);
   };
 
-  /**
-   * Handle audio end
-   */
   const handleAudioEnd = () => {
     setPlayingJobId(null);
+    setIsPaused(false);
     setCurrentTime(0);
+    setDuration(0);
   };
 
-  /**
-   * Handle audio time update - tracks current playback position
-   */
-  const handleTimeUpdate = useCallback(() => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-    }
-  }, []);
-
-  /**
-   * Handle audio metadata loaded - captures total duration
-   */
-  const handleLoadedMetadata = useCallback(() => {
-    if (audioRef.current) {
-      setDuration(audioRef.current.duration);
-    }
-  }, []);
-
-  /**
-   * Seek to a specific time position in the audio
-   */
-  const seekTo = useCallback((time: number) => {
+  const seekTo = (time: number) => {
     if (audioRef.current) {
       audioRef.current.currentTime = time;
       setCurrentTime(time);
     }
-  }, []);
+  };
 
-  /**
-   * Cycle playback speed through 1x → 1.5x → 2x → 1x
-   */
-  const cyclePlaybackRate = useCallback(() => {
-    const rates = [1, 1.5, 2];
-    const currentIndex = rates.indexOf(playbackRate);
-    const nextRate = rates[(currentIndex + 1) % rates.length];
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
+      audioRef.current.playbackRate = playbackRate;
+    }
+  };
+
+  const cyclePlaybackRate = () => {
+    const currentIndex = PLAYBACK_SPEEDS.indexOf(playbackRate as typeof PLAYBACK_SPEEDS[number]);
+    const nextRate = PLAYBACK_SPEEDS[(currentIndex + 1) % PLAYBACK_SPEEDS.length];
     setPlaybackRate(nextRate);
     if (audioRef.current) {
       audioRef.current.playbackRate = nextRate;
     }
-  }, [playbackRate]);
+  };
 
-  // Sync playback rate when audio element changes
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = playbackRate;
-    }
-  }, [playbackRate, playingJobId]);
-
-  /**
-   * Download audio file
-   * Educational Note: Cross-origin downloads require fetching as blob first.
-   * The `download` attribute on anchor tags only works for same-origin URLs.
-   */
   const downloadAudio = async (job: AudioJob) => {
     if (!job.audio_url) return;
 
@@ -191,7 +166,6 @@ export const useAudioGeneration = (projectId: string) => {
       link.download = job.audio_filename || 'audio_overview.mp3';
       link.click();
 
-      // Clean up the object URL after download
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Failed to download audio:', error);
@@ -199,9 +173,6 @@ export const useAudioGeneration = (projectId: string) => {
     }
   };
 
-  /**
-   * Format duration for display
-   */
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -213,9 +184,9 @@ export const useAudioGeneration = (projectId: string) => {
     currentAudioJob,
     isGeneratingAudio,
     playingJobId,
+    isPaused,
     currentTime,
     duration,
-    playbackRate,
     audioRef,
     handleAudioEnd,
     handleTimeUpdate,
@@ -224,9 +195,10 @@ export const useAudioGeneration = (projectId: string) => {
     handleAudioGeneration,
     playAudio,
     pauseAudio,
+    seekTo,
+    playbackRate,
+    cyclePlaybackRate,
     downloadAudio,
     formatDuration,
-    seekTo,
-    cyclePlaybackRate,
   };
 };
