@@ -36,7 +36,11 @@ def create_app(config_name='development'):
     ensure_base_directories()
 
     # Initialize extensions with app context
-    CORS(app, origins=app.config['CORS_ALLOWED_ORIGINS'])
+    CORS(app,
+         origins=app.config['CORS_ALLOWED_ORIGINS'],
+         supports_credentials=True,
+         allow_headers=["Content-Type", "Authorization"],
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"])
     socketio.init_app(app, async_mode='threading')
 
     # Register blueprints (modular route handlers)
