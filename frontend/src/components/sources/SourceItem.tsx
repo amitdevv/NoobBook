@@ -9,17 +9,22 @@
 import React from 'react';
 import {
   FileText,
-  File,
   FilePdf,
   FileDoc,
   FilePpt,
   FileCsv,
-  FileTxt,
+  FileHtml,
+  FilePng,
+  FileJpg,
+  MarkdownLogo,
+  File,
   MusicNote,
   Image,
   Table,
   Trash,
   DownloadSimple,
+  Link,
+  YoutubeLogo,
   CircleNotch,
   Warning,
   CheckCircle,
@@ -27,8 +32,6 @@ import {
   PencilSimple,
   Stop,
   ArrowClockwise,
-  YoutubeLogo,
-  Globe,
 } from '@phosphor-icons/react';
 import {
   DropdownMenu,
@@ -52,62 +55,51 @@ interface SourceItemProps {
 }
 
 /**
- * Get the appropriate icon component based on file extension and category.
- * Uses specific icons per file type for better visual distinction.
+ * Get the appropriate icon component for a source.
+ * Educational Note: We extract the file extension from source.name first because it persists
+ * across all status transitions. The embedding_info.file_extension gets overwritten when
+ * processing completes (replaced with embedding stats), so it's only reliable for fresh uploads.
+ * The backend `type` field uses "DOCUMENT" for all document types (PDF, DOCX, PPTX, TXT),
+ * so it can't distinguish between them — but it's useful for non-file sources (URLs, text).
  */
-const getSourceIcon = (source: Source) => {
-  const ext = source.file_extension?.toLowerCase() || '';
+const getSourceIcon = (source: Source): { icon: typeof File; weight?: 'bold' } => {
+  // 1. Extract extension from source name (most reliable — persists across processing)
+  const name = source.name || '';
+  const lastDot = name.lastIndexOf('.');
+  const nameExtension = lastDot > 0 ? name.substring(lastDot).toLowerCase() : '';
 
-  // File-type specific icons
-  switch (ext) {
-    case '.pdf':
-      return FilePdf;
-    case '.docx':
-    case '.doc':
-      return FileDoc;
-    case '.pptx':
-    case '.ppt':
-      return FilePpt;
-    case '.csv':
-      return FileCsv;
-    case '.txt':
-      return FileTxt;
-    case '.link':
-      // Distinguish YouTube from website links using processing metadata
-      if (source.processing_info?.link_type === 'youtube') {
-        return YoutubeLogo;
-      }
-      return Globe;
-    case '.mp3':
-    case '.wav':
-    case '.m4a':
-    case '.aac':
-    case '.flac':
-      return MusicNote;
-    case '.png':
-    case '.jpg':
-    case '.jpeg':
-    case '.gif':
-    case '.webp':
-      return Image;
-    default:
-      break;
+  // 2. Also check embedding_info (available on fresh uploads before processing overwrites it)
+  const embeddingExtension = ((source.embedding_info as Record<string, string>)?.file_extension || '').toLowerCase();
+
+  const fileExtension = nameExtension || embeddingExtension;
+
+  // Map extension to icon (all bold for visual consistency)
+  switch (fileExtension) {
+    case '.pdf': return { icon: FilePdf, weight: 'bold' };
+    case '.docx': return { icon: FileDoc, weight: 'bold' };
+    case '.pptx': return { icon: FilePpt, weight: 'bold' };
+    case '.txt': return { icon: FileText, weight: 'bold' };
+    case '.csv': return { icon: FileCsv, weight: 'bold' };
+    case '.md': return { icon: MarkdownLogo, weight: 'bold' };
+    case '.html': return { icon: FileHtml, weight: 'bold' };
+    case '.json': case '.xml': return { icon: FileText, weight: 'bold' };
+    case '.mp3': case '.wav': case '.m4a': case '.aac': case '.flac': return { icon: MusicNote, weight: 'bold' };
+    case '.jpg': case '.jpeg': return { icon: FileJpg, weight: 'bold' };
+    case '.png': return { icon: FilePng, weight: 'bold' };
+    case '.gif': case '.webp': return { icon: Image, weight: 'bold' };
   }
 
-  // Fallback to category-based icons
-  switch (source.category) {
-    case 'document':
-      return FileText;
-    case 'audio':
-      return MusicNote;
-    case 'image':
-      return Image;
-    case 'data':
-      return Table;
-    case 'link':
-      return Globe;
-    default:
-      return File;
+  // 3. Fall back to backend `type` field (for URLs, pasted text, etc. that have no extension in name)
+  const sourceType = (source as unknown as Record<string, unknown>).type as string;
+  switch (sourceType) {
+    case 'YOUTUBE': return { icon: YoutubeLogo, weight: 'bold' };
+    case 'LINK': case 'RESEARCH': return { icon: Link, weight: 'bold' };
+    case 'TEXT': return { icon: FileText, weight: 'bold' };
+    case 'AUDIO': return { icon: MusicNote, weight: 'bold' };
+    case 'IMAGE': return { icon: Image, weight: 'bold' };
+    case 'DATA': return { icon: Table, weight: 'bold' };
+    case 'DOCUMENT': return { icon: FileText, weight: 'bold' };
+    default: return { icon: File, weight: 'bold' };
   }
 };
 
@@ -174,7 +166,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   onRetryProcessing,
   onViewProcessed,
 }) => {
-  const Icon = getSourceIcon(source);
+  const { icon: Icon, weight: iconWeight } = getSourceIcon(source);
   const statusDisplay = getStatusDisplay(source.status);
   // "processing" or "embedding" are actively working - show spinner and allow cancel
   const isProcessing = source.status === 'processing';
@@ -216,15 +208,16 @@ export const SourceItem: React.FC<SourceItemProps> = ({
       {/* Icon Area - Shows category icon, transforms to menu on hover */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-muted transition-colors">
+          <button className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded transition-colors">
             {/* Category icon - visible by default, hidden on hover */}
             <Icon
-              size={16}
+              size={18}
+              weight={iconWeight}
               className="text-muted-foreground group-hover:hidden"
             />
             {/* Menu icon - hidden by default, visible on hover */}
             <DotsThreeVertical
-              size={16}
+              size={18}
               weight="bold"
               className="text-muted-foreground hidden group-hover:block"
             />

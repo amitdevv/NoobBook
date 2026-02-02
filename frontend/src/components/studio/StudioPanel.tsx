@@ -54,7 +54,7 @@ const StudioPanelContent: React.FC = () => {
       {/* BOTTOM HALF: Generated Outputs */}
       <div className="flex-1 min-h-0 flex flex-col">
         <div className="px-3 py-2 border-b">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Generated Content
           </h3>
         </div>

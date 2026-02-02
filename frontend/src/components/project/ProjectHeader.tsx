@@ -9,16 +9,6 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../ui/alert-dialog';
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -37,7 +27,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '../ui/collapsible';
-import { ArrowLeft, DotsThreeVertical, Plus, Trash, FolderOpen, Gear, CircleNotch, CurrencyDollar, Brain, CaretDown, CaretRight, Palette } from '@phosphor-icons/react';
+import { ArrowLeft, DotsThreeVertical, Plus, Trash, FolderOpen, Gear, CircleNotch, CurrencyDollar, Brain, CaretDown, CaretRight, Palette, PencilSimple } from '@phosphor-icons/react';
+import { Input } from '../ui/input';
 import { chatsAPI, type PromptConfig } from '../../lib/api/chats';
 import { projectsAPI, type CostTracking, type MemoryData } from '../../lib/api';
 import { useToast, ToastContainer } from '../ui/toast';
@@ -58,6 +49,7 @@ interface ProjectHeaderProps {
   onDelete: () => void;
   costsVersion?: number; // Increment to trigger cost refresh
   onNavigateToBrand?: (projectId: string) => void;
+  onRename?: (newName: string) => Promise<void>;
 }
 
 export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
@@ -66,11 +58,17 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   onDelete,
   costsVersion,
   onNavigateToBrand,
+  onRename,
 }) => {
   const { toasts, dismissToast, error } = useToast();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
+
+  // Rename dialog state
+  const [renameDialogOpen, setRenameDialogOpen] = React.useState(false);
+  const [renameValue, setRenameValue] = React.useState(project.name);
+  const [renaming, setRenaming] = React.useState(false);
 
   // Cost tracking state
   const [costs, setCosts] = React.useState<CostTracking | null>(null);
@@ -228,6 +226,21 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
     return tokens.toString();
   };
 
+  const handleRename = async () => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === project.name || !onRename) return;
+    try {
+      setRenaming(true);
+      await onRename(trimmed);
+      setRenameDialogOpen(false);
+    } catch (err) {
+      console.error('Error renaming project:', err);
+      error('Failed to rename project');
+    } finally {
+      setRenaming(false);
+    }
+  };
+
   const handleNewProject = () => {
     console.log('Creating new project...');
     // For now, just navigate back to project list
@@ -370,14 +383,12 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => console.log('Rename project')}>
+            <DropdownMenuItem onClick={() => {
+              setRenameValue(project.name);
+              setRenameDialogOpen(true);
+            }}>
+              <PencilSimple size={16} className="mr-2" />
               Rename Project
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => console.log('Duplicate project')}>
-              Duplicate Project
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => console.log('Export project')}>
-              Export Project
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -392,19 +403,24 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Are you absolutely sure?</DialogTitle>
+            <DialogDescription>
               This will permanently delete "{project.name}" and all of its data.
               This action cannot be undone. All sources, chats, and generated content
               will be lost forever.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="soft"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
               onClick={() => {
                 onDelete();
                 setDeleteDialogOpen(false);
@@ -412,10 +428,51 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete Project
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Project Dialog */}
+      <Dialog open={renameDialogOpen} onOpenChange={(open) => {
+        if (!renaming) setRenameDialogOpen(open);
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename Project</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRename();
+              }}
+              placeholder="Project name"
+              disabled={renaming}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="soft"
+              onClick={() => setRenameDialogOpen(false)}
+              disabled={renaming}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRename}
+              disabled={renaming || !renameValue.trim() || renameValue.trim() === project.name}
+            >
+              {renaming ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Project Settings Dialog */}
       <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>

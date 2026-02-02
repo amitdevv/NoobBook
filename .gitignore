@@ -88,3 +88,6 @@ docker/supabase/volumes/functions/
 !docker/supabase/volumes/logs/
 !docker/supabase/volumes/logs/vector.yml
 docker/supabase/volumes/minio/
+
+# Supabase CLI temp files
+backend/supabase/.temp/

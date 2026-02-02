@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash, Clock } from '@phosphor-icons/react';
+import { Plus, Trash, Clock, PencilSimple } from '@phosphor-icons/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../ui/alert-dialog';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { projectsAPI } from '@/lib/api';
+import { CreateProjectDialog } from '@/components/dashboard/CreateProjectDialog';
 
 /**
  * ProjectList Component
@@ -46,6 +45,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [editProject, setEditProject] = useState<{ id: string; name: string; description: string } | null>(null);
 
   // Fetch projects from API
   useEffect(() => {
@@ -134,15 +134,14 @@ export const ProjectList: React.FC<ProjectListProps> = ({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {/* Create New Project Card - Always first */}
       <Card
-        className="cursor-pointer hover:shadow-lg transition-shadow border-dashed border-2 border-border bg-transparent hover:bg-card/50"
+        className="cursor-pointer bg-[#e8e7e4] hover:bg-[#dddcd8] border-transparent transition-colors"
         onClick={onCreateNew}
       >
         <CardContent className="flex flex-col items-center justify-center h-full min-h-[140px] py-8">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-            <Plus size={24} className="text-primary" />
+          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+            <Plus size={28} weight="bold" className="text-primary" />
           </div>
-          <p className="font-medium text-sm">Create New Project</p>
-          <p className="text-xs text-muted-foreground mt-1">Start a new knowledge workspace</p>
+          <p className="font-semibold text-base">Create New Project</p>
         </CardContent>
       </Card>
 
@@ -150,7 +149,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
       {projects.map((project) => (
         <Card
           key={project.id}
-          className="cursor-pointer hover:shadow-lg transition-shadow"
+          className="cursor-pointer hover:bg-stone-50 transition-colors"
           onClick={() => handleOpenProject(project)}
         >
           <CardHeader>
@@ -161,19 +160,30 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                   {project.description || 'No description'}
                 </CardDescription>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => handleDeleteClick(e, project.id)}
-                className="ml-2"
-              >
-                <Trash size={16} />
-              </Button>
+              <div className="flex items-center gap-1 ml-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditProject({ id: project.id, name: project.name, description: project.description });
+                  }}
+                >
+                  <PencilSimple size={20} weight="bold" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => handleDeleteClick(e, project.id)}
+                >
+                  <Trash size={20} weight="bold" />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="flex items-center text-sm text-muted-foreground">
-              <Clock size={12} className="mr-1" />
+              <Clock size={16} weight="bold" className="mr-1" />
               Last opened: {formatDate(project.last_accessed)}
             </div>
           </CardContent>
@@ -181,26 +191,40 @@ export const ProjectList: React.FC<ProjectListProps> = ({
       ))}
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Project</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Project</DialogTitle>
+            <DialogDescription>
               Are you sure you want to delete this project? This action cannot be undone.
               All sources, chats, and data will be permanently deleted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="soft" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
               onClick={handleConfirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Project Dialog */}
+      {editProject && (
+        <CreateProjectDialog
+          editProject={editProject}
+          onClose={() => setEditProject(null)}
+          onProjectCreated={() => {
+            setEditProject(null);
+            loadProjects();
+          }}
+        />
+      )}
     </div>
   );
 };

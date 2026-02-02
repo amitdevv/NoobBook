@@ -31,6 +31,7 @@ SOURCE_TYPES = [
     "AUDIO",    # Audio transcriptions
     "LINK",     # Web URL content
     "YOUTUBE",  # YouTube video transcripts
+    "RESEARCH", # Research documents
 ]
 
 # Human-readable display names for headers
@@ -43,6 +44,7 @@ SOURCE_TYPE_DISPLAY = {
     "AUDIO": "audio file",
     "LINK": "URL",
     "YOUTUBE": "YouTube video transcript",
+    "RESEARCH": "research document",
 }
 
 
@@ -73,7 +75,7 @@ def build_page_marker(source_type: str, page_num: int, total_pages: int) -> str:
 # Captures: group(1) = page number, group(2) = total pages
 # The .*? allows for optional suffixes like "(continues...)"
 ANY_PAGE_PATTERN = re.compile(
-    r'=== (?:PDF|TEXT|DOCX|PPTX|AUDIO|LINK|YOUTUBE|IMAGE) PAGE (\d+) of (\d+).*?==='
+    r'=== (?:PDF|TEXT|DOCX|PPTX|AUDIO|LINK|YOUTUBE|IMAGE|RESEARCH) PAGE (\d+) of (\d+).*?==='
 )
 
 # Type-specific patterns (for when you need to match a specific type)
@@ -86,6 +88,7 @@ PAGE_PATTERNS = {
     "AUDIO": re.compile(r'=== AUDIO PAGE (\d+) of (\d+) ==='),
     "LINK": re.compile(r'=== LINK PAGE (\d+) of (\d+) ==='),
     "YOUTUBE": re.compile(r'=== YOUTUBE PAGE (\d+) of (\d+) ==='),
+    "RESEARCH": re.compile(r'=== RESEARCH PAGE (\d+) of (\d+) ==='),
 }
 
 

@@ -40,6 +40,10 @@ from app.utils.auth_middleware import validate_token  # noqa: E402
 @api_bp.before_request
 def authenticate_request():
     """Validate JWT for all API requests except auth endpoints."""
+    # Skip CORS preflight requests — browser sends OPTIONS before authenticated requests
+    if request.method == 'OPTIONS':
+        return None
+
     # Skip authentication for auth routes (login, signup, refresh)
     if request.path.startswith('/api/v1/auth/'):
         return None

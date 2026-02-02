@@ -57,7 +57,8 @@ class CSVService:
     def analyze_csv(
         self,
         project_id: str,
-        source_id: str
+        source_id: str,
+        csv_file_path: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Analyze a CSV file and generate a summary.
@@ -70,6 +71,8 @@ class CSVService:
         Args:
             project_id: Project ID (for file path and cost tracking)
             source_id: Source ID (filename is {source_id}.csv in raw folder)
+            csv_file_path: Optional explicit path to the CSV file (e.g. temp directory
+                           during processing). Passed through to csv_tool_executor.
 
         Returns:
             Dict with summary, row_count, column_count, and metadata
@@ -143,7 +146,9 @@ class CSVService:
 
                 # csv_analyzer: Execute and return results
                 elif tool_name == "csv_analyzer":
-                    result, _ = csv_tool_executor.execute_tool(tool_input, project_id, source_id)
+                    result, _ = csv_tool_executor.execute_tool(
+                        tool_input, project_id, source_id, csv_file_path=csv_file_path
+                    )
                     # Format result as readable string for Claude
                     content = self._format_tool_result(result)
                     tool_results_data.append({

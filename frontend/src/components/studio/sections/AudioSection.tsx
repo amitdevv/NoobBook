@@ -14,15 +14,14 @@ import { AudioProgressIndicator } from '../audio/AudioProgressIndicator';
 export const AudioSection: React.FC = () => {
   const { projectId, registerGenerationHandler } = useStudioContext();
 
-  // All audio state is owned here - not in parent
   const {
     savedAudioJobs,
     currentAudioJob,
     isGeneratingAudio,
     playingJobId,
+    isPaused,
     currentTime,
     duration,
-    playbackRate,
     audioRef,
     handleAudioEnd,
     handleTimeUpdate,
@@ -31,21 +30,19 @@ export const AudioSection: React.FC = () => {
     handleAudioGeneration,
     playAudio,
     pauseAudio,
+    seekTo,
+    playbackRate,
+    cyclePlaybackRate,
     downloadAudio,
     formatDuration,
-    seekTo,
-    cyclePlaybackRate,
   } = useAudioGeneration(projectId);
 
-  // Filter jobs by valid source IDs using O(1) Set lookup
   const filteredJobs = useFilteredJobs(savedAudioJobs);
 
-  // Load saved jobs on mount
   useEffect(() => {
     loadSavedJobs();
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Register generation handler with context
   const handleGenerate = useCallback(async (signal: Parameters<typeof handleAudioGeneration>[0]) => {
     await handleAudioGeneration(signal);
   }, [handleAudioGeneration]);
@@ -54,14 +51,12 @@ export const AudioSection: React.FC = () => {
     registerGenerationHandler('audio_overview', handleGenerate);
   }, [registerGenerationHandler, handleGenerate]);
 
-  // Don't render anything if no jobs and not generating
   if (filteredJobs.length === 0 && !isGeneratingAudio) {
     return null;
   }
 
   return (
     <>
-      {/* Hidden audio element for playback */}
       <audio
         ref={audioRef}
         onEnded={handleAudioEnd}
@@ -70,25 +65,24 @@ export const AudioSection: React.FC = () => {
         className="hidden"
       />
 
-      {/* Progress indicator when generating */}
       {isGeneratingAudio && (
         <AudioProgressIndicator currentAudioJob={currentAudioJob} />
       )}
 
-      {/* List of saved audio jobs */}
       {filteredJobs.map((job) => (
         <AudioListItem
           key={job.id}
           job={job}
           playingJobId={playingJobId}
-          currentTime={playingJobId === job.id ? currentTime : 0}
-          duration={playingJobId === job.id ? duration : 0}
-          playbackRate={playbackRate}
+          isPaused={isPaused}
+          currentTime={currentTime}
+          duration={duration}
           onPlay={playAudio}
           onPause={pauseAudio}
-          onDownload={downloadAudio}
           onSeek={seekTo}
+          playbackRate={playbackRate}
           onCycleSpeed={cyclePlaybackRate}
+          onDownload={downloadAudio}
           formatDuration={formatDuration}
         />
       ))}

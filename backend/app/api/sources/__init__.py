@@ -53,6 +53,8 @@ from app.utils.auth_middleware import verify_project_access  # noqa: E402
 
 @sources_bp.before_request
 def check_project_access():
+    if request.method == 'OPTIONS':
+        return None
     project_id = request.view_args.get('project_id') if request.view_args else None
     if project_id:
         denied = verify_project_access(project_id)

@@ -31,6 +31,7 @@ interface ProjectWorkspaceProps {
   onBack: () => void;
   onDeleteProject: (projectId: string) => void;
   onNavigateToBrand?: (projectId: string) => void;
+  onRenameProject?: (newName: string) => Promise<void>;
 }
 
 export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
@@ -38,6 +39,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   onBack,
   onDeleteProject,
   onNavigateToBrand,
+  onRenameProject,
 }) => {
   // Refs for programmatic panel control
   const leftPanelRef = useRef<ImperativePanelHandle>(null);
@@ -77,10 +79,11 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         onDelete={() => onDeleteProject(project.id)}
         costsVersion={costsVersion}
         onNavigateToBrand={onNavigateToBrand}
+        onRename={onRenameProject}
       />
 
       {/* Main Content Area - Floating panels over background */}
-      <div className="flex-1 flex flex-col px-3 pb-2 min-h-0">
+      <div className="flex-1 flex flex-col px-3 min-h-0">
         {/* Panel Container - bg-background so resize handles blend in as "gaps" */}
         <div className="flex-1 rounded-xl overflow-hidden bg-background min-h-0">
           <ResizablePanelGroup direction="horizontal" className="h-full">
@@ -94,7 +97,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               collapsedSize={4}
               onCollapse={() => setLeftPanelOpen(false)}
               onExpand={() => setLeftPanelOpen(true)}
-              className="bg-card overflow-hidden"
+              className="bg-card overflow-hidden rounded-xl"
             >
               <div className="h-full flex flex-col relative">
                 <SourcesPanel
@@ -119,7 +122,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             <ResizableHandle />
 
             {/* Center Panel - Chat */}
-            <ResizablePanel defaultSize={55} minSize={30} className="bg-card overflow-hidden min-w-0">
+            <ResizablePanel defaultSize={55} minSize={30} className="bg-card overflow-hidden rounded-xl min-w-0">
               <div className="h-full min-h-0 min-w-0 w-full flex flex-col overflow-hidden">
                 <ChatPanel
                   projectId={project.id}
@@ -143,7 +146,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               collapsedSize={4}
               onCollapse={() => setRightPanelOpen(false)}
               onExpand={() => setRightPanelOpen(true)}
-              className="bg-card overflow-hidden"
+              className="bg-card overflow-hidden rounded-xl"
             >
               <div className="h-full flex flex-col relative">
                 <StudioPanel
@@ -168,7 +171,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         </div>
 
         {/* Footer Disclaimer - sits on background layer */}
-        <div className="flex items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground">
+        <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
           <Warning size={12} />
           <span>NoobBook can make mistakes. Please verify important information.</span>
         </div>

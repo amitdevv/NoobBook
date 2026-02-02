@@ -124,6 +124,12 @@ function ProjectWorkspaceRoute({
     }
   };
 
+  const handleRenameProject = async (newName: string) => {
+    if (!projectId) return;
+    await projectsAPI.update(projectId, { name: newName });
+    setProject(prev => prev ? { ...prev, name: newName } : prev);
+  };
+
   const handleNavigateToBrand = (id: string) => {
     navigate(`/projects/${id}/brand`);
   };
@@ -146,6 +152,7 @@ function ProjectWorkspaceRoute({
       onBack={() => navigate('/')}
       onDeleteProject={handleDeleteProject}
       onNavigateToBrand={handleNavigateToBrand}
+      onRenameProject={handleRenameProject}
     />
   );
 }

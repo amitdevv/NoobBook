@@ -135,6 +135,8 @@ class ContextLoader:
             ".jpeg": "Image (JPEG)",
             ".webp": "Image (WebP)",
             ".link": "Web Link",
+            ".csv": "CSV Spreadsheet",
+            ".research": "Research Document",
         }
 
         if file_ext in ext_map:

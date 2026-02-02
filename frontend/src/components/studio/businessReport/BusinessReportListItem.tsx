@@ -26,31 +26,31 @@ export const BusinessReportListItem: React.FC<BusinessReportListItemProps> = ({ 
 
   return (
     <div
-      className="flex items-center gap-2 p-1.5 bg-muted/50 rounded border hover:border-primary/50 transition-colors cursor-pointer"
+      className="flex items-center gap-2.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 transition-colors cursor-pointer"
       onClick={onOpen}
     >
-      <div className="p-1 bg-teal-500/10 rounded flex-shrink-0">
-        <ChartBar size={12} className="text-teal-600" />
+      <div className="p-1.5 bg-teal-500/10 rounded-md flex-shrink-0">
+        <ChartBar size={16} className="text-teal-600" />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
-        <p className="text-[10px] font-medium truncate max-w-[100px]">
+        <p className="text-xs font-medium truncate">
           {job.title || job.source_name}
         </p>
       </div>
       {chartCount > 0 && (
-        <span className="text-[9px] text-teal-600 flex-shrink-0">
+        <span className="text-[11px] text-teal-600 flex-shrink-0">
           {chartCount} chart{chartCount > 1 ? 's' : ''}
         </span>
       )}
-      <span className="text-[9px] text-muted-foreground flex-shrink-0">
+      <span className="text-[11px] text-muted-foreground flex-shrink-0">
         {wordCountDisplay}w
       </span>
       <button
         onClick={onDownload}
-        className="p-0.5 hover:bg-muted rounded flex-shrink-0"
+        className="p-1 hover:bg-muted rounded flex-shrink-0"
         title="Download Business Report"
       >
-        <DownloadSimple size={10} className="text-muted-foreground" />
+        <DownloadSimple size={14} className="text-muted-foreground" />
       </button>
     </div>
   );
