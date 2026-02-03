@@ -80,6 +80,7 @@ const getSourceIcon = (source: Source): { icon: typeof File; weight?: 'bold' } =
     case '.pptx': return { icon: FilePpt, weight: 'bold' };
     case '.txt': return { icon: FileText, weight: 'bold' };
     case '.csv': return { icon: FileCsv, weight: 'bold' };
+    case '.database': return { icon: Table, weight: 'bold' };
     case '.md': return { icon: MarkdownLogo, weight: 'bold' };
     case '.html': return { icon: FileHtml, weight: 'bold' };
     case '.json': case '.xml': return { icon: FileText, weight: 'bold' };
@@ -90,7 +91,7 @@ const getSourceIcon = (source: Source): { icon: typeof File; weight?: 'bold' } =
   }
 
   // 3. Fall back to backend `type` field (for URLs, pasted text, etc. that have no extension in name)
-  const sourceType = (source as unknown as Record<string, unknown>).type as string;
+  const sourceType = source.type || '';
   switch (sourceType) {
     case 'YOUTUBE': return { icon: YoutubeLogo, weight: 'bold' };
     case 'LINK': case 'RESEARCH': return { icon: Link, weight: 'bold' };
@@ -98,6 +99,7 @@ const getSourceIcon = (source: Source): { icon: typeof File; weight?: 'bold' } =
     case 'AUDIO': return { icon: MusicNote, weight: 'bold' };
     case 'IMAGE': return { icon: Image, weight: 'bold' };
     case 'DATA': return { icon: Table, weight: 'bold' };
+    case 'DATABASE': return { icon: Table, weight: 'bold' };
     case 'DOCUMENT': return { icon: FileText, weight: 'bold' };
     default: return { icon: File, weight: 'bold' };
   }

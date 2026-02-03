@@ -1,0 +1,25 @@
+{
+  "name": "return_database_result",
+  "description": "Return your final answer after you have gathered enough evidence from schema_fetcher/query_runner. Always call this tool to finish.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "summary": {
+        "type": "string",
+        "description": "Concise, user-facing answer with concrete numbers and explanations."
+      },
+      "findings": {
+        "type": "array",
+        "description": "Key findings or takeaways (bulleted).",
+        "items": { "type": "string" }
+      },
+      "sql_queries": {
+        "type": "array",
+        "description": "SQL queries executed (for transparency / debugging).",
+        "items": { "type": "string" }
+      }
+    },
+    "required": ["summary"]
+  }
+}
+

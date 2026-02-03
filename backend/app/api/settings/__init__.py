@@ -37,3 +37,4 @@ settings_bp = Blueprint('settings', __name__)
 # Import routes to register them with the blueprint
 from app.api.settings import api_keys  # noqa: F401
 from app.api.settings import processing  # noqa: F401
+from app.api.settings import databases  # noqa: F401

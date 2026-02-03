@@ -27,6 +27,19 @@ export interface ValidationResult {
   message: string;
 }
 
+export type DatabaseType = 'postgresql' | 'mysql';
+
+export interface DatabaseConnection {
+  id: string;
+  name: string;
+  description: string;
+  db_type: DatabaseType;
+  connection_uri_masked: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 class SettingsAPI {
   /**
    * Get all API keys from the backend
@@ -95,6 +108,68 @@ class SettingsAPI {
 }
 
 export const settingsAPI = new SettingsAPI();
+
+// ============================================================================
+// Database Connections Types and API
+// ============================================================================
+
+class DatabasesAPI {
+  async listDatabases(): Promise<DatabaseConnection[]> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/settings/databases`);
+      return response.data.databases || [];
+    } catch (error) {
+      console.error('Error fetching databases:', error);
+      throw error;
+    }
+  }
+
+  async createDatabase(payload: {
+    name: string;
+    db_type: DatabaseType;
+    connection_uri: string;
+    description?: string;
+  }): Promise<DatabaseConnection> {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/settings/databases`, payload);
+      return response.data.database;
+    } catch (error) {
+      console.error('Error creating database:', error);
+      throw error;
+    }
+  }
+
+  async deleteDatabase(connectionId: string): Promise<void> {
+    try {
+      await axios.delete(`${API_BASE_URL}/settings/databases/${connectionId}`);
+    } catch (error) {
+      console.error('Error deleting database:', error);
+      throw error;
+    }
+  }
+
+  async validateDatabase(dbType: DatabaseType, connectionUri: string): Promise<ValidationResult> {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/settings/databases/validate`, {
+        db_type: dbType,
+        connection_uri: connectionUri,
+      });
+      return {
+        valid: response.data.valid,
+        message: response.data.message,
+      };
+    } catch (error) {
+      console.error('Error validating database:', error);
+      const axiosErr = error as { response?: { data?: { error?: string; message?: string } } };
+      return {
+        valid: false,
+        message: axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Validation failed',
+      };
+    }
+  }
+}
+
+export const databasesAPI = new DatabasesAPI();
 
 // ============================================================================
 // Processing Settings Types and API
