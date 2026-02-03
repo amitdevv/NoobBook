@@ -58,40 +58,40 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
           </p>
 
           <Tabs defaultValue="upload" className="w-full">
-            <TabsList className="w-full h-auto grid grid-cols-3 gap-1 md:grid-cols-6">
+            <TabsList className="w-full h-auto flex flex-wrap gap-2 bg-transparent p-0">
               <TabsTrigger
                 value="upload"
-                className="w-full hover:bg-[#e8e7e4] data-[state=active]:bg-[#dcdbd8]"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
               >
                 Upload
               </TabsTrigger>
               <TabsTrigger
                 value="link"
-                className="w-full hover:bg-[#e8e7e4] data-[state=active]:bg-[#dcdbd8]"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
               >
                 Link
               </TabsTrigger>
               <TabsTrigger
                 value="paste"
-                className="w-full hover:bg-[#e8e7e4] data-[state=active]:bg-[#dcdbd8]"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
               >
                 Paste
               </TabsTrigger>
               <TabsTrigger
                 value="drive"
-                className="w-full hover:bg-[#e8e7e4] data-[state=active]:bg-[#dcdbd8]"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
               >
                 Drive
               </TabsTrigger>
               <TabsTrigger
                 value="research"
-                className="w-full hover:bg-[#e8e7e4] data-[state=active]:bg-[#dcdbd8]"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
               >
                 Research
               </TabsTrigger>
               <TabsTrigger
                 value="database"
-                className="w-full hover:bg-[#e8e7e4] data-[state=active]:bg-[#dcdbd8]"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
               >
                 Database
               </TabsTrigger>
