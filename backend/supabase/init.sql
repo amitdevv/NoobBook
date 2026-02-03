@@ -84,6 +84,38 @@ CREATE INDEX IF NOT EXISTS idx_sources_status ON sources(status);
 CREATE INDEX IF NOT EXISTS idx_sources_type ON sources(type);
 
 -- ============================================================================
+-- DATABASE CONNECTIONS (Account-level)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS database_connections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  db_type TEXT NOT NULL,
+  connection_uri TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT valid_db_type CHECK (db_type IN ('postgresql', 'mysql')),
+  CONSTRAINT name_not_empty CHECK (length(trim(name)) > 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_database_connections_owner_user_id ON database_connections(owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_database_connections_db_type ON database_connections(db_type);
+
+-- Users allowed to use a database connection (for multi-user mode)
+CREATE TABLE IF NOT EXISTS database_connection_users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  connection_id UUID NOT NULL REFERENCES database_connections(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(connection_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_database_connection_users_connection_id ON database_connection_users(connection_id);
+CREATE INDEX IF NOT EXISTS idx_database_connection_users_user_id ON database_connection_users(user_id);
+
+-- ============================================================================
 -- CHATS TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS chats (
@@ -261,6 +293,10 @@ CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects
 
 DROP TRIGGER IF EXISTS update_sources_updated_at ON sources;
 CREATE TRIGGER update_sources_updated_at BEFORE UPDATE ON sources
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_database_connections_updated_at ON database_connections;
+CREATE TRIGGER update_database_connections_updated_at BEFORE UPDATE ON database_connections
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 DROP TRIGGER IF EXISTS update_chats_updated_at ON chats;

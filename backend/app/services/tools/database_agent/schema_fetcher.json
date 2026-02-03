@@ -1,0 +1,17 @@
+{
+  "name": "schema_fetcher",
+  "description": "Fetch the schema for the current DATABASE source. If table_names is omitted/empty, returns an overview list of tables/views. If table_names is provided, returns detailed column/keys info for those tables. Do NOT guess table names—call without table_names first to discover them.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "table_names": {
+        "type": "array",
+        "description": "Optional list of table names to fetch detailed schema for. Only pass table names you discovered from a previous schema_fetcher call or that the user explicitly mentioned.",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
+

@@ -12,7 +12,6 @@ The context is rebuilt on every message to reflect the current state
 from typing import Dict, Any, List
 
 from app.services.source_services import source_service
-from app.services.ai_services.memory_service import memory_service
 
 
 class ContextLoader:
@@ -73,7 +72,11 @@ class ContextLoader:
             "",
             "## Available Sources",
             "",
-            "You have access to the following sources. Use the search_sources tool to retrieve information when answering questions.",
+            "You have access to the following sources.",
+            "",
+            "- Use the search_sources tool to retrieve information from embedded sources (documents, links, schema snapshots, etc.).",
+            "- For CSV sources, use analyze_csv_agent when the user asks questions that require calculations/plots from the CSV data.",
+            "- For DATABASE sources, use analyze_database_agent when the user asks questions that require LIVE data from the database (counts, metrics, lists, trends).",
             "",
         ]
 
@@ -99,11 +102,15 @@ class ContextLoader:
             lines.append(f"  - ID: `{source_id}`")
             lines.append(f"  - Type: {source_type}")
             lines.append(f"  - Embedded: {embedded_label}")
+            if file_ext == ".csv":
+                lines.append("  - Chat tool: analyze_csv_agent (for calculations/plots)")
+            if file_ext == ".database":
+                lines.append("  - Chat tool: analyze_database_agent (for live SQL queries)")
             if summary_text:
                 lines.append(f"  - Summary: {summary_text}")
             lines.append("")
 
-        lines.append("When the user asks about content from these sources, use the search_sources tool with the appropriate source_id.")
+        lines.append("When answering, pick the correct tool based on the source type (search_sources vs analyze_csv_agent vs analyze_database_agent).")
         lines.append("")
 
         return "\n".join(lines)
@@ -137,6 +144,7 @@ class ContextLoader:
             ".link": "Web Link",
             ".csv": "CSV Spreadsheet",
             ".research": "Research Document",
+            ".database": "Database (Postgres/MySQL)",
         }
 
         if file_ext in ext_map:
@@ -169,6 +177,10 @@ class ContextLoader:
         Returns:
             Formatted string to append to system prompt, or empty string if no memory
         """
+        # Lazy import to avoid circular imports:
+        # memory_service -> app.config -> context_loader -> memory_service
+        from app.services.ai_services.memory_service import memory_service
+
         user_memory = memory_service.get_user_memory()
         project_memory = memory_service.get_project_memory(project_id)
 

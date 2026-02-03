@@ -38,11 +38,14 @@ export const AudioListItem: React.FC<AudioListItemProps> = ({
   onDownload,
   formatDuration,
 }) => {
+  // isActive: this job is loaded (playing or paused) — show timeline
   const isActive = playingJobId === job.id;
+  // isPlaying: actually producing audio right now — animate bars, show pause icon
   const isPlaying = isActive && !isPaused;
 
   return (
     <div className="flex flex-col gap-1.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 transition-colors">
+      {/* Top row: icon + name + controls */}
       <div className="flex items-center gap-2.5">
         <div className="p-1.5 bg-primary/10 rounded-md flex-shrink-0 w-7 h-7 flex items-center justify-center">
           {isPlaying ? (
@@ -66,14 +69,24 @@ export const AudioListItem: React.FC<AudioListItemProps> = ({
             className="h-7 w-7 p-0"
             onClick={() => isPlaying ? onPause() : onPlay(job)}
           >
-            {isPlaying ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}
+            {isPlaying ? (
+              <Pause size={16} weight="fill" />
+            ) : (
+              <Play size={16} weight="fill" />
+            )}
           </Button>
-          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onDownload(job)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={() => onDownload(job)}
+          >
             <DownloadSimple size={16} />
           </Button>
         </div>
       </div>
 
+      {/* Bottom row: timeline seekbar + speed control (visible when active) */}
       {isActive && (
         <div className="flex items-center gap-2 px-1">
           <span className="text-[11px] text-muted-foreground tabular-nums w-[34px] text-right flex-shrink-0">

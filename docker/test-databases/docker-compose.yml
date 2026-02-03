@@ -1,0 +1,48 @@
+# Dummy databases for local testing (Postgres + MySQL).
+#
+# These services join the existing external `noobbook-network` so the NoobBook
+# backend container can connect to them by service name.
+#
+# Start:
+#   docker compose -f docker/test-databases/docker-compose.yml up -d
+#
+# Stop:
+#   docker compose -f docker/test-databases/docker-compose.yml down
+
+services:
+  noobbook-test-postgres:
+    image: postgres:16-alpine
+    container_name: noobbook-test-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+      - POSTGRES_DB=test_postgres_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    networks:
+      - noobbook-network
+
+  noobbook-test-mysql:
+    image: mysql:8.0
+    container_name: noobbook-test-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=test_mysql_db
+      - MYSQL_USER=test_user
+      - MYSQL_PASSWORD=test_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    networks:
+      - noobbook-network
+
+networks:
+  noobbook-network:
+    external: true
+    name: noobbook-network
+

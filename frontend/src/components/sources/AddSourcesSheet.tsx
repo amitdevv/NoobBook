@@ -12,6 +12,7 @@ import { LinkTab } from './LinkTab';
 import { PasteTab } from './PasteTab';
 import { GoogleDriveTab } from './GoogleDriveTab';
 import { ResearchTab } from './ResearchTab';
+import { DatabaseTab } from './DatabaseTab';
 import { MAX_SOURCES } from '../../lib/api/sources';
 
 interface AddSourcesSheetProps {
@@ -23,6 +24,7 @@ interface AddSourcesSheetProps {
   onAddUrl: (url: string) => Promise<void>;
   onAddText: (content: string, name: string) => Promise<void>;
   onAddResearch: (topic: string, description: string, links: string[]) => Promise<void>;
+  onAddDatabase: (connectionId: string, name?: string, description?: string) => Promise<void>;
   onImportComplete: () => void;
   uploading: boolean;
 }
@@ -36,6 +38,7 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
   onAddUrl,
   onAddText,
   onAddResearch,
+  onAddDatabase,
   onImportComplete,
   uploading,
 }) => {
@@ -55,12 +58,43 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
           </p>
 
           <Tabs defaultValue="upload" className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="upload" className="hover:bg-[#e8e7e4] data-[state=active]:bg-[#dcdbd8]">Upload</TabsTrigger>
-              <TabsTrigger value="link" className="hover:bg-[#e8e7e4] data-[state=active]:bg-[#dcdbd8]">Link</TabsTrigger>
-              <TabsTrigger value="paste" className="hover:bg-[#e8e7e4] data-[state=active]:bg-[#dcdbd8]">Paste</TabsTrigger>
-              <TabsTrigger value="drive" className="hover:bg-[#e8e7e4] data-[state=active]:bg-[#dcdbd8]">Drive</TabsTrigger>
-              <TabsTrigger value="research" className="hover:bg-[#e8e7e4] data-[state=active]:bg-[#dcdbd8]">Research</TabsTrigger>
+            <TabsList className="w-full h-auto flex flex-wrap gap-2 bg-transparent p-0">
+              <TabsTrigger
+                value="upload"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
+              >
+                Upload
+              </TabsTrigger>
+              <TabsTrigger
+                value="link"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
+              >
+                Link
+              </TabsTrigger>
+              <TabsTrigger
+                value="paste"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
+              >
+                Paste
+              </TabsTrigger>
+              <TabsTrigger
+                value="drive"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
+              >
+                Drive
+              </TabsTrigger>
+              <TabsTrigger
+                value="research"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
+              >
+                Research
+              </TabsTrigger>
+              <TabsTrigger
+                value="database"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
+              >
+                Database
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="upload" className="mt-6">
@@ -94,6 +128,17 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
               <ResearchTab
                 onAddResearch={onAddResearch}
                 isAtLimit={isAtLimit}
+              />
+            </TabsContent>
+
+            <TabsContent value="database" className="mt-6">
+              <DatabaseTab
+                isAtLimit={isAtLimit}
+                onAddDatabase={async (connectionId, name, description) => {
+                  await onAddDatabase(connectionId, name, description);
+                  onImportComplete();
+                  onOpenChange(false);
+                }}
               />
             </TabsContent>
           </Tabs>

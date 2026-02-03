@@ -87,21 +87,27 @@ export const useAudioGeneration = (projectId: string) => {
     }
   };
 
+  /**
+   * Play a specific audio job, or resume if it's the same job that was paused
+   */
   const playAudio = (job: AudioJob) => {
     if (!job.audio_url) return;
 
+    // Resume if same job was paused — don't reload the source
     if (audioRef.current && playingJobId === job.id && isPaused) {
       audioRef.current.play();
       setIsPaused(false);
       return;
     }
 
+    // Switching to a different job — stop current and reset
     if (audioRef.current && playingJobId !== job.id) {
       audioRef.current.pause();
       setCurrentTime(0);
       setDuration(0);
     }
 
+    // Load new source and play
     if (audioRef.current) {
       audioRef.current.src = getAuthUrl(job.audio_url);
       audioRef.current.play();
@@ -110,6 +116,9 @@ export const useAudioGeneration = (projectId: string) => {
     }
   };
 
+  /**
+   * Pause current playback — keeps the job active so resume works
+   */
   const pauseAudio = () => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -117,6 +126,9 @@ export const useAudioGeneration = (projectId: string) => {
     setIsPaused(true);
   };
 
+  /**
+   * Handle audio end — reset playback state
+   */
   const handleAudioEnd = () => {
     setPlayingJobId(null);
     setIsPaused(false);
@@ -124,6 +136,9 @@ export const useAudioGeneration = (projectId: string) => {
     setDuration(0);
   };
 
+  /**
+   * Seek to a specific time in the audio
+   */
   const seekTo = (time: number) => {
     if (audioRef.current) {
       audioRef.current.currentTime = time;
@@ -131,19 +146,29 @@ export const useAudioGeneration = (projectId: string) => {
     }
   };
 
+  /**
+   * Track playback progress — called by audio element's onTimeUpdate
+   */
   const handleTimeUpdate = () => {
     if (audioRef.current) {
       setCurrentTime(audioRef.current.currentTime);
     }
   };
 
+  /**
+   * Capture duration once audio metadata is loaded
+   */
   const handleLoadedMetadata = () => {
     if (audioRef.current) {
       setDuration(audioRef.current.duration);
+      // Apply current playback rate to newly loaded audio
       audioRef.current.playbackRate = playbackRate;
     }
   };
 
+  /**
+   * Cycle through playback speeds: 1x → 1.25x → 1.5x → 1.75x → 2x → 1x
+   */
   const cyclePlaybackRate = () => {
     const currentIndex = PLAYBACK_SPEEDS.indexOf(playbackRate as typeof PLAYBACK_SPEEDS[number]);
     const nextRate = PLAYBACK_SPEEDS[(currentIndex + 1) % PLAYBACK_SPEEDS.length];
