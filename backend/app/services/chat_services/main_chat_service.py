@@ -22,6 +22,7 @@ from app.config import prompt_loader, tool_loader, context_loader
 from app.services.tool_executors import source_search_executor
 from app.services.tool_executors import memory_executor
 from app.services.tool_executors import csv_analyzer_agent_executor
+from app.services.tool_executors import database_analyzer_agent_executor
 from app.services.tool_executors import studio_signal_executor
 from app.services.integrations.knowledge_bases import knowledge_base_service
 from app.services.ai_services.chat_naming_service import chat_naming_service
@@ -46,6 +47,7 @@ class MainChatService:
         self._search_tool = None
         self._memory_tool = None
         self._csv_analyzer_tool = None
+        self._database_analyzer_tool = None
         self._studio_signal_tool = None
 
     def _get_search_tool(self) -> Dict[str, Any]:
@@ -66,24 +68,39 @@ class MainChatService:
             self._csv_analyzer_tool = tool_loader.load_tool("chat_tools", "analyze_csv_agent_tool")
         return self._csv_analyzer_tool
 
+    def _get_database_analyzer_tool(self) -> Dict[str, Any]:
+        """Load the analyze_database_agent tool definition (cached)."""
+        if self._database_analyzer_tool is None:
+            self._database_analyzer_tool = tool_loader.load_tool(
+                "chat_tools", "analyze_database_agent_tool"
+            )
+        return self._database_analyzer_tool
+
     def _get_studio_signal_tool(self) -> Dict[str, Any]:
         """Load the studio_signal tool definition (cached)."""
         if self._studio_signal_tool is None:
             self._studio_signal_tool = tool_loader.load_tool("chat_tools", "studio_signal_tool")
         return self._studio_signal_tool
 
-    def _get_tools(self, has_active_sources: bool, has_csv_sources: bool = False) -> List[Dict[str, Any]]:
+    def _get_tools(
+        self,
+        has_active_sources: bool,
+        has_csv_sources: bool = False,
+        has_database_sources: bool = False,
+    ) -> List[Dict[str, Any]]:
         """
         Get tools list for Claude API call.
 
         Educational Note: Memory and studio_signal tools are always available.
         Search tool is only available when there are active non-CSV sources.
         CSV analyzer tool is available when there are CSV sources.
+        Database analyzer tool is available when there are DATABASE sources.
         Knowledge base tools (Jira, Notion, GitHub) are added if configured.
 
         Args:
             has_active_sources: Whether project has active non-CSV sources
             has_csv_sources: Whether project has active CSV sources
+            has_database_sources: Whether project has active DATABASE sources
 
         Returns:
             List of tool definitions
@@ -99,6 +116,9 @@ class MainChatService:
 
         if has_csv_sources:
             tools.append(self._get_csv_analyzer_tool())
+
+        if has_database_sources:
+            tools.append(self._get_database_analyzer_tool())
 
         # Add all configured knowledge base tools (Jira, Notion, GitHub, etc.)
         tools.extend(knowledge_base_service.get_available_tools())
@@ -179,6 +199,18 @@ class MainChatService:
             else:
                 return f"Error: {result.get('error', 'Analysis failed')}"
 
+        elif tool_name == "analyze_database_agent":
+            # Database analyzer agent for answering questions using live SQL
+            result = database_analyzer_agent_executor.execute(
+                project_id=project_id,
+                source_id=tool_input.get("source_id", ""),
+                query=tool_input.get("query", "")
+            )
+            if result.get("success"):
+                return result.get("content", "No analysis result")
+            else:
+                return f"Error: {result.get('error', 'Analysis failed')}"
+
         elif tool_name == "studio_signal":
             # Studio signal returns immediately, actual storage happens in background
             result = studio_signal_executor.execute(
@@ -241,12 +273,18 @@ class MainChatService:
 
         # Step 3: Get tools (memory always available, search for non-CSV, analyzer for CSV)
         active_sources = context_loader.get_active_sources(project_id)
-        # Separate CSV sources from other sources
-        csv_sources = [s for s in active_sources if s.get("file_extension") == ".csv"]
-        non_csv_sources = [s for s in active_sources if s.get("file_extension") != ".csv"]
+        # Separate sources by file extension (stored inside embedding_info)
+        def _file_ext(source: Dict[str, Any]) -> str:
+            embedding_info = source.get("embedding_info", {}) or {}
+            return (embedding_info.get("file_extension") or "").lower()
+
+        csv_sources = [s for s in active_sources if _file_ext(s) == ".csv"]
+        database_sources = [s for s in active_sources if _file_ext(s) == ".database"]
+        non_csv_sources = [s for s in active_sources if _file_ext(s) != ".csv"]
         tools = self._get_tools(
             has_active_sources=bool(non_csv_sources),
-            has_csv_sources=bool(csv_sources)
+            has_csv_sources=bool(csv_sources),
+            has_database_sources=bool(database_sources),
         )
 
         try:

@@ -87,6 +87,7 @@ const getSourceIcon = (source: Source): typeof File => {
     case '.pptx': return FilePpt;
     case '.txt': return FileText;
     case '.csv': return FileCsv;
+    case '.database': return Table;
     case '.md': return MarkdownLogo;
     case '.html': return FileHtml;
     case '.json': case '.xml': return FileText;
@@ -97,7 +98,7 @@ const getSourceIcon = (source: Source): typeof File => {
   }
 
   // 3. Fall back to backend `type` field (for URLs, pasted text, etc.)
-  const sourceType = (source as unknown as Record<string, unknown>).type as string;
+  const sourceType = source.type || '';
   switch (sourceType) {
     case 'YOUTUBE': return YoutubeLogo;
     case 'LINK': case 'RESEARCH': return Link;
@@ -105,6 +106,7 @@ const getSourceIcon = (source: Source): typeof File => {
     case 'AUDIO': return MusicNote;
     case 'IMAGE': return Image;
     case 'DATA': return Table;
+    case 'DATABASE': return Table;
     case 'DOCUMENT': return FileText;
     default: return File;
   }
@@ -342,6 +344,32 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
     } catch (err: unknown) {
       console.error('Error starting research:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to start research';
+      if (typeof err === 'object' && err !== null && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { error?: string } } };
+        error(axiosErr.response?.data?.error || errorMessage);
+      } else {
+        error(errorMessage);
+      }
+    }
+  };
+
+  /**
+   * Handle adding a DATABASE source
+   */
+  const handleAddDatabase = async (connectionId: string, name?: string, description?: string) => {
+    if (sources.length >= MAX_SOURCES) {
+      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
+      return;
+    }
+
+    try {
+      await sourcesAPI.addDatabaseSource(projectId, connectionId, name, description);
+      success('Database source added successfully');
+      await loadSources();
+      setSheetOpen(false);
+    } catch (err: unknown) {
+      console.error('Error adding database source:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add database';
       if (typeof err === 'object' && err !== null && 'response' in err) {
         const axiosErr = err as { response?: { data?: { error?: string } } };
         error(axiosErr.response?.data?.error || errorMessage);
@@ -596,6 +624,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
         onAddUrl={handleAddUrl}
         onAddText={handleAddText}
         onAddResearch={handleAddResearch}
+        onAddDatabase={handleAddDatabase}
         onImportComplete={loadSources}
         uploading={uploading}
       />

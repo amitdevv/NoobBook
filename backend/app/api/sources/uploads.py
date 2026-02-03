@@ -31,6 +31,7 @@ Routes:
 - POST /projects/<id>/sources/url      - Add website/YouTube source
 - POST /projects/<id>/sources/text     - Add pasted text source
 - POST /projects/<id>/sources/research - Add AI research source
+- POST /projects/<id>/sources/database - Add database source (Postgres/MySQL)
 """
 from flask import jsonify, request, current_app
 from app.api.sources import sources_bp
@@ -275,3 +276,45 @@ def add_research_source(project_id: str):
             'success': False,
             'error': str(e)
         }), 500
+
+
+@sources_bp.route('/projects/<project_id>/sources/database', methods=['POST'])
+def add_database_source(project_id: str):
+    """
+    Add a database source (Postgres/MySQL) to a project.
+
+    Educational Note: Database sources are connected at the account level
+    (settings/databases) and then attached to projects as sources.
+
+    Request Body:
+        {
+            "connection_id": "uuid",        # required
+            "name": "Analytics DB",         # optional display name
+            "description": "Read-only..."   # optional
+        }
+    """
+    try:
+        data = request.get_json() or {}
+
+        connection_id = data.get('connection_id')
+        if not connection_id:
+            return jsonify({'success': False, 'error': 'connection_id is required'}), 400
+
+        source = source_service.add_database_source(
+            project_id=project_id,
+            connection_id=connection_id,
+            name=data.get('name'),
+            description=data.get('description', '')
+        )
+
+        return jsonify({
+            'success': True,
+            'source': source,
+            'message': 'Database source added successfully'
+        }), 201
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error adding database source: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500

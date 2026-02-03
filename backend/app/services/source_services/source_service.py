@@ -19,7 +19,8 @@ from app.services.source_services.source_upload import (
     create_from_existing_file,
     upload_url,
     upload_text,
-    upload_research
+    upload_research,
+    add_database_source,
 )
 # Note: Local path utils kept for backwards compatibility with other processors
 # that haven't been migrated to Supabase Storage yet
@@ -361,6 +362,22 @@ class SourceService:
         Delegates to source_upload.research_upload module.
         """
         return upload_research(project_id, topic, description, links)
+
+    def add_database_source(
+        self,
+        project_id: str,
+        connection_id: str,
+        name: Optional[str] = None,
+        description: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Add a database source (Postgres/MySQL) to a project.
+
+        Educational Note: This creates a DATABASE source that stores a small
+        `.database` metadata file in Supabase Storage and triggers processing
+        to fetch a schema snapshot + embeddings.
+        """
+        return add_database_source(project_id, connection_id, name, description)
 
     # =========================================================================
     # Processing Delegation (thin wrappers)

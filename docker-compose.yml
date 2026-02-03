@@ -43,18 +43,19 @@ services:
     image: postgres:16-alpine
     container_name: noobbook-migrate
     restart: "no"
-    environment:
-      - PGPASSWORD=${POSTGRES_PASSWORD:-your-super-secret-and-long-postgres-password}
+    env_file:
+      - ./docker/.env
     volumes:
       - ./backend/supabase/init.sql:/init.sql:ro
     entrypoint: >
       sh -c '
+        set -e
         echo "Waiting for Supabase database..."
         until pg_isready -h supabase-db -p 5432 -U postgres 2>/dev/null; do
           sleep 2
         done
         echo "Running database migrations..."
-        PGPASSWORD=$${PGPASSWORD} psql -h supabase-db -p 5432 -U postgres -d postgres -f /init.sql
+        PGPASSWORD="$${POSTGRES_PASSWORD}" psql -v ON_ERROR_STOP=1 -h supabase-db -p 5432 -U postgres -d postgres -f /init.sql
         echo "Migration complete."
       '
     networks:

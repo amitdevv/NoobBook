@@ -27,6 +27,7 @@ from app.services.tool_executors.source_search_executor import source_search_exe
 from app.services.tool_executors.web_agent_executor import web_agent_executor
 from app.services.tool_executors.deep_research_executor import deep_research_executor
 from app.services.tool_executors import csv_analyzer_agent_executor  # Module import (has execute function)
+from app.services.tool_executors import database_analyzer_agent_executor  # Module import (has execute function)
 from app.services.tool_executors.studio_signal_executor import studio_signal_executor
 from app.services.tool_executors.studio_audio_executor import studio_audio_executor
 from app.services.tool_executors.email_agent_executor import email_agent_executor
@@ -39,6 +40,7 @@ __all__ = [
     "web_agent_executor",
     "deep_research_executor",
     "csv_analyzer_agent_executor",
+    "database_analyzer_agent_executor",
     "studio_signal_executor",
     "studio_audio_executor",
     "email_agent_executor",
