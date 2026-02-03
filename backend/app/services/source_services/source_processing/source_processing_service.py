@@ -65,6 +65,7 @@ class SourceProcessingService:
         ".aac": "audio",
         ".flac": "audio",
         ".link": "link",  # Handles both website URLs and YouTube
+        ".database": "database",  # Database sources (Postgres/MySQL)
         ".research": "research",  # Deep research source
     }
 
@@ -169,6 +170,10 @@ class SourceProcessingService:
             elif processor_type == "link":
                 from app.services.source_services.source_processing.link_processor import process_link
                 return process_link(project_id, source_id, source, raw_file_path, source_service)
+
+            elif processor_type == "database":
+                from app.services.source_services.source_processing.database_processor import process_database
+                return process_database(project_id, source_id, source, raw_file_path, source_service)
 
             elif processor_type == "research":
                 from app.services.source_services.source_processing.research_processor import process_research

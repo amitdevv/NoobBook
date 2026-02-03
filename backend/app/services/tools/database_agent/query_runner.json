@@ -1,0 +1,15 @@
+{
+  "name": "query_runner",
+  "description": "Execute a read-only SQL query (SELECT/WITH only) on the current DATABASE source. Never write/modify data. Prefer adding LIMIT 100 (or smaller) to keep results small.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "A SQL SELECT/WITH query to execute. Only read-only queries are allowed."
+      }
+    },
+    "required": ["query"]
+  }
+}
+

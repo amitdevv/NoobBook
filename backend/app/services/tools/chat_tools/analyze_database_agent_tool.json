@@ -1,0 +1,19 @@
+{
+  "name": "analyze_database_agent",
+  "description": "Trigger a database query agent for DATABASE sources (Postgres/MySQL). Use this when the user asks questions that require LIVE data from a connected database (counts, metrics, lists, trends). The agent will inspect schema, write safe read-only SQL (SELECT only), execute queries, and return a clear answer. Do NOT write to the database.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "source_id": {
+        "type": "string",
+        "description": "The ID of the DATABASE source to analyze (from available sources in your context)"
+      },
+      "query": {
+        "type": "string",
+        "description": "The user's question or analysis request. Examples: 'Top 10 customers by revenue last month', 'Daily active users for the last 30 days', 'How many orders were refunded by reason?'"
+      }
+    },
+    "required": ["source_id", "query"]
+  }
+}
+

@@ -20,17 +20,22 @@ export interface Source {
   id: string;
   project_id: string;
   name: string;
-  original_filename: string;
   description: string;
-  category: 'document' | 'audio' | 'image' | 'data' | 'link';
-  mime_type: string;
-  file_extension: string;
+  /**
+   * Backend source type (DOCUMENT/LINK/TEXT/CSV/DATABASE/etc).
+   * Note: The backend stores the canonical file extension in `embedding_info.file_extension`.
+   */
+  type?: string;
   file_size: number;
-  stored_filename: string;
   status: 'uploaded' | 'processing' | 'embedding' | 'ready' | 'error';
   active: boolean; // Whether source is included in chat context
   processing_info: Record<string, unknown> | null;
   embedding_info?: Record<string, unknown> | null; // Embedding details
+  summary_info?: Record<string, unknown> | null;
+  raw_file_path?: string | null;
+  processed_file_path?: string | null;
+  error_message?: string | null;
+  url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -110,11 +115,28 @@ export const NON_VIEWABLE_EXTENSIONS = [
 ];
 
 /**
+ * Get a source's file extension.
+ * Educational Note: Prefer parsing from `source.name` (persists across renames),
+ * but fall back to `embedding_info.file_extension` for sources with no extension
+ * in the display name (e.g. DATABASE sources).
+ */
+export function getSourceFileExtension(source: Source): string {
+  const name = source.name || '';
+  const lastDot = name.lastIndexOf('.');
+  const nameExtension = lastDot > 0 ? name.substring(lastDot).toLowerCase() : '';
+
+  const embeddingExtension = ((source.embedding_info as Record<string, unknown>)?.file_extension as string | undefined);
+  const embeddingExtLower = typeof embeddingExtension === 'string' ? embeddingExtension.toLowerCase() : '';
+
+  return nameExtension || embeddingExtLower || '';
+}
+
+/**
  * Check if a source is viewable based on its file extension
  */
 export function isSourceViewable(source: Source): boolean {
   if (source.status !== 'ready') return false;
-  const ext = source.file_extension?.toLowerCase() || '';
+  const ext = getSourceFileExtension(source);
   return !NON_VIEWABLE_EXTENSIONS.includes(ext);
 }
 
@@ -318,6 +340,27 @@ class SourcesAPI {
       return response.data.source;
     } catch (error) {
       console.error('Error adding research source:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Add a DATABASE source (Postgres/MySQL) from an account-level connection
+   */
+  async addDatabaseSource(
+    projectId: string,
+    connectionId: string,
+    name?: string,
+    description?: string
+  ): Promise<Source> {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/projects/${projectId}/sources/database`,
+        { connection_id: connectionId, name, description }
+      );
+      return response.data.source;
+    } catch (error) {
+      console.error('Error adding database source:', error);
       throw error;
     }
   }
