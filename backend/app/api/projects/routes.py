@@ -29,6 +29,7 @@ Routes:
 from flask import request, jsonify
 from app.api.projects import projects_bp
 from app.services.data_services import project_service
+from app.services.auth.rbac import get_request_identity
 
 
 @projects_bp.route('/projects', methods=['GET'])
@@ -47,7 +48,8 @@ def list_projects():
         }
     """
     try:
-        projects = project_service.list_all_projects()
+        identity = get_request_identity()
+        projects = project_service.list_all_projects(user_id=identity.user_id)
         return jsonify({
             "success": True,
             "projects": projects,
@@ -82,6 +84,7 @@ def create_project():
         }
     """
     try:
+        identity = get_request_identity()
         data = request.get_json()
 
         # Validate required fields
@@ -102,7 +105,8 @@ def create_project():
         # Create the project
         project = project_service.create_project(
             name=name,
-            description=data.get('description', '')
+            description=data.get('description', ''),
+            user_id=identity.user_id,
         )
 
         return jsonify({
@@ -141,7 +145,8 @@ def get_project(project_id):
         }
     """
     try:
-        project = project_service.get_project(project_id)
+        identity = get_request_identity()
+        project = project_service.get_project(project_id, user_id=identity.user_id)
 
         if not project:
             return jsonify({
@@ -187,6 +192,7 @@ def update_project(project_id):
         }
     """
     try:
+        identity = get_request_identity()
         data = request.get_json()
 
         if not data:
@@ -199,7 +205,8 @@ def update_project(project_id):
         updated_project = project_service.update_project(
             project_id=project_id,
             name=data.get('name'),
-            description=data.get('description')
+            description=data.get('description'),
+            user_id=identity.user_id,
         )
 
         if not updated_project:
@@ -250,7 +257,8 @@ def delete_project(project_id):
         }
     """
     try:
-        success = project_service.delete_project(project_id)
+        identity = get_request_identity()
+        success = project_service.delete_project(project_id, user_id=identity.user_id)
 
         if not success:
             return jsonify({
@@ -295,7 +303,8 @@ def open_project(project_id):
         }
     """
     try:
-        project = project_service.open_project(project_id)
+        identity = get_request_identity()
+        project = project_service.open_project(project_id, user_id=identity.user_id)
 
         if not project:
             return jsonify({

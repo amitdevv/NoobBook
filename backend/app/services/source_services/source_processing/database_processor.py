@@ -25,10 +25,8 @@ import pymysql
 
 from app.services.ai_services.embedding_service import embedding_service
 from app.services.ai_services.summary_service import summary_service
-from app.services.data_services.database_connection_service import (
-    database_connection_service,
-    DEFAULT_USER_ID,
-)
+from app.services.data_services.database_connection_service import database_connection_service
+from app.services.data_services import project_service
 from app.services.integrations.supabase import storage_service
 
 
@@ -208,9 +206,19 @@ def process_database(
         return {"success": False, "error": "Missing connection_id"}
 
     # Load connection secret from account-level table
+    owner_user_id = project_service.get_project_owner_id(project_id)
+    if not owner_user_id:
+        source_service.update_source(
+            project_id,
+            source_id,
+            status="error",
+            processing_info={"error": "Project owner not found"},
+        )
+        return {"success": False, "error": "Project owner not found"}
+
     connection = database_connection_service.get_connection(
         connection_id=connection_id,
-        user_id=DEFAULT_USER_ID,
+        user_id=owner_user_id,
         include_secret=True,
     )
     if not connection:
@@ -324,4 +332,3 @@ def process_database(
     )
 
     return {"success": True, "status": "ready"}
-

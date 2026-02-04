@@ -49,7 +49,7 @@ export const useAudioGeneration = (projectId: string) => {
     try {
       const ttsStatus = await audioAPI.checkTTSStatus();
       if (!ttsStatus.configured) {
-        showError('ElevenLabs API key not configured. Please add it in App Settings.');
+        showError('ElevenLabs API key not configured. Please add it in Admin Settings.');
         setIsGeneratingAudio(false);
         return;
       }

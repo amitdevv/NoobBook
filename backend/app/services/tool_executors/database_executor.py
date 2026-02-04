@@ -23,10 +23,8 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import pymysql
 
-from app.services.data_services.database_connection_service import (
-    database_connection_service,
-    DEFAULT_USER_ID,
-)
+from app.services.data_services.database_connection_service import database_connection_service
+from app.services.data_services import project_service
 from app.services.source_services import source_service
 
 
@@ -168,9 +166,13 @@ class DatabaseExecutor:
         if not connection_id:
             raise ValueError("Database source missing connection_id")
 
+        owner_user_id = project_service.get_project_owner_id(project_id)
+        if not owner_user_id:
+            raise ValueError("Project owner not found")
+
         connection = database_connection_service.get_connection(
             connection_id=connection_id,
-            user_id=DEFAULT_USER_ID,
+            user_id=owner_user_id,
             include_secret=True,
         )
         if not connection:

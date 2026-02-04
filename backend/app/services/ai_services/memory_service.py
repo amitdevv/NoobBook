@@ -16,6 +16,7 @@ from typing import Optional, Dict, Any
 
 from app.services.integrations.claude import claude_service
 from app.services.data_services import project_service
+from app.services.data_services.project_service import DEFAULT_USER_ID
 from app.config import tool_loader, prompt_loader
 from app.utils import claude_parsing_utils
 
@@ -57,7 +58,7 @@ class MemoryService:
             self._tool_def = tool_loader.load_tool("memory_tools", "manage_memory_tool")
         return self._tool_def
 
-    def get_user_memory(self) -> Optional[str]:
+    def get_user_memory(self, user_id: str = DEFAULT_USER_ID) -> Optional[str]:
         """
         Get the current user memory content from Supabase.
 
@@ -65,12 +66,16 @@ class MemoryService:
             User memory string or None if no memory exists
         """
         try:
-            return project_service.get_user_memory()
+            return project_service.get_user_memory(user_id=user_id)
         except Exception as e:
             print(f"Error reading user memory: {e}")
             return None
 
-    def get_project_memory(self, project_id: str) -> Optional[str]:
+    def get_project_memory(
+        self,
+        project_id: str,
+        user_id: str = DEFAULT_USER_ID,
+    ) -> Optional[str]:
         """
         Get the current project memory content from Supabase.
 
@@ -81,7 +86,7 @@ class MemoryService:
             Project memory string or None if no memory exists
         """
         try:
-            memory_data = project_service.get_project_memory(project_id)
+            memory_data = project_service.get_project_memory(project_id, user_id=user_id)
             if memory_data:
                 return memory_data.get("memory")
             return None
@@ -89,7 +94,11 @@ class MemoryService:
             print(f"Error reading project memory: {e}")
             return None
 
-    def _save_user_memory(self, memory: str) -> bool:
+    def _save_user_memory(
+        self,
+        memory: str,
+        user_id: str = DEFAULT_USER_ID,
+    ) -> bool:
         """
         Save user memory to Supabase.
 
@@ -100,12 +109,17 @@ class MemoryService:
             True if saved successfully
         """
         try:
-            return project_service.update_user_memory(memory)
+            return project_service.update_user_memory(memory, user_id=user_id)
         except Exception as e:
             print(f"Error saving user memory: {e}")
             return False
 
-    def _save_project_memory(self, project_id: str, memory: str) -> bool:
+    def _save_project_memory(
+        self,
+        project_id: str,
+        memory: str,
+        user_id: str = DEFAULT_USER_ID,
+    ) -> bool:
         """
         Save project memory to Supabase.
 
@@ -121,7 +135,7 @@ class MemoryService:
                 "memory": memory,
                 "updated_at": datetime.now().isoformat()
             }
-            return project_service.update_project_memory(project_id, memory_data)
+            return project_service.update_project_memory(project_id, memory_data, user_id=user_id)
         except Exception as e:
             print(f"Error saving project memory: {e}")
             return False
@@ -165,7 +179,8 @@ class MemoryService:
         memory_type: str,
         new_memory: str,
         reason: str,
-        project_id: Optional[str] = None
+        project_id: Optional[str] = None,
+        user_id: str = DEFAULT_USER_ID,
     ) -> Dict[str, Any]:
         """
         Update memory by merging new content with existing memory using AI.
@@ -195,9 +210,9 @@ class MemoryService:
 
         # Get current memory
         if memory_type == "user":
-            current_memory = self.get_user_memory() or ""
+            current_memory = self.get_user_memory(user_id=user_id) or ""
         else:
-            current_memory = self.get_project_memory(project_id) or ""
+            current_memory = self.get_project_memory(project_id, user_id=user_id) or ""
 
         # Load prompt config and tool
         config = self._get_prompt_config()
@@ -245,9 +260,9 @@ class MemoryService:
 
             # Save the merged memory
             if memory_type == "user":
-                saved = self._save_user_memory(merged_memory)
+                saved = self._save_user_memory(merged_memory, user_id=user_id)
             else:
-                saved = self._save_project_memory(project_id, merged_memory)
+                saved = self._save_project_memory(project_id, merged_memory, user_id=user_id)
 
             if saved:
                 print(f"Memory updated ({memory_type}): {merged_memory[:50]}...")
@@ -272,7 +287,11 @@ class MemoryService:
                 "error": str(e)
             }
 
-    def delete_project_memory(self, project_id: str) -> bool:
+    def delete_project_memory(
+        self,
+        project_id: str,
+        user_id: str = DEFAULT_USER_ID,
+    ) -> bool:
         """
         Clear project memory in Supabase.
 
@@ -288,7 +307,7 @@ class MemoryService:
         """
         try:
             # Clear the memory by setting it to empty
-            return project_service.update_project_memory(project_id, {})
+            return project_service.update_project_memory(project_id, {}, user_id=user_id)
         except Exception as e:
             print(f"Error clearing project memory: {e}")
             return False

@@ -6,7 +6,8 @@ Supabase Auth. It provides a clean interface for sign up, sign in, sign out,
 and session management.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Iterable
+import os
 from supabase import Client
 from .supabase_client import get_supabase
 
@@ -48,9 +49,14 @@ class AuthService:
 
             # Create corresponding user record in public.users table
             if response.user:
-                self._create_user_profile(response.user.id, email)
+                role = self._resolve_signup_role(email)
+                self._create_user_profile(response.user.id, email, role=role)
 
-            return {"success": True, "user": response.user, "session": response.session}
+            return {
+                "success": True,
+                "user": self._serialize_user(response.user),
+                "session": self._serialize_session(response.session),
+            }
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -77,7 +83,11 @@ class AuthService:
                 {"email": email, "password": password}
             )
 
-            return {"success": True, "user": response.user, "session": response.session}
+            return {
+                "success": True,
+                "user": self._serialize_user(response.user),
+                "session": self._serialize_session(response.session),
+            }
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -180,7 +190,46 @@ class AuthService:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def _create_user_profile(self, user_id: str, email: str) -> None:
+    def bootstrap_admin_from_env(self) -> bool:
+        """
+        Ensure a bootstrap admin exists when env vars are provided.
+
+        Env vars:
+        - NOOBBOOK_BOOTSTRAP_ADMIN_EMAIL
+        - NOOBBOOK_BOOTSTRAP_ADMIN_PASSWORD
+        - NOOBBOOK_BOOTSTRAP_ADMIN_FORCE_RESET (optional)
+        """
+        email = (os.getenv("NOOBBOOK_BOOTSTRAP_ADMIN_EMAIL") or "").strip()
+        password = (os.getenv("NOOBBOOK_BOOTSTRAP_ADMIN_PASSWORD") or "").strip()
+        force_reset = (os.getenv("NOOBBOOK_BOOTSTRAP_ADMIN_FORCE_RESET") or "").strip().lower()
+
+        if not email or not password:
+            return False
+
+        force_reset_enabled = force_reset in {"1", "true", "yes", "on"}
+        normalized_email = self._normalize_email(email)
+
+        try:
+            existing_user = self._find_user_by_email(normalized_email)
+            if existing_user:
+                if force_reset_enabled:
+                    self.supabase.auth.admin.update_user_by_id(existing_user.id, {"password": password})
+                self._ensure_user_profile(existing_user.id, normalized_email, role="admin")
+                return True
+
+            response = self.supabase.auth.admin.create_user(
+                {"email": normalized_email, "password": password, "email_confirm": True}
+            )
+            created_user = getattr(response, "user", None) or response
+            if created_user:
+                self._ensure_user_profile(created_user.id, normalized_email, role="admin")
+                return True
+        except Exception as e:
+            print(f"Warning: Failed to bootstrap admin user: {e}")
+
+        return False
+
+    def _create_user_profile(self, user_id: str, email: str, role: str = "user") -> None:
         """
         Create a user profile in the public.users table.
 
@@ -194,10 +243,95 @@ class AuthService:
         """
         try:
             self.supabase.table("users").insert(
-                {"id": user_id, "email": email, "memory": {}, "settings": {}}
+                {"id": user_id, "email": email, "role": role, "memory": {}, "settings": {}}
             ).execute()
         except Exception as e:
             print(f"Warning: Failed to create user profile: {e}")
+
+    def _ensure_user_profile(self, user_id: str, email: str, role: str = "user") -> None:
+        """
+        Ensure the public.users profile exists and has the correct role.
+        """
+        try:
+            resp = self.supabase.table("users").select("id").eq("id", user_id).execute()
+            if resp.data:
+                self.supabase.table("users").update({"email": email, "role": role}).eq("id", user_id).execute()
+            else:
+                self._create_user_profile(user_id, email, role=role)
+        except Exception as e:
+            print(f"Warning: Failed to ensure user profile: {e}")
+
+    def _find_user_by_email(self, email: str):
+        try:
+            response = self.supabase.auth.admin.list_users()
+            users: Iterable = getattr(response, "users", None) or response
+            for user in users or []:
+                if self._normalize_email(getattr(user, "email", None) or "") == email:
+                    return user
+        except Exception:
+            return None
+        return None
+
+    @staticmethod
+    def _normalize_email(email: str) -> str:
+        return (email or "").strip().lower()
+
+    def _resolve_signup_role(self, email: str) -> str:
+        """
+        Determine role for a newly signed-up user.
+
+        Rules:
+        1) If email is in NOOBBOOK_ADMIN_EMAILS -> admin
+        2) If no admins exist yet -> admin (bootstrap)
+        3) Else -> user
+        """
+        admin_emails = os.getenv("NOOBBOOK_ADMIN_EMAILS", "")
+        admin_list = [e.strip().lower() for e in admin_emails.split(",") if e.strip()]
+        if email.strip().lower() in admin_list:
+            return "admin"
+
+        try:
+            resp = (
+                self.supabase.table("users")
+                .select("id")
+                .eq("role", "admin")
+                .limit(1)
+                .execute()
+            )
+            if not resp.data:
+                return "admin"
+        except Exception:
+            # If check fails, default to user
+            pass
+
+        return "user"
+
+    @staticmethod
+    def _serialize_user(user: Any) -> Optional[Dict[str, Any]]:
+        if not user:
+            return None
+        # supabase-py returns User object or dict
+        if isinstance(user, dict):
+            return {"id": user.get("id"), "email": user.get("email")}
+        return {"id": getattr(user, "id", None), "email": getattr(user, "email", None)}
+
+    @staticmethod
+    def _serialize_session(session: Any) -> Optional[Dict[str, Any]]:
+        if not session:
+            return None
+        if isinstance(session, dict):
+            return {
+                "access_token": session.get("access_token"),
+                "refresh_token": session.get("refresh_token"),
+                "expires_in": session.get("expires_in"),
+                "token_type": session.get("token_type"),
+            }
+        return {
+            "access_token": getattr(session, "access_token", None),
+            "refresh_token": getattr(session, "refresh_token", None),
+            "expires_in": getattr(session, "expires_in", None),
+            "token_type": getattr(session, "token_type", None),
+        }
 
 
 # Singleton instance

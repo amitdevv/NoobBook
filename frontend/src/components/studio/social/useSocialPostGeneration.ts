@@ -50,7 +50,7 @@ export const useSocialPostGeneration = (projectId: string) => {
       if (!geminiStatus.configured) {
         // Show inline banner so the user clearly sees what's missing
         if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
-        setConfigError('Add your Gemini API key in App Settings to generate social posts with images.');
+        setConfigError('Add your Gemini API key in Admin Settings to generate social posts with images.');
         configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         setIsGeneratingSocialPosts(false);
         return;

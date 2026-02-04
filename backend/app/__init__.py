@@ -5,7 +5,7 @@ Educational Note: The application factory pattern allows us to create
 multiple app instances with different configurations (dev, test, prod).
 This is a Flask best practice for larger applications.
 """
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
 
@@ -42,6 +42,45 @@ def create_app(config_name='development'):
     # Register blueprints (modular route handlers)
     from app.api import api_bp
     app.register_blueprint(api_bp, url_prefix=app.config['API_PREFIX'])
+
+    # Bootstrap admin (optional) when env vars are provided
+    from app.services.integrations.supabase import auth_service, is_supabase_enabled
+    if is_supabase_enabled():
+        auth_service.bootstrap_admin_from_env()
+
+    # Optional auth enforcement (RBAC)
+    from app.services.auth.rbac import get_request_identity, is_auth_required
+
+    @app.before_request
+    def enforce_auth():
+        if not is_auth_required():
+            return None
+
+        path = request.path
+        api_prefix = app.config.get('API_PREFIX', '/api/v1')
+
+        if not path.startswith(api_prefix):
+            return None
+
+        # Allow auth endpoints without authentication
+        if path.startswith(f"{api_prefix}/auth"):
+            return None
+
+        identity = get_request_identity()
+        if not identity.is_authenticated:
+            return {"success": False, "error": "Authentication required"}, 401
+
+        # Enforce per-project access for project-scoped routes
+        project_prefix = f"{api_prefix}/projects/"
+        if path.startswith(project_prefix):
+            remainder = path[len(project_prefix):]
+            project_id = remainder.split("/", 1)[0] if remainder else ""
+            if project_id:
+                from app.services.data_services import project_service
+                if not project_service.has_project_access(project_id, identity.user_id):
+                    return {"success": False, "error": "Project not found"}, 404
+
+        return None
 
     # Register error handlers
     register_error_handlers(app)

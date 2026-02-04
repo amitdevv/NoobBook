@@ -6,6 +6,7 @@
  */
 
 import axios from 'axios';
+import { getAccessToken } from '../auth/session';
 
 // Base host URL (without /api/v1 path) - used for file URLs, static assets.
 // When VITE_API_HOST is set to "" (Docker via nginx proxy), same-origin requests
@@ -24,17 +25,30 @@ export const api = axios.create({
   },
 });
 
+const attachAuthHeader = (config: any) => {
+  const token = getAccessToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+};
+
 // Add request interceptor for debugging (educational purposes)
 api.interceptors.request.use(
   (config) => {
+    const next = attachAuthHeader(config);
     console.log('API Request:', config.method?.toUpperCase(), config.url);
-    return config;
+    return next;
   },
   (error) => {
     console.error('Request Error:', error);
     return Promise.reject(error);
   }
 );
+
+// Ensure global axios requests (non-api instance) include auth header too
+axios.interceptors.request.use(attachAuthHeader);
 
 // Add response interceptor for debugging
 api.interceptors.response.use(

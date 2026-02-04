@@ -45,7 +45,7 @@ def process_audio(
             project_id,
             source_id,
             status="error",
-            processing_info={"error": "ELEVENLABS_API_KEY not configured. Please add it in App Settings."}
+            processing_info={"error": "ELEVENLABS_API_KEY not configured. Please add it in Admin Settings."}
         )
         return {"success": False, "error": "ELEVENLABS_API_KEY not configured"}
 

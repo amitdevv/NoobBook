@@ -77,7 +77,7 @@ export const DatabaseTab: React.FC<DatabaseTabProps> = ({ isAtLimit, onAddDataba
             No database connections found.
           </p>
           <p className="text-xs text-muted-foreground">
-            Add a connection in App Settings → Database Connections, then come back here to attach it to this project.
+            Add a connection in Admin Settings → Database Connections, then come back here to attach it to this project.
           </p>
           <Button variant="soft" onClick={loadConnections} disabled={loading}>
             Refresh

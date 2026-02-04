@@ -30,6 +30,7 @@ def add_database_source(
     connection_id: str,
     name: Optional[str] = None,
     description: str = "",
+    user_id: str = DEFAULT_USER_ID,
 ) -> Dict[str, Any]:
     """
     Create a DATABASE source in a project and trigger processing.
@@ -49,7 +50,7 @@ def add_database_source(
     # Load connection (server-side secret)
     connection = database_connection_service.get_connection(
         connection_id=connection_id,
-        user_id=DEFAULT_USER_ID,
+        user_id=user_id,
         include_secret=True,
     )
     if not connection:
@@ -143,4 +144,3 @@ def _submit_processing_task(project_id: str, source_id: str) -> None:
         source_service.update_source(project_id, source_id, status="processing")
     except Exception as e:
         print(f"ERROR: Failed to submit database processing task: {e}")
-
