@@ -71,7 +71,7 @@ def generate_ad_creative(project_id: str):
         if not imagen_service.is_configured():
             return jsonify({
                 'success': False,
-                'error': 'Gemini API key not configured. Please add it in App Settings.'
+                'error': 'Gemini API key not configured. Please add it in Admin Settings.'
             }), 400
 
         # Create job record

@@ -9,7 +9,7 @@ Educational Note: This module creates formatted context blocks for the system pr
 The context is rebuilt on every message to reflect the current state
 (active/inactive sources, new uploads, updated memories).
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from app.services.source_services import source_service
 
@@ -161,7 +161,7 @@ class ContextLoader:
 
         return category_map.get(category, category.title())
 
-    def build_memory_context(self, project_id: str) -> str:
+    def build_memory_context(self, project_id: str, user_id: Optional[str] = None) -> str:
         """
         Build formatted memory context for the system prompt.
 
@@ -181,8 +181,12 @@ class ContextLoader:
         # memory_service -> app.config -> context_loader -> memory_service
         from app.services.ai_services.memory_service import memory_service
 
-        user_memory = memory_service.get_user_memory()
-        project_memory = memory_service.get_project_memory(project_id)
+        user_memory = memory_service.get_user_memory(user_id=user_id) if user_id else memory_service.get_user_memory()
+        project_memory = (
+            memory_service.get_project_memory(project_id, user_id=user_id)
+            if user_id
+            else memory_service.get_project_memory(project_id)
+        )
 
         # Return empty if no memory exists
         if not user_memory and not project_memory:
@@ -206,7 +210,7 @@ class ContextLoader:
 
         return "\n".join(lines)
 
-    def build_full_context(self, project_id: str) -> str:
+    def build_full_context(self, project_id: str, user_id: Optional[str] = None) -> str:
         """
         Build complete context including sources and memory.
 
@@ -222,7 +226,7 @@ class ContextLoader:
         parts = []
 
         # Add memory context first (general personalization)
-        memory_context = self.build_memory_context(project_id)
+        memory_context = self.build_memory_context(project_id, user_id=user_id)
         if memory_context:
             parts.append(memory_context)
 

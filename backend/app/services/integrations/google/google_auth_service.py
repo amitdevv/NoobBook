@@ -21,7 +21,7 @@ Required Setup:
     2. Enable Google Drive API
     3. Create OAuth 2.0 credentials (Web application)
     4. Add http://localhost:5001/api/v1/google/callback as redirect URI
-    5. Copy Client ID and Client Secret to App Settings
+    5. Copy Client ID and Client Secret to Admin Settings
 
 Migration Note (2026-01):
     Previously tokens were stored in data/google_tokens.json (single file for all users).

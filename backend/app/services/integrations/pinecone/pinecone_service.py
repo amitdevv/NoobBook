@@ -70,7 +70,7 @@ class PineconeService:
             if not client.has_index(self.INDEX_NAME):
                 raise ValueError(
                     f"Pinecone index '{self.INDEX_NAME}' not found. "
-                    "Please validate your Pinecone API key in App Settings first."
+                    "Please validate your Pinecone API key in Admin Settings first."
                 )
 
             self._index = client.Index(self.INDEX_NAME)

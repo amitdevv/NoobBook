@@ -3,6 +3,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import {
   Dialog,
   DialogContent,
@@ -23,8 +24,8 @@ import {
   SignOut,
   ArrowSquareOut,
 } from '@phosphor-icons/react';
-import { settingsAPI, processingSettingsAPI, googleDriveAPI, databasesAPI } from '@/lib/api/settings';
-import type { ApiKey, AvailableTier, GoogleStatus, DatabaseConnection, DatabaseType } from '@/lib/api/settings';
+import { settingsAPI, processingSettingsAPI, googleDriveAPI, databasesAPI, usersAPI } from '@/lib/api/settings';
+import type { ApiKey, AvailableTier, GoogleStatus, DatabaseConnection, DatabaseType, UserSummary } from '@/lib/api/settings';
 import { useToast } from '../ui/toast';
 import {
   Select,
@@ -102,6 +103,11 @@ export const AppSettings: React.FC<AppSettingsProps> = ({ open, onOpenChange }) 
   });
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  // User Roles State
+  const [users, setUsers] = useState<UserSummary[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [roleSaving, setRoleSaving] = useState<{ [key: string]: boolean }>({});
+
   // Toast notifications
   const { success, error, info } = useToast();
 
@@ -112,6 +118,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({ open, onOpenChange }) 
       loadProcessingSettings();
       loadGoogleStatus();
       loadDatabases();
+      loadUsers();
     }
   }, [open]);
 
@@ -254,6 +261,33 @@ export const AppSettings: React.FC<AppSettingsProps> = ({ open, onOpenChange }) 
       // Don't block settings UI for DB failures
     } finally {
       setDbLoading(false);
+    }
+  };
+
+  const loadUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const list = await usersAPI.listUsers();
+      setUsers(list);
+    } catch (err) {
+      console.error('Failed to load users:', err);
+      // Admin-only endpoint; ignore if unavailable
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleRoleChange = async (userId: string, role: 'admin' | 'user') => {
+    setRoleSaving((prev) => ({ ...prev, [userId]: true }));
+    try {
+      const updated = await usersAPI.updateUserRole(userId, role);
+      setUsers((prev) => prev.map((u) => (u.id === userId ? updated : u)));
+      success('Role updated');
+    } catch (err) {
+      console.error('Failed to update role:', err);
+      error('Failed to update user role');
+    } finally {
+      setRoleSaving((prev) => ({ ...prev, [userId]: false }));
     }
   };
 
@@ -589,7 +623,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({ open, onOpenChange }) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col bg-card">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle>App Settings</DialogTitle>
+          <DialogTitle>Admin Settings</DialogTitle>
           <DialogDescription>
             Configure API keys and application settings. Keys are automatically saved after successful validation.
           </DialogDescription>
@@ -608,6 +642,59 @@ export const AppSettings: React.FC<AppSettingsProps> = ({ open, onOpenChange }) 
                   <Warning size={16} />
                   <p>API keys are securely stored in your backend .env file</p>
                 </div>
+
+                {/* User Roles Section */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-3">User Roles</h3>
+                  {usersLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <CircleNotch size={20} className="animate-spin" />
+                    </div>
+                  ) : users.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No users found yet. Create accounts to manage roles.
+                    </p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead className="text-right">Updated</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">
+                              {user.email || user.id}
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={user.role as string}
+                                onValueChange={(v) => handleRoleChange(user.id, v as 'admin' | 'user')}
+                                disabled={roleSaving[user.id]}
+                              >
+                                <SelectTrigger className="w-[140px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                  <SelectItem value="user">User</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">
+                              {new Date(user.updated_at).toLocaleDateString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+
+                <Separator />
 
                 {/* AI Models Section */}
                 {renderCategorySection('AI Models', 'ai')}

@@ -29,6 +29,7 @@ from flask import jsonify
 from app.api.projects import projects_bp
 from app.services.data_services import project_service
 from app.utils.cost_tracking import get_project_costs
+from app.services.auth.rbac import get_request_identity
 
 
 @projects_bp.route('/projects/<project_id>/costs', methods=['GET'])
@@ -66,8 +67,9 @@ def get_project_costs_endpoint(project_id):
         }
     """
     try:
+        identity = get_request_identity()
         # Verify project exists
-        project = project_service.get_project(project_id)
+        project = project_service.get_project(project_id, user_id=identity.user_id)
         if not project:
             return jsonify({
                 "success": False,
@@ -75,7 +77,7 @@ def get_project_costs_endpoint(project_id):
             }), 404
 
         # Get cost tracking data
-        costs = get_project_costs(project_id)
+        costs = get_project_costs(project_id, user_id=identity.user_id)
 
         return jsonify({
             "success": True,

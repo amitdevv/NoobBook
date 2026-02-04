@@ -41,12 +41,14 @@ from app.config import (
     APIProvider,
     ANTHROPIC_TIERS,
 )
+from app.services.auth.rbac import require_admin
 
 # Initialize service
 env_service = EnvService()
 
 
 @settings_bp.route('/settings/processing', methods=['GET'])
+@require_admin
 def get_processing_settings():
     """
     Get processing settings including Anthropic tier configuration.
@@ -98,6 +100,7 @@ def get_processing_settings():
 
 
 @settings_bp.route('/settings/processing', methods=['POST'])
+@require_admin
 def update_processing_settings():
     """
     Update processing settings.

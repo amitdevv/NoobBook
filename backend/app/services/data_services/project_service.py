@@ -34,7 +34,7 @@ class ProjectService:
         self.supabase = get_supabase()
         self.table = "projects"
 
-    def list_all_projects(self) -> List[Dict[str, Any]]:
+    def list_all_projects(self, user_id: str = DEFAULT_USER_ID) -> List[Dict[str, Any]]:
         """
         List all available projects.
 
@@ -47,13 +47,18 @@ class ProjectService:
         response = (
             self.supabase.table(self.table)
             .select("id, name, description, created_at, updated_at, last_accessed, costs")
-            .eq("user_id", DEFAULT_USER_ID)
+            .eq("user_id", user_id)
             .order("last_accessed", desc=True)
             .execute()
         )
         return response.data or []
 
-    def create_project(self, name: str, description: str = "") -> Dict[str, Any]:
+    def create_project(
+        self,
+        name: str,
+        description: str = "",
+        user_id: str = DEFAULT_USER_ID,
+    ) -> Dict[str, Any]:
         """
         Create a new project.
 
@@ -74,7 +79,7 @@ class ProjectService:
         existing = (
             self.supabase.table(self.table)
             .select("id")
-            .eq("user_id", DEFAULT_USER_ID)
+            .eq("user_id", user_id)
             .ilike("name", name)
             .execute()
         )
@@ -84,7 +89,7 @@ class ProjectService:
 
         # Create project data
         project_data = {
-            "user_id": DEFAULT_USER_ID,
+            "user_id": user_id,
             "name": name,
             "description": description,
             "custom_prompt": None,
@@ -111,7 +116,11 @@ class ProjectService:
 
         raise RuntimeError("Failed to create project")
 
-    def get_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+    def get_project(
+        self,
+        project_id: str,
+        user_id: str = DEFAULT_USER_ID,
+    ) -> Optional[Dict[str, Any]]:
         """
         Get full project data by ID.
 
@@ -128,7 +137,7 @@ class ProjectService:
             self.supabase.table(self.table)
             .select("*")
             .eq("id", project_id)
-            .eq("user_id", DEFAULT_USER_ID)
+            .eq("user_id", user_id)
             .execute()
         )
 
@@ -140,7 +149,7 @@ class ProjectService:
         # Update last accessed time
         self.supabase.table(self.table).update({
             "last_accessed": datetime.now().isoformat()
-        }).eq("id", project_id).execute()
+        }).eq("id", project_id).eq("user_id", user_id).execute()
 
         return project
 
@@ -148,7 +157,8 @@ class ProjectService:
         self,
         project_id: str,
         name: Optional[str] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
+        user_id: str = DEFAULT_USER_ID,
     ) -> Optional[Dict[str, Any]]:
         """
         Update project metadata.
@@ -165,7 +175,7 @@ class ProjectService:
             ValueError: If new name conflicts with existing project
         """
         # Check if project exists
-        project = self.get_project(project_id)
+        project = self.get_project(project_id, user_id=user_id)
         if not project:
             return None
 
@@ -174,7 +184,7 @@ class ProjectService:
             existing = (
                 self.supabase.table(self.table)
                 .select("id")
-                .eq("user_id", DEFAULT_USER_ID)
+                .eq("user_id", user_id)
                 .ilike("name", name)
                 .neq("id", project_id)
                 .execute()
@@ -197,6 +207,7 @@ class ProjectService:
             self.supabase.table(self.table)
             .update(update_data)
             .eq("id", project_id)
+            .eq("user_id", user_id)
             .execute()
         )
 
@@ -206,7 +217,7 @@ class ProjectService:
 
         return None
 
-    def delete_project(self, project_id: str) -> bool:
+    def delete_project(self, project_id: str, user_id: str = DEFAULT_USER_ID) -> bool:
         """
         Delete a project.
 
@@ -225,7 +236,7 @@ class ProjectService:
             self.supabase.table(self.table)
             .select("id")
             .eq("id", project_id)
-            .eq("user_id", DEFAULT_USER_ID)
+            .eq("user_id", user_id)
             .execute()
         )
 
@@ -233,12 +244,12 @@ class ProjectService:
             return False
 
         # Delete the project
-        self.supabase.table(self.table).delete().eq("id", project_id).execute()
+        self.supabase.table(self.table).delete().eq("id", project_id).eq("user_id", user_id).execute()
 
         print(f"Deleted project: {project_id}")
         return True
 
-    def open_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+    def open_project(self, project_id: str, user_id: str = DEFAULT_USER_ID) -> Optional[Dict[str, Any]]:
         """
         Open a project (update last accessed time).
 
@@ -248,7 +259,7 @@ class ProjectService:
         Returns:
             Project metadata or None if not found
         """
-        project = self.get_project(project_id)
+        project = self.get_project(project_id, user_id=user_id)
         if not project:
             return None
 
@@ -257,7 +268,8 @@ class ProjectService:
     def update_custom_prompt(
         self,
         project_id: str,
-        custom_prompt: Optional[str]
+        custom_prompt: Optional[str],
+        user_id: str = DEFAULT_USER_ID,
     ) -> Optional[Dict[str, Any]]:
         """
         Update the project's custom system prompt.
@@ -274,7 +286,7 @@ class ProjectService:
             self.supabase.table(self.table)
             .select("id")
             .eq("id", project_id)
-            .eq("user_id", DEFAULT_USER_ID)
+            .eq("user_id", user_id)
             .execute()
         )
 
@@ -286,6 +298,7 @@ class ProjectService:
             self.supabase.table(self.table)
             .update({"custom_prompt": custom_prompt})
             .eq("id", project_id)
+            .eq("user_id", user_id)
             .execute()
         )
 
@@ -295,7 +308,11 @@ class ProjectService:
 
         return None
 
-    def get_project_settings(self, project_id: str) -> Optional[Dict[str, Any]]:
+    def get_project_settings(
+        self,
+        project_id: str,
+        user_id: str = DEFAULT_USER_ID,
+    ) -> Optional[Dict[str, Any]]:
         """
         Get the project's settings.
 
@@ -309,7 +326,7 @@ class ProjectService:
             self.supabase.table(self.table)
             .select("custom_prompt, memory")
             .eq("id", project_id)
-            .eq("user_id", DEFAULT_USER_ID)
+            .eq("user_id", user_id)
             .execute()
         )
 
@@ -325,7 +342,11 @@ class ProjectService:
             "custom_prompt": project.get("custom_prompt")
         }
 
-    def get_project_costs(self, project_id: str) -> Optional[Dict[str, Any]]:
+    def get_project_costs(
+        self,
+        project_id: str,
+        user_id: str = DEFAULT_USER_ID,
+    ) -> Optional[Dict[str, Any]]:
         """
         Get the project's API usage costs.
 
@@ -339,7 +360,7 @@ class ProjectService:
             self.supabase.table(self.table)
             .select("costs")
             .eq("id", project_id)
-            .eq("user_id", DEFAULT_USER_ID)
+            .eq("user_id", user_id)
             .execute()
         )
 
@@ -353,7 +374,12 @@ class ProjectService:
             "by_model": {}
         })
 
-    def update_project_costs(self, project_id: str, costs: Dict[str, Any]) -> bool:
+    def update_project_costs(
+        self,
+        project_id: str,
+        costs: Dict[str, Any],
+        user_id: str = DEFAULT_USER_ID,
+    ) -> bool:
         """
         Update the project's API usage costs.
 
@@ -368,12 +394,17 @@ class ProjectService:
             self.supabase.table(self.table)
             .update({"costs": costs})
             .eq("id", project_id)
+            .eq("user_id", user_id)
             .execute()
         )
 
         return bool(response.data)
 
-    def get_project_memory(self, project_id: str) -> Optional[Dict[str, Any]]:
+    def get_project_memory(
+        self,
+        project_id: str,
+        user_id: str = DEFAULT_USER_ID,
+    ) -> Optional[Dict[str, Any]]:
         """
         Get the project's memory.
 
@@ -387,7 +418,7 @@ class ProjectService:
             self.supabase.table(self.table)
             .select("memory")
             .eq("id", project_id)
-            .eq("user_id", DEFAULT_USER_ID)
+            .eq("user_id", user_id)
             .execute()
         )
 
@@ -396,7 +427,12 @@ class ProjectService:
 
         return response.data[0].get("memory", {})
 
-    def update_project_memory(self, project_id: str, memory: Dict[str, Any]) -> bool:
+    def update_project_memory(
+        self,
+        project_id: str,
+        memory: Dict[str, Any],
+        user_id: str = DEFAULT_USER_ID,
+    ) -> bool:
         """
         Update the project's memory.
 
@@ -411,6 +447,7 @@ class ProjectService:
             self.supabase.table(self.table)
             .update({"memory": memory})
             .eq("id", project_id)
+            .eq("user_id", user_id)
             .execute()
         )
 
@@ -418,7 +455,7 @@ class ProjectService:
 
     # ==================== User Memory Methods ====================
 
-    def get_user_memory(self) -> Optional[str]:
+    def get_user_memory(self, user_id: str = DEFAULT_USER_ID) -> Optional[str]:
         """
         Get the user's global memory.
 
@@ -431,7 +468,7 @@ class ProjectService:
         response = (
             self.supabase.table("users")
             .select("memory")
-            .eq("id", DEFAULT_USER_ID)
+            .eq("id", user_id)
             .execute()
         )
 
@@ -441,7 +478,7 @@ class ProjectService:
         memory_data = response.data[0].get("memory", {})
         return memory_data.get("memory") if memory_data else None
 
-    def update_user_memory(self, memory: str) -> bool:
+    def update_user_memory(self, memory: str, user_id: str = DEFAULT_USER_ID) -> bool:
         """
         Update the user's global memory.
 
@@ -461,7 +498,7 @@ class ProjectService:
         response = (
             self.supabase.table("users")
             .update({"memory": memory_data})
-            .eq("id", DEFAULT_USER_ID)
+            .eq("id", user_id)
             .execute()
         )
 
@@ -483,6 +520,31 @@ class ProjectService:
             "last_accessed": project.get("last_accessed", project["updated_at"]),
             "costs": project.get("costs", {})
         }
+
+    def get_project_owner_id(self, project_id: str) -> Optional[str]:
+        """Get the owning user_id for a project (internal use)."""
+        response = (
+            self.supabase.table(self.table)
+            .select("user_id")
+            .eq("id", project_id)
+            .execute()
+        )
+        if not response.data:
+            return None
+        return response.data[0].get("user_id")
+
+    def has_project_access(self, project_id: str, user_id: str) -> bool:
+        """Check if a user owns the project."""
+        if not project_id or not user_id:
+            return False
+        response = (
+            self.supabase.table(self.table)
+            .select("id")
+            .eq("id", project_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return bool(response.data)
 
 
 # Singleton instance

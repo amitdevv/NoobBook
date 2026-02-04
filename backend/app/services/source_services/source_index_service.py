@@ -140,7 +140,7 @@ def remove_source_from_index(project_id: str, source_id: str) -> bool:
         return False
 
     # Delete the source
-    client.table("sources").delete().eq("id", source_id).execute()
+    client.table("sources").delete().eq("id", source_id).eq("project_id", project_id).execute()
 
     print(f"  Removed source from index: {source_id}")
     return True

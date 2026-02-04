@@ -49,7 +49,7 @@ export const useAdGeneration = (projectId: string) => {
       const geminiStatus = await checkGeminiStatus();
       if (!geminiStatus.configured) {
         if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
-        setConfigError('Add your Gemini API key in App Settings to generate ad creatives with images.');
+        setConfigError('Add your Gemini API key in Admin Settings to generate ad creatives with images.');
         configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         setIsGeneratingAd(false);
         return;
