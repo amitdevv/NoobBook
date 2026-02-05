@@ -82,6 +82,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
   }, [projectId]);
 
   /**
+   * Load full chat data including all messages
+   */
+  const loadFullChat = useCallback(async (chatId: string) => {
+    try {
+      const chat = await chatsAPI.getChat(projectId, chatId);
+      setActiveChat(chat);
+    } catch (err) {
+      console.error('Error loading chat:', err);
+      error('Failed to load chat');
+    }
+  }, [projectId, error]);
+
+  /**
    * Load all chats for the project
    */
   const loadChats = useCallback(async () => {
@@ -138,19 +151,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
       onSignalsChange?.([]);
     }
   }, [activeChat, onSignalsChange]);
-
-  /**
-   * Load full chat data including all messages
-   */
-  const loadFullChat = useCallback(async (chatId: string) => {
-    try {
-      const chat = await chatsAPI.getChat(projectId, chatId);
-      setActiveChat(chat);
-    } catch (err) {
-      console.error('Error loading chat:', err);
-      error('Failed to load chat');
-    }
-  }, [projectId, error]);
 
   /**
    * Send a message and get AI response
