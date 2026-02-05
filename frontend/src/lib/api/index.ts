@@ -11,7 +11,7 @@
 export { api, API_BASE_URL } from './client';
 
 // Auth API
-export { authAPI, tokenStorage } from './auth';
+export { authAPI } from './auth';
 
 // Projects API
 export { projectsAPI } from './projects';
