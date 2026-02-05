@@ -5,7 +5,7 @@
  * and manages chat state and API interactions.
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Sparkle } from '@phosphor-icons/react';
 import { Skeleton } from '../ui/skeleton';
 import { chatsAPI } from '@/lib/api/chats';
@@ -34,6 +34,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
   // Chat state
   const [message, setMessage] = useState('');
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
+  const activeChatRef = useRef(activeChat);
+  activeChatRef.current = activeChat;
   const [showChatList, setShowChatList] = useState(false);
   const [allChats, setAllChats] = useState<ChatMetadata[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,13 +106,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
       setAllChats(chats);
 
       // If we have chats and no active chat, load the first one
-      if (chats.length > 0) {
-        setActiveChat(prev => {
-          if (!prev) {
-            loadFullChat(chats[0].id);
-          }
-          return prev;
-        });
+      if (chats.length > 0 && !activeChatRef.current) {
+        await loadFullChat(chats[0].id);
       }
     } catch (err) {
       console.error('Error loading chats:', err);
