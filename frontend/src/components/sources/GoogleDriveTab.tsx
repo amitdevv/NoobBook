@@ -201,7 +201,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
         <GoogleDriveLogo size={48} weight="duotone" className="text-muted-foreground mb-4" />
         <h3 className="font-medium mb-2">Google Drive Not Configured</h3>
         <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-          Add your Google Client ID and Client Secret in App Settings to enable Google Drive
+          Add your Google Client ID and Client Secret in Admin Settings to enable Google Drive
           integration.
         </p>
         <Button variant="soft" size="sm">
@@ -219,7 +219,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
         <GoogleDriveLogo size={48} weight="duotone" className="text-primary mb-4" />
         <h3 className="font-medium mb-2">Connect Google Drive</h3>
         <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-          Connect your Google account in App Settings to import files from Google Drive.
+          Connect your Google account in Admin Settings to import files from Google Drive.
         </p>
         <Button variant="soft" size="sm">
           <Gear size={16} className="mr-2" />

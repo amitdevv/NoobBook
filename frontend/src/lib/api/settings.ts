@@ -40,6 +40,14 @@ export interface DatabaseConnection {
   updated_at: string;
 }
 
+export interface UserSummary {
+  id: string;
+  email: string | null;
+  role: 'admin' | 'user' | string;
+  created_at: string;
+  updated_at: string;
+}
+
 class SettingsAPI {
   /**
    * Get all API keys from the backend
@@ -170,6 +178,34 @@ class DatabasesAPI {
 }
 
 export const databasesAPI = new DatabasesAPI();
+
+// ============================================================================
+// Users (RBAC) Types and API
+// ============================================================================
+
+class UsersAPI {
+  async listUsers(): Promise<UserSummary[]> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/settings/users`);
+      return response.data.users || [];
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      throw error;
+    }
+  }
+
+  async updateUserRole(userId: string, role: 'admin' | 'user'): Promise<UserSummary> {
+    try {
+      const response = await axios.put(`${API_BASE_URL}/settings/users/${userId}/role`, { role });
+      return response.data.user;
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      throw error;
+    }
+  }
+}
+
+export const usersAPI = new UsersAPI();
 
 // ============================================================================
 // Processing Settings Types and API

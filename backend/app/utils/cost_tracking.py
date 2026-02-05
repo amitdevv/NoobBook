@@ -66,19 +66,27 @@ def _get_project_service():
     return project_service
 
 
-def _load_costs(project_id: str) -> Optional[Dict[str, Any]]:
+def _load_costs(project_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Load cost tracking data from Supabase."""
     try:
-        return _get_project_service().get_project_costs(project_id)
+        project_service = _get_project_service()
+        owner_id = user_id or project_service.get_project_owner_id(project_id)
+        if not owner_id:
+            return None
+        return project_service.get_project_costs(project_id, user_id=owner_id)
     except Exception as e:
         print(f"Cost tracking: Error loading costs for {project_id}: {e}")
         return None
 
 
-def _save_costs(project_id: str, costs: Dict[str, Any]) -> bool:
+def _save_costs(project_id: str, costs: Dict[str, Any], user_id: Optional[str] = None) -> bool:
     """Save cost tracking data to Supabase."""
     try:
-        return _get_project_service().update_project_costs(project_id, costs)
+        project_service = _get_project_service()
+        owner_id = user_id or project_service.get_project_owner_id(project_id)
+        if not owner_id:
+            return False
+        return project_service.update_project_costs(project_id, costs, user_id=owner_id)
     except Exception as e:
         print(f"Cost tracking: Error saving costs for {project_id}: {e}")
         return False
@@ -139,7 +147,8 @@ def add_usage(
     project_id: str,
     model: str,
     input_tokens: int,
-    output_tokens: int
+    output_tokens: int,
+    user_id: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Add API usage to project cost tracking.
@@ -158,7 +167,7 @@ def add_usage(
     """
     with _lock:
         # Load current costs from Supabase
-        costs = _load_costs(project_id)
+        costs = _load_costs(project_id, user_id=user_id)
         if costs is None:
             # Project might not exist or no costs yet - use defaults
             costs = _get_default_costs()
@@ -180,14 +189,14 @@ def add_usage(
         costs["total_cost"] += call_cost
 
         # Save updated costs to Supabase
-        if _save_costs(project_id, costs):
+        if _save_costs(project_id, costs, user_id=user_id):
             return costs
         else:
             print(f"Cost tracking: Failed to save costs for project {project_id}")
             return None
 
 
-def get_project_costs(project_id: str) -> Optional[Dict[str, Any]]:
+def get_project_costs(project_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Get cost tracking data for a project.
 
@@ -197,7 +206,7 @@ def get_project_costs(project_id: str) -> Optional[Dict[str, Any]]:
     Returns:
         Cost tracking data or default structure if not found
     """
-    costs = _load_costs(project_id)
+    costs = _load_costs(project_id, user_id=user_id)
 
     # Ensure structure exists (for projects created before cost tracking)
     costs = _ensure_cost_structure(costs)

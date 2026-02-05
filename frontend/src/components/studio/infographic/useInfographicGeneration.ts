@@ -52,7 +52,7 @@ export const useInfographicGeneration = (projectId: string) => {
       const geminiStatus = await checkGeminiStatus();
       if (!geminiStatus.configured) {
         if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
-        setConfigError('Add your Gemini API key in App Settings to generate infographics with images.');
+        setConfigError('Add your Gemini API key in Admin Settings to generate infographics with images.');
         configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         setIsGeneratingInfographic(false);
         return;

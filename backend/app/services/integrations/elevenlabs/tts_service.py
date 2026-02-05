@@ -71,7 +71,7 @@ class TTSService:
             if not api_key:
                 raise ValueError(
                     "ELEVENLABS_API_KEY not found in environment. "
-                    "Please configure it in App Settings."
+                    "Please configure it in Admin Settings."
                 )
 
             from elevenlabs.client import ElevenLabs

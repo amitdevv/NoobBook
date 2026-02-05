@@ -6,7 +6,6 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui
 import { Badge } from '../ui/badge';
 import { Gear, Ghost, Sparkle, GithubLogo, YoutubeLogo, BookOpen, SignOut } from '@phosphor-icons/react';
 import { ToastContainer, useToast } from '../ui/toast';
-import { useAuth } from '@/hooks/useAuth';
 
 /**
  * Dashboard Component
@@ -30,16 +29,21 @@ interface DashboardProps {
   onSelectProject: (project: Project) => void;
   onCreateNewProject: () => void;
   refreshTrigger?: number;
+  isAdmin: boolean;
+  isAuthenticated: boolean;
+  onSignOut: () => Promise<void>;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
   onSelectProject,
   onCreateNewProject,
-  refreshTrigger = 0
+  refreshTrigger = 0,
+  isAdmin,
+  isAuthenticated,
+  onSignOut,
 }) => {
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const { toasts, dismissToast } = useToast();
-  const { user, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-background">
@@ -55,29 +59,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {user && (
-              <span className="text-xs text-muted-foreground hidden sm:inline">
-                {user.email}
-              </span>
-            )}
-            <Button
-              variant="soft"
-              size="sm"
-              onClick={() => setAppSettingsOpen(true)}
-              className="gap-2"
-            >
-              <Gear size={16} />
-              App Settings
-            </Button>
-            <Button
-              variant="soft"
-              size="sm"
-              onClick={logout}
-              className="gap-2"
-            >
-              <SignOut size={16} />
-              Logout
-            </Button>
+            {isAuthenticated ? (
+              <Button
+                variant="soft"
+                size="sm"
+                onClick={onSignOut}
+                className="gap-2"
+              >
+                <SignOut size={16} />
+                Sign out
+              </Button>
+            ) : null}
+            {isAdmin ? (
+              <Button
+                variant="soft"
+                size="sm"
+                onClick={() => setAppSettingsOpen(true)}
+                className="gap-2"
+              >
+                <Gear size={16} />
+                Admin Settings
+              </Button>
+            ) : null}
           </div>
         </div>
       </header>
@@ -161,8 +164,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </main>
 
-      {/* App Settings Dialog */}
-      <AppSettings open={appSettingsOpen} onOpenChange={setAppSettingsOpen} />
+      {/* Admin Settings Dialog */}
+      {isAdmin ? (
+        <AppSettings open={appSettingsOpen} onOpenChange={setAppSettingsOpen} />
+      ) : null}
     </div>
   );
 };

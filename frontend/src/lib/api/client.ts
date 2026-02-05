@@ -6,18 +6,7 @@
  */
 
 import axios from 'axios';
-import type { AxiosError } from 'axios';
-
-// ==================== Default Axios Auth Interceptor ====================
-// Some API files (settings, sources, chats, studio) use raw axios instead
-// of the `api` instance below. This ensures ALL axios requests get the token.
-axios.interceptors.request.use((config) => {
-  const token = localStorage.getItem('noobbook_access_token');
-  if (token && !config.headers.Authorization) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+import { getAccessToken } from '../auth/session';
 
 // Base host URL (without /api/v1 path) - used for file URLs, static assets.
 // When VITE_API_HOST is set to "" (Docker via nginx proxy), same-origin requests
@@ -36,18 +25,21 @@ export const api = axios.create({
   },
 });
 
-// ==================== Request Interceptor ====================
-// Attaches Bearer token to every request + debugging log
+const attachAuthHeader = (config: any) => {
+  const token = getAccessToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+};
+
+// Add request interceptor for debugging (educational purposes)
 api.interceptors.request.use(
   (config) => {
-    // Attach JWT token if available
-    const token = localStorage.getItem('noobbook_access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
+    const next = attachAuthHeader(config);
     console.log('API Request:', config.method?.toUpperCase(), config.url);
-    return config;
+    return next;
   },
   (error) => {
     console.error('Request Error:', error);
@@ -55,100 +47,18 @@ api.interceptors.request.use(
   }
 );
 
-// ==================== Response Interceptor ====================
-// Handles 401 errors by attempting token refresh before redirecting to login.
-// Educational Note: When an access token expires mid-session, the first 401
-// triggers a refresh attempt using the stored refresh token. If the refresh
-// succeeds, the original request is retried transparently. A flag + queue
-// prevent multiple simultaneous refresh attempts — subsequent 401s wait for
-// the first refresh to complete, then retry with the new token.
-let isRefreshing = false;
-let pendingRequests: Array<{
-  resolve: (token: string) => void;
-  reject: (error: unknown) => void;
-}> = [];
+// Ensure global axios requests (non-api instance) include auth header too
+axios.interceptors.request.use(attachAuthHeader);
 
-function processPendingRequests(token: string | null, error?: unknown) {
-  pendingRequests.forEach(({ resolve, reject }) => {
-    if (token) {
-      resolve(token);
-    } else {
-      reject(error);
-    }
-  });
-  pendingRequests = [];
-}
-
+// Add response interceptor for debugging
 api.interceptors.response.use(
   (response) => {
     console.log('API Response:', response.status, response.config.url);
     return response;
   },
-  async (error: AxiosError) => {
+  async (error) => {
     const status = error.response?.status;
-    const originalRequest = error.config;
-    const url = originalRequest?.url || '';
-
-    // Only attempt refresh for 401s on non-auth endpoints
-    if (status === 401 && !url.includes('/auth/') && originalRequest) {
-      // If a refresh is already in progress, queue this request
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          pendingRequests.push({
-            resolve: (token: string) => {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-              resolve(api(originalRequest));
-            },
-            reject: (err: unknown) => reject(err),
-          });
-        });
-      }
-
-      isRefreshing = true;
-      const refreshToken = localStorage.getItem('noobbook_refresh_token');
-
-      if (refreshToken) {
-        try {
-          // Use raw axios to avoid triggering this interceptor again
-          const refreshResponse = await axios.post(
-            `${API_BASE_URL}/auth/refresh`,
-            { refresh_token: refreshToken }
-          );
-
-          const { access_token, refresh_token: newRefreshToken } = refreshResponse.data;
-
-          localStorage.setItem('noobbook_access_token', access_token);
-          if (newRefreshToken) {
-            localStorage.setItem('noobbook_refresh_token', newRefreshToken);
-          }
-
-          // Reset flag BEFORE processing pending requests and retrying.
-          // If isRefreshing stays true until finally, new 401s that arrive
-          // during processPendingRequests() or the retry would incorrectly queue.
-          isRefreshing = false;
-
-          // Retry the original request with the new token
-          originalRequest.headers.Authorization = `Bearer ${access_token}`;
-          processPendingRequests(access_token);
-          return api(originalRequest);
-        } catch (refreshError) {
-          // Refresh failed — clear tokens and redirect to login
-          isRefreshing = false;
-          processPendingRequests(null, refreshError);
-          localStorage.removeItem('noobbook_access_token');
-          localStorage.removeItem('noobbook_refresh_token');
-          window.location.href = '/login';
-          return Promise.reject(refreshError);
-        }
-      } else {
-        // No refresh token available — redirect to login
-        isRefreshing = false;
-        localStorage.removeItem('noobbook_access_token');
-        window.location.href = '/login';
-      }
-    }
-
-    console.error('Response Error:', status, (error.response?.data as any));
+    console.error('Response Error:', status, error.response?.data);
     return Promise.reject(error);
   }
 );
@@ -165,7 +75,7 @@ api.interceptors.response.use(
  *              the token is appended directly. If it's a path, API_HOST is prepended first.
  */
 export function getAuthUrl(url: string): string {
-  const token = localStorage.getItem('noobbook_access_token');
+  const token = getAccessToken();
   const fullUrl = url.startsWith('http') ? url : `${API_HOST}${url}`;
   if (!token) return fullUrl;
   const separator = fullUrl.includes('?') ? '&' : '?';

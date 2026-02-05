@@ -36,6 +36,7 @@ Routes:
 from flask import jsonify, request, current_app
 from app.api.sources import sources_bp
 from app.services.source_services import SourceService
+from app.services.auth.rbac import get_request_identity
 
 # Initialize service
 source_service = SourceService()
@@ -294,6 +295,7 @@ def add_database_source(project_id: str):
         }
     """
     try:
+        identity = get_request_identity()
         data = request.get_json() or {}
 
         connection_id = data.get('connection_id')
@@ -304,7 +306,8 @@ def add_database_source(project_id: str):
             project_id=project_id,
             connection_id=connection_id,
             name=data.get('name'),
-            description=data.get('description', '')
+            description=data.get('description', ''),
+            user_id=identity.user_id,
         )
 
         return jsonify({

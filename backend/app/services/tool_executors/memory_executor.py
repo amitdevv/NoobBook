@@ -30,7 +30,8 @@ class MemoryExecutor:
         project_id: str,
         user_memory: Optional[str] = None,
         project_memory: Optional[str] = None,
-        why_generated: str = ""
+        why_generated: str = "",
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Execute the store_memory tool call.
@@ -59,7 +60,8 @@ class MemoryExecutor:
                 "user_memory",             # target_id
                 self._update_user_memory,  # callable_func
                 new_memory=user_memory,
-                reason=why_generated
+                reason=why_generated,
+                user_id=user_id,
             )
             storing.append("user memory")
             print(f"Queued user memory update: {user_memory[:50]}...")
@@ -72,7 +74,8 @@ class MemoryExecutor:
                 self._update_project_memory,  # callable_func
                 project_id_for_memory=project_id,
                 new_memory=project_memory,
-                reason=why_generated
+                reason=why_generated,
+                user_id=user_id,
             )
             storing.append("project memory")
             print(f"Queued project memory update: {project_memory[:50]}...")
@@ -94,6 +97,7 @@ class MemoryExecutor:
         self,
         new_memory: str,
         reason: str,
+        user_id: Optional[str] = None,
         **kwargs  # Accept extra kwargs from task_service
     ) -> Dict[str, Any]:
         """
@@ -109,10 +113,17 @@ class MemoryExecutor:
         Returns:
             Result from memory_service.update_memory()
         """
+        if user_id:
+            return memory_service.update_memory(
+                memory_type="user",
+                new_memory=new_memory,
+                reason=reason,
+                user_id=user_id,
+            )
         return memory_service.update_memory(
             memory_type="user",
             new_memory=new_memory,
-            reason=reason
+            reason=reason,
         )
 
     def _update_project_memory(
@@ -120,6 +131,7 @@ class MemoryExecutor:
         project_id_for_memory: str,
         new_memory: str,
         reason: str,
+        user_id: Optional[str] = None,
         **kwargs  # Accept extra kwargs from task_service
     ) -> Dict[str, Any]:
         """
@@ -136,11 +148,19 @@ class MemoryExecutor:
         Returns:
             Result from memory_service.update_memory()
         """
+        if user_id:
+            return memory_service.update_memory(
+                memory_type="project",
+                new_memory=new_memory,
+                reason=reason,
+                project_id=project_id_for_memory,
+                user_id=user_id,
+            )
         return memory_service.update_memory(
             memory_type="project",
             new_memory=new_memory,
             reason=reason,
-            project_id=project_id_for_memory
+            project_id=project_id_for_memory,
         )
 
 

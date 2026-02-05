@@ -63,17 +63,17 @@ def authenticate_request():
 # =============================================================================
 # These blueprints have their own folders with __init__.py and routes.py
 
-from app.api.auth import auth_bp  # noqa: E402
-from app.api.chats import chats_bp  # noqa: E402
-from app.api.messages import messages_bp  # noqa: E402
-from app.api.prompts import prompts_bp  # noqa: E402
-from app.api.google import google_bp  # noqa: E402
-from app.api.projects import projects_bp  # noqa: E402
-from app.api.transcription import transcription_bp  # noqa: E402
-from app.api.settings import settings_bp  # noqa: E402
-from app.api.sources import sources_bp  # noqa: E402
-from app.api.studio import studio_bp  # noqa: E402
-from app.api.brand import brand_bp  # noqa: E402
+from app.api.auth import auth_bp
+from app.api.chats import chats_bp
+from app.api.messages import messages_bp
+from app.api.prompts import prompts_bp
+from app.api.google import google_bp
+from app.api.projects import projects_bp
+from app.api.transcription import transcription_bp
+from app.api.settings import settings_bp
+from app.api.sources import sources_bp
+from app.api.studio import studio_bp
+from app.api.brand import brand_bp
 
 # Register nested blueprints with the main api blueprint
 # No url_prefix needed - routes already have full paths

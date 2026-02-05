@@ -129,7 +129,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         {isRecording
           ? 'Listening... Click mic to stop'
           : !transcriptionConfigured
-          ? 'Voice input requires ElevenLabs API key (App Settings)'
+          ? 'Voice input requires ElevenLabs API key (Admin Settings)'
           : 'Click mic to speak, or type your message'}
       </p>
     </div>

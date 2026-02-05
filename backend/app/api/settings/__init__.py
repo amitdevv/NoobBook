@@ -38,3 +38,4 @@ settings_bp = Blueprint('settings', __name__)
 from app.api.settings import api_keys  # noqa: F401
 from app.api.settings import processing  # noqa: F401
 from app.api.settings import databases  # noqa: F401
+from app.api.settings import users  # noqa: F401

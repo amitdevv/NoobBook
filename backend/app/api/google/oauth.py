@@ -29,6 +29,7 @@ from typing import Optional
 from flask import jsonify, request, redirect, current_app
 from app.api.google import google_bp
 from app.services.integrations.google import google_auth_service
+from app.services.auth.rbac import get_request_identity
 
 
 def _get_current_user_id() -> Optional[str]:
@@ -42,11 +43,10 @@ def _get_current_user_id() -> Optional[str]:
     Returns:
         User ID string or None for default user
     """
-    # TODO: For multi-user mode, extract user_id from JWT/session:
-    # token = request.headers.get('Authorization', '').replace('Bearer ', '')
-    # user = supabase.auth.get_user(token)
-    # return user.id if user else None
-    return None  # Single-user mode: use default user
+    identity = get_request_identity()
+    if identity.is_authenticated:
+        return identity.user_id
+    return None
 
 
 @google_bp.route('/google/status', methods=['GET'])
@@ -108,7 +108,7 @@ def google_auth():
         if not google_auth_service.is_configured():
             return jsonify({
                 'success': False,
-                'error': 'Google OAuth not configured. Please add Client ID and Secret in App Settings.'
+                'error': 'Google OAuth not configured. Please add Client ID and Secret in Admin Settings.'
             }), 400
 
         user_id = _get_current_user_id()
