@@ -16,6 +16,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Eye,
   EyeSlash,
   Trash,
@@ -23,6 +31,7 @@ import {
   GoogleDriveLogo,
   SignOut,
   ArrowSquareOut,
+  Warning,
 } from '@phosphor-icons/react';
 import { googleDriveAPI, databasesAPI } from '@/lib/api/settings';
 import type { GoogleStatus, DatabaseConnection, DatabaseType } from '@/lib/api/settings';
@@ -55,6 +64,10 @@ export const IntegrationsSection: React.FC = () => {
     connection_uri: '',
     description: '',
   });
+
+  // Confirmation dialog state
+  const [deleteDbId, setDeleteDbId] = useState<string | null>(null);
+  const [disconnectGoogleOpen, setDisconnectGoogleOpen] = useState(false);
 
   const { success, error, info } = useToast();
 
@@ -183,9 +196,9 @@ export const IntegrationsSection: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-stone-900 mb-1">Integrations</h2>
+        <h2 className="text-base font-medium text-stone-900 mb-1">Integrations</h2>
         <p className="text-sm text-muted-foreground">
           Connect external services and databases
         </p>
@@ -219,7 +232,7 @@ export const IntegrationsSection: React.FC = () => {
               <Button
                 variant="soft"
                 size="sm"
-                onClick={handleGoogleDisconnect}
+                onClick={() => setDisconnectGoogleOpen(true)}
                 disabled={googleLoading}
               >
                 {googleLoading ? (
@@ -303,7 +316,7 @@ export const IntegrationsSection: React.FC = () => {
                       <Button
                         variant="soft"
                         size="sm"
-                        onClick={() => handleDeleteDatabase(db.id)}
+                        onClick={() => setDeleteDbId(db.id)}
                       >
                         <Trash size={16} className="mr-1" />
                         Delete
@@ -422,6 +435,66 @@ export const IntegrationsSection: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Delete Database Confirmation */}
+      <AlertDialog open={!!deleteDbId} onOpenChange={(open) => !open && setDeleteDbId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Warning size={20} className="text-destructive" />
+              Delete Database Connection
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{dbConnections.find(db => db.id === deleteDbId)?.name}</strong>? Projects using this connection will lose access.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="soft" onClick={() => setDeleteDbId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteDbId) {
+                  handleDeleteDatabase(deleteDbId);
+                  setDeleteDbId(null);
+                }
+              }}
+            >
+              Delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Disconnect Google Drive Confirmation */}
+      <AlertDialog open={disconnectGoogleOpen} onOpenChange={setDisconnectGoogleOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Warning size={20} className="text-destructive" />
+              Disconnect Google Drive
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to disconnect <strong>{googleStatus.email}</strong>? You'll need to re-authenticate to import files again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="soft" onClick={() => setDisconnectGoogleOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                handleGoogleDisconnect();
+                setDisconnectGoogleOpen(false);
+              }}
+            >
+              Disconnect
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

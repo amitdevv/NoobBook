@@ -18,6 +18,7 @@ import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { ChatList } from './ChatList';
 import { ChatEmptyState } from './ChatEmptyState';
+import { exportChatAsMarkdown } from '@/lib/exportChatMarkdown';
 
 interface ChatPanelProps {
   projectId: string;
@@ -37,6 +38,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
   const [allChats, setAllChats] = useState<ChatMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [exportingChat, setExportingChat] = useState(false);
 
   // Sources state for header display
   const [sources, setSources] = useState<Source[]>([]);
@@ -208,7 +210,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
             ? { ...prev, studio_signals: updatedChat.studio_signals || [] }
             : prev
           );
-        } catch (e) {
+        } catch {
           // Silently ignore - signal update is non-critical
         }
       }, 1000);
@@ -225,7 +227,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
           setAllChats(prev => prev.map(c =>
             c.id === chatId ? { ...c, title: updatedChat.title } : c
           ));
-        } catch (e) {
+        } catch {
           // Silently ignore - title update is non-critical
         }
       }, 4000);
@@ -320,6 +322,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
     }
   };
 
+  /**
+   * Export the active chat as a Markdown file
+   */
+  const handleExportChat = useCallback(async () => {
+    if (!activeChat) return;
+    setExportingChat(true);
+    try {
+      await exportChatAsMarkdown({ chat: activeChat, projectId, projectName });
+      success('Chat exported as Markdown');
+    } catch (err) {
+      console.error('Error exporting chat:', err);
+      error('Failed to export chat');
+    } finally {
+      setExportingChat(false);
+    }
+  }, [activeChat, projectId, projectName, success, error]);
+
   // Loading state
   if (loading) {
     return (
@@ -399,6 +418,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
         onSelectChat={handleSelectChat}
         onNewChat={handleNewChat}
         onShowChatList={() => setShowChatList(true)}
+        onExportChat={handleExportChat}
+        exportingChat={exportingChat}
       />
 
       <ChatMessages

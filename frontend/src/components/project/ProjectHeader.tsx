@@ -368,18 +368,6 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
           Project Settings
         </Button>
 
-        {onSignOut ? (
-          <Button
-            variant="soft"
-            size="sm"
-            onClick={onSignOut}
-            className="gap-2"
-          >
-            <SignOut size={16} />
-            Sign out
-          </Button>
-        ) : null}
-
         <Button
           variant="soft"
           size="sm"
@@ -412,6 +400,15 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
               <Trash size={16} className="mr-2" />
               Delete Project
             </DropdownMenuItem>
+            {onSignOut && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onSignOut}>
+                  <SignOut size={16} className="mr-2" />
+                  Sign out
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

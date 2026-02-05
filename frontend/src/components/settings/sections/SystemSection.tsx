@@ -68,9 +68,9 @@ export const SystemSection: React.FC = () => {
   const currentTier = availableTiers.find(t => t.tier === selectedTier);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-stone-900 mb-1">System</h2>
+        <h2 className="text-base font-medium text-stone-900 mb-1">System</h2>
         <p className="text-sm text-muted-foreground">
           Configure processing and performance settings
         </p>
