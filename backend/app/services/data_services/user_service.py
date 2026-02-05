@@ -27,6 +27,11 @@ class UserService:
         # from user logins on the shared singleton client
         supabase_url = os.getenv("SUPABASE_URL")
         service_key = os.getenv("SUPABASE_SERVICE_KEY")
+        if not supabase_url:
+            raise RuntimeError(
+                "SUPABASE_URL is required for admin user management. "
+                "Please add it to your .env file."
+            )
         if not service_key:
             raise RuntimeError(
                 "SUPABASE_SERVICE_KEY is required for admin user management. "
@@ -203,5 +208,13 @@ class UserService:
         return password
 
 
-user_service = UserService()
+_user_service: Optional[UserService] = None
+
+
+def get_user_service() -> UserService:
+    """Lazy initialization — only create the client when first needed."""
+    global _user_service
+    if _user_service is None:
+        _user_service = UserService()
+    return _user_service
 

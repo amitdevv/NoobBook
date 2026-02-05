@@ -70,12 +70,50 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
   });
 
   /**
+   * Load sources for the project (for header display)
+   */
+  const loadSources = useCallback(async () => {
+    try {
+      const data = await sourcesAPI.listSources(projectId);
+      setSources(data);
+    } catch (err) {
+      console.error('Error loading sources:', err);
+    }
+  }, [projectId]);
+
+  /**
+   * Load all chats for the project
+   */
+  const loadChats = useCallback(async () => {
+    try {
+      setLoading(true);
+      const chats = await chatsAPI.listChats(projectId);
+      setAllChats(chats);
+
+      // If we have chats and no active chat, load the first one
+      if (chats.length > 0) {
+        setActiveChat(prev => {
+          if (!prev) {
+            loadFullChat(chats[0].id);
+          }
+          return prev;
+        });
+      }
+    } catch (err) {
+      console.error('Error loading chats:', err);
+      error('Failed to load chats');
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, error, loadFullChat]);
+
+  /**
    * Load all chats and sources when component mounts or projectId changes
    */
   useEffect(() => {
     loadChats();
     loadSources();
-  }, [projectId]);
+  }, [loadChats, loadSources]);
 
   /**
    * Refetch sources when sourcesVersion changes
@@ -86,7 +124,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
     if (sourcesVersion !== undefined && sourcesVersion > 0) {
       loadSources();
     }
-  }, [sourcesVersion]);
+  }, [sourcesVersion, loadSources]);
 
   /**
    * Notify parent when studio signals change
@@ -102,42 +140,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
   }, [activeChat, onSignalsChange]);
 
   /**
-   * Load sources for the project (for header display)
-   */
-  const loadSources = async () => {
-    try {
-      const data = await sourcesAPI.listSources(projectId);
-      setSources(data);
-    } catch (err) {
-      console.error('Error loading sources:', err);
-    }
-  };
-
-  /**
-   * Load all chats for the project
-   */
-  const loadChats = async () => {
-    try {
-      setLoading(true);
-      const chats = await chatsAPI.listChats(projectId);
-      setAllChats(chats);
-
-      // If we have chats and no active chat, load the first one
-      if (chats.length > 0 && !activeChat) {
-        await loadFullChat(chats[0].id);
-      }
-    } catch (err) {
-      console.error('Error loading chats:', err);
-      error('Failed to load chats');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
    * Load full chat data including all messages
    */
-  const loadFullChat = async (chatId: string) => {
+  const loadFullChat = useCallback(async (chatId: string) => {
     try {
       const chat = await chatsAPI.getChat(projectId, chatId);
       setActiveChat(chat);
@@ -145,7 +150,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
       console.error('Error loading chat:', err);
       error('Failed to load chat');
     }
-  };
+  }, [projectId, error]);
 
   /**
    * Send a message and get AI response
