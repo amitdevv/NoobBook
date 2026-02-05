@@ -1,9 +1,18 @@
 """
 User Service - Admin-oriented user management (roles, create, delete).
+
+Note: This service uses a dedicated Supabase client for admin operations.
+The shared singleton client gets user sessions set on it during sign-in,
+which causes auth.admin methods to use the user's token instead of the
+service_role key. By creating a separate client here, we ensure admin
+operations always use the service_role key.
 """
+import os
 from typing import Dict, List, Optional, Tuple
 
-from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+from supabase import create_client
+
+from app.services.integrations.supabase import is_supabase_enabled
 from app.utils.password_utils import generate_secure_password
 
 
@@ -14,7 +23,16 @@ class UserService:
                 "Supabase is not configured. Please add SUPABASE_URL and "
                 "SUPABASE_ANON_KEY to your .env file."
             )
-        self.supabase = get_supabase()
+        # Create a dedicated client for admin operations to avoid session contamination
+        # from user logins on the shared singleton client
+        supabase_url = os.getenv("SUPABASE_URL")
+        service_key = os.getenv("SUPABASE_SERVICE_KEY")
+        if not service_key:
+            raise RuntimeError(
+                "SUPABASE_SERVICE_KEY is required for admin user management. "
+                "Please add it to your .env file."
+            )
+        self.supabase = create_client(supabase_url, service_key)
         self.table = "users"
 
     def list_users(self) -> List[Dict[str, str]]:
