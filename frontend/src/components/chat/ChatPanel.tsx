@@ -5,7 +5,7 @@
  * and manages chat state and API interactions.
  */
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Sparkle } from '@phosphor-icons/react';
 import { Skeleton } from '../ui/skeleton';
 import { chatsAPI } from '@/lib/api/chats';
@@ -34,8 +34,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
   // Chat state
   const [message, setMessage] = useState('');
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
-  const activeChatRef = useRef(activeChat);
-  activeChatRef.current = activeChat;
   const [showChatList, setShowChatList] = useState(false);
   const [allChats, setAllChats] = useState<ChatMetadata[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,19 +72,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
   /**
    * Load sources for the project (for header display)
    */
-  const loadSources = useCallback(async () => {
+  const loadSources = async () => {
     try {
       const data = await sourcesAPI.listSources(projectId);
       setSources(data);
     } catch (err) {
       console.error('Error loading sources:', err);
     }
-  }, [projectId]);
+  };
 
   /**
    * Load full chat data including all messages
    */
-  const loadFullChat = useCallback(async (chatId: string) => {
+  const loadFullChat = async (chatId: string) => {
     try {
       const chat = await chatsAPI.getChat(projectId, chatId);
       setActiveChat(chat);
@@ -94,19 +92,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
       console.error('Error loading chat:', err);
       error('Failed to load chat');
     }
-  }, [projectId, error]);
+  };
 
   /**
    * Load all chats for the project
    */
-  const loadChats = useCallback(async () => {
+  const loadChats = async () => {
     try {
       setLoading(true);
       const chats = await chatsAPI.listChats(projectId);
       setAllChats(chats);
 
       // If we have chats and no active chat, load the first one
-      if (chats.length > 0 && !activeChatRef.current) {
+      if (chats.length > 0 && !activeChat) {
         await loadFullChat(chats[0].id);
       }
     } catch (err) {
@@ -115,7 +113,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
     } finally {
       setLoading(false);
     }
-  }, [projectId, error, loadFullChat]);
+  };
 
   /**
    * Load all chats and sources when component mounts or projectId changes
@@ -123,7 +121,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
   useEffect(() => {
     loadChats();
     loadSources();
-  }, [loadChats, loadSources]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   /**
    * Refetch sources when sourcesVersion changes
@@ -134,7 +133,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
     if (sourcesVersion !== undefined && sourcesVersion > 0) {
       loadSources();
     }
-  }, [sourcesVersion, loadSources]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourcesVersion]);
 
   /**
    * Notify parent when studio signals change
