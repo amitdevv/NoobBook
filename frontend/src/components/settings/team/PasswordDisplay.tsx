@@ -21,7 +21,7 @@ export const PasswordDisplay: React.FC<PasswordDisplayProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [showPassword, setShowPassword] = useState(true);
-  const { success } = useToast();
+  const { success, error } = useToast();
 
   const handleCopy = async () => {
     try {
@@ -29,8 +29,24 @@ export const PasswordDisplay: React.FC<PasswordDisplayProps> = ({
       setCopied(true);
       success('Password copied to clipboard');
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
+    } catch {
+      // Fallback for non-HTTPS or restricted contexts
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = password;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setCopied(true);
+        success('Password copied to clipboard');
+        setTimeout(() => setCopied(false), 2000);
+      } catch (fallbackErr) {
+        error('Failed to copy password');
+        console.error('Failed to copy:', fallbackErr);
+      }
     }
   };
 

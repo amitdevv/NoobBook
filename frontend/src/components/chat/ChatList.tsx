@@ -5,7 +5,7 @@
  * message count and last updated time.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
 import { Input } from '../ui/input';
@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
-import { Sparkle, Plus, Clock, Hash, Trash, PencilSimple } from '@phosphor-icons/react';
+import { Sparkle, Plus, Clock, Hash, Trash, PencilSimple, MagnifyingGlass, X } from '@phosphor-icons/react';
 import type { ChatMetadata } from '../../lib/api/chats';
 
 interface ChatListProps {
@@ -55,6 +55,17 @@ export const ChatList: React.FC<ChatListProps> = ({
   onRenameChat,
   onNewChat,
 }) => {
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter chats by search query (case-insensitive title match)
+  const filteredChats = useMemo(
+    () => searchQuery
+      ? chats.filter((chat) => chat.title.toLowerCase().includes(searchQuery.toLowerCase()))
+      : chats,
+    [chats, searchQuery]
+  );
+
   // Rename dialog state
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameChatId, setRenameChatId] = useState<string | null>(null);
@@ -97,9 +108,43 @@ export const ChatList: React.FC<ChatListProps> = ({
         </Button>
       </div>
 
+      {/* Search input */}
+      <div className="px-4 pt-3">
+        <div className="relative">
+          <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search chats..."
+            className="pl-9 pr-9"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="text-xs text-muted-foreground mt-2">
+            Showing {filteredChats.length} of {chats.length} chats
+          </p>
+        )}
+      </div>
+
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-2">
-          {chats.map((chat) => (
+          {filteredChats.length === 0 && searchQuery ? (
+            <div className="text-center py-8">
+              <MagnifyingGlass size={32} className="mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">No chats found</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Try a different search term
+              </p>
+            </div>
+          ) : filteredChats.map((chat) => (
             <div
               key={chat.id}
               className="p-3 border rounded-lg hover:bg-accent transition-colors group"

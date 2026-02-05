@@ -17,6 +17,14 @@ import {
   XCircle,
   CircleNotch,
 } from '@phosphor-icons/react';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { settingsAPI } from '@/lib/api/settings';
 import type { ApiKey } from '@/lib/api/settings';
 import { useToast } from '@/components/ui/toast';
@@ -35,6 +43,7 @@ export const ApiKeysSection: React.FC = () => {
   const [showApiKeys, setShowApiKeys] = useState<{ [key: string]: boolean }>({});
   const [loading, setLoading] = useState(false);
   const [validationState, setValidationState] = useState<ValidationState>({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const { success, error, info } = useToast();
 
@@ -183,7 +192,7 @@ export const ApiKeysSection: React.FC = () => {
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={() => deleteApiKey(apiKey.id)}
+            onClick={() => setDeleteConfirmId(apiKey.id)}
             disabled={!apiKey.value && !apiKey.is_set}
           >
             <Trash size={16} />
@@ -262,9 +271,9 @@ export const ApiKeysSection: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-stone-900 mb-1">API Keys</h2>
+        <h2 className="text-base font-medium text-stone-900 mb-1">API Keys</h2>
         <p className="text-sm text-muted-foreground">
           Configure API keys for AI models and services
         </p>
@@ -282,6 +291,36 @@ export const ApiKeysSection: React.FC = () => {
         <Separator />
         {renderCategorySection('Utility Services', 'utility')}
       </div>
+
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Warning size={20} className="text-destructive" />
+              Delete API Key
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{apiKeys.find(k => k.id === deleteConfirmId)?.name}</strong>? You'll need to re-enter it to use this service again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="soft" onClick={() => setDeleteConfirmId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteConfirmId) {
+                  deleteApiKey(deleteConfirmId);
+                  setDeleteConfirmId(null);
+                }
+              }}
+            >
+              Delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

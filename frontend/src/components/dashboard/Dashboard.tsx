@@ -2,9 +2,15 @@ import React, { useState } from 'react';
 import { ProjectList } from '../project';
 import { AppSettings } from './AppSettings';
 import { Button } from '../ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
-import { Badge } from '../ui/badge';
-import { Gear, Ghost, Sparkle, GithubLogo, YoutubeLogo, BookOpen, SignOut } from '@phosphor-icons/react';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+import { Gear, Ghost, SignOut, Warning } from '@phosphor-icons/react';
 import { ToastContainer, useToast } from '../ui/toast';
 
 /**
@@ -49,6 +55,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   userRole,
 }) => {
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
   const { toasts, dismissToast } = useToast();
 
   return (
@@ -69,7 +76,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <Button
                 variant="soft"
                 size="sm"
-                onClick={onSignOut}
+                onClick={() => setSignOutOpen(true)}
                 className="gap-2"
               >
                 <SignOut size={16} />
@@ -91,83 +98,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </header>
 
-      {/* Main Content - Two Part Layout */}
-      <main className="container mx-auto px-4 py-6 flex flex-col h-[calc(100vh-56px)]">
-        {/* Top Section: Projects (Scrollable) */}
-        <div className="flex-1 min-h-0 overflow-y-auto mb-6">
-          <ProjectList
-            onSelectProject={onSelectProject}
-            onCreateNew={onCreateNewProject}
-            refreshTrigger={refreshTrigger}
-          />
-        </div>
-
-        {/* Bottom Section: Learning Info Cards */}
-        <div className="flex-shrink-0 grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
-          {/* Card 1: Session 3 - What We're Building */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Sparkle size={20} className="text-primary" />
-                Session 3: The Complete AI Tool
-              </CardTitle>
-              <CardDescription>
-                Build a production-ready AI application combining everything from the course into one powerful tool.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {['AI Chat', 'RAG', 'Image Gen', 'Video Gen', 'Realtime Transcription', 'Memories', 'Subagents', 'Deep Research', 'Web Search'].map((feature) => (
-                  <Badge key={feature} variant="secondary" className="rounded-md">
-                    {feature}
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Card 2: Previous Sessions & Resources */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <BookOpen size={20} className="text-primary" />
-                Previous Sessions & Resources
-              </CardTitle>
-              <CardDescription>
-                Catch up on the fundamentals from Sessions 1 & 2, and access all course materials on GitHub.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <a
-                href="https://www.youtube.com/watch?v=jsdKgmU3DJA"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
-              >
-                <YoutubeLogo size={18} className="text-red-500" />
-                <span>Session 1: API Basics, Parameters & Tool Use</span>
-              </a>
-              <a
-                href="https://www.youtube.com/watch?v=RgykmlWXzns"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
-              >
-                <YoutubeLogo size={18} className="text-red-500" />
-                <span>Session 2: Chat, Memory & AI Agents</span>
-              </a>
-              <a
-                href="https://github.com/TeacherOp/growthx_1"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
-              >
-                <GithubLogo size={18} />
-                <span>Course Code & Notes Repository</span>
-              </a>
-            </CardContent>
-          </Card>
-        </div>
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-6 h-[calc(100vh-56px)] overflow-y-auto">
+        <ProjectList
+          onSelectProject={onSelectProject}
+          onCreateNew={onCreateNewProject}
+          refreshTrigger={refreshTrigger}
+        />
       </main>
 
       {/* Settings Dialog */}
@@ -177,7 +114,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
         userId={userId}
         userEmail={userEmail}
         userRole={userRole}
+        onSignOut={onSignOut}
       />
+
+      {/* Sign Out Confirmation */}
+      <AlertDialog open={signOutOpen} onOpenChange={setSignOutOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Warning size={20} className="text-destructive" />
+              Sign Out
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to sign out? You'll need to log in again to access your projects.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="soft" onClick={() => setSignOutOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setSignOutOpen(false);
+                onSignOut();
+              }}
+            >
+              Sign Out
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

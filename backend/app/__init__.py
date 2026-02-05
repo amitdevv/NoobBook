@@ -57,6 +57,10 @@ def create_app(config_name='development'):
 
     @app.before_request
     def enforce_auth():
+        # Skip CORS preflight requests
+        if request.method == 'OPTIONS':
+            return None
+
         if not is_auth_required():
             return None
 

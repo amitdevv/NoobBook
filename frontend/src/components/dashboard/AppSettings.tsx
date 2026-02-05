@@ -11,8 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
-import { X } from '@phosphor-icons/react';
-import { Button } from '../ui/button';
 import { SettingsSidebar, type SettingsSection } from '../settings/SettingsSidebar';
 import {
   ProfileSection,
@@ -28,6 +26,7 @@ interface AppSettingsProps {
   userEmail?: string | null;
   userRole?: string;
   userId?: string;
+  onSignOut?: () => Promise<void>;
 }
 
 export const AppSettings: React.FC<AppSettingsProps> = ({
@@ -36,6 +35,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
   userEmail = null,
   userRole = 'user',
   userId = '',
+  onSignOut,
 }) => {
   const isAdmin = userRole === 'admin';
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
@@ -60,7 +60,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
   const renderSection = () => {
     switch (activeSection) {
       case 'profile':
-        return <ProfileSection userEmail={userEmail} userRole={userRole} />;
+        return <ProfileSection userEmail={userEmail} userRole={userRole} onSignOut={onSignOut} />;
       case 'team':
         return isAdmin ? <TeamSection currentUserId={userId} /> : null;
       case 'api-keys':
@@ -76,20 +76,10 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl h-[80vh] p-0 gap-0 overflow-hidden bg-card">
+      <DialogContent className="max-w-4xl h-[85vh] p-0 gap-0 overflow-hidden bg-card flex flex-col">
         {/* Header */}
-        <DialogHeader className="flex-shrink-0 px-6 py-4 border-b">
-          <div className="flex items-center justify-between">
-            <DialogTitle>Settings</DialogTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => handleOpenChange(false)}
-            >
-              <X size={18} />
-            </Button>
-          </div>
+        <DialogHeader className="flex-shrink-0 px-6 py-3 border-b">
+          <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
 
         {/* Main content with sidebar */}
@@ -103,7 +93,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
 
           {/* Content area */}
           <div className="flex-1 overflow-y-auto p-6 bg-white">
-            {renderSection()}
+            <div>{renderSection()}</div>
           </div>
         </div>
       </DialogContent>

@@ -18,6 +18,7 @@ import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { ChatList } from './ChatList';
 import { ChatEmptyState } from './ChatEmptyState';
+import { exportChatAsMarkdown } from '@/lib/exportChatMarkdown';
 
 interface ChatPanelProps {
   projectId: string;
@@ -37,6 +38,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
   const [allChats, setAllChats] = useState<ChatMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [exportingChat, setExportingChat] = useState(false);
 
   // Sources state for header display
   const [sources, setSources] = useState<Source[]>([]);
@@ -68,12 +70,50 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
   });
 
   /**
+   * Load sources for the project (for header display)
+   */
+  const loadSources = useCallback(async () => {
+    try {
+      const data = await sourcesAPI.listSources(projectId);
+      setSources(data);
+    } catch (err) {
+      console.error('Error loading sources:', err);
+    }
+  }, [projectId]);
+
+  /**
+   * Load all chats for the project
+   */
+  const loadChats = useCallback(async () => {
+    try {
+      setLoading(true);
+      const chats = await chatsAPI.listChats(projectId);
+      setAllChats(chats);
+
+      // If we have chats and no active chat, load the first one
+      if (chats.length > 0) {
+        setActiveChat(prev => {
+          if (!prev) {
+            loadFullChat(chats[0].id);
+          }
+          return prev;
+        });
+      }
+    } catch (err) {
+      console.error('Error loading chats:', err);
+      error('Failed to load chats');
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, error, loadFullChat]);
+
+  /**
    * Load all chats and sources when component mounts or projectId changes
    */
   useEffect(() => {
     loadChats();
     loadSources();
-  }, [projectId]);
+  }, [loadChats, loadSources]);
 
   /**
    * Refetch sources when sourcesVersion changes
@@ -84,7 +124,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
     if (sourcesVersion !== undefined && sourcesVersion > 0) {
       loadSources();
     }
-  }, [sourcesVersion]);
+  }, [sourcesVersion, loadSources]);
 
   /**
    * Notify parent when studio signals change
@@ -100,42 +140,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
   }, [activeChat, onSignalsChange]);
 
   /**
-   * Load sources for the project (for header display)
-   */
-  const loadSources = async () => {
-    try {
-      const data = await sourcesAPI.listSources(projectId);
-      setSources(data);
-    } catch (err) {
-      console.error('Error loading sources:', err);
-    }
-  };
-
-  /**
-   * Load all chats for the project
-   */
-  const loadChats = async () => {
-    try {
-      setLoading(true);
-      const chats = await chatsAPI.listChats(projectId);
-      setAllChats(chats);
-
-      // If we have chats and no active chat, load the first one
-      if (chats.length > 0 && !activeChat) {
-        await loadFullChat(chats[0].id);
-      }
-    } catch (err) {
-      console.error('Error loading chats:', err);
-      error('Failed to load chats');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
    * Load full chat data including all messages
    */
-  const loadFullChat = async (chatId: string) => {
+  const loadFullChat = useCallback(async (chatId: string) => {
     try {
       const chat = await chatsAPI.getChat(projectId, chatId);
       setActiveChat(chat);
@@ -143,7 +150,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
       console.error('Error loading chat:', err);
       error('Failed to load chat');
     }
-  };
+  }, [projectId, error]);
 
   /**
    * Send a message and get AI response
@@ -208,7 +215,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
             ? { ...prev, studio_signals: updatedChat.studio_signals || [] }
             : prev
           );
-        } catch (e) {
+        } catch {
           // Silently ignore - signal update is non-critical
         }
       }, 1000);
@@ -225,7 +232,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
           setAllChats(prev => prev.map(c =>
             c.id === chatId ? { ...c, title: updatedChat.title } : c
           ));
-        } catch (e) {
+        } catch {
           // Silently ignore - title update is non-critical
         }
       }, 4000);
@@ -320,6 +327,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
     }
   };
 
+  /**
+   * Export the active chat as a Markdown file
+   */
+  const handleExportChat = useCallback(async () => {
+    if (!activeChat) return;
+    setExportingChat(true);
+    try {
+      await exportChatAsMarkdown({ chat: activeChat, projectId, projectName });
+      success('Chat exported as Markdown');
+    } catch (err) {
+      console.error('Error exporting chat:', err);
+      error('Failed to export chat');
+    } finally {
+      setExportingChat(false);
+    }
+  }, [activeChat, projectId, projectName, success, error]);
+
   // Loading state
   if (loading) {
     return (
@@ -399,6 +423,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
         onSelectChat={handleSelectChat}
         onNewChat={handleNewChat}
         onShowChatList={() => setShowChatList(true)}
+        onExportChat={handleExportChat}
+        exportingChat={exportingChat}
       />
 
       <ChatMessages

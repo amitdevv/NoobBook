@@ -12,7 +12,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import { Sparkle, Plus, ChatCircle, CaretDown, Hash, Books } from '@phosphor-icons/react';
+import { Sparkle, Plus, ChatCircle, CaretDown, Hash, Books, DownloadSimple, CircleNotch } from '@phosphor-icons/react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { Button } from '../ui/button';
 import type { Chat, ChatMetadata } from '../../lib/api/chats';
 
 interface ChatHeaderProps {
@@ -23,6 +25,8 @@ interface ChatHeaderProps {
   onSelectChat: (chatId: string) => void;
   onNewChat: () => void;
   onShowChatList: () => void;
+  onExportChat: () => void;
+  exportingChat: boolean;
 }
 
 /**
@@ -37,6 +41,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = React.memo(({
   onSelectChat,
   onNewChat,
   onShowChatList,
+  onExportChat,
+  exportingChat,
 }) => {
   return (
     <div className="border-b px-4 py-3">
@@ -81,10 +87,34 @@ export const ChatHeader: React.FC<ChatHeaderProps> = React.memo(({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        {/* Source count indicator */}
-        <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-md">
-          <Books size={16} className="text-primary" />
-          <span className="text-sm font-medium">{activeSources}/{totalSources}</span>
+        <div className="flex items-center gap-2">
+          {/* Export chat button */}
+          <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onExportChat}
+                disabled={!activeChat || !activeChat.messages?.length || exportingChat}
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+              >
+                {exportingChat ? (
+                  <CircleNotch size={32} weight="bold" className="animate-spin" />
+                ) : (
+                  <DownloadSimple size={32} weight="bold" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Export as Markdown</TooltipContent>
+          </Tooltip>
+          </TooltipProvider>
+
+          {/* Source count indicator */}
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-md">
+            <Books size={16} className="text-primary" />
+            <span className="text-sm font-medium">{activeSources}/{totalSources}</span>
+          </div>
         </div>
       </div>
       {/* Description - matches Sources/Studio */}
