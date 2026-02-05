@@ -23,13 +23,14 @@ import { getAccessToken, clearSession } from '@/lib/auth/session';
 interface AuthUser {
   id: string;
   email: string | null;
+  role: 'admin' | 'user';
 }
 
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: 'admin' | 'user' }>;
+  signup: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: 'admin' | 'user' }>;
   logout: () => Promise<void>;
 }
 
@@ -55,7 +56,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const response = await authAPI.me();
         if (response.success && response.user) {
-          setUser({ id: response.user.id, email: response.user.email || null });
+          setUser({
+            id: response.user.id,
+            email: response.user.email || null,
+            role: response.user.role === 'admin' ? 'admin' : 'user',
+          });
         } else {
           clearSession();
         }
@@ -74,14 +79,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await authAPI.signIn(email, password);
 
       if (result.success && result.user) {
-        setUser({ id: result.user.id, email: result.user.email || null });
-        return { success: true };
+        // Fetch /auth/me to get the user's role
+        const meResponse = await authAPI.me();
+        const role: 'admin' | 'user' = meResponse.user?.role === 'admin' ? 'admin' : 'user';
+        setUser({ id: result.user.id, email: result.user.email || null, role });
+        return { success: true as const, role };
       }
 
-      return { success: false, error: result.error || 'Login failed' };
+      return { success: false as const, error: result.error || 'Login failed' };
     } catch (err: any) {
       const message = err.response?.data?.error || 'Login failed. Please try again.';
-      return { success: false, error: message };
+      return { success: false as const, error: message };
     }
   }, []);
 
@@ -90,14 +98,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await authAPI.signUp(email, password);
 
       if (result.success && result.user) {
-        setUser({ id: result.user.id, email: result.user.email || null });
-        return { success: true };
+        // Fetch /auth/me to get the user's role
+        const meResponse = await authAPI.me();
+        const role: 'admin' | 'user' = meResponse.user?.role === 'admin' ? 'admin' : 'user';
+        setUser({ id: result.user.id, email: result.user.email || null, role });
+        return { success: true as const, role };
       }
 
-      return { success: false, error: result.error || 'Signup failed' };
+      return { success: false as const, error: result.error || 'Signup failed' };
     } catch (err: any) {
       const message = err.response?.data?.error || 'Signup failed. Please try again.';
-      return { success: false, error: message };
+      return { success: false as const, error: message };
     }
   }, []);
 

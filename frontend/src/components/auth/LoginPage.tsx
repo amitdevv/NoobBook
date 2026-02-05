@@ -13,11 +13,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Ghost, EnvelopeSimple, Lock } from '@phosphor-icons/react';
+import { useToast } from '@/components/ui/toast';
 
 type AuthMode = 'login' | 'signup';
 
 export function LoginPage() {
   const { user, loading, login, signup } = useAuth();
+  const { success: showSuccess } = useToast();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,12 +48,16 @@ export function LoginPage() {
     try {
       if (mode === 'login') {
         const result = await login(email, password);
-        if (!result.success) {
+        if (result.success && result.role) {
+          showSuccess(`Welcome! You're signed in as ${result.role === 'admin' ? 'Admin' : 'User'}`);
+        } else if (!result.success) {
           setError(result.error || 'Login failed');
         }
       } else {
         const result = await signup(email, password);
-        if (!result.success) {
+        if (result.success && result.role) {
+          showSuccess(`Welcome! You're signed in as ${result.role === 'admin' ? 'Admin' : 'User'}`);
+        } else if (!result.success) {
           setError(result.error || 'Signup failed');
         }
       }
