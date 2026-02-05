@@ -2,9 +2,7 @@
  * Login / Signup Page
  *
  * Educational Note: This page handles both login and signup modes.
- * It uses a toggle link to switch between them. The signup mode
- * includes a "Signup Key" field — a shared invite code to prevent
- * unauthorized account creation.
+ * It uses a toggle link to switch between them.
  */
 
 import React, { useState } from 'react';
@@ -14,7 +12,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Ghost, EnvelopeSimple, Lock, Key } from '@phosphor-icons/react';
+import { Ghost, EnvelopeSimple, Lock } from '@phosphor-icons/react';
 
 type AuthMode = 'login' | 'signup';
 
@@ -23,10 +21,8 @@ export function LoginPage() {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [signupKey, setSignupKey] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [confirmationMessage, setConfirmationMessage] = useState('');
 
   // If already logged in, redirect to dashboard
   if (!loading && user) {
@@ -45,7 +41,6 @@ export function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setConfirmationMessage('');
     setSubmitting(true);
 
     try {
@@ -55,13 +50,8 @@ export function LoginPage() {
           setError(result.error || 'Login failed');
         }
       } else {
-        const result = await signup(email, password, signupKey);
-        if (result.requiresConfirmation) {
-          setConfirmationMessage(
-            'Account created! Check your email to confirm, then log in.'
-          );
-          setMode('login');
-        } else if (!result.success) {
+        const result = await signup(email, password);
+        if (!result.success) {
           setError(result.error || 'Signup failed');
         }
       }
@@ -83,7 +73,7 @@ export function LoginPage() {
           <CardDescription>
             {mode === 'login'
               ? 'Sign in to your NoobBook account'
-              : 'Enter your details and invite key to get started'}
+              : 'Enter your details to get started'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -92,13 +82,6 @@ export function LoginPage() {
             {error && (
               <div className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
                 {error}
-              </div>
-            )}
-
-            {/* Confirmation message */}
-            {confirmationMessage && (
-              <div className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2">
-                {confirmationMessage}
               </div>
             )}
 
@@ -144,31 +127,6 @@ export function LoginPage() {
                 />
               </div>
             </div>
-
-            {/* Signup Key (only in signup mode) */}
-            {mode === 'signup' && (
-              <div className="space-y-2">
-                <Label htmlFor="signupKey">Invite Key</Label>
-                <div className="relative">
-                  <Key
-                    size={16}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <Input
-                    id="signupKey"
-                    type="text"
-                    placeholder="Enter the invite key"
-                    value={signupKey}
-                    onChange={(e) => setSignupKey(e.target.value)}
-                    className="pl-9"
-                    required
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Ask your team admin for the invite key.
-                </p>
-              </div>
-            )}
 
             {/* Submit */}
             <Button type="submit" className="w-full" disabled={submitting}>
