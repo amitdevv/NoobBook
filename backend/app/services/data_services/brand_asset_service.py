@@ -299,7 +299,7 @@ class BrandAssetService:
         )
 
         # Delete database record
-        self.supabase.table(self.table).delete().eq("id", asset_id).execute()
+        self.supabase.table(self.table).delete().eq("id", asset_id).eq("project_id", project_id).execute()
 
         print(f"Deleted brand asset: {asset_id}")
         return True
@@ -332,7 +332,7 @@ class BrandAssetService:
         # Set this asset as primary
         self.supabase.table(self.table).update({
             "is_primary": True
-        }).eq("id", asset_id).execute()
+        }).eq("id", asset_id).eq("project_id", project_id).execute()
 
         print(f"Set primary {asset_type}: {asset_id}")
         return True

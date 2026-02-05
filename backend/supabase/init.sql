@@ -14,21 +14,33 @@ CREATE EXTENSION IF NOT EXISTS "vector";
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT UNIQUE,
+  role TEXT NOT NULL DEFAULT 'user',
   memory JSONB DEFAULT '{}'::jsonb,
   settings JSONB DEFAULT '{}'::jsonb,
   google_tokens JSONB DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT valid_user_role CHECK (role IN ('admin', 'user'))
 );
 
+-- Backfill/migrate role column for existing installations
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user';
+
 -- Default user for single-user mode
-INSERT INTO users (id, email, memory, settings)
+INSERT INTO users (id, email, role, memory, settings)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
   'local@noobbook.local',
+  'admin',
   '{}'::jsonb,
   '{}'::jsonb
 ) ON CONFLICT (id) DO NOTHING;
+
+-- Ensure the default user is admin (for single-user mode)
+UPDATE users
+SET role = 'admin'
+WHERE id = '00000000-0000-0000-0000-000000000001'
+  AND role <> 'admin';
 
 -- ============================================================================
 -- PROJECTS TABLE

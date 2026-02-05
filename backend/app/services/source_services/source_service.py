@@ -369,6 +369,7 @@ class SourceService:
         connection_id: str,
         name: Optional[str] = None,
         description: str = "",
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Add a database source (Postgres/MySQL) to a project.
@@ -377,6 +378,14 @@ class SourceService:
         `.database` metadata file in Supabase Storage and triggers processing
         to fetch a schema snapshot + embeddings.
         """
+        if user_id:
+            return add_database_source(
+                project_id,
+                connection_id,
+                name,
+                description,
+                user_id=user_id,
+            )
         return add_database_source(project_id, connection_id, name, description)
 
     # =========================================================================

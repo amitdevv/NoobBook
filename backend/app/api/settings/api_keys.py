@@ -41,6 +41,7 @@ Routes:
 from flask import jsonify, request, current_app
 from app.api.settings import settings_bp
 from app.services.app_settings import EnvService, ValidationService
+from app.services.auth.rbac import require_admin
 
 # Initialize services
 env_service = EnvService()
@@ -126,6 +127,7 @@ API_KEYS_CONFIG = [
 
 
 @settings_bp.route('/settings/api-keys', methods=['GET'])
+@require_admin
 def get_api_keys():
     """
     Get all API keys (with values masked for security).
@@ -181,6 +183,7 @@ def get_api_keys():
 
 
 @settings_bp.route('/settings/api-keys', methods=['POST'])
+@require_admin
 def update_api_keys():
     """
     Update API keys in the .env file and trigger Flask reload.
@@ -258,6 +261,7 @@ def update_api_keys():
 
 
 @settings_bp.route('/settings/api-keys/<key_id>', methods=['DELETE'])
+@require_admin
 def delete_api_key(key_id):
     """
     Delete a specific API key from the .env file.
@@ -299,6 +303,7 @@ def delete_api_key(key_id):
 
 
 @settings_bp.route('/settings/api-keys/validate', methods=['POST'])
+@require_admin
 def validate_api_key():
     """
     Validate an API key by making a test request to the service.

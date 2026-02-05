@@ -305,6 +305,7 @@ class ChatService:
             self.supabase.table(self.table)
             .update(filtered_updates)
             .eq("id", chat_id)
+            .eq("project_id", project_id)
             .execute()
         )
 
@@ -355,7 +356,7 @@ class ChatService:
             return False
 
         # Delete the chat (messages and signals cascade automatically)
-        self.supabase.table(self.table).delete().eq("id", chat_id).execute()
+        self.supabase.table(self.table).delete().eq("id", chat_id).eq("project_id", project_id).execute()
 
         print(f"Deleted chat: {chat_id}")
         return True

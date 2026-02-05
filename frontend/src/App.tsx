@@ -3,9 +3,9 @@ import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-rout
 import { Dashboard, CreateProjectDialog } from './components/dashboard';
 import { ProjectWorkspace } from './components/project';
 import { BrandPage } from './components/brand/BrandPage';
-import { LoginPage, ProtectedRoute } from './components/auth';
-import { AuthProvider } from './hooks/useAuth';
 import { projectsAPI } from './lib/api';
+import { AuthPage } from './components/auth/AuthPage';
+import { authAPI } from './lib/api/auth';
 
 /**
  * Main App Component for NoobBook
@@ -33,6 +33,12 @@ interface AppContentProps {
   setShowCreateDialog: (show: boolean) => void;
   refreshTrigger: number;
   setRefreshTrigger: (fn: (prev: number) => number) => void;
+  isAdmin: boolean;
+  isAuthenticated: boolean;
+  onSignOut: () => Promise<void>;
+  userId: string;
+  userEmail: string | null;
+  userRole: string;
 }
 
 /**
@@ -45,6 +51,12 @@ function AppContent({
   setShowCreateDialog,
   refreshTrigger,
   setRefreshTrigger,
+  isAdmin,
+  isAuthenticated,
+  onSignOut,
+  userId,
+  userEmail,
+  userRole,
 }: AppContentProps) {
   const navigate = useNavigate();
 
@@ -66,6 +78,12 @@ function AppContent({
         onSelectProject={handleSelectProject}
         onCreateNewProject={() => setShowCreateDialog(true)}
         refreshTrigger={refreshTrigger}
+        isAdmin={isAdmin}
+        isAuthenticated={isAuthenticated}
+        onSignOut={onSignOut}
+        userId={userId}
+        userEmail={userEmail}
+        userRole={userRole}
       />
 
       {showCreateDialog && (
@@ -85,8 +103,12 @@ function AppContent({
  */
 function ProjectWorkspaceRoute({
   setRefreshTrigger,
+  isAuthenticated,
+  onSignOut,
 }: {
   setRefreshTrigger: (fn: (prev: number) => number) => void;
+  isAuthenticated: boolean;
+  onSignOut: () => Promise<void>;
 }) {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -153,6 +175,7 @@ function ProjectWorkspaceRoute({
       onDeleteProject={handleDeleteProject}
       onNavigateToBrand={handleNavigateToBrand}
       onRenameProject={handleRenameProject}
+      onSignOut={isAuthenticated ? onSignOut : undefined}
     />
   );
 }
@@ -160,45 +183,98 @@ function ProjectWorkspaceRoute({
 function App() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [authReady, setAuthReady] = useState(false);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [userId, setUserId] = useState('');
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState('user');
+
+  const refreshAuth = async () => {
+    try {
+      const res = await authAPI.me();
+      setAuthRequired(Boolean(res?.auth_required));
+      setIsAuthenticated(Boolean(res?.user?.is_authenticated));
+      setIsAdmin(Boolean(res?.user?.is_admin));
+      setUserId(res?.user?.id || '');
+      setUserEmail(res?.user?.email || null);
+      setUserRole(res?.user?.role || 'user');
+    } catch (err) {
+      console.error('Auth check failed:', err);
+      setAuthRequired(false);
+      setIsAuthenticated(false);
+      setIsAdmin(false);
+      setUserId('');
+      setUserEmail(null);
+      setUserRole('user');
+    } finally {
+      setAuthReady(true);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await authAPI.signOut();
+    setIsAuthenticated(false);
+    setIsAdmin(false);
+    setUserId('');
+    setUserEmail(null);
+    setUserRole('user');
+  };
+
+  useEffect(() => {
+    refreshAuth();
+  }, []);
+
+  if (!authReady) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (authRequired && !isAuthenticated) {
+    return <AuthPage onAuthenticated={refreshAuth} />;
+  }
 
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          {/* Public route - Login/Signup */}
-          <Route path="/login" element={<LoginPage />} />
+      <Routes>
+        {/* Brand Kit Page - Full page for brand management */}
+        <Route path="/projects/:projectId/brand" element={<BrandPage />} />
 
-          {/* Protected routes - require authentication */}
-          <Route path="/projects/:projectId/brand" element={
-            <ProtectedRoute><BrandPage /></ProtectedRoute>
-          } />
+        {/* Project Workspace - URL-based routing */}
+        <Route
+          path="/projects/:projectId"
+          element={
+            <ProjectWorkspaceRoute
+              setRefreshTrigger={setRefreshTrigger}
+              isAuthenticated={isAuthenticated}
+              onSignOut={handleSignOut}
+            />
+          }
+        />
 
-          <Route
-            path="/projects/:projectId"
-            element={
-              <ProtectedRoute>
-                <ProjectWorkspaceRoute
-                  setRefreshTrigger={setRefreshTrigger}
-                />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="*"
-            element={
-              <ProtectedRoute>
-                <AppContent
-                  showCreateDialog={showCreateDialog}
-                  setShowCreateDialog={setShowCreateDialog}
-                  refreshTrigger={refreshTrigger}
-                  setRefreshTrigger={setRefreshTrigger}
-                />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </AuthProvider>
+        {/* Dashboard - Home/root route */}
+        <Route
+          path="*"
+          element={
+            <AppContent
+              showCreateDialog={showCreateDialog}
+              setShowCreateDialog={setShowCreateDialog}
+              refreshTrigger={refreshTrigger}
+              setRefreshTrigger={setRefreshTrigger}
+              isAdmin={isAdmin}
+              isAuthenticated={isAuthenticated}
+              onSignOut={handleSignOut}
+              userId={userId}
+              userEmail={userEmail}
+              userRole={userRole}
+            />
+          }
+        />
+      </Routes>
     </BrowserRouter>
   );
 }

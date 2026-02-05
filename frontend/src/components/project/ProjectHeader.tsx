@@ -27,7 +27,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '../ui/collapsible';
-import { ArrowLeft, DotsThreeVertical, Plus, Trash, FolderOpen, Gear, CircleNotch, CurrencyDollar, Brain, CaretDown, CaretRight, Palette, PencilSimple } from '@phosphor-icons/react';
+import { ArrowLeft, DotsThreeVertical, Plus, Trash, FolderOpen, Gear, CircleNotch, CurrencyDollar, Brain, CaretDown, CaretRight, Palette, PencilSimple, SignOut } from '@phosphor-icons/react';
 import { Input } from '../ui/input';
 import { chatsAPI, type PromptConfig } from '../../lib/api/chats';
 import { projectsAPI, type CostTracking, type MemoryData } from '../../lib/api';
@@ -50,6 +50,7 @@ interface ProjectHeaderProps {
   costsVersion?: number; // Increment to trigger cost refresh
   onNavigateToBrand?: (projectId: string) => void;
   onRename?: (newName: string) => Promise<void>;
+  onSignOut?: () => Promise<void>;
 }
 
 export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
@@ -59,6 +60,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   costsVersion,
   onNavigateToBrand,
   onRename,
+  onSignOut,
 }) => {
   const { toasts, dismissToast, error } = useToast();
 
@@ -365,6 +367,18 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
           <Gear size={16} />
           Project Settings
         </Button>
+
+        {onSignOut ? (
+          <Button
+            variant="soft"
+            size="sm"
+            onClick={onSignOut}
+            className="gap-2"
+          >
+            <SignOut size={16} />
+            Sign out
+          </Button>
+        ) : null}
 
         <Button
           variant="soft"

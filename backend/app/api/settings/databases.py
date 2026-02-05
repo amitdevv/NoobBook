@@ -15,18 +15,20 @@ Routes:
 from flask import jsonify, request, current_app
 
 from app.api.settings import settings_bp
-from app.services.data_services.database_connection_service import (
-    database_connection_service,
-    DEFAULT_USER_ID,
-)
+from app.services.auth.rbac import require_admin
+from app.services.data_services.database_connection_service import database_connection_service, DEFAULT_USER_ID
+from app.services.auth.rbac import get_request_identity
 
 
 @settings_bp.route("/settings/databases", methods=["GET"])
 def list_databases():
     """List database connections available to the current user (masked)."""
     try:
-        # Single-user mode for now
-        connections = database_connection_service.list_connections(user_id=DEFAULT_USER_ID)
+        identity = get_request_identity()
+        # Single-user mode still uses DEFAULT_USER_ID for ownership/scoping,
+        # but we return masked URIs so non-admins can attach allowed connections.
+        user_id = DEFAULT_USER_ID if not identity.is_authenticated else identity.user_id
+        connections = database_connection_service.list_connections(user_id=user_id)
         return jsonify({"success": True, "databases": connections, "count": len(connections)}), 200
     except Exception as e:
         current_app.logger.error(f"Error listing databases: {e}")
@@ -34,6 +36,7 @@ def list_databases():
 
 
 @settings_bp.route("/settings/databases", methods=["POST"])
+@require_admin
 def create_database():
     """Create a new database connection."""
     try:
@@ -56,12 +59,13 @@ def create_database():
         if not validation.get("valid"):
             return jsonify({"success": False, "error": validation.get("message", "Validation failed")}), 400
 
+        identity = get_request_identity()
         created = database_connection_service.create_connection(
             name=name,
             db_type=db_type,
             connection_uri=connection_uri,
             description=description,
-            user_id=DEFAULT_USER_ID,
+            user_id=identity.user_id,
         )
 
         return jsonify({"success": True, "database": created}), 201
@@ -73,10 +77,12 @@ def create_database():
 
 
 @settings_bp.route("/settings/databases/<connection_id>", methods=["DELETE"])
+@require_admin
 def delete_database(connection_id: str):
     """Delete a database connection (owner only in single-user mode)."""
     try:
-        ok = database_connection_service.delete_connection(connection_id, user_id=DEFAULT_USER_ID)
+        identity = get_request_identity()
+        ok = database_connection_service.delete_connection(connection_id, user_id=identity.user_id)
         if not ok:
             return jsonify({"success": False, "error": "Database connection not found"}), 404
         return jsonify({"success": True, "message": "Database connection deleted"}), 200
@@ -86,6 +92,7 @@ def delete_database(connection_id: str):
 
 
 @settings_bp.route("/settings/databases/validate", methods=["POST"])
+@require_admin
 def validate_database():
     """Validate a database connection without saving it."""
     try:
@@ -98,4 +105,3 @@ def validate_database():
     except Exception as e:
         current_app.logger.error(f"Error validating database connection: {e}")
         return jsonify({"success": False, "valid": False, "message": str(e)}), 500
-

@@ -154,7 +154,7 @@ class ProjectService:
         # Update last accessed time
         self.supabase.table(self.table).update({
             "last_accessed": datetime.now().isoformat()
-        }).eq("id", project_id).execute()
+        }).eq("id", project_id).eq("user_id", uid).execute()
 
         return project
 
@@ -179,14 +179,15 @@ class ProjectService:
         Raises:
             ValueError: If new name conflicts with existing project
         """
+        uid = _resolve_user_id(user_id)
+
         # Check if project exists
-        project = self.get_project(project_id)
+        project = self.get_project(project_id, user_id=user_id)
         if not project:
             return None
 
         # Check if new name conflicts with existing project for this user
         if name and name != project["name"]:
-            uid = _resolve_user_id(user_id)
             existing = (
                 self.supabase.table(self.table)
                 .select("id")
@@ -213,6 +214,7 @@ class ProjectService:
             self.supabase.table(self.table)
             .update(update_data)
             .eq("id", project_id)
+            .eq("user_id", uid)
             .execute()
         )
 
@@ -252,7 +254,7 @@ class ProjectService:
             return False
 
         # Delete the project
-        self.supabase.table(self.table).delete().eq("id", project_id).execute()
+        self.supabase.table(self.table).delete().eq("id", project_id).eq("user_id", uid).execute()
 
         print(f"Deleted project: {project_id}")
         return True
@@ -310,6 +312,7 @@ class ProjectService:
             self.supabase.table(self.table)
             .update({"custom_prompt": custom_prompt})
             .eq("id", project_id)
+            .eq("user_id", uid)
             .execute()
         )
 
@@ -381,7 +384,12 @@ class ProjectService:
             "by_model": {}
         })
 
-    def update_project_costs(self, project_id: str, costs: Dict[str, Any]) -> bool:
+    def update_project_costs(
+        self,
+        project_id: str,
+        costs: Dict[str, Any],
+        user_id: Optional[str] = None,
+    ) -> bool:
         """
         Update the project's API usage costs.
 
@@ -392,10 +400,12 @@ class ProjectService:
         Returns:
             True if updated, False if project not found
         """
+        uid = _resolve_user_id(user_id)
         response = (
             self.supabase.table(self.table)
             .update({"costs": costs})
             .eq("id", project_id)
+            .eq("user_id", uid)
             .execute()
         )
 
@@ -426,7 +436,12 @@ class ProjectService:
 
         return response.data[0].get("memory", {})
 
-    def update_project_memory(self, project_id: str, memory: Dict[str, Any]) -> bool:
+    def update_project_memory(
+        self,
+        project_id: str,
+        memory: Dict[str, Any],
+        user_id: Optional[str] = None,
+    ) -> bool:
         """
         Update the project's memory.
 
@@ -437,10 +452,12 @@ class ProjectService:
         Returns:
             True if updated, False if project not found
         """
+        uid = _resolve_user_id(user_id)
         response = (
             self.supabase.table(self.table)
             .update({"memory": memory})
             .eq("id", project_id)
+            .eq("user_id", uid)
             .execute()
         )
 
@@ -519,6 +536,31 @@ class ProjectService:
             "last_accessed": project.get("last_accessed", project["updated_at"]),
             "costs": project.get("costs", {})
         }
+
+    def get_project_owner_id(self, project_id: str) -> Optional[str]:
+        """Get the owning user_id for a project (internal use)."""
+        response = (
+            self.supabase.table(self.table)
+            .select("user_id")
+            .eq("id", project_id)
+            .execute()
+        )
+        if not response.data:
+            return None
+        return response.data[0].get("user_id")
+
+    def has_project_access(self, project_id: str, user_id: str) -> bool:
+        """Check if a user owns the project."""
+        if not project_id or not user_id:
+            return False
+        response = (
+            self.supabase.table(self.table)
+            .select("id")
+            .eq("id", project_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return bool(response.data)
 
 
 # Singleton instance

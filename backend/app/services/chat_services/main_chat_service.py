@@ -27,6 +27,9 @@ from app.services.tool_executors import studio_signal_executor
 from app.services.integrations.knowledge_bases import knowledge_base_service
 from app.services.ai_services.chat_naming_service import chat_naming_service
 from app.services.background_services import task_service
+from flask import has_request_context
+from app.services.auth.rbac import get_request_identity
+from app.services.data_services.project_service import DEFAULT_USER_ID
 from app.utils import claude_parsing_utils
 
 
@@ -125,7 +128,12 @@ class MainChatService:
 
         return tools
 
-    def _build_system_prompt(self, project_id: str, base_prompt: str) -> str:
+    def _build_system_prompt(
+        self,
+        project_id: str,
+        base_prompt: str,
+        user_id: Optional[str] = None,
+    ) -> str:
         """
         Build system prompt with memory and source context appended.
 
@@ -133,7 +141,7 @@ class MainChatService:
         current state (memory updates, active/inactive sources).
         Includes both memory context (personalization) and source context (tools).
         """
-        full_context = context_loader.build_full_context(project_id)
+        full_context = context_loader.build_full_context(project_id, user_id=user_id)
         if full_context:
             return base_prompt + "\n" + full_context
         return base_prompt
@@ -143,7 +151,8 @@ class MainChatService:
         project_id: str,
         chat_id: str,
         tool_name: str,
-        tool_input: Dict[str, Any]
+        tool_input: Dict[str, Any],
+        user_id: Optional[str] = None,
     ) -> str:
         """
         Execute a tool and return result string.
@@ -172,7 +181,8 @@ class MainChatService:
                 project_id=project_id,
                 user_memory=tool_input.get("user_memory"),
                 project_memory=tool_input.get("project_memory"),
-                why_generated=tool_input.get("why_generated", "")
+                why_generated=tool_input.get("why_generated", ""),
+                user_id=user_id,
             )
             if result.get("success"):
                 return result.get("message", "Memory stored successfully")
@@ -258,6 +268,9 @@ class MainChatService:
         Returns:
             Tuple of (user_message_dict, assistant_message_dict)
         """
+        identity = get_request_identity() if has_request_context() else None
+        user_id = identity.user_id if identity else DEFAULT_USER_ID
+
         # Verify chat exists
         chat = chat_service.get_chat(project_id, chat_id)
         if not chat:
@@ -269,7 +282,7 @@ class MainChatService:
         # Step 2: Get config and build system prompt
         prompt_config = prompt_loader.get_project_prompt_config(project_id)
         base_prompt = prompt_config.get("system_prompt", "")
-        system_prompt = self._build_system_prompt(project_id, base_prompt)
+        system_prompt = self._build_system_prompt(project_id, base_prompt, user_id=user_id)
 
         # Step 3: Get tools (memory always available, search for non-CSV, analyzer for CSV)
         active_sources = context_loader.get_active_sources(project_id)
@@ -349,7 +362,13 @@ class MainChatService:
                     print(f"Executing tool: {tool_name} for source: {tool_input.get('source_id', 'unknown')}")
 
                     # Execute tool
-                    result = self._execute_tool(project_id, chat_id, tool_name, tool_input)
+                    result = self._execute_tool(
+                        project_id,
+                        chat_id,
+                        tool_name,
+                        tool_input,
+                        user_id=user_id,
+                    )
 
                     # Add tool result as user message
                     message_service.add_tool_result_message(

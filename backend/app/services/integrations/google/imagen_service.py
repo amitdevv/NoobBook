@@ -49,7 +49,7 @@ class ImagenService:
             if not api_key:
                 raise ValueError(
                     "NANO_BANANA_API_KEY not found in environment. "
-                    "Please configure it in App Settings."
+                    "Please configure it in Admin Settings."
                 )
 
             from google import genai

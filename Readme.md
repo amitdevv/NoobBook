@@ -194,6 +194,29 @@ You'll need these before the app will work:
 
 ---
 
+### Auth & Roles (RBAC)
+
+NoobBook supports two roles:
+- **admin**: can view/update secrets and app-level settings
+- **user**: can chat, use studio, and manage projects
+
+Configure in `docker/.env`:
+```
+NOOBBOOK_AUTH_REQUIRED=false   # set true to require login for all API routes
+NOOBBOOK_ADMIN_EMAILS=you@company.com,admin@company.com
+```
+
+First signup becomes admin if no admins exist (or if email is in `NOOBBOOK_ADMIN_EMAILS`).
+
+Optional local bootstrap (creates or resets an admin user on startup):
+```
+NOOBBOOK_BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+NOOBBOOK_BOOTSTRAP_ADMIN_PASSWORD=Admin123!
+NOOBBOOK_BOOTSTRAP_ADMIN_FORCE_RESET=true
+```
+
+---
+
 ### Option A: Docker Setup (Recommended)
 
 One script starts everything — Supabase, database migrations, backend, and frontend.

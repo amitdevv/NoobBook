@@ -1,74 +1,80 @@
-/**
- * Auth API Service + Token Storage
- *
- * Educational Note: This module handles all authentication-related API calls
- * and manages JWT tokens in localStorage. Tokens are stored client-side so
- * they persist across page refreshes and browser sessions.
- *
- * Token Flow:
- * 1. User logs in → backend returns access_token + refresh_token
- * 2. Tokens stored in localStorage
- * 3. Every API request includes access_token via interceptor (client.ts)
- * 4. When access_token expires, refresh_token is used to get a new one
- */
-
 import { api } from './client';
+import { setSession, clearSession } from '../auth/session';
 
-// ==================== Token Storage ====================
-
-const TOKEN_KEY = 'noobbook_access_token';
-const REFRESH_TOKEN_KEY = 'noobbook_refresh_token';
-
-export const tokenStorage = {
-  getAccessToken: (): string | null => localStorage.getItem(TOKEN_KEY),
-  getRefreshToken: (): string | null => localStorage.getItem(REFRESH_TOKEN_KEY),
-
-  setTokens: (accessToken: string, refreshToken: string) => {
-    localStorage.setItem(TOKEN_KEY, accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-  },
-
-  clearTokens: () => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-  },
-};
-
-// ==================== Auth Types ====================
-
-interface AuthUser {
-  id: string;
-  email: string;
-}
-
-interface AuthResponse {
+export interface MeResponse {
   success: boolean;
-  user?: AuthUser;
-  access_token?: string;
-  refresh_token?: string;
-  expires_in?: number;
-  requires_confirmation?: boolean;
-  error?: string;
-  message?: string;
+  auth_required?: boolean;
+  user: {
+    id: string;
+    email?: string | null;
+    role: 'admin' | 'user' | string;
+    is_admin: boolean;
+    is_authenticated: boolean;
+  };
 }
 
-// ==================== Auth API ====================
+export interface AuthResponse {
+  success: boolean;
+  user?: {
+    id: string;
+    email?: string | null;
+  };
+  session?: {
+    access_token?: string | null;
+    refresh_token?: string | null;
+    expires_in?: number | null;
+    token_type?: string | null;
+  };
+  error?: string;
+}
 
 export const authAPI = {
-  signup: (email: string, password: string, signupKey: string) =>
-    api.post<AuthResponse>('/auth/signup', {
-      email,
-      password,
-      signup_key: signupKey,
-    }),
+  async me(): Promise<MeResponse> {
+    const response = await api.get('/auth/me');
+    return response.data as MeResponse;
+  },
 
-  login: (email: string, password: string) =>
-    api.post<AuthResponse>('/auth/login', { email, password }),
+  async signIn(email: string, password: string): Promise<AuthResponse> {
+    try {
+      const response = await api.post('/auth/signin', { email, password });
+      const data = response.data as AuthResponse;
+      if (data?.session?.access_token) {
+        setSession(data.session.access_token, data.session.refresh_token);
+      }
+      return data;
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Sign in failed';
+      return { success: false, error: message };
+    }
+  },
 
-  logout: () => api.post('/auth/logout'),
+  async signUp(email: string, password: string): Promise<AuthResponse> {
+    try {
+      const response = await api.post('/auth/signup', { email, password });
+      const data = response.data as AuthResponse;
+      if (data?.session?.access_token) {
+        setSession(data.session.access_token, data.session.refresh_token);
+      }
+      return data;
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Sign up failed';
+      return { success: false, error: message };
+    }
+  },
 
-  getMe: () => api.get<{ success: boolean; user: AuthUser }>('/auth/me'),
-
-  refresh: (refreshToken: string) =>
-    api.post<AuthResponse>('/auth/refresh', { refresh_token: refreshToken }),
+  async signOut(): Promise<void> {
+    try {
+      await api.post('/auth/signout');
+    } finally {
+      clearSession();
+    }
+  },
 };

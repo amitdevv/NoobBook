@@ -28,6 +28,7 @@ from typing import Optional
 from flask import jsonify, request, current_app
 from app.api.google import google_bp
 from app.services.integrations.google import google_drive_service
+from app.services.auth.rbac import get_request_identity
 from app.services.source_services import source_service
 from app.utils.path_utils import get_raw_dir
 
@@ -39,8 +40,10 @@ def _get_current_user_id() -> Optional[str]:
     Returns:
         User ID string or None for default user
     """
-    # TODO: For multi-user mode, extract user_id from JWT/session
-    return None  # Single-user mode: use default user
+    identity = get_request_identity()
+    if identity.is_authenticated:
+        return identity.user_id
+    return None
 
 
 @google_bp.route('/google/files', methods=['GET'])

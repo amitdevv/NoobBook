@@ -58,6 +58,16 @@ class MessageService:
         Returns:
             List of message dicts
         """
+        chat_check = (
+            self.supabase.table(self.chats_table)
+            .select("id")
+            .eq("id", chat_id)
+            .eq("project_id", project_id)
+            .execute()
+        )
+        if not chat_check.data:
+            return []
+
         response = (
             self.supabase.table(self.table)
             .select("*")
@@ -97,6 +107,7 @@ class MessageService:
             self.supabase.table(self.chats_table)
             .select("id")
             .eq("id", chat_id)
+            .eq("project_id", project_id)
             .execute()
         )
 
@@ -142,7 +153,7 @@ class MessageService:
             # Update chat's updated_at timestamp
             self.supabase.table(self.chats_table).update({
                 "updated_at": datetime.now().isoformat()
-            }).eq("id", chat_id).execute()
+            }).eq("id", chat_id).eq("project_id", project_id).execute()
 
             # Format message for frontend (extract text from JSONB)
             return self._format_message_for_frontend(message)
@@ -385,6 +396,7 @@ class MessageService:
             self.supabase.table(self.chats_table)
             .update(filtered_updates)
             .eq("id", chat_id)
+            .eq("project_id", project_id)
             .execute()
         )
 

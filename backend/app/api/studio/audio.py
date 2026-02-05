@@ -71,7 +71,7 @@ def generate_audio_overview(project_id: str):
         if not tts_service.is_configured():
             return jsonify({
                 'success': False,
-                'error': 'ElevenLabs API key not configured. Please add it in App Settings.'
+                'error': 'ElevenLabs API key not configured. Please add it in Admin Settings.'
             }), 400
 
         # Get source info for the job record
