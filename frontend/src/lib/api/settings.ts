@@ -194,12 +194,44 @@ class UsersAPI {
     }
   }
 
+  async createUser(email: string, role: 'admin' | 'user' = 'user'): Promise<{ user: UserSummary; password: string }> {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/settings/users`, { email, role });
+      return {
+        user: response.data.user,
+        password: response.data.password,
+      };
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
+    }
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    try {
+      await axios.delete(`${API_BASE_URL}/settings/users/${userId}`);
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      throw error;
+    }
+  }
+
   async updateUserRole(userId: string, role: 'admin' | 'user'): Promise<UserSummary> {
     try {
       const response = await axios.put(`${API_BASE_URL}/settings/users/${userId}/role`, { role });
       return response.data.user;
     } catch (error) {
       console.error('Error updating user role:', error);
+      throw error;
+    }
+  }
+
+  async resetPassword(userId: string): Promise<{ password: string }> {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/settings/users/${userId}/reset-password`);
+      return { password: response.data.password };
+    } catch (error) {
+      console.error('Error resetting password:', error);
       throw error;
     }
   }

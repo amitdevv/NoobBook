@@ -32,6 +32,9 @@ interface DashboardProps {
   isAdmin: boolean;
   isAuthenticated: boolean;
   onSignOut: () => Promise<void>;
+  userId: string;
+  userEmail: string | null;
+  userRole: string;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -41,6 +44,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   isAdmin,
   isAuthenticated,
   onSignOut,
+  userId,
+  userEmail,
+  userRole,
 }) => {
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const { toasts, dismissToast } = useToast();
@@ -70,7 +76,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 Sign out
               </Button>
             ) : null}
-            {isAdmin ? (
+            {isAuthenticated ? (
               <Button
                 variant="soft"
                 size="sm"
@@ -78,7 +84,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 className="gap-2"
               >
                 <Gear size={16} />
-                Admin Settings
+                {isAdmin ? 'Admin Settings' : 'Settings'}
               </Button>
             ) : null}
           </div>
@@ -164,10 +170,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </main>
 
-      {/* Admin Settings Dialog */}
-      {isAdmin ? (
-        <AppSettings open={appSettingsOpen} onOpenChange={setAppSettingsOpen} />
-      ) : null}
+      {/* Settings Dialog */}
+      <AppSettings
+        open={appSettingsOpen}
+        onOpenChange={setAppSettingsOpen}
+        userId={userId}
+        userEmail={userEmail}
+        userRole={userRole}
+      />
     </div>
   );
 };
