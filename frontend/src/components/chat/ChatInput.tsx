@@ -38,13 +38,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     : message;
 
   // Auto-resize textarea based on content
+  // Educational Note: Wrapping in requestAnimationFrame batches both height changes
+  // (reset to 'auto' + set to scrollHeight) into a single paint cycle, preventing
+  // visible cursor flicker / layout reflow on every keystroke.
   useEffect(() => {
     const textarea = textareaRef.current;
-    if (textarea) {
+    if (!textarea) return;
+
+    const frameId = requestAnimationFrame(() => {
       textarea.style.height = 'auto';
-      // Max height of ~4 lines (approx 100px), min height of 40px
       textarea.style.height = `${Math.min(textarea.scrollHeight, 100)}px`;
-    }
+    });
+
+    return () => cancelAnimationFrame(frameId);
   }, [displayMessage]);
 
   // Handle key down - Enter sends, Shift+Enter adds new line

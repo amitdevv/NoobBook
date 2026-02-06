@@ -14,7 +14,6 @@ import { AudioProgressIndicator } from '../audio/AudioProgressIndicator';
 export const AudioSection: React.FC = () => {
   const { projectId, registerGenerationHandler } = useStudioContext();
 
-  // All audio state is owned here - not in parent
   const {
     savedAudioJobs,
     currentAudioJob,
@@ -38,15 +37,12 @@ export const AudioSection: React.FC = () => {
     formatDuration,
   } = useAudioGeneration(projectId);
 
-  // Filter jobs by valid source IDs using O(1) Set lookup
   const filteredJobs = useFilteredJobs(savedAudioJobs);
 
-  // Load saved jobs on mount
   useEffect(() => {
     loadSavedJobs();
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Register generation handler with context
   const handleGenerate = useCallback(async (signal: Parameters<typeof handleAudioGeneration>[0]) => {
     await handleAudioGeneration(signal);
   }, [handleAudioGeneration]);
@@ -55,14 +51,12 @@ export const AudioSection: React.FC = () => {
     registerGenerationHandler('audio_overview', handleGenerate);
   }, [registerGenerationHandler, handleGenerate]);
 
-  // Don't render anything if no jobs and not generating
   if (filteredJobs.length === 0 && !isGeneratingAudio) {
     return null;
   }
 
   return (
     <>
-      {/* Hidden audio element for playback */}
       <audio
         ref={audioRef}
         onEnded={handleAudioEnd}
@@ -71,12 +65,10 @@ export const AudioSection: React.FC = () => {
         className="hidden"
       />
 
-      {/* Progress indicator when generating */}
       {isGeneratingAudio && (
         <AudioProgressIndicator currentAudioJob={currentAudioJob} />
       )}
 
-      {/* List of saved audio jobs */}
       {filteredJobs.map((job) => (
         <AudioListItem
           key={job.id}

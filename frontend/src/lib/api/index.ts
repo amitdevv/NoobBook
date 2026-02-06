@@ -10,6 +10,9 @@
 // Core API client
 export { api, API_BASE_URL } from './client';
 
+// Auth API
+export { authAPI } from './auth';
+
 // Projects API
 export { projectsAPI } from './projects';
 export type { MemoryData, ModelCostBreakdown, CostTracking } from './projects';

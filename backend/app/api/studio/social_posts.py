@@ -47,6 +47,8 @@ def generate_social_posts(project_id: str):
     Request Body:
         - topic: Topic/content to create posts about (required)
         - direction: Optional guidance for the style/focus
+        - platforms: Optional list of platforms to generate for (default: all 3)
+                     Valid values: 'linkedin', 'instagram', 'twitter'
 
     Response:
         - success: Boolean
@@ -65,6 +67,16 @@ def generate_social_posts(project_id: str):
 
         direction = data.get('direction', 'Create engaging social media posts for this topic.')
 
+        # Validate platforms parameter
+        valid_platforms = {'linkedin', 'instagram', 'twitter'}
+        platforms = data.get('platforms', list(valid_platforms))
+        platforms = [p.lower() for p in platforms if p.lower() in valid_platforms]
+        if not platforms:
+            return jsonify({
+                'success': False,
+                'error': 'At least one valid platform is required (linkedin, instagram, twitter)'
+            }), 400
+
         # Check if Gemini is configured
         if not imagen_service.is_configured():
             return jsonify({
@@ -78,7 +90,8 @@ def generate_social_posts(project_id: str):
             project_id=project_id,
             job_id=job_id,
             topic=topic,
-            direction=direction
+            direction=direction,
+            platforms=platforms
         )
 
         # Submit background task
@@ -89,7 +102,8 @@ def generate_social_posts(project_id: str):
             project_id=project_id,
             job_id=job_id,
             topic=topic,
-            direction=direction
+            direction=direction,
+            platforms=platforms
         )
 
         return jsonify({

@@ -36,6 +36,7 @@ export interface SocialPostJob {
   id: string;
   topic: string;
   direction: string;
+  platforms?: string[];
   status: JobStatus;
   progress: string;
   error: string | null;
@@ -88,7 +89,8 @@ export const socialPostsAPI = {
   async startGeneration(
     projectId: string,
     topic: string,
-    direction?: string
+    direction?: string,
+    platforms?: string[]
   ): Promise<StartSocialPostsResponse> {
     try {
       const response = await axios.post(
@@ -96,6 +98,7 @@ export const socialPostsAPI = {
         {
           topic: topic,
           direction: direction || 'Create engaging social media posts for this topic.',
+          ...(platforms && { platforms }),
         }
       );
       return response.data;

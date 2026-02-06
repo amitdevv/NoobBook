@@ -1,8 +1,11 @@
 """
-Identity endpoints.
+Identity and authentication endpoints.
 
 Routes:
-- GET /auth/me - return current user's identity + RBAC role
+- GET  /auth/me      - return current user's identity + RBAC role
+- POST /auth/signup  - Create new user account
+- POST /auth/signin  - Sign in with email/password
+- POST /auth/signout - Sign out
 """
 
 from flask import jsonify, request
@@ -14,6 +17,7 @@ from app.services.integrations.supabase.auth_service import auth_service
 
 @auth_bp.route("/auth/me", methods=["GET"])
 def me():
+    """Get current user identity with RBAC role info."""
     identity = get_request_identity()
     return (
         jsonify(

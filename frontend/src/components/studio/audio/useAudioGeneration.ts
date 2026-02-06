@@ -6,7 +6,7 @@
 
 import { useState, useRef } from 'react';
 import { audioAPI, type AudioJob } from '@/lib/api/studio';
-import { API_HOST } from '@/lib/api/client';
+import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
 
@@ -54,11 +54,7 @@ export const useAudioGeneration = (projectId: string) => {
         return;
       }
 
-      const startResponse = await audioAPI.startGeneration(
-        projectId,
-        sourceId,
-        signal.direction
-      );
+      const startResponse = await audioAPI.startGeneration(projectId, sourceId, signal.direction);
 
       if (!startResponse.success || !startResponse.job_id) {
         showError(startResponse.error || 'Failed to start audio generation.');
@@ -113,7 +109,7 @@ export const useAudioGeneration = (projectId: string) => {
 
     // Load new source and play
     if (audioRef.current) {
-      audioRef.current.src = `${API_HOST}${job.audio_url}`;
+      audioRef.current.src = getAuthUrl(job.audio_url);
       audioRef.current.play();
       setPlayingJobId(job.id);
       setIsPaused(false);
@@ -182,16 +178,11 @@ export const useAudioGeneration = (projectId: string) => {
     }
   };
 
-  /**
-   * Download audio file
-   * Educational Note: Cross-origin downloads require fetching as blob first.
-   * The `download` attribute on anchor tags only works for same-origin URLs.
-   */
   const downloadAudio = async (job: AudioJob) => {
     if (!job.audio_url) return;
 
     try {
-      const response = await fetch(`${API_HOST}${job.audio_url}`);
+      const response = await fetch(getAuthUrl(job.audio_url));
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
 
@@ -200,7 +191,6 @@ export const useAudioGeneration = (projectId: string) => {
       link.download = job.audio_filename || 'audio_overview.mp3';
       link.click();
 
-      // Clean up the object URL after download
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Failed to download audio:', error);
@@ -208,9 +198,6 @@ export const useAudioGeneration = (projectId: string) => {
     }
   };
 
-  /**
-   * Format duration for display
-   */
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);

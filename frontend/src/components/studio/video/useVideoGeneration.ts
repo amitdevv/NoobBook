@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { videosAPI, type VideoJob } from '@/lib/api/studio';
+import { getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
 
@@ -110,7 +111,7 @@ export const useVideoGeneration = (projectId: string) => {
   const downloadVideo = (jobId: string, filename: string) => {
     const downloadUrl = videosAPI.getDownloadUrl(projectId, jobId, filename);
     const link = document.createElement('a');
-    link.href = downloadUrl;
+    link.href = getAuthUrl(downloadUrl);
     link.download = filename;
     link.click();
   };

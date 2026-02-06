@@ -15,7 +15,7 @@ import {
 import { Button } from '../../ui/button';
 import { Image, DownloadSimple } from '@phosphor-icons/react';
 import type { AdJob } from '@/lib/api/studio';
-import { API_HOST } from '@/lib/api/client';
+import { getAuthUrl } from '@/lib/api/client';
 
 interface AdViewerModalProps {
   viewingAdJob: AdJob | null;
@@ -44,7 +44,7 @@ export const AdViewerModal: React.FC<AdViewerModalProps> = ({
             <div key={index} className="flex flex-col gap-2">
               <div className="relative group rounded-lg overflow-hidden border bg-muted">
                 <img
-                  src={`${API_HOST}${image.url}`}
+                  src={getAuthUrl(image.url)}
                   alt={`${image.type} creative`}
                   className="w-full h-auto object-cover"
                 />
@@ -55,7 +55,7 @@ export const AdViewerModal: React.FC<AdViewerModalProps> = ({
                     className="gap-1"
                     onClick={() => {
                       const link = document.createElement('a');
-                      link.href = `${API_HOST}${image.url}`;
+                      link.href = getAuthUrl(image.url);
                       link.download = image.filename;
                       link.click();
                     }}

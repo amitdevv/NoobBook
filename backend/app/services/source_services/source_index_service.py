@@ -151,7 +151,9 @@ def _map_source_fields(source: Dict[str, Any]) -> Dict[str, Any]:
     Map Supabase column names to frontend field names.
 
     Educational Note: The Supabase table uses `is_active` but the frontend
-    expects `active`. This function provides a consistent mapping.
+    expects `active`. Fields like file_extension are stored inside the
+    embedding_info JSONB column but the frontend expects them at the top level.
+    This function flattens nested fields for frontend compatibility.
     """
     if source is None:
         return None
@@ -159,6 +161,24 @@ def _map_source_fields(source: Dict[str, Any]) -> Dict[str, Any]:
     # Map is_active -> active for frontend compatibility
     if "is_active" in source:
         source["active"] = source.pop("is_active")
+
+    # Flatten embedding_info fields to top level for frontend compatibility
+    # Uses setdefault so existing top-level values aren't overwritten
+    embedding_info = source.get("embedding_info") or {}
+    source.setdefault("file_extension", embedding_info.get("file_extension", ""))
+    source.setdefault("original_filename", embedding_info.get("original_filename", ""))
+    source.setdefault("mime_type", embedding_info.get("mime_type", ""))
+    source.setdefault("stored_filename", embedding_info.get("stored_filename", ""))
+
+    # Map type to category if category not present (used by frontend for icon selection)
+    if not source.get("category") and source.get("type"):
+        type_to_category = {
+            "PDF": "document", "DOCX": "document", "PPTX": "document",
+            "TXT": "document", "CSV": "data",
+            "LINK": "link", "YOUTUBE": "link",
+            "AUDIO": "audio", "IMAGE": "image",
+        }
+        source["category"] = type_to_category.get(source["type"], "document")
 
     return source
 

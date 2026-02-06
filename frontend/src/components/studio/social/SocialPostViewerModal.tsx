@@ -16,7 +16,7 @@ import { Button } from '../../ui/button';
 import { ShareNetwork, DownloadSimple } from '@phosphor-icons/react';
 import { useToast } from '../../ui/toast';
 import type { SocialPostJob } from '@/lib/api/studio';
-import { API_HOST } from '@/lib/api/client';
+import { getAuthUrl } from '@/lib/api/client';
 
 interface SocialPostViewerModalProps {
   viewingSocialPostJob: SocialPostJob | null;
@@ -28,10 +28,21 @@ export const SocialPostViewerModal: React.FC<SocialPostViewerModalProps> = ({
   onClose,
 }) => {
   const { success: showSuccess } = useToast();
+  const postCount = viewingSocialPostJob?.posts.length || 0;
+
+  // Responsive grid: 1 post = centered single col, 2 = 2-col, 3 = 3-col
+  const gridClass = postCount === 1
+    ? 'grid grid-cols-1 max-w-sm mx-auto gap-6 py-4'
+    : postCount === 2
+      ? 'grid grid-cols-1 md:grid-cols-2 gap-6 py-4'
+      : 'grid grid-cols-1 md:grid-cols-3 gap-6 py-4';
+
+  // Adjust modal width based on post count
+  const dialogMaxWidth = postCount === 1 ? 'sm:max-w-lg' : 'sm:max-w-4xl';
 
   return (
     <Dialog open={viewingSocialPostJob !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className={`${dialogMaxWidth} max-h-[90vh] overflow-y-auto`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShareNetwork size={20} className="text-cyan-600" />
@@ -44,7 +55,7 @@ export const SocialPostViewerModal: React.FC<SocialPostViewerModalProps> = ({
           )}
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
+        <div className={gridClass}>
           {viewingSocialPostJob?.posts.map((post, index) => (
             <div key={index} className="flex flex-col gap-3 border rounded-lg overflow-hidden bg-card">
               {/* Platform Badge */}
@@ -65,7 +76,7 @@ export const SocialPostViewerModal: React.FC<SocialPostViewerModalProps> = ({
               {post.image_url && (
                 <div className="relative group">
                   <img
-                    src={post.image_url.startsWith('http') ? post.image_url : `${API_HOST}${post.image_url}`}
+                    src={getAuthUrl(post.image_url)}
                     alt={`${post.platform} post`}
                     className="w-full h-auto object-cover"
                   />
@@ -77,7 +88,7 @@ export const SocialPostViewerModal: React.FC<SocialPostViewerModalProps> = ({
                       onClick={() => {
                         if (post.image?.filename && post.image_url) {
                           const link = document.createElement('a');
-                          link.href = post.image_url.startsWith('http') ? post.image_url : `${API_HOST}${post.image_url}`;
+                          link.href = getAuthUrl(post.image_url);
                           link.download = post.image.filename;
                           link.click();
                         }

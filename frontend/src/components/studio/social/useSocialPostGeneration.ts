@@ -59,7 +59,8 @@ export const useSocialPostGeneration = (projectId: string) => {
       const startResponse = await socialPostsAPI.startGeneration(
         projectId,
         topic,
-        signal.direction
+        signal.direction,
+        ['linkedin', 'instagram', 'twitter']
       );
 
       if (!startResponse.success || !startResponse.job_id) {

@@ -36,6 +36,9 @@ interface AppContentProps {
   isAdmin: boolean;
   isAuthenticated: boolean;
   onSignOut: () => Promise<void>;
+  userId: string;
+  userEmail: string | null;
+  userRole: string;
 }
 
 /**
@@ -51,6 +54,9 @@ function AppContent({
   isAdmin,
   isAuthenticated,
   onSignOut,
+  userId,
+  userEmail,
+  userRole,
 }: AppContentProps) {
   const navigate = useNavigate();
 
@@ -75,6 +81,9 @@ function AppContent({
         isAdmin={isAdmin}
         isAuthenticated={isAuthenticated}
         onSignOut={onSignOut}
+        userId={userId}
+        userEmail={userEmail}
+        userRole={userRole}
       />
 
       {showCreateDialog && (
@@ -178,6 +187,9 @@ function App() {
   const [authRequired, setAuthRequired] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userId, setUserId] = useState('');
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState('user');
 
   const refreshAuth = async () => {
     try {
@@ -185,11 +197,17 @@ function App() {
       setAuthRequired(Boolean(res?.auth_required));
       setIsAuthenticated(Boolean(res?.user?.is_authenticated));
       setIsAdmin(Boolean(res?.user?.is_admin));
+      setUserId(res?.user?.id || '');
+      setUserEmail(res?.user?.email || null);
+      setUserRole(res?.user?.role || 'user');
     } catch (err) {
       console.error('Auth check failed:', err);
       setAuthRequired(false);
       setIsAuthenticated(false);
       setIsAdmin(false);
+      setUserId('');
+      setUserEmail(null);
+      setUserRole('user');
     } finally {
       setAuthReady(true);
     }
@@ -199,6 +217,9 @@ function App() {
     await authAPI.signOut();
     setIsAuthenticated(false);
     setIsAdmin(false);
+    setUserId('');
+    setUserEmail(null);
+    setUserRole('user');
   };
 
   useEffect(() => {
@@ -247,6 +268,9 @@ function App() {
               isAdmin={isAdmin}
               isAuthenticated={isAuthenticated}
               onSignOut={handleSignOut}
+              userId={userId}
+              userEmail={userEmail}
+              userRole={userRole}
             />
           }
         />

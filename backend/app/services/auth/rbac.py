@@ -55,12 +55,18 @@ def is_auth_required() -> bool:
 
 
 def _get_bearer_token() -> Optional[str]:
+    """
+    Extract the JWT from the request.
+
+    Checks Authorization header first, then falls back to ?token= query parameter.
+    The query param fallback is needed for browser elements like <img>, <video>,
+    <audio>, and <iframe> that can't send custom headers.
+    """
     auth = request.headers.get("Authorization", "")
-    if not auth:
-        return None
-    if auth.lower().startswith("bearer "):
+    if auth and auth.lower().startswith("bearer "):
         return auth.split(" ", 1)[1].strip() or None
-    return None
+    # Fallback: check query parameter for browser elements (img, video, etc.)
+    return request.args.get("token") or None
 
 
 def _load_role_from_users_table(user_id: str) -> Optional[str]:

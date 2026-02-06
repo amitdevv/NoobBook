@@ -6,7 +6,8 @@
 
 import React from 'react';
 import { ScrollArea } from '../ui/scroll-area';
-import { CircleNotch, FolderOpen } from '@phosphor-icons/react';
+import { FolderOpen } from '@phosphor-icons/react';
+import { Skeleton } from '../ui/skeleton';
 import { type Source } from '../../lib/api/sources';
 import { SourceItem } from './SourceItem';
 
@@ -44,9 +45,17 @@ export const SourcesList: React.FC<SourcesListProps> = ({
     <ScrollArea className="flex-1">
       <div className="p-4">
         {loading ? (
-          <div className="text-center py-8">
-            <CircleNotch size={32} className="mx-auto mb-3 animate-spin text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Loading sources...</p>
+          <div className="space-y-2">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex items-center gap-2 p-2 rounded-lg">
+                <Skeleton className="h-5 w-5 rounded" />
+                <div className="flex-1 space-y-1">
+                  <Skeleton className="h-3.5 w-3/4" />
+                  <Skeleton className="h-2.5 w-1/4" />
+                </div>
+                <Skeleton className="h-4 w-4 rounded" />
+              </div>
+            ))}
           </div>
         ) : filteredSources.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
