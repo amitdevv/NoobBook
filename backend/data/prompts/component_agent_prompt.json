@@ -1,5 +1,5 @@
 {
-  "model": "claude-opus-4-5-20251101",
+  "model": "claude-opus-4-6",
   "temperature": 0.5,
   "max_tokens": 16000,
   "user_message": "Create 2-4 professional UI component variations based on the following source content.\n\n=== SOURCE CONTENT ===\n{source_content}\n=== END SOURCE CONTENT ===\n\nDirection from user: {direction}\n\nPlease create complete, production-ready components following the workflow:\n1. Plan 2-4 distinct component variations (different styles, not just colors)\n2. Write complete HTML/CSS/JS code for each variation (self-contained HTML documents)\n3. Make each variation unique and professional",
