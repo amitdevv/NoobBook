@@ -140,9 +140,21 @@ else
     info "Supabase .env already exists, reading existing values..."
     # shellcheck disable=SC1090
     source "$SUPABASE_ENV"
-    ANON_KEY="${ANON_KEY}"
-    SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY}"
-    POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
+    # If a previous run crashed (e.g. LibreSSL segfault) the file may exist
+    # but JWT keys may be missing or still hold placeholder values.
+    JWT_SECRET="${JWT_SECRET:-$(generate_hex 32)}"
+    POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(generate_password)}"
+    if [ -z "${ANON_KEY:-}" ] || [[ "${ANON_KEY}" == *"supabase-demo"* ]]; then
+        warn "ANON_KEY missing or placeholder — regenerating JWT keys..."
+        ANON_KEY=$(generate_jwt "anon" "$JWT_SECRET")
+        SERVICE_ROLE_KEY=$(generate_jwt "service_role" "$JWT_SECRET")
+        replace_env_var "$SUPABASE_ENV" "JWT_SECRET" "$JWT_SECRET"
+        replace_env_var "$SUPABASE_ENV" "ANON_KEY" "$ANON_KEY"
+        replace_env_var "$SUPABASE_ENV" "SERVICE_ROLE_KEY" "$SERVICE_ROLE_KEY"
+        success "JWT keys regenerated"
+    else
+        SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY}"
+    fi
 fi
 
 # Create NoobBook .env if it doesn't exist
