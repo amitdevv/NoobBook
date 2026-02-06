@@ -6,13 +6,13 @@
 #   bash docker/setup.sh
 #
 # What it does:
-#   1. Checks prerequisites (Docker, Docker Compose)
+#   1. Checks prerequisites (Docker, Docker Compose, Python3)
 #   2. Generates Supabase secrets (JWT, passwords, tokens)
 #   3. Creates .env files from templates
-#   4. Creates the shared Docker network
-#   5. Creates edge functions placeholder (prevents container crash)
-#   6. Starts Supabase
-#   7. Waits for Kong (API gateway) to become healthy
+#   4. Cleans up orphaned state from previous runs
+#   5. Creates the shared Docker network
+#   6. Creates edge functions placeholder (prevents container crash)
+#   7. Starts Supabase and waits for it to become healthy
 #   8. Creates MinIO storage bucket (for macOS compatibility)
 #   9. Builds and starts NoobBook (backend + frontend + migration)
 #   10. Waits for database migration
@@ -41,6 +41,11 @@ info "Checking prerequisites..."
 
 command -v docker >/dev/null 2>&1 || error "Docker is not installed. See https://docs.docker.com/get-docker/"
 
+# Verify Docker daemon is actually running (not just installed)
+if ! docker info >/dev/null 2>&1; then
+    error "Docker is installed but not running. Please start Docker Desktop and try again."
+fi
+
 # Check for docker compose (v2 plugin or standalone docker-compose)
 if docker compose version >/dev/null 2>&1; then
     COMPOSE="docker compose"
@@ -50,7 +55,23 @@ else
     error "Docker Compose is not installed. See https://docs.docker.com/compose/install/"
 fi
 
+# Python3 is required for JWT generation (macOS LibreSSL segfaults with openssl)
+command -v python3 >/dev/null 2>&1 || error "Python3 is not installed. Install via: brew install python3"
+
 success "Docker and Docker Compose found ($COMPOSE)"
+
+# Check for port conflicts before starting anything
+check_port() {
+    local port="$1" service="$2"
+    if lsof -iTCP:"$port" -sTCP:LISTEN -P -n >/dev/null 2>&1; then
+        error "Port $port is already in use (needed for $service). Stop the conflicting service and try again."
+    fi
+}
+check_port 80 "NoobBook frontend"
+check_port 5001 "NoobBook backend"
+check_port 8000 "Supabase API gateway"
+check_port 5432 "PostgreSQL"
+success "Required ports are available (80, 5001, 8000, 5432)"
 
 # ---- Step 2: Generate secrets ----
 generate_password() {
@@ -115,12 +136,7 @@ fi
 DB_DATA_DIR="$SCRIPT_DIR/supabase/volumes/db/data"
 if [ ! -f "$SUPABASE_ENV" ] && [ -d "$DB_DATA_DIR" ] && [ "$(ls -A "$DB_DATA_DIR" 2>/dev/null)" ]; then
     warn "Found orphaned DB data without matching .env — removing stale DB volume..."
-    # Stop any running Supabase containers that might hold the volume
-    if docker compose version >/dev/null 2>&1; then
-        docker compose -f "$SCRIPT_DIR/supabase/docker-compose.yml" down --remove-orphans 2>/dev/null || true
-    elif command -v docker-compose >/dev/null 2>&1; then
-        docker-compose -f "$SCRIPT_DIR/supabase/docker-compose.yml" down --remove-orphans 2>/dev/null || true
-    fi
+    $COMPOSE -f "$SCRIPT_DIR/supabase/docker-compose.yml" down --remove-orphans 2>/dev/null || true
     rm -rf "$DB_DATA_DIR"
     success "Stale DB data removed — fresh database will be created"
 fi
@@ -259,11 +275,8 @@ fi
 info "Starting Supabase services..."
 $COMPOSE -f "$SCRIPT_DIR/supabase/docker-compose.yml" --env-file "$SUPABASE_ENV" up -d
 
-# ---- Step 6: Wait for Kong health ----
+# ---- Step 7: Wait for Kong health ----
 info "Waiting for Supabase API gateway (Kong) to become healthy..."
-KONG_PORT=$(grep '^KONG_HTTP_PORT=' "$SUPABASE_ENV" | cut -d= -f2)
-KONG_PORT="${KONG_PORT:-8000}"
-
 TIMEOUT=120
 ELAPSED=0
 while [ $ELAPSED -lt $TIMEOUT ]; do
@@ -293,20 +306,34 @@ else
 fi
 
 # ---- Step 9: Build and start NoobBook ----
-info "Building and starting NoobBook..."
+info "Building and starting NoobBook (this may take a few minutes on first run)..."
 $COMPOSE -f "$ROOT_DIR/docker-compose.yml" --env-file "$NOOBBOOK_ENV" up -d --build
 
 # ---- Step 10: Wait for migration ----
 info "Waiting for database migration to complete..."
-$COMPOSE -f "$ROOT_DIR/docker-compose.yml" --env-file "$NOOBBOOK_ENV" logs -f migrate 2>&1 | while read -r line; do
-    echo "  $line"
-    if echo "$line" | grep -q "Migration complete"; then
+TIMEOUT=90
+ELAPSED=0
+while [ $ELAPSED -lt $TIMEOUT ]; do
+    # The migrate container is a one-shot: it runs and exits
+    STATUS=$(docker inspect -f '{{.State.Status}}' noobbook-migrate 2>/dev/null || echo "unknown")
+    if [ "$STATUS" = "exited" ]; then
+        EXIT_CODE=$(docker inspect -f '{{.State.ExitCode}}' noobbook-migrate 2>/dev/null || echo "1")
+        if [ "$EXIT_CODE" = "0" ]; then
+            success "Database migration complete"
+        else
+            warn "Migration exited with code $EXIT_CODE — check: docker logs noobbook-migrate"
+        fi
         break
     fi
-    if echo "$line" | grep -q "exited with code"; then
-        break
-    fi
+    sleep 2
+    ELAPSED=$((ELAPSED + 2))
+    printf "."
 done
+echo ""
+
+if [ $ELAPSED -ge $TIMEOUT ]; then
+    warn "Migration still running after ${TIMEOUT}s — check: docker logs noobbook-migrate"
+fi
 
 # ---- Step 11: Print summary ----
 echo ""
