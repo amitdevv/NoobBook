@@ -103,6 +103,12 @@ print(f'{h}.{p}.{b64url(sig)}')
 SUPABASE_ENV="$SCRIPT_DIR/supabase/.env"
 NOOBBOOK_ENV="$SCRIPT_DIR/.env"
 
+# If a previous run left a broken/incomplete .env, delete it so we recreate from template
+if [ -f "$SUPABASE_ENV" ] && ! grep -q '^POSTGRES_HOST=' "$SUPABASE_ENV"; then
+    warn "Supabase .env is incomplete (missing core variables) — deleting to recreate..."
+    rm -f "$SUPABASE_ENV"
+fi
+
 # Generate Supabase secrets if .env doesn't exist yet
 if [ ! -f "$SUPABASE_ENV" ]; then
     info "Generating Supabase secrets..."
@@ -155,6 +161,12 @@ else
     else
         SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY}"
     fi
+fi
+
+# Same guard for NoobBook .env
+if [ -f "$NOOBBOOK_ENV" ] && ! grep -q '^SUPABASE_URL=' "$NOOBBOOK_ENV"; then
+    warn "NoobBook .env is incomplete — deleting to recreate..."
+    rm -f "$NOOBBOOK_ENV"
 fi
 
 # Create NoobBook .env if it doesn't exist
