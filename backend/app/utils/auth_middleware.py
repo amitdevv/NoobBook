@@ -6,13 +6,55 @@ We keep using the SERVICE_KEY Supabase client for database queries (bypasses RLS
 but validate the user's JWT to extract their user_id. This is simpler than
 switching to ANON_KEY and lets the backend act as a trusted server.
 
+Token Validation Cache: We cache successful token validations for 60 seconds
+to avoid hitting Supabase Auth on every request. This prevents failures when
+many concurrent requests (e.g., loading multiple images) overwhelm the Auth
+server. JWTs are already self-validating (signed + expiry), so a short cache
+window is safe — even if a token is revoked, the cache expires quickly.
+
 Pattern: Decorator-based auth, similar to Flask-Login but using Supabase JWTs.
 """
 import functools
-from typing import Optional
+import time
+import threading
+from typing import Optional, Dict, Tuple
 
 from flask import request, jsonify, g
 from app.services.integrations.supabase import get_supabase
+
+# ─── Token Validation Cache ─────────────────────────────────────────────────
+# Educational Note: Without caching, every API request triggers an HTTP call
+# to Supabase Auth (get_user). When a page loads multiple images simultaneously,
+# 3+ concurrent get_user calls can overwhelm the Auth server, causing 401s.
+# Caching the result for 60 seconds fixes this while staying security-safe.
+_token_cache: Dict[str, Tuple[str, float]] = {}  # {token: (user_id, expires_at)}
+_TOKEN_CACHE_TTL = 60  # seconds
+_cache_lock = threading.Lock()
+
+
+def _get_cached_user_id(token: str) -> Optional[str]:
+    """Check if a token has a valid cached validation result."""
+    cached = _token_cache.get(token)
+    if cached:
+        user_id, expires_at = cached
+        if time.time() < expires_at:
+            return user_id
+        # Expired — remove from cache
+        with _cache_lock:
+            _token_cache.pop(token, None)
+    return None
+
+
+def _cache_token(token: str, user_id: str) -> None:
+    """Cache a successful token validation result."""
+    with _cache_lock:
+        _token_cache[token] = (user_id, time.time() + _TOKEN_CACHE_TTL)
+        # Prevent unbounded growth — evict expired entries when cache gets large
+        if len(_token_cache) > 100:
+            now = time.time()
+            expired = [k for k, (_, exp) in _token_cache.items() if now >= exp]
+            for k in expired:
+                del _token_cache[k]
 
 
 def get_current_user_id() -> Optional[str]:
@@ -39,6 +81,10 @@ def validate_token() -> Optional[str]:
     the Supabase Auth server to verify the token signature and expiration.
     The SERVICE_KEY client has permission to validate any user's token.
 
+    Performance: Results are cached for 60 seconds to avoid redundant Auth
+    server calls when multiple browser elements (images, videos) load
+    simultaneously with the same token.
+
     Query param fallback: Browser elements like <img>, <video>, <audio>, and <iframe>
     can't send Authorization headers. For these, the frontend appends ?token=JWT
     to the URL. We only check the query param when no Authorization header is present.
@@ -52,17 +98,27 @@ def validate_token() -> Optional[str]:
         token = request.args.get('token', '')
 
     if not token:
+        print(f"[Auth] No token found (header={bool(auth_header)}, query={bool(request.args.get('token'))})")
         return None
+
+    # Check cache first — avoids redundant Supabase Auth calls
+    cached_user_id = _get_cached_user_id(token)
+    if cached_user_id:
+        return cached_user_id
 
     try:
         supabase = get_supabase()
         user_response = supabase.auth.get_user(token)
 
         if not user_response or not user_response.user:
+            print(f"[Auth] get_user returned no user (response={user_response})")
             return None
 
-        return str(user_response.user.id)
-    except Exception:
+        user_id = str(user_response.user.id)
+        _cache_token(token, user_id)
+        return user_id
+    except Exception as e:
+        print(f"[Auth] Token validation exception: {type(e).__name__}: {e}")
         return None
 
 
