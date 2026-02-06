@@ -92,14 +92,6 @@ export const WebsiteViewerModal: React.FC<WebsiteViewerModalProps> = ({
           />
         </div>
 
-        {/* Footer Info */}
-        {viewingWebsiteJob.summary && (
-          <div className="px-6 py-3 border-t bg-gray-50/50 flex-shrink-0">
-            <p className="text-xs text-muted-foreground">
-              <span className="font-medium">Summary:</span> {viewingWebsiteJob.summary}
-            </p>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );

@@ -28,9 +28,10 @@ Routes:
 - GET  /projects/<id>/studio/email-templates/<id>/download - Download ZIP
 """
 import io
+import re
 import zipfile
 from pathlib import Path
-from flask import jsonify, request, current_app, send_file
+from flask import jsonify, request, current_app, send_file, Response
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.email_agent_executor import email_agent_executor
@@ -201,8 +202,13 @@ def preview_email_template(project_id: str, job_id: str):
     """
     Serve email template HTML for preview (iframe).
 
+    Educational Note: The iframe can't send Authorization headers for <img> tags
+    inside the HTML. We inject ?token= into image src URLs so the browser passes
+    the JWT when fetching images. This rewriting only affects the preview — the
+    original HTML on disk stays clean for download/export.
+
     Response:
-        - HTML file for rendering in iframe
+        - HTML with auth-aware image URLs for rendering in iframe
     """
     try:
         # Get job to find HTML file
@@ -230,11 +236,26 @@ def preview_email_template(project_id: str, job_id: str):
                 'error': f'HTML file not found: {html_file}'
             }), 404
 
-        return send_file(
-            filepath,
-            mimetype='text/html',
-            as_attachment=False
-        )
+        html_content = filepath.read_text(encoding='utf-8')
+
+        # Inject auth token into image URLs so <img> tags pass auth.
+        # The token comes from the ?token= query param the frontend already sends.
+        token = request.args.get('token', '')
+        if token:
+            # Match image src attributes pointing to our email-templates endpoint
+            # e.g. src="/api/v1/projects/.../studio/email-templates/image.png"
+            def _add_token(match: re.Match) -> str:
+                url = match.group(1)
+                separator = '&' if '?' in url else '?'
+                return f'src="{url}{separator}token={token}"'
+
+            html_content = re.sub(
+                r'src="(/api/v1/projects/[^"]+/studio/email-templates/[^"]+\.(?:png|jpg|jpeg|gif|webp))"',
+                _add_token,
+                html_content
+            )
+
+        return Response(html_content, mimetype='text/html')
 
     except Exception as e:
         current_app.logger.error(f"Error previewing email template: {e}")

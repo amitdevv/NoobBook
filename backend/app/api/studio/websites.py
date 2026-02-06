@@ -30,9 +30,10 @@ Routes:
 - GET  /projects/<id>/studio/websites/<id>/download         - Download ZIP
 """
 import io
+import re
 import zipfile
 from pathlib import Path
-from flask import jsonify, request, current_app, send_file
+from flask import jsonify, request, current_app, send_file, Response
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.utils.path_utils import get_studio_dir
@@ -192,6 +193,27 @@ def get_website_file(project_id: str, job_id: str, filename: str):
         elif filename.endswith('.webp'):
             mime_type = 'image/webp'
 
+        # For CSS files, inject auth token into url() references so images load.
+        # Educational Note: CSS url() references (e.g. background-image) trigger
+        # separate browser requests that don't carry the parent page's query params.
+        token = request.args.get('token', '')
+        if mime_type == 'text/css' and token:
+            css_content = file_path.read_text(encoding='utf-8')
+
+            def _add_token_to_css_url(match: re.Match) -> str:
+                prefix = match.group(1)   # url( or url(" or url('
+                url = match.group(2)
+                suffix = match.group(3)   # ) or ") or ')
+                sep = '&' if '?' in url else '?'
+                return f'{prefix}{url}{sep}token={token}{suffix}'
+
+            css_content = re.sub(
+                r"""(url\(["']?)(?!https?://|//|data:)([^"')\s]+)(["']?\))""",
+                _add_token_to_css_url,
+                css_content
+            )
+            return Response(css_content, mimetype='text/css')
+
         return send_file(file_path, mimetype=mime_type)
 
     except Exception as e:
@@ -205,10 +227,12 @@ def get_website_file(project_id: str, job_id: str, filename: str):
 @studio_bp.route('/projects/<project_id>/studio/websites/<job_id>/preview', methods=['GET'])
 def preview_website(project_id: str, job_id: str):
     """
-    Preview website by serving index.html.
+    Preview website by serving index.html with auth tokens injected.
 
-    This endpoint serves the index.html file which will load other files
-    (CSS, JS, images) via relative paths that are handled by get_website_file.
+    Educational Note: The iframe can't pass Authorization headers for sub-resource
+    requests (CSS, JS, images). We inject ?token= into local resource URLs in the
+    HTML so the browser passes the JWT when fetching these files. The original
+    files on disk stay clean for download/export.
     """
     try:
         # Get website directory
@@ -221,7 +245,25 @@ def preview_website(project_id: str, job_id: str):
                 'error': 'Website not ready yet or index.html not found'
             }), 404
 
-        return send_file(index_path, mimetype='text/html')
+        html_content = index_path.read_text(encoding='utf-8')
+
+        # Inject auth token into local resource URLs (CSS, JS, images)
+        token = request.args.get('token', '')
+        if token:
+            def _add_token(match: re.Match) -> str:
+                attr = match.group(1)   # src or href
+                url = match.group(2)
+                sep = '&' if '?' in url else '?'
+                return f'{attr}="{url}{sep}token={token}"'
+
+            # Match src="..." and href="..." but skip external URLs
+            html_content = re.sub(
+                r'(src|href)="(?!https?://|//|data:|#|mailto:)([^"]+)"',
+                _add_token,
+                html_content
+            )
+
+        return Response(html_content, mimetype='text/html')
 
     except Exception as e:
         current_app.logger.error(f"Error previewing website: {e}")
