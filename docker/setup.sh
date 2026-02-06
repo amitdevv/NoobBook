@@ -109,6 +109,22 @@ if [ -f "$SUPABASE_ENV" ] && ! grep -q '^POSTGRES_HOST=' "$SUPABASE_ENV"; then
     rm -f "$SUPABASE_ENV"
 fi
 
+# If .env is missing but DB data directory exists from a previous run, the new
+# generated password won't match the existing database. Wipe the orphaned DB
+# data so Postgres re-initializes with the new credentials.
+DB_DATA_DIR="$SCRIPT_DIR/supabase/volumes/db/data"
+if [ ! -f "$SUPABASE_ENV" ] && [ -d "$DB_DATA_DIR" ] && [ "$(ls -A "$DB_DATA_DIR" 2>/dev/null)" ]; then
+    warn "Found orphaned DB data without matching .env — removing stale DB volume..."
+    # Stop any running Supabase containers that might hold the volume
+    if docker compose version >/dev/null 2>&1; then
+        docker compose -f "$SCRIPT_DIR/supabase/docker-compose.yml" down --remove-orphans 2>/dev/null || true
+    elif command -v docker-compose >/dev/null 2>&1; then
+        docker-compose -f "$SCRIPT_DIR/supabase/docker-compose.yml" down --remove-orphans 2>/dev/null || true
+    fi
+    rm -rf "$DB_DATA_DIR"
+    success "Stale DB data removed — fresh database will be created"
+fi
+
 # Generate Supabase secrets if .env doesn't exist yet
 if [ ! -f "$SUPABASE_ENV" ]; then
     info "Generating Supabase secrets..."
