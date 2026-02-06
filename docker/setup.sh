@@ -80,19 +80,23 @@ replace_env_var() {
 generate_jwt() {
     local role="$1"
     local secret="$2"
-    # JWT header and payload
-    local header='{"alg":"HS256","typ":"JWT"}'
-    local payload="{\"role\":\"${role}\",\"iss\":\"supabase\",\"iat\":1641769200,\"exp\":1799535600}"
+    # Use Python for JWT generation — macOS LibreSSL's openssl dgst -hmac -binary
+    # can segfault (exit 139) on certain versions.
+    python3 -c "
+import hmac, hashlib, base64, json
 
-    local header_b64
-    header_b64=$(echo -n "$header" | openssl base64 -A | tr '+/' '-_' | tr -d '=')
-    local payload_b64
-    payload_b64=$(echo -n "$payload" | openssl base64 -A | tr '+/' '-_' | tr -d '=')
+def b64url(data):
+    return base64.urlsafe_b64encode(data).rstrip(b'=').decode()
 
-    local signature
-    signature=$(echo -n "${header_b64}.${payload_b64}" | openssl dgst -sha256 -hmac "$secret" -binary | openssl base64 -A | tr '+/' '-_' | tr -d '=')
+header = json.dumps({'alg':'HS256','typ':'JWT'}, separators=(',',':')).encode()
+payload = json.dumps({'role':'${role}','iss':'supabase','iat':1641769200,'exp':1799535600}, separators=(',',':')).encode()
 
-    echo "${header_b64}.${payload_b64}.${signature}"
+h = b64url(header)
+p = b64url(payload)
+sig = hmac.new('${secret}'.encode(), f'{h}.{p}'.encode(), hashlib.sha256).digest()
+
+print(f'{h}.{p}.{b64url(sig)}')
+"
 }
 
 # ---- Step 3: Create .env files ----
