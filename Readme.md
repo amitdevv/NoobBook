@@ -66,6 +66,31 @@
 
 ---
 
+## Table of Contents
+
+- [What is NoobBook?](#what-is-noobbook)
+- [How It Works](#how-it-works)
+  - [Projects](#1-projects)
+  - [Sources](#2-sources-left-panel)
+  - [Chat](#3-chat-center-panel)
+  - [Studio](#4-studio-right-panel)
+- [Architecture](#architecture)
+- [Getting Started (Docker Setup)](#getting-started-docker-setup)
+  - [Prerequisites](#prerequisites)
+  - [API Keys](#api-keys)
+  - [Step 1: Clone and Configure](#step-1-clone-and-configure)
+  - [Step 2: Set Up Auth](#step-2-set-up-auth-required)
+  - [Step 3: Run Setup](#step-3-run-setup)
+  - [Step 4: Log In](#step-4-log-in)
+  - [Auth & Roles (RBAC)](#auth--roles-rbac)
+  - [Managing Your Setup](#managing-your-setup)
+- [Local Development](#option-b-local-development)
+- [Tech Stack](#tech-stack)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
 ## What is NoobBook?
 
 NoobBook is a fully-featured NotebookLM alternative that you can run yourself. Upload documents, chat with your sources using RAG, and generate content with AI agents.
