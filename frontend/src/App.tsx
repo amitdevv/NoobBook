@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { Dashboard, CreateProjectDialog } from './components/dashboard';
 import { ProjectWorkspace } from './components/project';
-import { BrandPage } from './components/brand/BrandPage';
+
 import { projectsAPI } from './lib/api';
 import { AuthPage } from './components/auth/AuthPage';
 import { authAPI } from './lib/api/auth';
@@ -11,7 +11,7 @@ import { authAPI } from './lib/api/auth';
  * Main App Component for NoobBook
  * Educational Note: This component manages the overall application state
  * and controls which view is shown (project list, create dialog, or project workspace).
- * React Router is used for navigation to full-page views like Brand Kit.
+ * React Router is used for URL-based navigation between dashboard and project views.
  */
 
 /**
@@ -152,10 +152,6 @@ function ProjectWorkspaceRoute({
     setProject(prev => prev ? { ...prev, name: newName } : prev);
   };
 
-  const handleNavigateToBrand = (id: string) => {
-    navigate(`/projects/${id}/brand`);
-  };
-
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
@@ -173,7 +169,6 @@ function ProjectWorkspaceRoute({
       project={project}
       onBack={() => navigate('/')}
       onDeleteProject={handleDeleteProject}
-      onNavigateToBrand={handleNavigateToBrand}
       onRenameProject={handleRenameProject}
       onSignOut={isAuthenticated ? onSignOut : undefined}
     />
@@ -241,9 +236,6 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Brand Kit Page - Full page for brand management */}
-        <Route path="/projects/:projectId/brand" element={<BrandPage />} />
-
         {/* Project Workspace - URL-based routing */}
         <Route
           path="/projects/:projectId"

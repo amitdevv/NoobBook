@@ -9,7 +9,8 @@ that can be injected into studio agent system prompts. The context includes:
 3. Brand Guidelines - Written guidelines and best practices
 4. Brand Voice - Tone, personality, and keywords
 
-The context is only loaded when the feature has brand enabled.
+Brand config is now user-level (workspace setting). Studio agents pass
+project_id, which is resolved to user_id here — so agents need zero changes.
 """
 from typing import Dict, Any, Optional
 
@@ -24,7 +25,30 @@ class BrandContextLoader:
     Educational Note: This loader is called by studio services before
     content generation. It checks if brand is enabled for the feature
     and builds formatted context for the AI to follow.
+
+    Studio agents pass project_id → we resolve to user_id internally,
+    since brand config is now a workspace-level (per-user) setting.
     """
+
+    def _resolve_user_id(self, project_id: str) -> Optional[str]:
+        """
+        Resolve project_id to user_id via the projects table.
+
+        Educational Note: Brand moved from project-level to user-level,
+        but studio agents still pass project_id. This bridge method
+        ensures backward compatibility with zero changes to agents.
+
+        Args:
+            project_id: The project UUID
+
+        Returns:
+            The user_id who owns the project, or None if not found
+        """
+        from app.services.data_services import project_service
+        project = project_service.get_project(project_id)
+        if not project:
+            return None
+        return project.get("user_id")
 
     def load_brand_context(
         self,
@@ -40,18 +64,23 @@ class BrandContextLoader:
         presentations and blogs follow brand guidelines.
 
         Args:
-            project_id: The project UUID
+            project_id: The project UUID (resolved to user_id internally)
             feature_name: The studio feature name (e.g., 'blog', 'presentation')
 
         Returns:
             Formatted brand context string, or empty string if brand disabled
         """
+        # Resolve project_id to user_id (brand is now user-level)
+        user_id = self._resolve_user_id(project_id)
+        if not user_id:
+            return ""
+
         # Check if brand is enabled for this feature
-        if not brand_config_service.is_feature_enabled(project_id, feature_name):
+        if not brand_config_service.is_feature_enabled(user_id, feature_name):
             return ""
 
         # Get brand config
-        config = brand_config_service.get_config(project_id)
+        config = brand_config_service.get_config(user_id)
 
         # Build context sections
         sections = []
@@ -70,7 +99,7 @@ class BrandContextLoader:
             sections.append(typography_context)
 
         # Add brand assets info
-        assets_context = self._build_assets_context(project_id)
+        assets_context = self._build_assets_context(user_id)
         if assets_context:
             sections.append(assets_context)
 
@@ -169,9 +198,9 @@ class BrandContextLoader:
         lines.append("")
         return "\n".join(lines)
 
-    def _build_assets_context(self, project_id: str) -> str:
+    def _build_assets_context(self, user_id: str) -> str:
         """Build brand assets context section."""
-        assets = brand_asset_service.list_assets(project_id)
+        assets = brand_asset_service.list_assets(user_id)
 
         if not assets:
             return ""
@@ -274,21 +303,18 @@ class BrandContextLoader:
 
         return "\n".join(lines)
 
-    def get_brand_summary(self, project_id: str) -> Optional[Dict[str, Any]]:
+    def get_brand_summary(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
         Get a summary of brand configuration for display purposes.
 
-        Educational Note: This is useful for showing a brand preview in the UI
-        without loading the full context.
-
         Args:
-            project_id: The project UUID
+            user_id: The user UUID
 
         Returns:
             Summary dict with key brand elements, or None if no config
         """
-        config = brand_config_service.get_config(project_id)
-        assets = brand_asset_service.list_assets(project_id)
+        config = brand_config_service.get_config(user_id)
+        assets = brand_asset_service.list_assets(user_id)
 
         # Get primary logo
         primary_logo = next(
@@ -321,6 +347,9 @@ brand_context_loader = BrandContextLoader()
 def load_brand_context(project_id: str, feature_name: str) -> str:
     """
     Convenience function for loading brand context.
+
+    Educational Note: Studio agents call this with project_id. The loader
+    resolves project_id → user_id internally since brand is now user-level.
 
     Args:
         project_id: The project UUID

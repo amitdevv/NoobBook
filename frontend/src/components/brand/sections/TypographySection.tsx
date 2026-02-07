@@ -26,13 +26,9 @@ import {
   FONT_WEIGHTS,
 } from '../../../lib/api/brand';
 
-interface TypographySectionProps {
-  projectId: string;
-}
-
 type HeadingLevel = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 
-export const TypographySection: React.FC<TypographySectionProps> = ({ projectId }) => {
+export const TypographySection: React.FC = () => {
   const [typography, setTypography] = useState<Typography>(getDefaultTypography());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,7 +37,7 @@ export const TypographySection: React.FC<TypographySectionProps> = ({ projectId 
   const loadTypography = async () => {
     try {
       setLoading(true);
-      const response = await brandAPI.getConfig(projectId);
+      const response = await brandAPI.getConfig();
       if (response.data.success) {
         // Merge with defaults to handle missing h4, h5, h6 from older configs
         const loadedTypography = response.data.config.typography;
@@ -64,12 +60,12 @@ export const TypographySection: React.FC<TypographySectionProps> = ({ projectId 
 
   useEffect(() => {
     loadTypography();
-  }, [projectId]);
+  }, []);
 
   const handleSave = async () => {
     try {
       setSaving(true);
-      const response = await brandAPI.updateTypography(projectId, typography);
+      const response = await brandAPI.updateTypography(typography);
       if (response.data.success) {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);

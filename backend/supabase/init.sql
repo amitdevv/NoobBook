@@ -219,7 +219,7 @@ CREATE INDEX IF NOT EXISTS idx_studio_signals_chat_id ON studio_signals(chat_id)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS brand_assets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
   asset_type TEXT NOT NULL,
@@ -235,7 +235,7 @@ CREATE TABLE IF NOT EXISTS brand_assets (
   CONSTRAINT name_not_empty CHECK (length(trim(name)) > 0)
 );
 
-CREATE INDEX IF NOT EXISTS idx_brand_assets_project_id ON brand_assets(project_id);
+CREATE INDEX IF NOT EXISTS idx_brand_assets_user_id ON brand_assets(user_id);
 CREATE INDEX IF NOT EXISTS idx_brand_assets_type ON brand_assets(asset_type);
 
 -- ============================================================================
@@ -243,7 +243,7 @@ CREATE INDEX IF NOT EXISTS idx_brand_assets_type ON brand_assets(asset_type);
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS brand_config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID UNIQUE NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id UUID UNIQUE NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   colors JSONB DEFAULT '{
     "primary": "#000000",
     "secondary": "#666666",

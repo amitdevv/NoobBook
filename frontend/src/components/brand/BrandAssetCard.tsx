@@ -33,14 +33,12 @@ import { brandAPI, type BrandAsset } from '../../lib/api/brand';
 
 interface BrandAssetCardProps {
   asset: BrandAsset;
-  projectId: string;
   onDelete: (assetId: string) => void;
   onSetPrimary: (assetId: string) => void;
 }
 
 export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
   asset,
-  projectId,
   onDelete,
   onSetPrimary,
 }) => {
@@ -54,7 +52,7 @@ export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
       if (asset.mime_type?.startsWith('image/')) {
         setLoadingImage(true);
         try {
-          const response = await brandAPI.getAssetUrl(projectId, asset.id);
+          const response = await brandAPI.getAssetUrl(asset.id);
           if (response.data.success) {
             setImageUrl(response.data.url);
           }
@@ -66,11 +64,11 @@ export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
       }
     };
     loadImage();
-  }, [asset.id, asset.mime_type, projectId]);
+  }, [asset.id, asset.mime_type]);
 
   const handleDownload = async () => {
     try {
-      const response = await brandAPI.getAssetUrl(projectId, asset.id);
+      const response = await brandAPI.getAssetUrl(asset.id);
       if (response.data.success) {
         window.open(response.data.url, '_blank');
       }

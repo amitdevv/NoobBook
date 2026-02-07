@@ -39,6 +39,9 @@ services:
       - backend
 
   # --- Database migration (runs once, then exits) ---
+  # Runs init.sql for base schema, then applies numbered migrations in order.
+  # A schema_migrations table tracks which migrations have already been applied,
+  # so re-running is safe (idempotent).
   migrate:
     image: postgres:16-alpine
     container_name: noobbook-migrate
@@ -47,15 +50,51 @@ services:
       - ./docker/.env
     volumes:
       - ./backend/supabase/init.sql:/init.sql:ro
+      - ./backend/supabase/migrations:/migrations:ro
     entrypoint: >
       sh -c '
         set -e
+        PSQL="psql -v ON_ERROR_STOP=1 -h supabase-db -p 5432 -U postgres -d postgres"
+        export PGPASSWORD="$${POSTGRES_PASSWORD}"
+
         echo "Waiting for Supabase database..."
         until pg_isready -h supabase-db -p 5432 -U postgres 2>/dev/null; do
           sleep 2
         done
-        echo "Running database migrations..."
-        PGPASSWORD="$${POSTGRES_PASSWORD}" psql -v ON_ERROR_STOP=1 -h supabase-db -p 5432 -U postgres -d postgres -f /init.sql
+
+        echo "Running base schema (init.sql)..."
+        $$PSQL -f /init.sql
+
+        echo "Creating migration tracker..."
+        $$PSQL -c "CREATE TABLE IF NOT EXISTS schema_migrations (
+          filename TEXT PRIMARY KEY,
+          applied_at TIMESTAMPTZ DEFAULT now()
+        );"
+
+        ROW_COUNT=$$($$PSQL -tAc "SELECT count(*) FROM schema_migrations")
+        if [ "$$ROW_COUNT" = "0" ]; then
+          echo "  First run — seeding tracker with migrations already in init.sql..."
+          for f in /migrations/*.sql; do
+            [ -f "$$f" ] || continue
+            name=$$(basename "$$f")
+            $$PSQL -c "INSERT INTO schema_migrations (filename) VALUES ('"'"'$$name'"'"') ON CONFLICT DO NOTHING"
+          done
+        fi
+
+        echo "Applying migrations..."
+        for f in /migrations/*.sql; do
+          [ -f "$$f" ] || continue
+          name=$$(basename "$$f")
+          already=$$($$PSQL -tAc "SELECT 1 FROM schema_migrations WHERE filename = '"'"'$$name'"'"'")
+          if [ "$$already" = "1" ]; then
+            echo "  skip $$name (already applied)"
+          else
+            echo "  apply $$name ..."
+            $$PSQL -f "$$f"
+            $$PSQL -c "INSERT INTO schema_migrations (filename) VALUES ('"'"'$$name'"'"')"
+          fi
+        done
+
         echo "Migration complete."
       '
     networks:

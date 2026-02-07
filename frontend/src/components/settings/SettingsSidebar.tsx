@@ -4,10 +4,10 @@
  */
 
 import React from 'react';
-import { User, Users, Key, Plug, Gear } from '@phosphor-icons/react';
+import { User, Users, Key, Plug, Gear, Palette } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 
-export type SettingsSection = 'profile' | 'team' | 'api-keys' | 'integrations' | 'system';
+export type SettingsSection = 'profile' | 'team' | 'api-keys' | 'integrations' | 'design' | 'system';
 
 interface SettingsSidebarProps {
   activeSection: SettingsSection;
@@ -28,6 +28,7 @@ const sidebarItems: SidebarItem[] = [
   { id: 'team', label: 'Team', icon: <Users size={18} />, category: 'workspace', adminOnly: true },
   { id: 'api-keys', label: 'API Keys', icon: <Key size={18} />, category: 'workspace', adminOnly: true },
   { id: 'integrations', label: 'Integrations', icon: <Plug size={18} />, category: 'workspace' },
+  { id: 'design', label: 'Design', icon: <Palette size={18} />, category: 'workspace', adminOnly: true },
   { id: 'system', label: 'System', icon: <Gear size={18} />, category: 'workspace', adminOnly: true },
 ];
 

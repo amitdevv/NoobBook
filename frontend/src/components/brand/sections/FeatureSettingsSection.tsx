@@ -9,10 +9,6 @@ import { Switch } from '../../ui/switch';
 import { CircleNotch, Check } from '@phosphor-icons/react';
 import { brandAPI, type FeatureSettings, getDefaultFeatureSettings } from '../../../lib/api/brand';
 
-interface FeatureSettingsSectionProps {
-  projectId: string;
-}
-
 interface FeatureConfig {
   key: string;
   label: string;
@@ -67,9 +63,7 @@ const features: FeatureConfig[] = [
   },
 ];
 
-export const FeatureSettingsSection: React.FC<FeatureSettingsSectionProps> = ({
-  projectId,
-}) => {
+export const FeatureSettingsSection: React.FC = () => {
   const [settings, setSettings] = useState<FeatureSettings>(getDefaultFeatureSettings());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -78,7 +72,7 @@ export const FeatureSettingsSection: React.FC<FeatureSettingsSectionProps> = ({
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await brandAPI.getConfig(projectId);
+      const response = await brandAPI.getConfig();
       if (response.data.success) {
         setSettings(response.data.config.feature_settings);
       }
@@ -91,12 +85,12 @@ export const FeatureSettingsSection: React.FC<FeatureSettingsSectionProps> = ({
 
   useEffect(() => {
     loadSettings();
-  }, [projectId]);
+  }, []);
 
   const handleSave = async () => {
     try {
       setSaving(true);
-      const response = await brandAPI.updateFeatureSettings(projectId, settings);
+      const response = await brandAPI.updateFeatureSettings(settings);
       if (response.data.success) {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);

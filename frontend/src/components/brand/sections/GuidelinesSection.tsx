@@ -11,11 +11,7 @@ import { Badge } from '../../ui/badge';
 import { Plus, X, CircleNotch, Check, PencilSimple, Trash } from '@phosphor-icons/react';
 import { brandAPI, type BrandVoice, type BestPractices } from '../../../lib/api/brand';
 
-interface GuidelinesSectionProps {
-  projectId: string;
-}
-
-export const GuidelinesSection: React.FC<GuidelinesSectionProps> = ({ projectId }) => {
+export const GuidelinesSection: React.FC = () => {
   const [guidelines, setGuidelines] = useState('');
   const [voice, setVoice] = useState<BrandVoice>({
     tone: 'professional',
@@ -45,7 +41,7 @@ export const GuidelinesSection: React.FC<GuidelinesSectionProps> = ({ projectId 
   const loadConfig = async () => {
     try {
       setLoading(true);
-      const response = await brandAPI.getConfig(projectId);
+      const response = await brandAPI.getConfig();
       if (response.data.success) {
         const config = response.data.config;
         setGuidelines(config.guidelines || '');
@@ -61,12 +57,12 @@ export const GuidelinesSection: React.FC<GuidelinesSectionProps> = ({ projectId 
 
   useEffect(() => {
     loadConfig();
-  }, [projectId]);
+  }, []);
 
   const handleSave = async () => {
     try {
       setSaving(true);
-      const response = await brandAPI.updateConfig(projectId, {
+      const response = await brandAPI.updateConfig({
         guidelines,
         voice,
         best_practices: bestPractices,

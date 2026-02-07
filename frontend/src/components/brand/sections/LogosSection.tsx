@@ -9,11 +9,7 @@ import { brandAPI, type BrandAsset } from '../../../lib/api/brand';
 import { BrandAssetCard } from '../BrandAssetCard';
 import { BrandAssetUploader } from '../BrandAssetUploader';
 
-interface LogosSectionProps {
-  projectId: string;
-}
-
-export const LogosSection: React.FC<LogosSectionProps> = ({ projectId }) => {
+export const LogosSection: React.FC = () => {
   const [assets, setAssets] = useState<BrandAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploaderOpen, setUploaderOpen] = useState(false);
@@ -21,7 +17,7 @@ export const LogosSection: React.FC<LogosSectionProps> = ({ projectId }) => {
   const loadAssets = async () => {
     try {
       setLoading(true);
-      const response = await brandAPI.listAssets(projectId, 'logo');
+      const response = await brandAPI.listAssets('logo');
       if (response.data.success) {
         setAssets(response.data.assets);
       }
@@ -34,11 +30,11 @@ export const LogosSection: React.FC<LogosSectionProps> = ({ projectId }) => {
 
   useEffect(() => {
     loadAssets();
-  }, [projectId]);
+  }, []);
 
   const handleDelete = async (assetId: string) => {
     try {
-      const response = await brandAPI.deleteAsset(projectId, assetId);
+      const response = await brandAPI.deleteAsset(assetId);
       if (response.data.success) {
         loadAssets();
       }
@@ -49,7 +45,7 @@ export const LogosSection: React.FC<LogosSectionProps> = ({ projectId }) => {
 
   const handleSetPrimary = async (assetId: string) => {
     try {
-      const response = await brandAPI.setAssetPrimary(projectId, assetId);
+      const response = await brandAPI.setAssetPrimary(assetId);
       if (response.data.success) {
         loadAssets();
       }
@@ -91,7 +87,6 @@ export const LogosSection: React.FC<LogosSectionProps> = ({ projectId }) => {
             <BrandAssetCard
               key={asset.id}
               asset={asset}
-              projectId={projectId}
               onDelete={handleDelete}
               onSetPrimary={handleSetPrimary}
             />
@@ -100,7 +95,6 @@ export const LogosSection: React.FC<LogosSectionProps> = ({ projectId }) => {
       )}
 
       <BrandAssetUploader
-        projectId={projectId}
         assetType="logo"
         open={uploaderOpen}
         onOpenChange={setUploaderOpen}

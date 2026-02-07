@@ -2,8 +2,8 @@
 Brand API endpoints.
 
 Educational Note: These endpoints manage brand assets and configuration
-for a project. Brand settings are used by studio agents to maintain
-consistent branding across generated content.
+at the workspace (user) level. Brand settings are used by studio agents
+to maintain consistent branding across all projects' generated content.
 
 Asset Types:
 - logo: Brand logos (SVG, PNG preferred)
@@ -19,7 +19,7 @@ Configuration Sections:
 - voice: Brand voice (tone, personality, keywords)
 - feature_settings: Per-feature toggles for brand application
 """
-from flask import request, jsonify
+from flask import request, jsonify, g
 from app.api.brand import brand_bp
 from app.services.data_services import brand_asset_service, brand_config_service
 
@@ -28,10 +28,10 @@ from app.services.data_services import brand_asset_service, brand_config_service
 # BRAND ASSETS ENDPOINTS
 # =============================================================================
 
-@brand_bp.route('/projects/<project_id>/brand/assets', methods=['GET'])
-def list_assets(project_id: str):
+@brand_bp.route('/brand/assets', methods=['GET'])
+def list_assets():
     """
-    List all brand assets for a project.
+    List all brand assets for the authenticated user.
 
     Optional Query Parameters:
         type: Filter by asset type (logo, icon, font, image)
@@ -44,12 +44,13 @@ def list_assets(project_id: str):
         }
     """
     try:
+        user_id = g.user_id
         asset_type = request.args.get('type')
 
         if asset_type:
-            assets = brand_asset_service.list_assets_by_type(project_id, asset_type)
+            assets = brand_asset_service.list_assets_by_type(user_id, asset_type)
         else:
-            assets = brand_asset_service.list_assets(project_id)
+            assets = brand_asset_service.list_assets(user_id)
 
         return jsonify({
             "success": True,
@@ -64,8 +65,8 @@ def list_assets(project_id: str):
         }), 500
 
 
-@brand_bp.route('/projects/<project_id>/brand/assets', methods=['POST'])
-def upload_asset(project_id: str):
+@brand_bp.route('/brand/assets', methods=['POST'])
+def upload_asset():
     """
     Upload a new brand asset.
 
@@ -87,6 +88,8 @@ def upload_asset(project_id: str):
         }
     """
     try:
+        user_id = g.user_id
+
         # Check for file
         if 'file' not in request.files:
             return jsonify({
@@ -128,7 +131,7 @@ def upload_asset(project_id: str):
 
         # Create the asset
         asset = brand_asset_service.create_asset(
-            project_id=project_id,
+            user_id=user_id,
             name=name,
             asset_type=asset_type,
             file_name=file_name,
@@ -156,8 +159,8 @@ def upload_asset(project_id: str):
         }), 500
 
 
-@brand_bp.route('/projects/<project_id>/brand/assets/<asset_id>', methods=['GET'])
-def get_asset(project_id: str, asset_id: str):
+@brand_bp.route('/brand/assets/<asset_id>', methods=['GET'])
+def get_asset(asset_id: str):
     """
     Get a single brand asset's metadata.
 
@@ -168,7 +171,8 @@ def get_asset(project_id: str, asset_id: str):
         }
     """
     try:
-        asset = brand_asset_service.get_asset(project_id, asset_id)
+        user_id = g.user_id
+        asset = brand_asset_service.get_asset(user_id, asset_id)
 
         if not asset:
             return jsonify({
@@ -188,8 +192,8 @@ def get_asset(project_id: str, asset_id: str):
         }), 500
 
 
-@brand_bp.route('/projects/<project_id>/brand/assets/<asset_id>', methods=['PUT'])
-def update_asset(project_id: str, asset_id: str):
+@brand_bp.route('/brand/assets/<asset_id>', methods=['PUT'])
+def update_asset(asset_id: str):
     """
     Update a brand asset's metadata (not the file itself).
 
@@ -208,6 +212,7 @@ def update_asset(project_id: str, asset_id: str):
         }
     """
     try:
+        user_id = g.user_id
         data = request.get_json()
 
         if not data:
@@ -217,7 +222,7 @@ def update_asset(project_id: str, asset_id: str):
             }), 400
 
         updated_asset = brand_asset_service.update_asset(
-            project_id=project_id,
+            user_id=user_id,
             asset_id=asset_id,
             name=data.get('name'),
             description=data.get('description'),
@@ -244,8 +249,8 @@ def update_asset(project_id: str, asset_id: str):
         }), 500
 
 
-@brand_bp.route('/projects/<project_id>/brand/assets/<asset_id>', methods=['DELETE'])
-def delete_asset(project_id: str, asset_id: str):
+@brand_bp.route('/brand/assets/<asset_id>', methods=['DELETE'])
+def delete_asset(asset_id: str):
     """
     Delete a brand asset and its file.
 
@@ -256,7 +261,8 @@ def delete_asset(project_id: str, asset_id: str):
         }
     """
     try:
-        success = brand_asset_service.delete_asset(project_id, asset_id)
+        user_id = g.user_id
+        success = brand_asset_service.delete_asset(user_id, asset_id)
 
         if not success:
             return jsonify({
@@ -276,8 +282,8 @@ def delete_asset(project_id: str, asset_id: str):
         }), 500
 
 
-@brand_bp.route('/projects/<project_id>/brand/assets/<asset_id>/download', methods=['GET'])
-def get_asset_download_url(project_id: str, asset_id: str):
+@brand_bp.route('/brand/assets/<asset_id>/download', methods=['GET'])
+def get_asset_download_url(asset_id: str):
     """
     Get a signed URL for downloading a brand asset.
 
@@ -293,7 +299,8 @@ def get_asset_download_url(project_id: str, asset_id: str):
         }
     """
     try:
-        url = brand_asset_service.get_asset_url(project_id, asset_id)
+        user_id = g.user_id
+        url = brand_asset_service.get_asset_url(user_id, asset_id)
 
         if not url:
             return jsonify({
@@ -314,8 +321,8 @@ def get_asset_download_url(project_id: str, asset_id: str):
         }), 500
 
 
-@brand_bp.route('/projects/<project_id>/brand/assets/<asset_id>/primary', methods=['POST'])
-def set_asset_primary(project_id: str, asset_id: str):
+@brand_bp.route('/brand/assets/<asset_id>/primary', methods=['POST'])
+def set_asset_primary(asset_id: str):
     """
     Set a brand asset as the primary for its type.
 
@@ -326,8 +333,10 @@ def set_asset_primary(project_id: str, asset_id: str):
         }
     """
     try:
+        user_id = g.user_id
+
         # Get asset to find its type
-        asset = brand_asset_service.get_asset(project_id, asset_id)
+        asset = brand_asset_service.get_asset(user_id, asset_id)
         if not asset:
             return jsonify({
                 "success": False,
@@ -335,7 +344,7 @@ def set_asset_primary(project_id: str, asset_id: str):
             }), 404
 
         success = brand_asset_service.set_primary(
-            project_id, asset_id, asset['asset_type']
+            user_id, asset_id, asset['asset_type']
         )
 
         if not success:
@@ -360,10 +369,10 @@ def set_asset_primary(project_id: str, asset_id: str):
 # BRAND CONFIG ENDPOINTS
 # =============================================================================
 
-@brand_bp.route('/projects/<project_id>/brand/config', methods=['GET'])
-def get_config(project_id: str):
+@brand_bp.route('/brand/config', methods=['GET'])
+def get_config():
     """
-    Get the brand configuration for a project.
+    Get the brand configuration for the authenticated user.
 
     Educational Note: Creates default config if none exists. This ensures
     there's always a valid config to display.
@@ -382,7 +391,8 @@ def get_config(project_id: str):
         }
     """
     try:
-        config = brand_config_service.get_config(project_id)
+        user_id = g.user_id
+        config = brand_config_service.get_config(user_id)
 
         return jsonify({
             "success": True,
@@ -396,8 +406,8 @@ def get_config(project_id: str):
         }), 500
 
 
-@brand_bp.route('/projects/<project_id>/brand/config', methods=['PUT'])
-def update_config(project_id: str):
+@brand_bp.route('/brand/config', methods=['PUT'])
+def update_config():
     """
     Update the brand configuration (full or partial).
 
@@ -420,6 +430,7 @@ def update_config(project_id: str):
         }
     """
     try:
+        user_id = g.user_id
         data = request.get_json()
 
         if not data:
@@ -429,7 +440,7 @@ def update_config(project_id: str):
             }), 400
 
         updated_config = brand_config_service.update_config(
-            project_id=project_id,
+            user_id=user_id,
             colors=data.get('colors'),
             typography=data.get('typography'),
             spacing=data.get('spacing'),
@@ -452,8 +463,8 @@ def update_config(project_id: str):
         }), 500
 
 
-@brand_bp.route('/projects/<project_id>/brand/config/colors', methods=['PUT'])
-def update_colors(project_id: str):
+@brand_bp.route('/brand/config/colors', methods=['PUT'])
+def update_colors():
     """
     Update just the color palette.
 
@@ -470,15 +481,9 @@ def update_colors(project_id: str):
                 ]
             }
         }
-
-    Returns:
-        {
-            "success": true,
-            "config": { ... updated ... },
-            "message": "Brand colors updated successfully"
-        }
     """
     try:
+        user_id = g.user_id
         data = request.get_json()
 
         if not data or 'colors' not in data:
@@ -488,7 +493,7 @@ def update_colors(project_id: str):
             }), 400
 
         updated_config = brand_config_service.update_colors(
-            project_id, data['colors']
+            user_id, data['colors']
         )
 
         return jsonify({
@@ -504,8 +509,8 @@ def update_colors(project_id: str):
         }), 500
 
 
-@brand_bp.route('/projects/<project_id>/brand/config/typography', methods=['PUT'])
-def update_typography(project_id: str):
+@brand_bp.route('/brand/config/typography', methods=['PUT'])
+def update_typography():
     """
     Update just the typography settings.
 
@@ -519,15 +524,9 @@ def update_typography(project_id: str):
                 "line_height": "1.6"
             }
         }
-
-    Returns:
-        {
-            "success": true,
-            "config": { ... updated ... },
-            "message": "Brand typography updated successfully"
-        }
     """
     try:
+        user_id = g.user_id
         data = request.get_json()
 
         if not data or 'typography' not in data:
@@ -537,7 +536,7 @@ def update_typography(project_id: str):
             }), 400
 
         updated_config = brand_config_service.update_typography(
-            project_id, data['typography']
+            user_id, data['typography']
         )
 
         return jsonify({
@@ -553,8 +552,8 @@ def update_typography(project_id: str):
         }), 500
 
 
-@brand_bp.route('/projects/<project_id>/brand/config/guidelines', methods=['PUT'])
-def update_guidelines(project_id: str):
+@brand_bp.route('/brand/config/guidelines', methods=['PUT'])
+def update_guidelines():
     """
     Update just the brand guidelines text.
 
@@ -562,15 +561,9 @@ def update_guidelines(project_id: str):
         {
             "guidelines": "# Brand Guidelines\n\nOur brand is..."
         }
-
-    Returns:
-        {
-            "success": true,
-            "config": { ... updated ... },
-            "message": "Brand guidelines updated successfully"
-        }
     """
     try:
+        user_id = g.user_id
         data = request.get_json()
 
         if not data or 'guidelines' not in data:
@@ -580,7 +573,7 @@ def update_guidelines(project_id: str):
             }), 400
 
         updated_config = brand_config_service.update_guidelines(
-            project_id, data['guidelines']
+            user_id, data['guidelines']
         )
 
         return jsonify({
@@ -596,8 +589,8 @@ def update_guidelines(project_id: str):
         }), 500
 
 
-@brand_bp.route('/projects/<project_id>/brand/config/voice', methods=['PUT'])
-def update_voice(project_id: str):
+@brand_bp.route('/brand/config/voice', methods=['PUT'])
+def update_voice():
     """
     Update just the brand voice settings.
 
@@ -609,15 +602,9 @@ def update_voice(project_id: str):
                 "keywords": ["innovation", "quality"]
             }
         }
-
-    Returns:
-        {
-            "success": true,
-            "config": { ... updated ... },
-            "message": "Brand voice updated successfully"
-        }
     """
     try:
+        user_id = g.user_id
         data = request.get_json()
 
         if not data or 'voice' not in data:
@@ -627,7 +614,7 @@ def update_voice(project_id: str):
             }), 400
 
         updated_config = brand_config_service.update_voice(
-            project_id, data['voice']
+            user_id, data['voice']
         )
 
         return jsonify({
@@ -643,8 +630,8 @@ def update_voice(project_id: str):
         }), 500
 
 
-@brand_bp.route('/projects/<project_id>/brand/config/features', methods=['PUT'])
-def update_feature_settings(project_id: str):
+@brand_bp.route('/brand/config/features', methods=['PUT'])
+def update_feature_settings():
     """
     Update per-feature brand application settings.
 
@@ -662,15 +649,9 @@ def update_feature_settings(project_id: str):
                 "email": true
             }
         }
-
-    Returns:
-        {
-            "success": true,
-            "config": { ... updated ... },
-            "message": "Feature settings updated successfully"
-        }
     """
     try:
+        user_id = g.user_id
         data = request.get_json()
 
         if not data or 'feature_settings' not in data:
@@ -680,7 +661,7 @@ def update_feature_settings(project_id: str):
             }), 400
 
         updated_config = brand_config_service.update_feature_settings(
-            project_id, data['feature_settings']
+            user_id, data['feature_settings']
         )
 
         return jsonify({

@@ -4,6 +4,8 @@
  * Educational Note: This module handles all brand-related API calls including
  * asset management (logos, icons, fonts, images) and configuration (colors,
  * typography, guidelines, voice, feature settings).
+ *
+ * Brand is a workspace-level (per-user) setting — shared across all projects.
  */
 
 import { api } from './client';
@@ -20,7 +22,7 @@ export type BrandAssetType = 'logo' | 'icon' | 'font' | 'image';
 
 export interface BrandAsset {
   id: string;
-  project_id: string;
+  user_id: string;
   name: string;
   description?: string;
   asset_type: BrandAssetType;
@@ -179,11 +181,11 @@ export interface FeatureSettings {
 
 /**
  * Full Brand Configuration
- * Educational Note: Complete brand settings stored per project.
+ * Educational Note: Complete brand settings stored per user (workspace-level).
  */
 export interface BrandConfig {
   id: string;
-  project_id: string;
+  user_id: string;
   colors: ColorPalette;
   typography: Typography;
   spacing: Spacing;
@@ -243,18 +245,16 @@ export const brandAPI = {
   // =========================================================================
 
   /**
-   * List all brand assets for a project
-   * @param projectId - The project UUID
+   * List all brand assets for the authenticated user
    * @param assetType - Optional filter by asset type
    */
-  listAssets: (projectId: string, assetType?: BrandAssetType) => {
+  listAssets: (assetType?: BrandAssetType) => {
     const params = assetType ? { type: assetType } : {};
-    return api.get<AssetsResponse>(`/projects/${projectId}/brand/assets`, { params });
+    return api.get<AssetsResponse>('/brand/assets', { params });
   },
 
   /**
    * Upload a new brand asset
-   * @param projectId - The project UUID
    * @param formData - FormData with file and metadata
    *
    * Educational Note: We use FormData for file uploads (multipart/form-data)
@@ -265,92 +265,91 @@ export const brandAPI = {
    * - description: Optional description
    * - is_primary: 'true' or 'false'
    */
-  uploadAsset: (projectId: string, formData: FormData) =>
-    api.post<AssetResponse>(`/projects/${projectId}/brand/assets`, formData, {
+  uploadAsset: (formData: FormData) =>
+    api.post<AssetResponse>('/brand/assets', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     }),
 
   /**
    * Get a single brand asset's metadata
    */
-  getAsset: (projectId: string, assetId: string) =>
-    api.get<AssetResponse>(`/projects/${projectId}/brand/assets/${assetId}`),
+  getAsset: (assetId: string) =>
+    api.get<AssetResponse>(`/brand/assets/${assetId}`),
 
   /**
    * Update a brand asset's metadata (not the file)
    */
   updateAsset: (
-    projectId: string,
     assetId: string,
     data: Partial<Pick<BrandAsset, 'name' | 'description' | 'metadata' | 'is_primary'>>
-  ) => api.put<AssetResponse>(`/projects/${projectId}/brand/assets/${assetId}`, data),
+  ) => api.put<AssetResponse>(`/brand/assets/${assetId}`, data),
 
   /**
    * Delete a brand asset
    */
-  deleteAsset: (projectId: string, assetId: string) =>
-    api.delete<SuccessResponse>(`/projects/${projectId}/brand/assets/${assetId}`),
+  deleteAsset: (assetId: string) =>
+    api.delete<SuccessResponse>(`/brand/assets/${assetId}`),
 
   /**
    * Get a signed download URL for a brand asset
    * Educational Note: Returns a temporary URL (1 hour expiry) to download the file
    * directly from storage without proxying through the backend.
    */
-  getAssetUrl: (projectId: string, assetId: string) =>
-    api.get<AssetUrlResponse>(`/projects/${projectId}/brand/assets/${assetId}/download`),
+  getAssetUrl: (assetId: string) =>
+    api.get<AssetUrlResponse>(`/brand/assets/${assetId}/download`),
 
   /**
    * Set an asset as the primary for its type
    */
-  setAssetPrimary: (projectId: string, assetId: string) =>
-    api.post<SuccessResponse>(`/projects/${projectId}/brand/assets/${assetId}/primary`),
+  setAssetPrimary: (assetId: string) =>
+    api.post<SuccessResponse>(`/brand/assets/${assetId}/primary`),
 
   // =========================================================================
   // CONFIGURATION
   // =========================================================================
 
   /**
-   * Get the brand configuration for a project
+   * Get the brand configuration for the authenticated user
    * Educational Note: Creates default config if none exists
    */
-  getConfig: (projectId: string) =>
-    api.get<ConfigResponse>(`/projects/${projectId}/brand/config`),
+  getConfig: () =>
+    api.get<ConfigResponse>('/brand/config'),
 
   /**
    * Update the brand configuration (full or partial)
    */
-  updateConfig: (projectId: string, config: Partial<Omit<BrandConfig, 'id' | 'project_id' | 'created_at' | 'updated_at'>>) =>
-    api.put<ConfigResponse>(`/projects/${projectId}/brand/config`, config),
+  updateConfig: (config: Partial<Omit<BrandConfig, 'id' | 'user_id' | 'created_at' | 'updated_at'>>) =>
+    api.put<ConfigResponse>('/brand/config', config),
 
   /**
    * Update just the color palette
    */
-  updateColors: (projectId: string, colors: ColorPalette) =>
-    api.put<ConfigResponse>(`/projects/${projectId}/brand/config/colors`, { colors }),
+  updateColors: (colors: ColorPalette) =>
+    api.put<ConfigResponse>('/brand/config/colors', { colors }),
 
   /**
    * Update just the typography settings
    */
-  updateTypography: (projectId: string, typography: Typography) =>
-    api.put<ConfigResponse>(`/projects/${projectId}/brand/config/typography`, { typography }),
+  updateTypography: (typography: Typography) =>
+    api.put<ConfigResponse>('/brand/config/typography', { typography }),
 
   /**
    * Update just the brand guidelines text
    */
-  updateGuidelines: (projectId: string, guidelines: string) =>
-    api.put<ConfigResponse>(`/projects/${projectId}/brand/config/guidelines`, { guidelines }),
+  updateGuidelines: (guidelines: string) =>
+    api.put<ConfigResponse>('/brand/config/guidelines', { guidelines }),
 
   /**
    * Update just the brand voice settings
    */
-  updateVoice: (projectId: string, voice: BrandVoice) =>
-    api.put<ConfigResponse>(`/projects/${projectId}/brand/config/voice`, { voice }),
+  updateVoice: (voice: BrandVoice) =>
+    api.put<ConfigResponse>('/brand/config/voice', { voice }),
 
   /**
    * Update per-feature brand application settings
    */
-  updateFeatureSettings: (projectId: string, featureSettings: FeatureSettings) =>
-    api.put<ConfigResponse>(`/projects/${projectId}/brand/config/features`, { feature_settings: featureSettings }),
+  updateFeatureSettings: (featureSettings: FeatureSettings) =>
+    api.put<ConfigResponse>('/brand/config/features', { feature_settings: featureSettings }),
 };
 
 // =============================================================================

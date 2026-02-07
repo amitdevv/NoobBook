@@ -10,11 +10,7 @@ import { Plus, Trash, CircleNotch, Check } from '@phosphor-icons/react';
 import { brandAPI, type ColorPalette, type CustomColor, getDefaultColors } from '../../../lib/api/brand';
 import { ColorPicker } from '../ColorPicker';
 
-interface ColorsSectionProps {
-  projectId: string;
-}
-
-export const ColorsSection: React.FC<ColorsSectionProps> = ({ projectId }) => {
+export const ColorsSection: React.FC = () => {
   const [colors, setColors] = useState<ColorPalette>(getDefaultColors());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,7 +21,7 @@ export const ColorsSection: React.FC<ColorsSectionProps> = ({ projectId }) => {
   const loadColors = async () => {
     try {
       setLoading(true);
-      const response = await brandAPI.getConfig(projectId);
+      const response = await brandAPI.getConfig();
       if (response.data.success) {
         setColors(response.data.config.colors);
       }
@@ -38,12 +34,12 @@ export const ColorsSection: React.FC<ColorsSectionProps> = ({ projectId }) => {
 
   useEffect(() => {
     loadColors();
-  }, [projectId]);
+  }, []);
 
   const handleSave = async () => {
     try {
       setSaving(true);
-      const response = await brandAPI.updateColors(projectId, colors);
+      const response = await brandAPI.updateColors(colors);
       if (response.data.success) {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);

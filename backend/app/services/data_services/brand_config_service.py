@@ -2,8 +2,8 @@
 Brand Config Service - Business logic for brand configuration management.
 
 Educational Note: Brand configuration stores colors, typography, guidelines,
-and voice settings for a project. This is used by studio agents to maintain
-consistent branding across generated content.
+and voice settings at the workspace (user) level. This is used by studio agents
+to maintain consistent branding across all projects' generated content.
 
 The config is created on first access with sensible defaults and can be
 updated incrementally (e.g., update just colors without touching typography).
@@ -75,9 +75,8 @@ class BrandConfigService:
     """
     Service class for managing brand configuration using Supabase.
 
-    Educational Note: Unlike brand assets which can have multiple per project,
-    each project has exactly one brand config. The config is created automatically
-    on first access with defaults.
+    Educational Note: Each user has exactly one brand config (workspace-level).
+    The config is created automatically on first access with defaults.
     """
 
     def __init__(self):
@@ -90,15 +89,15 @@ class BrandConfigService:
         self.supabase = get_supabase()
         self.table = "brand_config"
 
-    def get_config(self, project_id: str) -> Dict[str, Any]:
+    def get_config(self, user_id: str) -> Dict[str, Any]:
         """
-        Get the brand configuration for a project.
+        Get the brand configuration for a user.
 
         Educational Note: Creates default config if none exists. This ensures
         there's always a valid config to work with.
 
         Args:
-            project_id: The project UUID
+            user_id: The user UUID
 
         Returns:
             Brand configuration object
@@ -106,7 +105,7 @@ class BrandConfigService:
         response = (
             self.supabase.table(self.table)
             .select("*")
-            .eq("project_id", project_id)
+            .eq("user_id", user_id)
             .execute()
         )
 
@@ -114,11 +113,11 @@ class BrandConfigService:
             return response.data[0]
 
         # Create default config if none exists
-        return self._create_default_config(project_id)
+        return self._create_default_config(user_id)
 
     def update_config(
         self,
-        project_id: str,
+        user_id: str,
         colors: Optional[Dict[str, Any]] = None,
         typography: Optional[Dict[str, Any]] = None,
         spacing: Optional[Dict[str, Any]] = None,
@@ -128,13 +127,13 @@ class BrandConfigService:
         feature_settings: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Update the brand configuration for a project.
+        Update the brand configuration for a user.
 
         Educational Note: Only updates the fields that are provided.
         This allows partial updates (e.g., just update colors).
 
         Args:
-            project_id: The project UUID
+            user_id: The user UUID
             colors: Color palette settings
             typography: Typography settings
             spacing: Spacing configuration
@@ -147,7 +146,7 @@ class BrandConfigService:
             Updated brand configuration
         """
         # Ensure config exists
-        self.get_config(project_id)
+        self.get_config(user_id)
 
         # Build update data (only include non-None values)
         update_data = {}
@@ -168,110 +167,110 @@ class BrandConfigService:
 
         if not update_data:
             # No updates, return existing config
-            return self.get_config(project_id)
+            return self.get_config(user_id)
 
         # Update the config
         response = (
             self.supabase.table(self.table)
             .update(update_data)
-            .eq("project_id", project_id)
+            .eq("user_id", user_id)
             .execute()
         )
 
         if response.data:
-            print(f"Updated brand config for project: {project_id}")
+            print(f"Updated brand config for user: {user_id}")
             return response.data[0]
 
-        return self.get_config(project_id)
+        return self.get_config(user_id)
 
     def update_colors(
         self,
-        project_id: str,
+        user_id: str,
         colors: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Update just the color palette.
 
         Args:
-            project_id: The project UUID
+            user_id: The user UUID
             colors: New color palette
 
         Returns:
             Updated brand configuration
         """
-        return self.update_config(project_id, colors=colors)
+        return self.update_config(user_id, colors=colors)
 
     def update_typography(
         self,
-        project_id: str,
+        user_id: str,
         typography: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Update just the typography settings.
 
         Args:
-            project_id: The project UUID
+            user_id: The user UUID
             typography: New typography settings
 
         Returns:
             Updated brand configuration
         """
-        return self.update_config(project_id, typography=typography)
+        return self.update_config(user_id, typography=typography)
 
     def update_guidelines(
         self,
-        project_id: str,
+        user_id: str,
         guidelines: str
     ) -> Dict[str, Any]:
         """
         Update just the brand guidelines text.
 
         Args:
-            project_id: The project UUID
+            user_id: The user UUID
             guidelines: New guidelines text (markdown supported)
 
         Returns:
             Updated brand configuration
         """
-        return self.update_config(project_id, guidelines=guidelines)
+        return self.update_config(user_id, guidelines=guidelines)
 
     def update_best_practices(
         self,
-        project_id: str,
+        user_id: str,
         best_practices: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Update just the best practices (dos/donts).
 
         Args:
-            project_id: The project UUID
+            user_id: The user UUID
             best_practices: Object with 'dos' and 'donts' arrays
 
         Returns:
             Updated brand configuration
         """
-        return self.update_config(project_id, best_practices=best_practices)
+        return self.update_config(user_id, best_practices=best_practices)
 
     def update_voice(
         self,
-        project_id: str,
+        user_id: str,
         voice: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Update just the brand voice settings.
 
         Args:
-            project_id: The project UUID
+            user_id: The user UUID
             voice: Object with tone, personality, keywords
 
         Returns:
             Updated brand configuration
         """
-        return self.update_config(project_id, voice=voice)
+        return self.update_config(user_id, voice=voice)
 
     def update_feature_settings(
         self,
-        project_id: str,
+        user_id: str,
         feature_settings: Dict[str, bool]
     ) -> Dict[str, Any]:
         """
@@ -282,43 +281,39 @@ class BrandConfigService:
         brand colors but presentations do.
 
         Args:
-            project_id: The project UUID
+            user_id: The user UUID
             feature_settings: Dict mapping feature names to booleans
 
         Returns:
             Updated brand configuration
         """
-        return self.update_config(project_id, feature_settings=feature_settings)
+        return self.update_config(user_id, feature_settings=feature_settings)
 
     def is_feature_enabled(
         self,
-        project_id: str,
+        user_id: str,
         feature_name: str
     ) -> bool:
         """
         Check if brand should be applied for a specific feature.
 
         Args:
-            project_id: The project UUID
+            user_id: The user UUID
             feature_name: The studio feature name (e.g., 'blog', 'presentation')
 
         Returns:
             True if brand should be applied for this feature
         """
-        config = self.get_config(project_id)
+        config = self.get_config(user_id)
         feature_settings = config.get("feature_settings", DEFAULT_FEATURE_SETTINGS)
         return feature_settings.get(feature_name, False)
 
-    def delete_config(self, project_id: str) -> bool:
+    def delete_config(self, user_id: str) -> bool:
         """
-        Delete the brand configuration for a project.
-
-        Educational Note: This is typically called when a project is deleted
-        (via cascade) but can also be used to reset to defaults by deleting
-        and then getting the config again.
+        Delete the brand configuration for a user.
 
         Args:
-            project_id: The project UUID
+            user_id: The user UUID
 
         Returns:
             True if deleted, False if not found
@@ -326,25 +321,25 @@ class BrandConfigService:
         response = (
             self.supabase.table(self.table)
             .delete()
-            .eq("project_id", project_id)
+            .eq("user_id", user_id)
             .execute()
         )
 
         # Check if any rows were deleted
         return bool(response.data)
 
-    def _create_default_config(self, project_id: str) -> Dict[str, Any]:
+    def _create_default_config(self, user_id: str) -> Dict[str, Any]:
         """
-        Create a default brand configuration for a project.
+        Create a default brand configuration for a user.
 
         Args:
-            project_id: The project UUID
+            user_id: The user UUID
 
         Returns:
             Newly created brand configuration
         """
         config_data = {
-            "project_id": project_id,
+            "user_id": user_id,
             "colors": DEFAULT_COLORS,
             "typography": DEFAULT_TYPOGRAPHY,
             "spacing": DEFAULT_SPACING,
@@ -361,7 +356,7 @@ class BrandConfigService:
         )
 
         if response.data:
-            print(f"Created default brand config for project: {project_id}")
+            print(f"Created default brand config for user: {user_id}")
             return response.data[0]
 
         raise RuntimeError("Failed to create default brand config")

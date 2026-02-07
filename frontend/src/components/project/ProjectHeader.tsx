@@ -27,7 +27,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '../ui/collapsible';
-import { ArrowLeft, DotsThreeVertical, Plus, Trash, FolderOpen, Gear, CircleNotch, CurrencyDollar, Brain, CaretDown, CaretRight, Palette, PencilSimple, SignOut } from '@phosphor-icons/react';
+import { ArrowLeft, DotsThreeVertical, Plus, Trash, FolderOpen, Gear, CircleNotch, CurrencyDollar, Brain, CaretDown, CaretRight, PencilSimple, SignOut } from '@phosphor-icons/react';
 import { Input } from '../ui/input';
 import { chatsAPI, type PromptConfig } from '../../lib/api/chats';
 import { projectsAPI, type CostTracking, type MemoryData } from '../../lib/api';
@@ -48,7 +48,6 @@ interface ProjectHeaderProps {
   onBack: () => void;
   onDelete: () => void;
   costsVersion?: number; // Increment to trigger cost refresh
-  onNavigateToBrand?: (projectId: string) => void;
   onRename?: (newName: string) => Promise<void>;
   onSignOut?: () => Promise<void>;
 }
@@ -58,7 +57,6 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   onBack,
   onDelete,
   costsVersion,
-  onNavigateToBrand,
   onRename,
   onSignOut,
 }) => {
@@ -345,18 +343,6 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
           <Brain size={16} />
           Memory
         </Button>
-
-        {onNavigateToBrand && (
-          <Button
-            variant="soft"
-            size="sm"
-            onClick={() => onNavigateToBrand(project.id)}
-            className="gap-2"
-          >
-            <Palette size={16} />
-            Brand Kit
-          </Button>
-        )}
 
         <Button
           variant="soft"

@@ -30,7 +30,6 @@ interface ProjectWorkspaceProps {
   };
   onBack: () => void;
   onDeleteProject: (projectId: string) => void;
-  onNavigateToBrand?: (projectId: string) => void;
   onRenameProject?: (newName: string) => Promise<void>;
   onSignOut?: () => Promise<void>;
 }
@@ -39,7 +38,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   project,
   onBack,
   onDeleteProject,
-  onNavigateToBrand,
   onRenameProject,
   onSignOut,
 }) => {
@@ -80,7 +78,6 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
         onBack={onBack}
         onDelete={() => onDeleteProject(project.id)}
         costsVersion={costsVersion}
-        onNavigateToBrand={onNavigateToBrand}
         onRename={onRenameProject}
         onSignOut={onSignOut}
       />

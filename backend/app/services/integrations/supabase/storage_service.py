@@ -831,17 +831,17 @@ def delete_source_files(project_id: str, source_id: str, filename: str) -> bool:
 # BRAND ASSETS (Logos, icons, fonts, images for brand kit)
 # =============================================================================
 
-def _build_brand_path(project_id: str, asset_id: str, filename: str) -> str:
+def _build_brand_path(user_id: str, asset_id: str, filename: str) -> str:
     """
     Build storage path for brand assets.
-    Pattern: {project_id}/brand/{asset_id}/{filename}
+    Pattern: {user_id}/brand/{asset_id}/{filename}
     Example: abc123/brand/def456/logo.svg
     """
-    return f"{project_id}/brand/{asset_id}/{filename}"
+    return f"{user_id}/brand/{asset_id}/{filename}"
 
 
 def upload_brand_asset(
-    project_id: str,
+    user_id: str,
     asset_id: str,
     filename: str,
     file_data: bytes,
@@ -851,7 +851,7 @@ def upload_brand_asset(
     Upload a brand asset file to storage.
 
     Args:
-        project_id: The project UUID
+        user_id: The user UUID
         asset_id: The brand asset UUID
         filename: Asset filename (e.g., logo.svg)
         file_data: File bytes
@@ -861,7 +861,7 @@ def upload_brand_asset(
         Storage path if successful, None otherwise
     """
     client = _get_client()
-    path = _build_brand_path(project_id, asset_id, filename)
+    path = _build_brand_path(user_id, asset_id, filename)
 
     try:
         client.storage.from_(BUCKET_BRAND_ASSETS).upload(
@@ -890,7 +890,7 @@ def upload_brand_asset(
 
 
 def download_brand_asset(
-    project_id: str,
+    user_id: str,
     asset_id: str,
     filename: str
 ) -> Optional[bytes]:
@@ -898,7 +898,7 @@ def download_brand_asset(
     Download a brand asset file from storage.
 
     Args:
-        project_id: The project UUID
+        user_id: The user UUID
         asset_id: The brand asset UUID
         filename: Asset filename
 
@@ -906,7 +906,7 @@ def download_brand_asset(
         File bytes or None if not found
     """
     client = _get_client()
-    path = _build_brand_path(project_id, asset_id, filename)
+    path = _build_brand_path(user_id, asset_id, filename)
 
     try:
         response = client.storage.from_(BUCKET_BRAND_ASSETS).download(path)
@@ -917,7 +917,7 @@ def download_brand_asset(
 
 
 def delete_brand_asset(
-    project_id: str,
+    user_id: str,
     asset_id: str,
     filename: str
 ) -> bool:
@@ -925,7 +925,7 @@ def delete_brand_asset(
     Delete a brand asset file from storage.
 
     Args:
-        project_id: The project UUID
+        user_id: The user UUID
         asset_id: The brand asset UUID
         filename: Asset filename
 
@@ -933,7 +933,7 @@ def delete_brand_asset(
         True if successful
     """
     client = _get_client()
-    path = _build_brand_path(project_id, asset_id, filename)
+    path = _build_brand_path(user_id, asset_id, filename)
 
     try:
         client.storage.from_(BUCKET_BRAND_ASSETS).remove([path])
@@ -945,7 +945,7 @@ def delete_brand_asset(
 
 
 def get_brand_asset_url(
-    project_id: str,
+    user_id: str,
     asset_id: str,
     filename: str,
     expires_in: int = 3600
@@ -954,7 +954,7 @@ def get_brand_asset_url(
     Get a signed URL for a brand asset (for private bucket access).
 
     Args:
-        project_id: The project UUID
+        user_id: The user UUID
         asset_id: The brand asset UUID
         filename: Asset filename
         expires_in: URL expiration time in seconds (default 1 hour)
@@ -963,7 +963,7 @@ def get_brand_asset_url(
         Signed URL or None
     """
     client = _get_client()
-    path = _build_brand_path(project_id, asset_id, filename)
+    path = _build_brand_path(user_id, asset_id, filename)
 
     try:
         response = client.storage.from_(BUCKET_BRAND_ASSETS).create_signed_url(path, expires_in)
@@ -973,18 +973,18 @@ def get_brand_asset_url(
         return None
 
 
-def delete_project_brand_assets(project_id: str) -> bool:
+def delete_user_brand_assets(user_id: str) -> bool:
     """
-    Delete all brand assets for a project.
+    Delete all brand assets for a user.
 
     Args:
-        project_id: The project UUID
+        user_id: The user UUID
 
     Returns:
         True if successful
     """
     client = _get_client()
-    prefix = f"{project_id}/brand"
+    prefix = f"{user_id}/brand"
 
     try:
         # List all files in the project's brand folder
@@ -1004,7 +1004,7 @@ def delete_project_brand_assets(project_id: str) -> bool:
 
             if all_paths:
                 client.storage.from_(BUCKET_BRAND_ASSETS).remove(all_paths)
-                print(f"  Deleted {len(all_paths)} brand assets for project {project_id}")
+                print(f"  Deleted {len(all_paths)} brand assets for user {user_id}")
         return True
     except Exception as e:
         print(f"  Error deleting project brand assets: {e}")

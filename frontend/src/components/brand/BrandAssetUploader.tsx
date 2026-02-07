@@ -21,7 +21,6 @@ import { cn } from '../../lib/utils';
 import { brandAPI, createAssetFormData, type BrandAssetType } from '../../lib/api/brand';
 
 interface BrandAssetUploaderProps {
-  projectId: string;
   assetType: BrandAssetType;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,7 +29,6 @@ interface BrandAssetUploaderProps {
 }
 
 export const BrandAssetUploader: React.FC<BrandAssetUploaderProps> = ({
-  projectId,
   assetType,
   open,
   onOpenChange,
@@ -110,7 +108,7 @@ export const BrandAssetUploader: React.FC<BrandAssetUploaderProps> = ({
         isPrimary,
       });
 
-      const response = await brandAPI.uploadAsset(projectId, formData);
+      const response = await brandAPI.uploadAsset(formData);
 
       if (response.data.success) {
         onUploaded();
