@@ -165,21 +165,36 @@ Supabase (PostgreSQL + S3 Storage + Auth)
 
 ---
 
-## Getting Started
+## Getting Started (Docker Setup)
+
+Docker is the recommended way to run NoobBook. One script starts everything — Supabase, PostgreSQL, database migrations, backend, and frontend (16 containers total).
 
 ### Prerequisites
 
-| Requirement | Install |
-|-------------|---------|
-| **Python 3.10+** | `brew install python3` (macOS) / `sudo apt install python3 python3-venv` (Ubuntu) |
-| **Node.js 18+** | `brew install node` (macOS) / [nodesource](https://github.com/nodesource/distributions) (Ubuntu) |
-| **Docker & Docker Compose** | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/) |
-| **LibreOffice** (optional) | `brew install libreoffice` / `sudo apt install libreoffice` — for DOCX/PPTX |
-| **FFmpeg** (optional) | `brew install ffmpeg` / `sudo apt install ffmpeg` — for audio |
+Before you begin, make sure you have:
+
+| Requirement | Install | Check |
+|-------------|---------|-------|
+| **Docker Desktop** | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/) | `docker info` |
+| **Docker Compose v2** | Included with Docker Desktop | `docker compose version` |
+| **Python 3** | `brew install python3` (macOS) / `sudo apt install python3` (Ubuntu) | `python3 --version` |
+
+> **Important:** Docker Desktop must be **running** (not just installed). Open it from your Applications before running setup.
+
+**Ports required (must be free):**
+
+| Port | Used by |
+|------|---------|
+| `80` | NoobBook frontend |
+| `5001` | NoobBook backend API |
+| `8000` | Supabase API gateway |
+| `5432` | PostgreSQL |
+
+The setup script checks these automatically and will tell you if something is already using a port.
 
 ### API Keys
 
-You'll need these before the app will work:
+Get these before running setup:
 
 | Key | Where to get it | Required? |
 |-----|-----------------|-----------|
@@ -194,63 +209,143 @@ You'll need these before the app will work:
 
 ---
 
-### Auth & Roles (RBAC)
-
-NoobBook supports two roles:
-- **admin**: can view/update secrets and app-level settings
-- **user**: can chat, use studio, and manage projects
-
-Configure in `docker/.env`:
-```
-NOOBBOOK_AUTH_REQUIRED=false   # set true to require login for all API routes
-NOOBBOOK_ADMIN_EMAILS=you@company.com,admin@company.com
-```
-
-First signup becomes admin if no admins exist (or if email is in `NOOBBOOK_ADMIN_EMAILS`).
-
-Optional local bootstrap (creates or resets an admin user on startup):
-```
-NOOBBOOK_BOOTSTRAP_ADMIN_EMAIL=admin@example.com
-NOOBBOOK_BOOTSTRAP_ADMIN_PASSWORD=Admin123!
-NOOBBOOK_BOOTSTRAP_ADMIN_FORCE_RESET=true
-```
-
----
-
-### Option A: Docker Setup (Recommended)
-
-One script starts everything — Supabase, database migrations, backend, and frontend.
+### Step 1: Clone and Configure
 
 ```bash
-# 1. Clone and switch to develop
-git clone https://github.com/amitdevv/NoobBook.git
+# Clone the repo
+git clone https://github.com/TeacherOp/NoobBook.git
 cd NoobBook
 git checkout develop
 
-# 2. Copy env template and add your API keys
+# Copy env template
 cp docker/.env.example docker/.env
-nano docker/.env    # Add ANTHROPIC_API_KEY, OPENAI_API_KEY, PINECONE_API_KEY, PINECONE_INDEX_NAME
-
-# 3. Run setup (generates Supabase secrets, starts everything)
-bash docker/setup.sh
-
-# 4. Open NoobBook
-open http://localhost
 ```
 
-**Manage Docker setup:**
+Edit `docker/.env` and add your API keys:
 ```bash
-bash docker/stop.sh           # Stop all services (data preserved)
-bash docker/setup.sh          # Re-run (idempotent, safe to re-run)
-bash docker/reset.sh          # Stop all services
-bash docker/reset.sh -v       # Stop + delete ALL data (destructive)
+nano docker/.env
 ```
+
+At minimum, fill in these four:
+```
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+PINECONE_API_KEY=...
+PINECONE_INDEX_NAME=...
+```
+
+### Step 2: Set Up Auth (Required)
+
+Auth is **enabled by default**. You need to configure an admin account before running setup.
+
+In `docker/.env`, set your admin credentials:
+```bash
+# Admin email(s) — these users get admin role on signup
+NOOBBOOK_ADMIN_EMAILS=you@company.com
+
+# Bootstrap admin — auto-creates this admin account on startup
+NOOBBOOK_BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+NOOBBOOK_BOOTSTRAP_ADMIN_PASSWORD=YourSecurePassword123!
+```
+
+> **How it works:** The bootstrap admin is created automatically when the app starts. You'll use these credentials to log in at `http://localhost`. Any other user who signs up gets the `user` role (can chat, use studio, manage projects). Admins can additionally manage app settings and API keys.
+
+### Step 3: Run Setup
+
+```bash
+bash docker/setup.sh
+```
+
+This will:
+1. Check prerequisites (Docker running, ports free, python3 available)
+2. Generate Supabase secrets (JWT tokens, database passwords)
+3. Create the Docker network
+4. Start Supabase services (PostgreSQL, Auth, Storage, API gateway)
+5. Build and start NoobBook (backend, frontend, database migration)
+
+First run takes **3-5 minutes** (downloading images + building). Subsequent runs are faster (cached).
+
+When you see this, you're good:
+```
+============================================
+  NoobBook is running!
+============================================
+
+  App:              http://localhost
+  Backend API:      http://localhost:5001/api/v1
+  Supabase API:     http://localhost:8000
+```
+
+### Step 4: Log In
+
+Open `http://localhost` and sign in with the bootstrap admin credentials you set in Step 2.
+
+---
+
+### Auth & Roles (RBAC)
+
+NoobBook has two roles:
+- **admin** — can view/update API keys, manage app settings, plus everything a user can do
+- **user** — can chat, use studio, upload sources, and manage projects
+
+**Auth settings in `docker/.env`:**
+
+| Variable | Description |
+|----------|-------------|
+| `NOOBBOOK_AUTH_REQUIRED=true` | Requires login for all API routes (default: `true`) |
+| `NOOBBOOK_ADMIN_EMAILS=a@b.com,c@d.com` | These emails get admin role on signup |
+| `NOOBBOOK_BOOTSTRAP_ADMIN_EMAIL` | Auto-creates this admin on startup |
+| `NOOBBOOK_BOOTSTRAP_ADMIN_PASSWORD` | Password for the bootstrap admin |
+| `NOOBBOOK_BOOTSTRAP_ADMIN_FORCE_RESET=true` | Reset the bootstrap admin password if account already exists |
+
+> **First signup rule:** If no admins exist yet, the first user to sign up automatically becomes admin (even without being in `NOOBBOOK_ADMIN_EMAILS`).
+
+---
+
+### Managing Your Setup
+
+**Stopping and starting:**
+```bash
+bash docker/stop.sh           # Stop all services (your data is preserved)
+bash docker/setup.sh          # Start again (safe to re-run, uses existing config)
+```
+
+**Full reset (destructive — deletes all data):**
+```bash
+bash docker/reset.sh -v       # Stops everything + deletes database, storage, and .env files
+bash docker/setup.sh          # Fresh start with new secrets
+```
+
+> **Note on re-running `setup.sh`:** The script is idempotent — it detects existing `.env` files and reuses them. Your Supabase secrets, database passwords, and API keys are **not regenerated** on subsequent runs. If you need fresh secrets (e.g. something is broken), do a full reset first with `reset.sh -v`.
+
+**If something goes wrong:**
+```bash
+# Check container status
+docker ps --format "table {{.Names}}\t{{.Status}}"
+
+# Check logs for a specific service
+docker logs noobbook-backend
+docker logs supabase-db
+docker logs supabase-kong
+
+# Nuclear option — wipe everything and start fresh
+bash docker/reset.sh -v
+bash docker/setup.sh
+```
+
+| Command | What it does |
+|---------|-------------|
+| `bash docker/setup.sh` | Start everything (idempotent, safe to re-run) |
+| `bash docker/stop.sh` | Stop all services, keep data |
+| `bash docker/reset.sh` | Stop all services, remove network |
+| `bash docker/reset.sh -v` | Stop + delete ALL data (database, storage, .env files) |
 
 | Service | URL |
 |---------|-----|
-| NoobBook | `http://localhost` |
+| NoobBook App | `http://localhost` |
 | Backend API | `http://localhost:5001/api/v1` |
-| Supabase Studio | `http://localhost:8000` |
+| Supabase API | `http://localhost:8000` |
+| MinIO Console | `http://localhost:9001` (supabase/supabase123) |
 
 ---
 

@@ -50,7 +50,7 @@ def is_auth_required() -> bool:
 
     Controlled via env var NOOBBOOK_AUTH_REQUIRED.
     """
-    value = os.getenv("NOOBBOOK_AUTH_REQUIRED", "false").strip().lower()
+    value = os.getenv("NOOBBOOK_AUTH_REQUIRED", "true").strip().lower()
     return value in {"1", "true", "yes", "on"}
 
 

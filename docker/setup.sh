@@ -225,26 +225,14 @@ if [ ! -f "$NOOBBOOK_ENV" ]; then
         warn "Edit docker/.env and add your API keys before the app will work."
     fi
 else
-    info "NoobBook .env already exists, ensuring Supabase keys are set..."
+    info "NoobBook .env already exists, syncing Supabase keys..."
     # shellcheck disable=SC1090
     source "$SUPABASE_ENV"
-    # Inject each Supabase-managed key independently (user may have set some but not others)
-    INJECTED=false
-    if grep -q '^SUPABASE_ANON_KEY=$' "$NOOBBOOK_ENV" 2>/dev/null; then
-        replace_env_var "$NOOBBOOK_ENV" "SUPABASE_ANON_KEY" "$ANON_KEY"
-        INJECTED=true
-    fi
-    if grep -q '^SUPABASE_SERVICE_KEY=$' "$NOOBBOOK_ENV" 2>/dev/null; then
-        replace_env_var "$NOOBBOOK_ENV" "SUPABASE_SERVICE_KEY" "$SERVICE_ROLE_KEY"
-        INJECTED=true
-    fi
-    if grep -q '^POSTGRES_PASSWORD=$' "$NOOBBOOK_ENV" 2>/dev/null; then
-        replace_env_var "$NOOBBOOK_ENV" "POSTGRES_PASSWORD" "$POSTGRES_PASSWORD"
-        INJECTED=true
-    fi
-    if [ "$INJECTED" = true ]; then
-        success "Supabase keys injected into existing .env"
-    fi
+    # Always sync Supabase-managed keys (user API keys are never touched)
+    replace_env_var "$NOOBBOOK_ENV" "SUPABASE_ANON_KEY" "$ANON_KEY"
+    replace_env_var "$NOOBBOOK_ENV" "SUPABASE_SERVICE_KEY" "$SERVICE_ROLE_KEY"
+    replace_env_var "$NOOBBOOK_ENV" "POSTGRES_PASSWORD" "$POSTGRES_PASSWORD"
+    success "Supabase keys synced from supabase/.env"
 fi
 
 # ---- Step 4: Create Docker network ----
