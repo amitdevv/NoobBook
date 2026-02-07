@@ -265,6 +265,12 @@ This will:
 
 First run takes **3-5 minutes** (downloading images + building). Subsequent runs are faster (cached).
 
+> **Already ran setup before?** If you've previously set up NoobBook and something isn't working, do a full reset first so everything starts fresh:
+> ```bash
+> bash docker/reset.sh -v
+> bash docker/setup.sh
+> ```
+
 When you see this, you're good:
 ```
 ============================================
