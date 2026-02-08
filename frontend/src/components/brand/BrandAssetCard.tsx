@@ -29,7 +29,9 @@ import {
   DownloadSimple,
   CircleNotch,
 } from '@phosphor-icons/react';
-import { brandAPI, type BrandAsset } from '../../lib/api/brand';
+import { type BrandAsset } from '../../lib/api/brand';
+import { API_HOST } from '../../lib/api/client';
+import { getAccessToken } from '../../lib/auth/session';
 
 interface BrandAssetCardProps {
   asset: BrandAsset;
@@ -46,15 +48,23 @@ export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
 
-  // Load image URL for preview
+  // Build authenticated image URL for preview
+  // Educational Note: The download endpoint now proxies the file through the backend
+  // (instead of returning a Supabase signed URL) so it works in Docker where the
+  // Supabase internal hostname isn't reachable from the browser.
   useEffect(() => {
     const loadImage = async () => {
       if (asset.mime_type?.startsWith('image/')) {
         setLoadingImage(true);
         try {
-          const response = await brandAPI.getAssetUrl(asset.id);
-          if (response.data.success) {
-            setImageUrl(response.data.url);
+          const token = await getAccessToken();
+          const url = `${API_HOST}/api/v1/brand/assets/${asset.id}/download`;
+          const response = await fetch(url, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (response.ok) {
+            const blob = await response.blob();
+            setImageUrl(URL.createObjectURL(blob));
           }
         } catch (error) {
           console.error('Failed to load image:', error);
@@ -64,16 +74,25 @@ export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
       }
     };
     loadImage();
+    return () => {
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+    };
   }, [asset.id, asset.mime_type]);
 
   const handleDownload = async () => {
     try {
-      const response = await brandAPI.getAssetUrl(asset.id);
-      if (response.data.success) {
-        window.open(response.data.url, '_blank');
+      const token = await getAccessToken();
+      const url = `${API_HOST}/api/v1/brand/assets/${asset.id}/download`;
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
       }
     } catch (error) {
-      console.error('Failed to get download URL:', error);
+      console.error('Failed to download:', error);
     }
   };
 

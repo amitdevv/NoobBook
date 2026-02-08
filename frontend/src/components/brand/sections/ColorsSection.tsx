@@ -9,6 +9,7 @@ import { Label } from '../../ui/label';
 import { Plus, Trash, CircleNotch, Check } from '@phosphor-icons/react';
 import { brandAPI, type ColorPalette, type CustomColor, getDefaultColors } from '../../../lib/api/brand';
 import { ColorPicker } from '../ColorPicker';
+import { useToast } from '@/components/ui/toast';
 
 export const ColorsSection: React.FC = () => {
   const [colors, setColors] = useState<ColorPalette>(getDefaultColors());
@@ -17,6 +18,7 @@ export const ColorsSection: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [newColorName, setNewColorName] = useState('');
   const [newColorValue, setNewColorValue] = useState('#000000');
+  const { success: showSuccess, error: showError } = useToast();
 
   const loadColors = async () => {
     try {
@@ -42,10 +44,12 @@ export const ColorsSection: React.FC = () => {
       const response = await brandAPI.updateColors(colors);
       if (response.data.success) {
         setSaved(true);
+        showSuccess('Colors saved');
         setTimeout(() => setSaved(false), 2000);
       }
     } catch (error) {
       console.error('Failed to save colors:', error);
+      showError('Failed to save colors');
     } finally {
       setSaving(false);
     }
@@ -92,28 +96,31 @@ export const ColorsSection: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Colors</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Define your brand color palette for consistent styling across generated content.
-          </p>
+      {/* Sticky header — stays visible while scrolling within the settings panel */}
+      <div className="sticky top-0 z-10 bg-white pb-4 -mx-6 px-6 pt-1 -mt-1">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Colors</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Define your brand color palette for consistent styling across generated content.
+            </p>
+          </div>
+          <Button onClick={handleSave} disabled={saving} className="gap-2">
+            {saving ? (
+              <>
+                <CircleNotch size={16} className="animate-spin" />
+                Saving...
+              </>
+            ) : saved ? (
+              <>
+                <Check size={16} />
+                Saved
+              </>
+            ) : (
+              'Save Colors'
+            )}
+          </Button>
         </div>
-        <Button onClick={handleSave} disabled={saving} className="gap-2">
-          {saving ? (
-            <>
-              <CircleNotch size={16} className="animate-spin" />
-              Saving...
-            </>
-          ) : saved ? (
-            <>
-              <Check size={16} />
-              Saved
-            </>
-          ) : (
-            'Save Colors'
-          )}
-        </Button>
       </div>
 
       {/* Primary Colors */}

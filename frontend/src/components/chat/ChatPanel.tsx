@@ -344,7 +344,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
   // Loading state
   if (loading) {
     return (
-      <div className="flex flex-col h-full bg-card">
+      <div className="flex flex-col h-full bg-white">
         <div className="border-b px-4 py-3">
           <div className="flex items-center gap-2">
             <Sparkle size={20} className="text-primary" />
@@ -411,7 +411,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
 
   // Active chat view
   return (
-    <div className="flex flex-col h-full min-h-0 min-w-0 w-full bg-card overflow-hidden">
+    <div className="flex flex-col h-full min-h-0 min-w-0 w-full bg-white overflow-hidden">
       <ChatHeader
         activeChat={activeChat}
         allChats={allChats}

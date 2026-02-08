@@ -167,6 +167,7 @@ export interface BrandVoice {
  * Educational Note: Controls which studio features should apply brand guidelines.
  */
 export interface FeatureSettings {
+  chat: boolean;
   infographic: boolean;
   presentation: boolean;
   mind_map: boolean;
@@ -426,6 +427,7 @@ export function getDefaultTypography(): Typography {
  */
 export function getDefaultFeatureSettings(): FeatureSettings {
   return {
+    chat: true,
     infographic: true,
     presentation: true,
     mind_map: false,

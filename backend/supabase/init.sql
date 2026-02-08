@@ -235,7 +235,14 @@ CREATE TABLE IF NOT EXISTS brand_assets (
   CONSTRAINT name_not_empty CHECK (length(trim(name)) > 0)
 );
 
-CREATE INDEX IF NOT EXISTS idx_brand_assets_user_id ON brand_assets(user_id);
+-- Index creation guarded: user_id may not exist yet on upgrades from older schema.
+-- Migration 00010_brand_to_user_level.sql handles adding user_id and its index.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'brand_assets' AND column_name = 'user_id') THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_brand_assets_user_id ON brand_assets(user_id)';
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_brand_assets_type ON brand_assets(asset_type);
 
 -- ============================================================================
@@ -269,6 +276,7 @@ CREATE TABLE IF NOT EXISTS brand_config (
   best_practices JSONB DEFAULT '{"dos": [], "donts": []}'::jsonb,
   voice JSONB DEFAULT '{"tone": "professional", "personality": [], "keywords": []}'::jsonb,
   feature_settings JSONB DEFAULT '{
+    "chat": true,
     "infographic": true,
     "presentation": true,
     "mind_map": false,
@@ -282,6 +290,105 @@ CREATE TABLE IF NOT EXISTS brand_config (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ============================================================================
+-- BRAND SCHEMA UPGRADE (idempotent)
+-- Handles upgrade from project-level (00007) to user-level (00010) schema.
+-- Runs inline because migration 00010 may have been seeded as "applied"
+-- by the Docker migration runner without actually executing.
+-- ============================================================================
+DO $$ BEGIN
+  -- Only run if brand_config still has the old project_id column
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'brand_config' AND column_name = 'project_id'
+  ) THEN
+    RAISE NOTICE 'brand_config has project_id — applying user-level migration...';
+
+    -- Add user_id columns WITHOUT FK constraint first (to allow backfill)
+    ALTER TABLE brand_config ADD COLUMN IF NOT EXISTS user_id UUID;
+    ALTER TABLE brand_assets ADD COLUMN IF NOT EXISTS user_id UUID;
+
+    -- Backfill user_id from projects table
+    UPDATE brand_config bc SET user_id = p.user_id FROM projects p WHERE bc.project_id = p.id AND bc.user_id IS NULL;
+    UPDATE brand_assets ba SET user_id = p.user_id FROM projects p WHERE ba.project_id = p.id AND ba.user_id IS NULL;
+
+    -- Delete rows that couldn't be backfilled (orphaned — no matching project)
+    DELETE FROM brand_config WHERE user_id IS NULL;
+    DELETE FROM brand_assets WHERE user_id IS NULL;
+
+    -- Delete rows whose user doesn't exist in auth.users (e.g. dev seed users)
+    DELETE FROM brand_assets WHERE user_id NOT IN (SELECT id FROM auth.users);
+    DELETE FROM brand_config WHERE user_id NOT IN (SELECT id FROM auth.users);
+
+    -- Deduplicate brand_config (keep most recently updated per user)
+    DELETE FROM brand_config WHERE id NOT IN (
+      SELECT DISTINCT ON (user_id) id FROM brand_config ORDER BY user_id, updated_at DESC
+    );
+
+    -- Make user_id NOT NULL
+    ALTER TABLE brand_config ALTER COLUMN user_id SET NOT NULL;
+    ALTER TABLE brand_assets ALTER COLUMN user_id SET NOT NULL;
+
+    -- Drop old project_id infrastructure
+    DROP INDEX IF EXISTS idx_brand_assets_project_id;
+    ALTER TABLE brand_config DROP CONSTRAINT IF EXISTS brand_config_project_id_key;
+    ALTER TABLE brand_config DROP CONSTRAINT IF EXISTS brand_config_project_id_fkey;
+    ALTER TABLE brand_config DROP COLUMN project_id;
+    ALTER TABLE brand_assets DROP CONSTRAINT IF EXISTS brand_assets_project_id_fkey;
+    ALTER TABLE brand_assets DROP COLUMN project_id;
+
+    -- Add new constraints, FK references, and indexes
+    ALTER TABLE brand_config ADD CONSTRAINT brand_config_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+    ALTER TABLE brand_assets ADD CONSTRAINT brand_assets_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+    ALTER TABLE brand_config ADD CONSTRAINT brand_config_user_id_key UNIQUE (user_id);
+    CREATE INDEX IF NOT EXISTS idx_brand_assets_user_id ON brand_assets(user_id);
+    CREATE INDEX IF NOT EXISTS idx_brand_config_user_id ON brand_config(user_id);
+
+    -- Drop old project-based RLS policies
+    DROP POLICY IF EXISTS "Users can view own project brand assets" ON brand_assets;
+    DROP POLICY IF EXISTS "Users can insert brand assets to own projects" ON brand_assets;
+    DROP POLICY IF EXISTS "Users can update own project brand assets" ON brand_assets;
+    DROP POLICY IF EXISTS "Users can delete own project brand assets" ON brand_assets;
+    DROP POLICY IF EXISTS "Users can view own project brand config" ON brand_config;
+    DROP POLICY IF EXISTS "Users can insert brand config to own projects" ON brand_config;
+    DROP POLICY IF EXISTS "Users can update own project brand config" ON brand_config;
+    DROP POLICY IF EXISTS "Users can delete own project brand config" ON brand_config;
+
+    RAISE NOTICE 'Brand schema upgraded to user-level successfully.';
+  END IF;
+END $$;
+
+-- Ensure RLS is enabled and user-based policies exist (idempotent)
+ALTER TABLE brand_assets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE brand_config ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can view own brand assets') THEN
+    CREATE POLICY "Users can view own brand assets" ON brand_assets FOR SELECT USING (user_id = auth.uid());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can insert own brand assets') THEN
+    CREATE POLICY "Users can insert own brand assets" ON brand_assets FOR INSERT WITH CHECK (user_id = auth.uid());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can update own brand assets') THEN
+    CREATE POLICY "Users can update own brand assets" ON brand_assets FOR UPDATE USING (user_id = auth.uid());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can delete own brand assets') THEN
+    CREATE POLICY "Users can delete own brand assets" ON brand_assets FOR DELETE USING (user_id = auth.uid());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can view own brand config') THEN
+    CREATE POLICY "Users can view own brand config" ON brand_config FOR SELECT USING (user_id = auth.uid());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can insert own brand config') THEN
+    CREATE POLICY "Users can insert own brand config" ON brand_config FOR INSERT WITH CHECK (user_id = auth.uid());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can update own brand config') THEN
+    CREATE POLICY "Users can update own brand config" ON brand_config FOR UPDATE USING (user_id = auth.uid());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can delete own brand config') THEN
+    CREATE POLICY "Users can delete own brand config" ON brand_config FOR DELETE USING (user_id = auth.uid());
+  END IF;
+END $$;
 
 -- ============================================================================
 -- UPDATED_AT TRIGGER FUNCTION
