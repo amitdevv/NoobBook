@@ -282,16 +282,23 @@ class EmailToolExecutor:
                 # brand logo appears in the email header regardless.
                 if logo_url not in final_html:
                     logo_img = (
-                        f'<tr><td align="center" style="padding:20px 0;">'
+                        f'<tr><td align="center" style="padding:20px 0;background:transparent;">'
                         f'<img src="{logo_url}" alt="Logo" '
-                        f'style="max-height:60px;width:auto;"></td></tr>'
+                        f'style="max-height:60px;width:auto;display:block;"></td></tr>'
                     )
-                    # Insert after the first 600px-wide table (the main email container)
+                    # Insert after the first 600px-wide table (the main email container),
+                    # falling back to right after <body> for responsive/non-standard layouts.
                     body_table_match = re.search(r'(<table[^>]*width="600"[^>]*>)', final_html)
                     if body_table_match:
                         insert_pos = body_table_match.end()
                         final_html = final_html[:insert_pos] + logo_img + final_html[insert_pos:]
                         print(f"      Logo injected (agent omitted BRAND_LOGO placeholder)")
+                    else:
+                        body_match = re.search(r'(<body[^>]*>)', final_html, re.IGNORECASE)
+                        if body_match:
+                            insert_pos = body_match.end()
+                            final_html = final_html[:insert_pos] + logo_img + final_html[insert_pos:]
+                            print(f"      Logo injected after <body> (no 600px table found)")
 
             # Save HTML file
             studio_dir = get_studio_dir(project_id)
