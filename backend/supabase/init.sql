@@ -318,8 +318,14 @@ DO $$ BEGIN
     DELETE FROM brand_assets WHERE user_id IS NULL;
 
     -- Delete rows whose user doesn't exist in auth.users (e.g. dev seed users)
-    DELETE FROM brand_assets WHERE user_id NOT IN (SELECT id FROM auth.users);
-    DELETE FROM brand_config WHERE user_id NOT IN (SELECT id FROM auth.users);
+    -- Only delete if auth.users actually has rows (avoid wiping everything if auth is empty)
+    IF (SELECT COUNT(*) FROM auth.users) > 0 THEN
+      RAISE NOTICE 'Cleaning up brand rows for users not in auth.users...';
+      DELETE FROM brand_assets WHERE user_id NOT IN (SELECT id FROM auth.users);
+      DELETE FROM brand_config WHERE user_id NOT IN (SELECT id FROM auth.users);
+    ELSE
+      RAISE NOTICE 'Skipping auth.users cleanup — auth.users is empty';
+    END IF;
 
     -- Deduplicate brand_config (keep most recently updated per user)
     DELETE FROM brand_config WHERE id NOT IN (

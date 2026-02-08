@@ -148,7 +148,7 @@ class MainChatService:
             parts.append(full_context)
 
         # Inject brand guidelines so the chat AI can follow brand colors, voice, etc.
-        brand_context = brand_context_loader.load_brand_context(project_id, "chat")
+        brand_context = brand_context_loader.load_brand_context(project_id, "chat", user_id=user_id)
         if brand_context:
             parts.append(brand_context)
 
