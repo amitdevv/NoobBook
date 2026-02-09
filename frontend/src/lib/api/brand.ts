@@ -216,13 +216,6 @@ interface AssetResponse {
   error?: string;
 }
 
-interface AssetUrlResponse {
-  success: boolean;
-  url: string;
-  expires_in: number;
-  error?: string;
-}
-
 interface ConfigResponse {
   success: boolean;
   config: BrandConfig;
@@ -290,14 +283,6 @@ export const brandAPI = {
    */
   deleteAsset: (assetId: string) =>
     api.delete<SuccessResponse>(`/brand/assets/${assetId}`),
-
-  /**
-   * Get a signed download URL for a brand asset
-   * Educational Note: Returns a temporary URL (1 hour expiry) to download the file
-   * directly from storage without proxying through the backend.
-   */
-  getAssetUrl: (assetId: string) =>
-    api.get<AssetUrlResponse>(`/brand/assets/${assetId}/download`),
 
   /**
    * Set an asset as the primary for its type

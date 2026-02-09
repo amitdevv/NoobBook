@@ -496,7 +496,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({ messages,
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden bg-white"
+      className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden bg-background"
     >
       <div className="pt-6 pb-2 px-6 space-y-4 w-full">
         {messages.map((msg) => (

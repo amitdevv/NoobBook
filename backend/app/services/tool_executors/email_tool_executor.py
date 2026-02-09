@@ -264,11 +264,13 @@ class EmailToolExecutor:
             # Safety net: remove any <img> tags with unreplaced IMAGE_N placeholders.
             # This catches cases where image generation failed but the agent still
             # used the placeholder despite being told not to.
-            final_html = re.sub(
+            final_html, stripped_count = re.subn(
                 r'<img\s[^>]*src=["\']IMAGE_\d+["\'][^>]*/?>',
                 '',
                 final_html
             )
+            if stripped_count > 0:
+                print(f"      Removed {stripped_count} unreplaced IMAGE_N placeholder(s) from HTML")
 
             # Replace BRAND_LOGO placeholder with actual logo URL
             if logo_info:
@@ -299,6 +301,8 @@ class EmailToolExecutor:
                             insert_pos = body_match.end()
                             final_html = final_html[:insert_pos] + logo_img + final_html[insert_pos:]
                             print(f"      Logo injected after <body> (no 600px table found)")
+                        else:
+                            print(f"      WARNING: Could not inject brand logo — no <body> or 600px table found")
 
             # Save HTML file
             studio_dir = get_studio_dir(project_id)

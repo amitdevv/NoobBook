@@ -320,9 +320,10 @@ def download_asset(asset_id: str):
         return send_file(io.BytesIO(data), mimetype=mimetype, as_attachment=False)
 
     except Exception as e:
+        print(f"[BrandAPI] Error downloading asset {asset_id}: {e}")
         return jsonify({
             "success": False,
-            "error": str(e)
+            "error": "Failed to download brand asset"
         }), 500
 
 

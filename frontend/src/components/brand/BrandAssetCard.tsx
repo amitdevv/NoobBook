@@ -3,7 +3,7 @@
  * Educational Note: Displays a single brand asset (logo, icon, font, image)
  * with actions for viewing, setting primary, and deleting.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import {
@@ -47,6 +47,7 @@ export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
+  const blobUrlRef = useRef<string | null>(null);
 
   // Build authenticated image URL for preview
   // Educational Note: The download endpoint now proxies the file through the backend
@@ -64,7 +65,11 @@ export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
           });
           if (response.ok) {
             const blob = await response.blob();
-            setImageUrl(URL.createObjectURL(blob));
+            const objectUrl = URL.createObjectURL(blob);
+            blobUrlRef.current = objectUrl;
+            setImageUrl(objectUrl);
+          } else {
+            console.error(`Failed to load image: ${response.status}`);
           }
         } catch (error) {
           console.error('Failed to load image:', error);
@@ -75,7 +80,10 @@ export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
     };
     loadImage();
     return () => {
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
     };
   }, [asset.id, asset.mime_type]);
 
@@ -90,6 +98,9 @@ export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
         window.open(blobUrl, '_blank');
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      } else {
+        console.error(`Download failed: ${response.status}`);
       }
     } catch (error) {
       console.error('Failed to download:', error);
