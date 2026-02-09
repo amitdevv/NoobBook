@@ -1,18 +1,31 @@
 /**
  * ColorsSection Component
  * Educational Note: Manages brand color palette configuration.
+ * Each color has an enable/disable toggle so users only include
+ * the colors they need in generated content.
  */
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
+import { Switch } from '../../ui/switch';
 import { Plus, Trash, CircleNotch, Check } from '@phosphor-icons/react';
-import { brandAPI, type ColorPalette, type CustomColor, getDefaultColors } from '../../../lib/api/brand';
+import { brandAPI, type ColorPalette, type CustomColor, type ColorEnabled, getDefaultColors, getDefaultColorEnabled } from '../../../lib/api/brand';
 import { ColorPicker } from '../ColorPicker';
 import { useToast } from '@/components/ui/toast';
 
+/** The 5 standard brand color slots with display metadata. */
+const COLOR_FIELDS: { key: keyof Omit<ColorPalette, 'custom' | 'enabled'>; label: string; description: string }[] = [
+  { key: 'primary', label: 'Primary', description: 'Main brand color for buttons and CTAs' },
+  { key: 'secondary', label: 'Secondary', description: 'Supporting color for secondary elements' },
+  { key: 'accent', label: 'Accent', description: 'Highlight color for emphasis' },
+  { key: 'background', label: 'Background', description: 'Page background color' },
+  { key: 'text', label: 'Text', description: 'Primary text color' },
+];
+
 export const ColorsSection: React.FC = () => {
   const [colors, setColors] = useState<ColorPalette>(getDefaultColors());
+  const [enabled, setEnabled] = useState<ColorEnabled>(getDefaultColorEnabled());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -25,7 +38,9 @@ export const ColorsSection: React.FC = () => {
       setLoading(true);
       const response = await brandAPI.getConfig();
       if (response.data.success) {
-        setColors(response.data.config.colors);
+        const loaded = response.data.config.colors;
+        setColors({ ...loaded, custom: loaded.custom ?? [] });
+        setEnabled(loaded.enabled ?? getDefaultColorEnabled());
       }
     } catch (error) {
       console.error('Failed to load colors:', error);
@@ -41,7 +56,7 @@ export const ColorsSection: React.FC = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const response = await brandAPI.updateColors(colors);
+      const response = await brandAPI.updateColors({ ...colors, enabled });
       if (response.data.success) {
         setSaved(true);
         showSuccess('Colors saved');
@@ -55,8 +70,12 @@ export const ColorsSection: React.FC = () => {
     }
   };
 
-  const updateColor = (key: keyof Omit<ColorPalette, 'custom'>, value: string) => {
+  const updateColor = (key: keyof Omit<ColorPalette, 'custom' | 'enabled'>, value: string) => {
     setColors((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const toggleColor = (key: keyof ColorEnabled) => {
+    setEnabled((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const addCustomColor = () => {
@@ -128,36 +147,26 @@ export const ColorsSection: React.FC = () => {
         <h3 className="font-medium">Primary Colors</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ColorPicker
-            label="Primary"
-            value={colors.primary}
-            onChange={(v) => updateColor('primary', v)}
-            description="Main brand color for buttons and CTAs"
-          />
-          <ColorPicker
-            label="Secondary"
-            value={colors.secondary}
-            onChange={(v) => updateColor('secondary', v)}
-            description="Supporting color for secondary elements"
-          />
-          <ColorPicker
-            label="Accent"
-            value={colors.accent}
-            onChange={(v) => updateColor('accent', v)}
-            description="Highlight color for emphasis"
-          />
-          <ColorPicker
-            label="Background"
-            value={colors.background}
-            onChange={(v) => updateColor('background', v)}
-            description="Page background color"
-          />
-          <ColorPicker
-            label="Text"
-            value={colors.text}
-            onChange={(v) => updateColor('text', v)}
-            description="Primary text color"
-          />
+          {COLOR_FIELDS.map(({ key, label, description }) => (
+            <div key={key} className={!enabled[key] ? 'opacity-40' : undefined}>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-medium">{label}</Label>
+                <Switch
+                  checked={enabled[key]}
+                  onCheckedChange={() => toggleColor(key)}
+                  aria-label={`Toggle ${label} color`}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">{description}</p>
+              <div className={!enabled[key] ? 'pointer-events-none' : undefined}>
+                <ColorPicker
+                  label=""
+                  value={colors[key] as string}
+                  onChange={(v) => updateColor(key, v)}
+                />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -226,45 +235,19 @@ export const ColorsSection: React.FC = () => {
         </div>
       </div>
 
-      {/* Preview */}
+      {/* Preview — only shows enabled colors */}
       <div className="bg-card border rounded-lg p-6 space-y-4">
         <h3 className="font-medium">Preview</h3>
         <div className="flex flex-wrap gap-4">
-          <div className="text-center">
-            <div
-              className="w-16 h-16 rounded-lg border"
-              style={{ backgroundColor: colors.primary }}
-            />
-            <p className="text-xs text-muted-foreground mt-1">Primary</p>
-          </div>
-          <div className="text-center">
-            <div
-              className="w-16 h-16 rounded-lg border"
-              style={{ backgroundColor: colors.secondary }}
-            />
-            <p className="text-xs text-muted-foreground mt-1">Secondary</p>
-          </div>
-          <div className="text-center">
-            <div
-              className="w-16 h-16 rounded-lg border"
-              style={{ backgroundColor: colors.accent }}
-            />
-            <p className="text-xs text-muted-foreground mt-1">Accent</p>
-          </div>
-          <div className="text-center">
-            <div
-              className="w-16 h-16 rounded-lg border"
-              style={{ backgroundColor: colors.background }}
-            />
-            <p className="text-xs text-muted-foreground mt-1">Background</p>
-          </div>
-          <div className="text-center">
-            <div
-              className="w-16 h-16 rounded-lg border"
-              style={{ backgroundColor: colors.text }}
-            />
-            <p className="text-xs text-muted-foreground mt-1">Text</p>
-          </div>
+          {COLOR_FIELDS.filter(({ key }) => enabled[key]).map(({ key, label }) => (
+            <div key={key} className="text-center">
+              <div
+                className="w-16 h-16 rounded-lg border"
+                style={{ backgroundColor: colors[key] as string }}
+              />
+              <p className="text-xs text-muted-foreground mt-1">{label}</p>
+            </div>
+          ))}
           {colors.custom.map((color, index) => (
             <div key={index} className="text-center">
               <div

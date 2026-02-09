@@ -130,11 +130,14 @@ class BrandContextLoader:
         return "\n".join(sections)
 
     def _build_color_context(self, config: Dict[str, Any]) -> str:
-        """Build color palette context section."""
+        """Build color palette context section, respecting per-color enabled toggles."""
         colors = config.get("colors", {})
 
         if not colors:
             return ""
+
+        # Per-color enabled flags — default all-on for backward compatibility
+        enabled = colors.get("enabled", {})
 
         lines = [
             "### Color Palette",
@@ -142,15 +145,16 @@ class BrandContextLoader:
         ]
 
         # Standard colors with usage mapping so agents know where to apply each
-        if colors.get("primary"):
+        # Only include colors the user has enabled in Settings > Design > Colors
+        if colors.get("primary") and enabled.get("primary", True):
             lines.append(f"- **Primary Color**: {colors['primary']} → Use for: headers, section backgrounds, key accents")
-        if colors.get("accent"):
+        if colors.get("accent") and enabled.get("accent", True):
             lines.append(f"- **Accent Color**: {colors['accent']} → Use for: CTA buttons, links, highlights")
-        if colors.get("secondary"):
+        if colors.get("secondary") and enabled.get("secondary", True):
             lines.append(f"- **Secondary Color**: {colors['secondary']} → Use for: secondary sections, borders, dividers")
-        if colors.get("background"):
+        if colors.get("background") and enabled.get("background", True):
             lines.append(f"- **Background Color**: {colors['background']} → Use for: email/page body background")
-        if colors.get("text"):
+        if colors.get("text") and enabled.get("text", True):
             lines.append(f"- **Text Color**: {colors['text']} → Use for: all body text, paragraphs")
 
         # Custom colors
@@ -242,9 +246,13 @@ class BrandContextLoader:
         if len(logos) > 1:
             lines.append(f"- **Additional Logos Available**: {len(logos) - 1}")
 
-        # Icons
+        # Icons — list each by name so the AI knows what's available
         if icons:
             lines.append(f"- **Icons Available**: {len(icons)}")
+            for icon in icons:
+                primary_tag = " (primary)" if icon.get("is_primary") else ""
+                desc = f" — {icon['description']}" if icon.get("description") else ""
+                lines.append(f"  - {icon.get('name', 'Icon')}{primary_tag}{desc}")
 
         lines.append("")
         return "\n".join(lines)

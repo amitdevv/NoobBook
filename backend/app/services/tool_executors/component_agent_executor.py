@@ -27,7 +27,8 @@ class ComponentAgentExecutor:
         self,
         project_id: str,
         source_id: str,
-        direction: str = ""
+        direction: str = "",
+        user_id: str = None
     ) -> Dict[str, Any]:
         """
         Execute component generation as a background task.
@@ -36,6 +37,7 @@ class ComponentAgentExecutor:
             project_id: The project ID
             source_id: Source to generate components from
             direction: User's direction/guidance for the components
+            user_id: The authenticated user's UUID (for brand config lookup)
 
         Returns:
             Job info with status and job_id for polling
@@ -76,7 +78,8 @@ class ComponentAgentExecutor:
                     project_id=project_id,
                     source_id=source_id,
                     job_id=job_id,
-                    direction=direction
+                    direction=direction,
+                    user_id=user_id
                 )
             except Exception as e:
                 print(f"[ComponentAgentExecutor] Error in component agent: {e}")

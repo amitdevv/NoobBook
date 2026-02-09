@@ -38,11 +38,38 @@
           "required": ["variation_name", "style_approach", "key_features"]
         }
       },
+      "color_scheme": {
+        "type": "object",
+        "description": "Color palette for the components. If Brand Guidelines are provided, use those exact colors.",
+        "properties": {
+          "primary": {
+            "type": "string",
+            "description": "Primary brand color (hex code, e.g., '#3B82F6')"
+          },
+          "secondary": {
+            "type": "string",
+            "description": "Secondary color (hex code)"
+          },
+          "accent": {
+            "type": "string",
+            "description": "Accent/CTA color (hex code)"
+          },
+          "background": {
+            "type": "string",
+            "description": "Background color (hex code)"
+          },
+          "text": {
+            "type": "string",
+            "description": "Text color (hex code)"
+          }
+        },
+        "required": ["primary", "background", "text"]
+      },
       "technical_notes": {
         "type": "string",
         "description": "Technical considerations: responsive design approach, accessibility features, JavaScript requirements (if any)"
       }
     },
-    "required": ["component_category", "component_description", "variations", "technical_notes"]
+    "required": ["component_category", "component_description", "variations", "color_scheme", "technical_notes"]
   }
 }

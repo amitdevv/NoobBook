@@ -26,7 +26,7 @@ Routes:
 - GET  /projects/<id>/studio/components/<id>/preview/<file>  - Preview HTML
 """
 from pathlib import Path
-from flask import jsonify, request, current_app, send_file
+from flask import g, jsonify, request, current_app, send_file
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.component_agent_executor import component_agent_executor
@@ -62,7 +62,8 @@ def generate_components(project_id: str):
         result = component_agent_executor.execute(
             project_id=project_id,
             source_id=source_id,
-            direction=direction
+            direction=direction,
+            user_id=g.user_id
         )
 
         if not result.get('success'):
@@ -179,4 +180,55 @@ def preview_component(project_id: str, job_id: str, filename: str):
         return jsonify({
             'success': False,
             'error': f'Failed to serve component: {str(e)}'
+        }), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/components/<job_id>/assets/<filename>', methods=['GET'])
+def serve_component_asset(project_id: str, job_id: str, filename: str):
+    """
+    Serve a non-HTML asset (logo, image) from a component job directory.
+
+    Educational Note: The preview route hardcodes mimetype='text/html' for
+    iframe rendering. This route serves other file types (brand logos, images)
+    that are referenced by the generated HTML components.
+    """
+    try:
+        component_dir = get_studio_dir(project_id) / "components" / job_id
+        filepath = component_dir / filename
+
+        if not filepath.exists():
+            return jsonify({
+                'success': False,
+                'error': f'Asset not found: {filename}'
+            }), 404
+
+        # Security: ensure file is within expected directory
+        try:
+            filepath.resolve().relative_to(component_dir.resolve())
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid file path'
+            }), 400
+
+        # Determine mimetype from extension
+        ext = filepath.suffix.lower()
+        mimetypes = {
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.svg': 'image/svg+xml',
+            '.gif': 'image/gif',
+            '.webp': 'image/webp',
+            '.ico': 'image/x-icon',
+        }
+        mimetype = mimetypes.get(ext, 'application/octet-stream')
+
+        return send_file(filepath, mimetype=mimetype, as_attachment=False)
+
+    except Exception as e:
+        current_app.logger.error(f"Error serving component asset: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to serve asset'
         }), 500
