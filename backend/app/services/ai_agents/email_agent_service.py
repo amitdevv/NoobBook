@@ -8,14 +8,19 @@ Orchestrates the email template generation workflow:
 """
 
 import uuid
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
+from pathlib import Path
 
 from app.services.integrations.claude import claude_service
 from app.config import prompt_loader, tool_loader, brand_context_loader
 from app.utils import claude_parsing_utils
 from app.utils.source_content_utils import get_source_content
-from app.services.data_services import message_service
+from app.utils.path_utils import get_studio_dir
+from app.services.data_services import message_service, project_service
+from app.services.data_services.brand_asset_service import brand_asset_service
+from app.services.data_services.brand_config_service import brand_config_service
+from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.email_tool_executor import email_tool_executor
 
@@ -40,12 +45,82 @@ class EmailAgentService:
             self._tools = tool_loader.load_tools_for_agent(self.AGENT_NAME)
         return self._tools
 
+    def _prepare_brand_logo(
+        self,
+        project_id: str,
+        job_id: str,
+        user_id: str = None
+    ) -> Optional[Dict[str, str]]:
+        """
+        Download the primary brand logo and save it locally for the email template.
+
+        Educational Note: Signed URLs from Supabase expire in 1 hour, but saved
+        HTML needs stable URLs. We download the logo and save it to the email
+        templates directory — same pattern as generated Imagen images.
+
+        Args:
+            project_id: The project UUID
+            job_id: The email job UUID (used for filename prefix)
+            user_id: The authenticated user's UUID (avoids project lookup)
+
+        Returns:
+            Logo info dict with filename/url/placeholder, or None if no logo
+        """
+        try:
+            # Use provided user_id, or fall back to project lookup
+            if not user_id:
+                project = project_service.get_project(project_id)
+                if not project:
+                    return None
+                user_id = project.get("user_id")
+            if not user_id:
+                return None
+
+            # Get primary logo asset metadata
+            logo_asset = brand_asset_service.get_primary_asset(user_id, "logo")
+            if not logo_asset:
+                return None
+
+            # Download logo bytes from Supabase storage
+            logo_bytes = storage_service.download_brand_asset(
+                user_id=user_id,
+                asset_id=logo_asset["id"],
+                filename=logo_asset["file_name"]
+            )
+            if not logo_bytes:
+                print(f"[EmailAgent] Could not download brand logo")
+                return None
+
+            # Determine file extension from original filename
+            original_name = logo_asset.get("file_name", "logo.png")
+            ext = Path(original_name).suffix or ".png"
+            logo_filename = f"{job_id}_brand_logo{ext}"
+
+            # Save to email templates directory
+            email_dir = get_studio_dir(project_id) / "email_templates"
+            email_dir.mkdir(parents=True, exist_ok=True)
+            logo_path = email_dir / logo_filename
+            logo_path.write_bytes(logo_bytes)
+
+            print(f"[EmailAgent] Brand logo saved: {logo_filename}")
+
+            return {
+                "filename": logo_filename,
+                "placeholder": "BRAND_LOGO",
+                "url": f"/api/v1/projects/{project_id}/studio/email-templates/{logo_filename}"
+            }
+
+        except Exception as e:
+            print(f"[EmailAgent] Error preparing brand logo: {e}")
+            return None
+
     def generate_template(
         self,
         project_id: str,
         source_id: str,
         job_id: str,
-        direction: str = ""
+        direction: str = "",
+        user_id: str = None
     ) -> Dict[str, Any]:
         """Run the agent to generate an email template."""
         config = self._load_config()
@@ -71,13 +146,56 @@ class EmailAgentService:
             direction=effective_direction
         )
 
-        messages = [{"role": "user", "content": user_message}]
-
         # Load brand context if configured for email feature
-        brand_context = brand_context_loader.load_brand_context(project_id, "email")
+        brand_context = brand_context_loader.load_brand_context(
+            project_id, "email", user_id=user_id
+        )
         system_prompt = config["system_prompt"]
+        logo_info = None
+        brand_colors = None
+        brand_config = None
         if brand_context:
             system_prompt = f"{system_prompt}\n\n{brand_context}"
+            # Download brand logo so it can be embedded in the email HTML
+            logo_info = self._prepare_brand_logo(project_id, job_id, user_id=user_id)
+            # Extract brand colors for plan validation in the tool executor
+            if user_id:
+                brand_config = brand_config_service.get_config(user_id) or {}
+                brand_colors = brand_config.get("colors")
+            else:
+                project = project_service.get_project(project_id)
+                if project and project.get("user_id"):
+                    brand_config = brand_config_service.get_config(project["user_id"]) or {}
+                    brand_colors = brand_config.get("colors")
+
+        # Inject brand requirements directly into user message for higher priority.
+        # Educational Note: Claude weights user message content higher than the tail
+        # of long system prompts. By putting exact hex values and font names here,
+        # the agent is far more likely to use them in the generated HTML.
+        if brand_context and brand_colors:
+            brand_instruction = "\n\n## BRAND REQUIREMENTS (MANDATORY)\n"
+            brand_instruction += "You MUST use these exact colors in the email HTML:\n"
+            brand_instruction += f"- Header/sections background: {brand_colors.get('primary', '#000000')}\n"
+            brand_instruction += f"- CTA buttons/links: {brand_colors.get('accent', brand_colors.get('secondary', '#0066CC'))}\n"
+            brand_instruction += f"- Body background: {brand_colors.get('background', '#FFFFFF')}\n"
+            brand_instruction += f"- Text color: {brand_colors.get('text', '#1A1A1A')}\n"
+            # Typography
+            if brand_config:
+                typography = brand_config.get("typography", {})
+                if typography.get("heading_font"):
+                    brand_instruction += f"- Heading font: {typography['heading_font']}\n"
+                if typography.get("body_font"):
+                    brand_instruction += f"- Body font: {typography['body_font']}\n"
+            # Logo
+            if logo_info:
+                brand_instruction += (
+                    '- Logo: Include <img src="BRAND_LOGO" alt="Logo" '
+                    'style="max-height:60px;width:auto;"> in the header\n'
+                )
+            brand_instruction += "Do NOT substitute these with any other colors, fonts, or skip the logo.\n"
+            user_message = user_message + brand_instruction
+
+        messages = [{"role": "user", "content": user_message}]
 
         total_input_tokens = 0
         total_output_tokens = 0
@@ -125,6 +243,8 @@ class EmailAgentService:
                         "job_id": job_id,
                         "source_id": source_id,
                         "generated_images": generated_images,
+                        "logo_info": logo_info,
+                        "brand_colors": brand_colors,
                         "iterations": iteration,
                         "input_tokens": total_input_tokens,
                         "output_tokens": total_output_tokens

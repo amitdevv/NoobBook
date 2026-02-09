@@ -79,7 +79,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl h-[85vh] p-0 gap-0 overflow-hidden bg-card flex flex-col">
+      <DialogContent className="max-w-6xl h-[85vh] p-0 gap-0 overflow-hidden bg-card flex flex-col">
         {/* Header */}
         <DialogHeader className="flex-shrink-0 px-6 py-3 border-b">
           <DialogTitle>Settings</DialogTitle>

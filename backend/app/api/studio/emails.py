@@ -31,7 +31,7 @@ import io
 import re
 import zipfile
 from pathlib import Path
-from flask import jsonify, request, current_app, send_file, Response
+from flask import g, jsonify, request, current_app, send_file, Response
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.email_agent_executor import email_agent_executor
@@ -67,7 +67,8 @@ def generate_email_template(project_id: str):
         result = email_agent_executor.execute(
             project_id=project_id,
             source_id=source_id,
-            direction=direction
+            direction=direction,
+            user_id=g.user_id
         )
 
         if not result.get('success'):
@@ -180,6 +181,8 @@ def get_email_template_file(project_id: str, filename: str):
             mimetype = 'image/png'
         elif filename.endswith('.jpg') or filename.endswith('.jpeg'):
             mimetype = 'image/jpeg'
+        elif filename.endswith('.svg'):
+            mimetype = 'image/svg+xml'
         else:
             mimetype = 'application/octet-stream'
 
@@ -250,7 +253,7 @@ def preview_email_template(project_id: str, job_id: str):
                 return f'src="{url}{separator}token={token}"'
 
             html_content = re.sub(
-                r'src="(/api/v1/projects/[^"]+/studio/email-templates/[^"]+\.(?:png|jpg|jpeg|gif|webp))"',
+                r'src="(/api/v1/projects/[^"]+/studio/email-templates/[^"]+\.(?:png|jpg|jpeg|gif|webp|svg))"',
                 _add_token,
                 html_content
             )

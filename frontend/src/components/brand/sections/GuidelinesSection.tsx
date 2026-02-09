@@ -10,6 +10,7 @@ import { Textarea } from '../../ui/textarea';
 import { Badge } from '../../ui/badge';
 import { Plus, X, CircleNotch, Check, PencilSimple, Trash } from '@phosphor-icons/react';
 import { brandAPI, type BrandVoice, type BestPractices } from '../../../lib/api/brand';
+import { useToast } from '@/components/ui/toast';
 
 export const GuidelinesSection: React.FC = () => {
   const [guidelines, setGuidelines] = useState('');
@@ -25,6 +26,8 @@ export const GuidelinesSection: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const { success: showSuccess, error: showError } = useToast();
 
   // Input states for adding items
   const [newPersonality, setNewPersonality] = useState('');
@@ -69,10 +72,12 @@ export const GuidelinesSection: React.FC = () => {
       });
       if (response.data.success) {
         setSaved(true);
+        showSuccess('Guidelines saved');
         setTimeout(() => setSaved(false), 2000);
       }
     } catch (error) {
       console.error('Failed to save:', error);
+      showError('Failed to save guidelines');
     } finally {
       setSaving(false);
     }
@@ -193,28 +198,31 @@ export const GuidelinesSection: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Guidelines & Voice</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Define your brand voice, tone, and best practices.
-          </p>
+      {/* Sticky header — stays visible while scrolling within the settings panel */}
+      <div className="sticky top-0 z-10 bg-card pb-4 -mx-6 px-6 pt-1 -mt-1">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Guidelines & Voice</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Define your brand voice, tone, and best practices.
+            </p>
+          </div>
+          <Button onClick={handleSave} disabled={saving} className="gap-2">
+            {saving ? (
+              <>
+                <CircleNotch size={16} className="animate-spin" />
+                Saving...
+              </>
+            ) : saved ? (
+              <>
+                <Check size={16} />
+                Saved
+              </>
+            ) : (
+              'Save Guidelines'
+            )}
+          </Button>
         </div>
-        <Button onClick={handleSave} disabled={saving} className="gap-2">
-          {saving ? (
-            <>
-              <CircleNotch size={16} className="animate-spin" />
-              Saving...
-            </>
-          ) : saved ? (
-            <>
-              <Check size={16} />
-              Saved
-            </>
-          ) : (
-            'Save Guidelines'
-          )}
-        </Button>
       </div>
 
       {/* Brand Voice */}

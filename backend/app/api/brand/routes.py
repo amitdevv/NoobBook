@@ -19,9 +19,11 @@ Configuration Sections:
 - voice: Brand voice (tone, personality, keywords)
 - feature_settings: Per-feature toggles for brand application
 """
-from flask import request, jsonify, g
+import io
+from flask import request, jsonify, g, send_file
 from app.api.brand import brand_bp
 from app.services.data_services import brand_asset_service, brand_config_service
+from app.services.integrations.supabase import storage_service
 
 
 # =============================================================================
@@ -283,41 +285,45 @@ def delete_asset(asset_id: str):
 
 
 @brand_bp.route('/brand/assets/<asset_id>/download', methods=['GET'])
-def get_asset_download_url(asset_id: str):
+def download_asset(asset_id: str):
     """
-    Get a signed URL for downloading a brand asset.
+    Download a brand asset file, proxied through the backend.
 
-    Educational Note: We return a signed URL instead of the file directly
-    to avoid proxying large files through the backend. The URL expires
-    after 1 hour.
-
-    Returns:
-        {
-            "success": true,
-            "url": "https://...",
-            "expires_in": 3600
-        }
+    Educational Note: In Docker, Supabase storage signed URLs use internal
+    hostnames (e.g. supabase-kong:8000) that browsers can't resolve.
+    Instead of returning a signed URL, we download the file server-side
+    and stream it to the browser — same pattern used by studio endpoints.
     """
     try:
         user_id = g.user_id
-        url = brand_asset_service.get_asset_url(user_id, asset_id)
+        asset = brand_asset_service.get_asset(user_id, asset_id)
 
-        if not url:
+        if not asset:
             return jsonify({
                 "success": False,
                 "error": "Brand asset not found"
             }), 404
 
-        return jsonify({
-            "success": True,
-            "url": url,
-            "expires_in": 3600
-        }), 200
+        data = storage_service.download_brand_asset(
+            user_id=user_id,
+            asset_id=asset_id,
+            filename=asset["file_name"]
+        )
+
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "Asset file not found in storage"
+            }), 404
+
+        mimetype = asset.get("mime_type", "application/octet-stream")
+        return send_file(io.BytesIO(data), mimetype=mimetype, as_attachment=False)
 
     except Exception as e:
+        print(f"[BrandAPI] Error downloading asset {asset_id}: {e}")
         return jsonify({
             "success": False,
-            "error": str(e)
+            "error": "Failed to download brand asset"
         }), 500
 
 

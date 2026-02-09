@@ -269,6 +269,7 @@ CREATE TABLE IF NOT EXISTS brand_config (
   best_practices JSONB DEFAULT '{"dos": [], "donts": []}'::jsonb,
   voice JSONB DEFAULT '{"tone": "professional", "personality": [], "keywords": []}'::jsonb,
   feature_settings JSONB DEFAULT '{
+    "chat": true,
     "infographic": true,
     "presentation": true,
     "mind_map": false,

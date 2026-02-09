@@ -53,7 +53,8 @@ class BrandContextLoader:
     def load_brand_context(
         self,
         project_id: str,
-        feature_name: str
+        feature_name: str,
+        user_id: str = None
     ) -> str:
         """
         Load brand context for injection into a studio agent prompt.
@@ -64,14 +65,16 @@ class BrandContextLoader:
         presentations and blogs follow brand guidelines.
 
         Args:
-            project_id: The project UUID (resolved to user_id internally)
+            project_id: The project UUID (used as fallback to resolve user_id)
             feature_name: The studio feature name (e.g., 'blog', 'presentation')
+            user_id: Optional user UUID — skips project lookup when provided
 
         Returns:
             Formatted brand context string, or empty string if brand disabled
         """
-        # Resolve project_id to user_id (brand is now user-level)
-        user_id = self._resolve_user_id(project_id)
+        # Use provided user_id, or resolve from project_id (brand is user-level)
+        if not user_id:
+            user_id = self._resolve_user_id(project_id)
         if not user_id:
             return ""
 
@@ -121,7 +124,7 @@ class BrandContextLoader:
         if len(sections) <= 2:  # Only header and empty line
             return ""
 
-        sections.append("Please ensure all generated content follows these brand guidelines.")
+        sections.append("**MANDATORY**: All generated content MUST use these exact brand colors, fonts, voice, and logo. Do NOT substitute with defaults or generic values.")
         sections.append("")
 
         return "\n".join(sections)
@@ -138,17 +141,17 @@ class BrandContextLoader:
             "",
         ]
 
-        # Standard colors
+        # Standard colors with usage mapping so agents know where to apply each
         if colors.get("primary"):
-            lines.append(f"- **Primary Color**: {colors['primary']}")
-        if colors.get("secondary"):
-            lines.append(f"- **Secondary Color**: {colors['secondary']}")
+            lines.append(f"- **Primary Color**: {colors['primary']} → Use for: headers, section backgrounds, key accents")
         if colors.get("accent"):
-            lines.append(f"- **Accent Color**: {colors['accent']}")
+            lines.append(f"- **Accent Color**: {colors['accent']} → Use for: CTA buttons, links, highlights")
+        if colors.get("secondary"):
+            lines.append(f"- **Secondary Color**: {colors['secondary']} → Use for: secondary sections, borders, dividers")
         if colors.get("background"):
-            lines.append(f"- **Background Color**: {colors['background']}")
+            lines.append(f"- **Background Color**: {colors['background']} → Use for: email/page body background")
         if colors.get("text"):
-            lines.append(f"- **Text Color**: {colors['text']}")
+            lines.append(f"- **Text Color**: {colors['text']} → Use for: all body text, paragraphs")
 
         # Custom colors
         custom_colors = colors.get("custom", [])
@@ -175,10 +178,23 @@ class BrandContextLoader:
             "",
         ]
 
+        # Include CSS-ready snippets so agents can copy-paste directly
         if typography.get("heading_font"):
-            lines.append(f"- **Heading Font**: {typography['heading_font']}")
+            hf = typography['heading_font']
+            lines.append(f"- **Heading Font**: {hf} → CSS: font-family: '{hf}', serif;")
         if typography.get("body_font"):
-            lines.append(f"- **Body Font**: {typography['body_font']}")
+            bf = typography['body_font']
+            lines.append(f"- **Body Font**: {bf} → CSS: font-family: '{bf}', sans-serif;")
+
+        # Google Fonts link for web/email use
+        fonts_to_import = []
+        if typography.get("body_font"):
+            fonts_to_import.append(typography["body_font"])
+        if typography.get("heading_font"):
+            fonts_to_import.append(typography["heading_font"])
+        if fonts_to_import:
+            families = "&family=".join(f.replace(" ", "+") + ":wght@400;700" for f in fonts_to_import)
+            lines.append(f"- **Google Fonts**: `<link href=\"https://fonts.googleapis.com/css2?family={families}&display=swap\" rel=\"stylesheet\">`")
 
         if typography.get("heading_weight"):
             lines.append(f"- **Heading Weight**: {typography['heading_weight']}")
@@ -220,6 +236,7 @@ class BrandContextLoader:
             lines.append(f"- **Primary Logo**: {primary_logo.get('name', 'Logo')}")
             if primary_logo.get("description"):
                 lines.append(f"  - Description: {primary_logo['description']}")
+            lines.append("- **Logo Placeholder**: Use `BRAND_LOGO` as the image src in HTML templates")
 
         # Logo count
         if len(logos) > 1:
@@ -344,18 +361,20 @@ class BrandContextLoader:
 brand_context_loader = BrandContextLoader()
 
 
-def load_brand_context(project_id: str, feature_name: str) -> str:
+def load_brand_context(project_id: str, feature_name: str, user_id: str = None) -> str:
     """
     Convenience function for loading brand context.
 
     Educational Note: Studio agents call this with project_id. The loader
     resolves project_id → user_id internally since brand is now user-level.
+    When user_id is provided directly, the project lookup is skipped.
 
     Args:
         project_id: The project UUID
         feature_name: The studio feature name
+        user_id: Optional user UUID — skips project lookup when provided
 
     Returns:
         Formatted brand context string
     """
-    return brand_context_loader.load_brand_context(project_id, feature_name)
+    return brand_context_loader.load_brand_context(project_id, feature_name, user_id=user_id)

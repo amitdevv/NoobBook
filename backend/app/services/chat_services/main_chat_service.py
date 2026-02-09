@@ -18,7 +18,7 @@ from typing import Dict, Any, Tuple, List, Optional
 from app.services.data_services import chat_service
 from app.services.integrations.claude import claude_service
 from app.services.data_services import message_service
-from app.config import prompt_loader, tool_loader, context_loader
+from app.config import prompt_loader, tool_loader, context_loader, brand_context_loader
 from app.services.tool_executors import source_search_executor
 from app.services.tool_executors import memory_executor
 from app.services.tool_executors import csv_analyzer_agent_executor
@@ -141,10 +141,18 @@ class MainChatService:
         current state (memory updates, active/inactive sources).
         Includes both memory context (personalization) and source context (tools).
         """
+        parts = [base_prompt]
+
         full_context = context_loader.build_full_context(project_id, user_id=user_id)
         if full_context:
-            return base_prompt + "\n" + full_context
-        return base_prompt
+            parts.append(full_context)
+
+        # Inject brand guidelines so the chat AI can follow brand colors, voice, etc.
+        brand_context = brand_context_loader.load_brand_context(project_id, "chat", user_id=user_id)
+        if brand_context:
+            parts.append(brand_context)
+
+        return "\n".join(parts)
 
     def _execute_tool(
         self,

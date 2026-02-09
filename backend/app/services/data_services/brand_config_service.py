@@ -59,6 +59,7 @@ DEFAULT_VOICE = {
 }
 
 DEFAULT_FEATURE_SETTINGS = {
+    "chat": True,
     "infographic": True,
     "presentation": True,
     "mind_map": False,

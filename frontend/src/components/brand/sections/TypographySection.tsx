@@ -25,6 +25,7 @@ import {
   POPULAR_FONTS,
   FONT_WEIGHTS,
 } from '../../../lib/api/brand';
+import { useToast } from '@/components/ui/toast';
 
 type HeadingLevel = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 
@@ -33,6 +34,7 @@ export const TypographySection: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const { success: showSuccess, error: showError } = useToast();
 
   const loadTypography = async () => {
     try {
@@ -68,10 +70,12 @@ export const TypographySection: React.FC = () => {
       const response = await brandAPI.updateTypography(typography);
       if (response.data.success) {
         setSaved(true);
+        showSuccess('Typography saved');
         setTimeout(() => setSaved(false), 2000);
       }
     } catch (error) {
       console.error('Failed to save typography:', error);
+      showError('Failed to save typography');
     } finally {
       setSaving(false);
     }
@@ -107,28 +111,31 @@ export const TypographySection: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Typography</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Configure fonts, weights, and text sizing for your brand.
-          </p>
+      {/* Sticky header — stays visible while scrolling within the settings panel */}
+      <div className="sticky top-0 z-10 bg-card pb-4 -mx-6 px-6 pt-1 -mt-1">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Typography</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Configure fonts, weights, and text sizing for your brand.
+            </p>
+          </div>
+          <Button onClick={handleSave} disabled={saving} className="gap-2">
+            {saving ? (
+              <>
+                <CircleNotch size={16} className="animate-spin" />
+                Saving...
+              </>
+            ) : saved ? (
+              <>
+                <Check size={16} />
+                Saved
+              </>
+            ) : (
+              'Save Typography'
+            )}
+          </Button>
         </div>
-        <Button onClick={handleSave} disabled={saving} className="gap-2">
-          {saving ? (
-            <>
-              <CircleNotch size={16} className="animate-spin" />
-              Saving...
-            </>
-          ) : saved ? (
-            <>
-              <Check size={16} />
-              Saved
-            </>
-          ) : (
-            'Save Typography'
-          )}
-        </Button>
       </div>
 
       {/* Font Families */}

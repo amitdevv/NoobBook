@@ -8,6 +8,7 @@ import { Label } from '../../ui/label';
 import { Switch } from '../../ui/switch';
 import { CircleNotch, Check } from '@phosphor-icons/react';
 import { brandAPI, type FeatureSettings, getDefaultFeatureSettings } from '../../../lib/api/brand';
+import { useToast } from '@/components/ui/toast';
 
 interface FeatureConfig {
   key: string;
@@ -16,6 +17,11 @@ interface FeatureConfig {
 }
 
 const features: FeatureConfig[] = [
+  {
+    key: 'chat',
+    label: 'Chat',
+    description: 'Give the chat AI awareness of your brand colors, voice, and guidelines',
+  },
   {
     key: 'infographic',
     label: 'Infographics',
@@ -68,6 +74,7 @@ export const FeatureSettingsSection: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const { success: showSuccess, error: showError } = useToast();
 
   const loadSettings = async () => {
     try {
@@ -93,10 +100,12 @@ export const FeatureSettingsSection: React.FC = () => {
       const response = await brandAPI.updateFeatureSettings(settings);
       if (response.data.success) {
         setSaved(true);
+        showSuccess('Feature settings saved');
         setTimeout(() => setSaved(false), 2000);
       }
     } catch (error) {
       console.error('Failed to save settings:', error);
+      showError('Failed to save feature settings');
     } finally {
       setSaving(false);
     }
@@ -137,28 +146,31 @@ export const FeatureSettingsSection: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Feature Settings</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Choose which studio features should apply your brand guidelines.
-          </p>
+      {/* Sticky header — stays visible while scrolling within the settings panel */}
+      <div className="sticky top-0 z-10 bg-card pb-4 -mx-6 px-6 pt-1 -mt-1">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Feature Settings</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Choose which studio features should apply your brand guidelines.
+            </p>
+          </div>
+          <Button onClick={handleSave} disabled={saving} className="gap-2">
+            {saving ? (
+              <>
+                <CircleNotch size={16} className="animate-spin" />
+                Saving...
+              </>
+            ) : saved ? (
+              <>
+                <Check size={16} />
+                Saved
+              </>
+            ) : (
+              'Save Settings'
+            )}
+          </Button>
         </div>
-        <Button onClick={handleSave} disabled={saving} className="gap-2">
-          {saving ? (
-            <>
-              <CircleNotch size={16} className="animate-spin" />
-              Saving...
-            </>
-          ) : saved ? (
-            <>
-              <Check size={16} />
-              Saved
-            </>
-          ) : (
-            'Save Settings'
-          )}
-        </Button>
       </div>
 
       {/* Quick Actions */}

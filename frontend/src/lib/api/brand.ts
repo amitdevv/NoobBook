@@ -167,6 +167,7 @@ export interface BrandVoice {
  * Educational Note: Controls which studio features should apply brand guidelines.
  */
 export interface FeatureSettings {
+  chat: boolean;
   infographic: boolean;
   presentation: boolean;
   mind_map: boolean;
@@ -212,13 +213,6 @@ interface AssetResponse {
   success: boolean;
   asset: BrandAsset;
   message?: string;
-  error?: string;
-}
-
-interface AssetUrlResponse {
-  success: boolean;
-  url: string;
-  expires_in: number;
   error?: string;
 }
 
@@ -289,14 +283,6 @@ export const brandAPI = {
    */
   deleteAsset: (assetId: string) =>
     api.delete<SuccessResponse>(`/brand/assets/${assetId}`),
-
-  /**
-   * Get a signed download URL for a brand asset
-   * Educational Note: Returns a temporary URL (1 hour expiry) to download the file
-   * directly from storage without proxying through the backend.
-   */
-  getAssetUrl: (assetId: string) =>
-    api.get<AssetUrlResponse>(`/brand/assets/${assetId}/download`),
 
   /**
    * Set an asset as the primary for its type
@@ -426,6 +412,7 @@ export function getDefaultTypography(): Typography {
  */
 export function getDefaultFeatureSettings(): FeatureSettings {
   return {
+    chat: true,
     infographic: true,
     presentation: true,
     mind_map: false,
