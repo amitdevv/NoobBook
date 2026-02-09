@@ -168,6 +168,14 @@ class EmailAgentService:
                     brand_config = brand_config_service.get_config(project["user_id"]) or {}
                     brand_colors = brand_config.get("colors")
 
+        # Filter brand_colors to only include user-enabled colors
+        if brand_colors:
+            color_enabled = brand_colors.get("enabled", {})
+            brand_colors = {
+                k: v for k, v in brand_colors.items()
+                if k not in ("enabled", "custom") and color_enabled.get(k, True)
+            }
+
         # Inject brand requirements directly into user message for higher priority.
         # Educational Note: Claude weights user message content higher than the tail
         # of long system prompts. By putting exact hex values and font names here,
@@ -175,10 +183,14 @@ class EmailAgentService:
         if brand_context and brand_colors:
             brand_instruction = "\n\n## BRAND REQUIREMENTS (MANDATORY)\n"
             brand_instruction += "You MUST use these exact colors in the email HTML:\n"
-            brand_instruction += f"- Header/sections background: {brand_colors.get('primary', '#000000')}\n"
-            brand_instruction += f"- CTA buttons/links: {brand_colors.get('accent', brand_colors.get('secondary', '#0066CC'))}\n"
-            brand_instruction += f"- Body background: {brand_colors.get('background', '#FFFFFF')}\n"
-            brand_instruction += f"- Text color: {brand_colors.get('text', '#1A1A1A')}\n"
+            if brand_colors.get("primary"):
+                brand_instruction += f"- Header/sections background: {brand_colors['primary']}\n"
+            if brand_colors.get("accent"):
+                brand_instruction += f"- CTA buttons/links: {brand_colors['accent']}\n"
+            if brand_colors.get("background"):
+                brand_instruction += f"- Body background: {brand_colors['background']}\n"
+            if brand_colors.get("text"):
+                brand_instruction += f"- Text color: {brand_colors['text']}\n"
             # Typography
             if brand_config:
                 typography = brand_config.get("typography", {})

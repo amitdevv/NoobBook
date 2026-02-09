@@ -49,12 +49,21 @@ export interface CustomColor {
  * Color Palette Configuration
  * Educational Note: Defines the core colors used across brand materials.
  */
+export interface ColorEnabled {
+  primary: boolean;
+  secondary: boolean;
+  accent: boolean;
+  background: boolean;
+  text: boolean;
+}
+
 export interface ColorPalette {
   primary: string;
   secondary: string;
   accent: string;
   background: string;
   text: string;
+  enabled?: ColorEnabled;
   custom: CustomColor[];
 }
 
@@ -381,8 +390,13 @@ export function getDefaultColors(): ColorPalette {
     accent: '#0066CC',
     background: '#FFFFFF',
     text: '#1A1A1A',
+    enabled: { primary: true, secondary: true, accent: true, background: true, text: true },
     custom: []
   };
+}
+
+export function getDefaultColorEnabled(): ColorEnabled {
+  return { primary: true, secondary: true, accent: true, background: true, text: true };
 }
 
 /**
