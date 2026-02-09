@@ -62,8 +62,17 @@ services:
           sleep 2
         done
 
-        echo "Running base schema (init.sql)..."
-        $$PSQL -f /init.sql
+        # Detect fresh vs existing database
+        HAS_TABLES=$$($$PSQL -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='"'"'public'"'"' AND table_name='"'"'users'"'"')")
+
+        if [ "$$HAS_TABLES" = "f" ]; then
+          echo "Fresh database — running init.sql..."
+          $$PSQL -f /init.sql
+          FRESH_DB=1
+        else
+          echo "Existing database — skipping init.sql"
+          FRESH_DB=0
+        fi
 
         echo "Creating migration tracker..."
         $$PSQL -c "CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -71,9 +80,9 @@ services:
           applied_at TIMESTAMPTZ DEFAULT now()
         );"
 
-        ROW_COUNT=$$($$PSQL -tAc "SELECT count(*) FROM schema_migrations")
-        if [ "$$ROW_COUNT" = "0" ]; then
-          echo "  First run — seeding tracker with migrations already in init.sql..."
+        # Fresh DB: init.sql already created everything, seed all migrations as applied
+        if [ "$$FRESH_DB" = "1" ]; then
+          echo "  Seeding tracker with migrations covered by init.sql..."
           for f in /migrations/*.sql; do
             [ -f "$$f" ] || continue
             name=$$(basename "$$f")
