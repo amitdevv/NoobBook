@@ -68,10 +68,6 @@ services:
         if [ "$$HAS_TABLES" = "f" ]; then
           echo "Fresh database — running init.sql..."
           $$PSQL -f /init.sql
-          FRESH_DB=1
-        else
-          echo "Existing database — skipping init.sql"
-          FRESH_DB=0
         fi
 
         echo "Creating migration tracker..."
@@ -80,14 +76,24 @@ services:
           applied_at TIMESTAMPTZ DEFAULT now()
         );"
 
-        # Fresh DB: init.sql already created everything, seed all migrations as applied
-        if [ "$$FRESH_DB" = "1" ]; then
-          echo "  Seeding tracker with migrations covered by init.sql..."
+        ROW_COUNT=$$($$PSQL -tAc "SELECT count(*) FROM schema_migrations")
+        if [ "$$ROW_COUNT" = "0" ]; then
+          echo "  First run — seeding tracker with already-applied migrations..."
           for f in /migrations/*.sql; do
             [ -f "$$f" ] || continue
             name=$$(basename "$$f")
             $$PSQL -c "INSERT INTO schema_migrations (filename) VALUES ('"'"'$$name'"'"') ON CONFLICT DO NOTHING"
           done
+
+          # For existing DBs: check if brand migration (00010) still needs to run
+          # by detecting the old project_id column on brand_assets
+          if [ "$$HAS_TABLES" = "t" ]; then
+            HAS_OLD_BRAND=$$($$PSQL -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='"'"'brand_assets'"'"' AND column_name='"'"'project_id'"'"')")
+            if [ "$$HAS_OLD_BRAND" = "t" ]; then
+              echo "  Detected old brand schema — 00010 will be applied"
+              $$PSQL -c "DELETE FROM schema_migrations WHERE filename = '"'"'00010_brand_to_user_level.sql'"'"'"
+            fi
+          fi
         fi
 
         echo "Applying migrations..."
