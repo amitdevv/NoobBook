@@ -67,7 +67,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
       case 'api-keys':
         return isAdmin ? <ApiKeysSection /> : null;
       case 'integrations':
-        return <IntegrationsSection />;
+        return <IntegrationsSection isAdmin={isAdmin} />;
       case 'design':
         return isAdmin ? <DesignSection /> : null;
       case 'system':
