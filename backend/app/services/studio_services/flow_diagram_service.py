@@ -18,10 +18,13 @@ Mermaid supports many diagram types:
 
 The tool-based approach ensures structured output with valid Mermaid syntax.
 """
+import logging
 from typing import Dict, Any
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
+
+logger = logging.getLogger(__name__)
 from app.services.source_services import source_index_service
 from app.services.studio_services import studio_index_service
 from app.config import prompt_loader, tool_loader
@@ -132,8 +135,6 @@ class FlowDiagramService:
             started_at=datetime.now().isoformat()
         )
 
-        print(f"[FlowDiagram] Starting job {job_id}")
-
         try:
             # Get source metadata
             source = source_index_service.get_source_from_index(project_id, source_id)
@@ -209,7 +210,7 @@ class FlowDiagramService:
                 completed_at=datetime.now().isoformat()
             )
 
-            print(f"[FlowDiagram] Generated {diagram_type} diagram in {generation_time:.1f}s")
+            logger.info("Generated %s flow diagram in %.1fs", diagram_type, generation_time)
 
             return {
                 "success": True,
@@ -222,7 +223,7 @@ class FlowDiagramService:
             }
 
         except Exception as e:
-            print(f"[FlowDiagram] Error: {e}")
+            logger.exception("Flow diagram generation failed")
             studio_index_service.update_flow_diagram_job(
                 project_id, job_id,
                 status="error",

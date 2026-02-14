@@ -14,12 +14,15 @@ This enables:
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 import psycopg2
+
+logger = logging.getLogger(__name__)
 from psycopg2.extras import RealDictCursor
 import pymysql
 
@@ -319,7 +322,7 @@ def process_database(
         }
         summary_info = summary_service.generate_summary(project_id, source_id, summary_source_metadata) or {}
     except Exception as e:
-        print(f"Error generating database summary for {source_id}: {e}")
+        logger.exception("Summary generation failed for source %s", source_id)
         summary_info = {}
 
     source_service.update_source(

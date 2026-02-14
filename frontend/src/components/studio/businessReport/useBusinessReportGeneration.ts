@@ -9,6 +9,9 @@ import { businessReportsAPI, type BusinessReportJob, type BusinessReportType } f
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('business-report-generation');
 
 // Extend StudioSignal for business_report-specific fields
 interface BusinessReportSignal extends StudioSignal {
@@ -85,7 +88,7 @@ export const useBusinessReportGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Business report generation failed.');
       }
     } catch (error) {
-      console.error('Business report generation error:', error);
+      log.error({ err: error }, 'LBusiness report generationE failed');
       showError(error instanceof Error ? error.message : 'Business report generation failed.');
     } finally {
       setIsGeneratingBusinessReport(false);

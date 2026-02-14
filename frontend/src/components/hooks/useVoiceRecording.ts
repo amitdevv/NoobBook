@@ -13,6 +13,9 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { chatsAPI } from '../../lib/api/chats';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('voice-recording');
 
 interface UseVoiceRecordingProps {
   onError: (message: string) => void;
@@ -53,7 +56,7 @@ export const useVoiceRecording = ({
         const configured = await chatsAPI.isTranscriptionConfigured();
         setTranscriptionConfigured(configured);
       } catch (err) {
-        console.error('Error checking transcription status:', err);
+        log.error({ err }, 'failed to check transcription status');
         setTranscriptionConfigured(false);
       }
     };
@@ -152,9 +155,9 @@ export const useVoiceRecording = ({
       source.connect(workletNode);
       // Don't connect to destination (we don't want to hear ourselves)
 
-      console.log('Audio capture started');
+      log.debug('audio capture started');
     } catch (err) {
-      console.error('Failed to start audio capture:', err);
+      log.error({ err }, 'failed to start audio capture');
       onError('Failed to access microphone. Please check permissions.');
       stopRecording();
     }
@@ -169,29 +172,29 @@ export const useVoiceRecording = ({
       commitProcessedRef.current = false;
 
       // Always fetch fresh config (token is single-use and expires)
-      console.log('Fetching transcription config...');
+      log.debug('fetching transcription config');
       const config = await chatsAPI.getTranscriptionConfig();
-      console.log('Got config, connecting to WebSocket...');
+      log.debug('connecting to WebSocket');
 
       // Connect to ElevenLabs WebSocket (token is in the URL)
       const ws = new WebSocket(config.websocket_url);
       websocketRef.current = ws;
 
       ws.onopen = () => {
-        console.log('ElevenLabs WebSocket connected, waiting for session_started...');
+        log.debug('WebSocket connected, waiting for session_started');
         // Don't start audio capture yet - wait for session_started
       };
 
       ws.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('WS message:', data.message_type || data.type, data);
+          log.debug(`WS message: ${data.message_type || data.type}`);
 
           // Educational Note: ElevenLabs uses message_type field
           const messageType = data.message_type || data.type;
 
           if (messageType === 'session_started') {
-            console.log('Session started, beginning audio capture...');
+            log.debug('session started, beginning audio capture');
             // Now start audio capture
             await startAudioCapture(config.sample_rate);
           } else if (messageType === 'partial_transcript' && data.text) {
@@ -203,31 +206,31 @@ export const useVoiceRecording = ({
             onTranscriptCommit(data.text);
             setPartialTranscript('');
           } else if (messageType === 'auth_error') {
-            console.error('ElevenLabs auth error:', data.error);
+            log.error({ error: data.error }, 'ElevenLabs auth error');
             onError('Authentication error: ' + (data.error || 'Invalid token'));
             stopRecording();
           } else if (messageType === 'error' || messageType === 'input_error') {
-            console.error('ElevenLabs error:', data);
+            log.error({ data }, 'ElevenLabs transcription error');
             onError('Transcription error: ' + (data.error || data.message || 'Unknown error'));
           }
         } catch (err) {
-          console.error('Error parsing WebSocket message:', err);
+          log.error({ err }, 'failed to parse WebSocket message');
         }
       };
 
-      ws.onerror = (event) => {
-        console.error('WebSocket error:', event);
+      ws.onerror = () => {
+        log.error('WebSocket connection error');
         onError('Connection error. Please try again.');
         stopRecording();
       };
 
       ws.onclose = () => {
-        console.log('ElevenLabs WebSocket closed');
+        log.debug('WebSocket closed');
       };
 
       setIsRecording(true);
     } catch (err) {
-      console.error('Failed to start recording:', err);
+      log.error({ err }, 'failed to start recording');
       onError('Failed to start transcription. Check API key in settings.');
     }
   }, [onError, onTranscriptCommit, startAudioCapture]);
@@ -271,7 +274,7 @@ export const useVoiceRecording = ({
         setTimeout(() => {
           // Only add partial if no committed_transcript was received (fallback)
           if (currentPartial && !commitProcessedRef.current) {
-            console.log('Commit not processed, using partial fallback:', currentPartial);
+            log.debug('commit not processed, using partial fallback');
             onTranscriptCommit(currentPartial);
             setPartialTranscript('');
           }
@@ -295,7 +298,7 @@ export const useVoiceRecording = ({
     }
 
     setIsRecording(false);
-    console.log('Recording stopped');
+    log.debug('recording stopped');
   }, [partialTranscript, onTranscriptCommit]);
 
   // Cleanup on unmount

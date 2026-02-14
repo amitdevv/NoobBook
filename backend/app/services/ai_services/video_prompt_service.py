@@ -5,12 +5,15 @@ Educational Note: This is a simple AI service that uses Claude to generate
 detailed, vivid video prompts from source content. The generated prompts are
 then used with Google Veo 2.0 for video generation.
 """
+import logging
 from typing import Dict, Any
 
 from app.services.integrations.claude import claude_service
 from app.services.integrations.supabase import storage_service
 from app.config import prompt_loader
 from app.utils import claude_parsing_utils
+
+logger = logging.getLogger(__name__)
 
 
 class VideoPromptService:
@@ -38,7 +41,7 @@ class VideoPromptService:
         Returns:
             Dict with success status and generated prompt
         """
-        print(f"[VideoPromptService] Generating video prompt for source {source_id[:8]}")
+        logger.info("Generating video prompt for source %s", source_id[:8])
 
         # Load prompt config
         config = prompt_loader.get_prompt_config("video")
@@ -80,8 +83,6 @@ Generate a clear, vivid video prompt (2-4 sentences) that describes what should 
             # Clean up the prompt (remove any markdown, quotes, etc.)
             prompt_text = prompt_text.strip().strip('"').strip("'")
 
-            print(f"[VideoPromptService] Generated prompt: {prompt_text[:100]}...")
-
             return {
                 "success": True,
                 "prompt": prompt_text,
@@ -89,9 +90,7 @@ Generate a clear, vivid video prompt (2-4 sentences) that describes what should 
             }
 
         except Exception as e:
-            print(f"[VideoPromptService] Error: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.exception("Error generating video prompt")
             return {
                 "success": False,
                 "error": str(e)
@@ -147,7 +146,7 @@ Generate a clear, vivid video prompt (2-4 sentences) that describes what should 
             return "\n\n".join(sampled_content)
 
         except Exception as e:
-            print(f"[VideoPromptService] Error getting source content: {e}")
+            logger.exception("Error getting source content")
             return f"Error loading source content: {str(e)}"
 
 

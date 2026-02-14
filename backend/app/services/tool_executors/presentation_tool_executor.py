@@ -11,6 +11,7 @@ Tools:
 - finalize_presentation: Termination tool - signals completion
 """
 
+import logging
 import os
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
@@ -18,6 +19,8 @@ from pathlib import Path
 
 from app.utils.path_utils import get_studio_dir
 from app.services.studio_services import studio_index_service
+
+logger = logging.getLogger(__name__)
 
 
 class PresentationToolExecutor:
@@ -116,7 +119,6 @@ class PresentationToolExecutor:
         slides = tool_input.get("slides", [])
         presentation_type = tool_input.get("presentation_type", "business")
 
-        print(f"      Planning: {title} ({len(slides)} slides)")
 
         studio_index_service.update_presentation_job(
             project_id, job_id,
@@ -145,7 +147,6 @@ class PresentationToolExecutor:
         """Handle create_base_styles tool call."""
         content = tool_input.get("content", "")
 
-        print(f"      Creating: base-styles.css ({len(content)} chars)")
 
         try:
             slides_dir = Path(get_studio_dir(project_id)) / "presentations" / job_id / "slides"
@@ -166,8 +167,6 @@ class PresentationToolExecutor:
                 files=updated_files,
                 status_message="Base styles created, generating slides..."
             )
-
-            print(f"      Saved: base-styles.css")
 
             return (
                 f"base-styles.css created successfully ({len(content)} characters). "
@@ -192,7 +191,6 @@ class PresentationToolExecutor:
 
         filename = f"slide_{slide_number:02d}.html"
 
-        print(f"      Creating: {filename} ({slide_type}, {len(content)} chars)")
 
         try:
             slides_dir = Path(get_studio_dir(project_id)) / "presentations" / job_id / "slides"
@@ -225,8 +223,6 @@ class PresentationToolExecutor:
                 status_message=f"Created {filename} ({slide_count} slides so far)"
             )
 
-            print(f"      Saved: {filename}")
-
             return (
                 f"Slide {slide_number} ({filename}) created successfully. "
                 f"Type: {slide_type}, Size: {len(content)} characters."
@@ -253,7 +249,6 @@ class PresentationToolExecutor:
         slides_created = tool_input.get("slides_created", [])
         design_notes = tool_input.get("design_notes", "")
 
-        print(f"      Finalizing presentation ({total_slides} slides)")
 
         try:
             job = studio_index_service.get_presentation_job(project_id, job_id)
@@ -299,7 +294,7 @@ class PresentationToolExecutor:
 
         except Exception as e:
             error_msg = f"Error finalizing presentation: {str(e)}"
-            print(f"      {error_msg}")
+            logger.exception("Failed to finalize presentation")
 
             studio_index_service.update_presentation_job(
                 project_id, job_id,

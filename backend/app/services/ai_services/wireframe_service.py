@@ -5,6 +5,7 @@ Single AI call service that uses Claude to generate Excalidraw-compatible
 element definitions for wireframe creation.
 """
 
+import logging
 from typing import Dict, Any
 from datetime import datetime
 
@@ -15,6 +16,8 @@ from app.config import prompt_loader, tool_loader
 from app.utils import claude_parsing_utils
 from app.utils.source_content_utils import get_source_content
 from app.utils.excalidraw_utils import convert_to_excalidraw_elements
+
+logger = logging.getLogger(__name__)
 
 
 class WireframeService:
@@ -63,7 +66,7 @@ class WireframeService:
             started_at=datetime.now().isoformat()
         )
 
-        print(f"[Wireframe] Starting job {job_id}")
+        logger.info("Starting wireframe job %s", job_id[:8])
 
         try:
             # Get source metadata
@@ -151,7 +154,7 @@ class WireframeService:
                 completed_at=datetime.now().isoformat()
             )
 
-            print(f"[Wireframe] Generated {len(excalidraw_elements)} elements in {generation_time:.1f}s")
+            logger.info("Wireframe generated: %d elements in %.1fs", len(excalidraw_elements), generation_time)
 
             return {
                 "success": True,
@@ -164,7 +167,7 @@ class WireframeService:
             }
 
         except Exception as e:
-            print(f"[Wireframe] Error: {e}")
+            logger.exception("Wireframe generation failed")
             studio_index_service.update_wireframe_job(
                 project_id, job_id,
                 status="error",

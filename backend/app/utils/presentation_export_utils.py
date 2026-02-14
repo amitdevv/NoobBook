@@ -24,11 +24,14 @@ Usage:
     )
 """
 
+import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.enum.shapes import MSO_SHAPE
+
+logger = logging.getLogger(__name__)
 
 
 # Standard 16:9 widescreen dimensions (in inches)
@@ -75,7 +78,7 @@ def create_pptx_from_screenshots(
         valid_screenshots = [s for s in screenshots if s.get("success") and s.get("screenshot_path")]
 
         if not valid_screenshots:
-            print("[PPTX] No valid screenshots to export")
+            logger.warning("No valid screenshots to export")
             return None
 
         # Create presentation with widescreen dimensions
@@ -99,11 +102,9 @@ def create_pptx_from_screenshots(
                     "total": len(valid_screenshots)
                 })
 
-            print(f"[PPTX] Adding slide {i + 1}/{len(valid_screenshots)}")
-
             # Verify screenshot file exists
             if not Path(screenshot_path).exists():
-                print(f"[PPTX] Screenshot not found, skipping: {screenshot_path}")
+                logger.warning("Screenshot not found, skipping: %s", screenshot_path)
                 continue
 
             # Add blank slide
@@ -126,14 +127,12 @@ def create_pptx_from_screenshots(
         # Save the presentation
         prs.save(str(output_file))
 
-        print(f"[PPTX] Created presentation with {len(valid_screenshots)} slides: {output_path}")
+        logger.info("Created presentation with %s slides: %s", len(valid_screenshots), output_path)
 
         return str(output_file)
 
     except Exception as e:
-        print(f"[PPTX] Error creating presentation: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error creating presentation")
         return None
 
 

@@ -6,6 +6,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-flash-cards-api');
 
 /**
  * Flash card item
@@ -91,7 +94,7 @@ export const flashCardsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting flash card generation:', error);
+      log.error({ err: error }, 'failed to start flash card generation');
       throw error;
     }
   },
@@ -109,7 +112,7 @@ export const flashCardsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting flash card job status:', error);
+      log.error({ err: error }, 'failed to get flash card job status');
       throw error;
     }
   },
@@ -129,7 +132,7 @@ export const flashCardsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing flash card jobs:', error);
+      log.error({ err: error }, 'failed to list flash card jobs');
       throw error;
     }
   },

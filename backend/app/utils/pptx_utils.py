@@ -10,10 +10,13 @@ Why LibreOffice?
 - Headless mode allows server-side conversion without GUI
 - Accurate rendering of PowerPoint presentations
 """
+import logging
 import os
 import subprocess
 import platform
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def get_libreoffice_path() -> str:
@@ -90,7 +93,7 @@ def convert_pptx_to_pdf(pptx_path: Path, output_dir: Path) -> Path:
         str(pptx_path)
     ]
 
-    print(f"Converting PPTX to PDF: {pptx_path.name}")
+    logger.info("Converting PPTX to PDF: %s", pptx_path.name)
 
     try:
         result = subprocess.run(
@@ -110,7 +113,7 @@ def convert_pptx_to_pdf(pptx_path: Path, output_dir: Path) -> Path:
         if not pdf_path.exists():
             raise RuntimeError(f"PDF not created at expected path: {pdf_path}")
 
-        print(f"PDF created: {pdf_path}")
+        logger.info("PDF created: %s", pdf_path)
         return pdf_path
 
     except subprocess.TimeoutExpired:

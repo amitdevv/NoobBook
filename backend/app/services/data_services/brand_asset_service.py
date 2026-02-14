@@ -212,7 +212,6 @@ class BrandAssetService:
             storage_service.delete_brand_asset(user_id, asset_id, file_name)
             raise RuntimeError("Failed to create brand asset record")
 
-        print(f"Created brand asset: {name} (ID: {asset_id})")
         return response.data[0]
 
     def update_asset(
@@ -270,7 +269,6 @@ class BrandAssetService:
         )
 
         if response.data:
-            print(f"Updated brand asset: {asset_id}")
             return response.data[0]
 
         return None
@@ -301,7 +299,6 @@ class BrandAssetService:
         # Delete database record
         self.supabase.table(self.table).delete().eq("id", asset_id).eq("user_id", user_id).execute()
 
-        print(f"Deleted brand asset: {asset_id}")
         return True
 
     def set_primary(
@@ -334,7 +331,6 @@ class BrandAssetService:
             "is_primary": True
         }).eq("id", asset_id).eq("user_id", user_id).execute()
 
-        print(f"Set primary {asset_type}: {asset_id}")
         return True
 
     def get_asset_url(

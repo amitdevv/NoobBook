@@ -8,6 +8,7 @@ Orchestrates the business report generation workflow:
 4. Agent writes the final markdown report (write_business_report - termination)
 """
 
+import logging
 import uuid
 from typing import Dict, Any, List
 from datetime import datetime
@@ -18,6 +19,8 @@ from app.utils import claude_parsing_utils
 from app.services.data_services import message_service
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.business_report_tool_executor import business_report_tool_executor
+
+logger = logging.getLogger(__name__)
 
 
 class BusinessReportAgentService:
@@ -92,11 +95,9 @@ class BusinessReportAgentService:
         collected_charts = []
         collected_analyses = []
 
-        print(f"[BusinessReportAgent] Starting (job_id: {job_id[:8]}, type: {report_type})")
-        print(f"  CSV sources: {len(csv_source_ids)}, Context sources: {len(context_source_ids)}")
+        logger.info("Starting business report agent job %s, type=%s", job_id[:8], report_type)
 
         for iteration in range(1, self.MAX_ITERATIONS + 1):
-            print(f"  Iteration {iteration}/{self.MAX_ITERATIONS}")
 
             response = claude_service.send_message(
                 messages=messages,
@@ -127,8 +128,6 @@ class BusinessReportAgentService:
                     tool_input = getattr(block, "input", {}) if hasattr(block, "input") else block.get("input", {})
                     tool_id = getattr(block, "id", "") if hasattr(block, "id") else block.get("id", "")
 
-                    print(f"    Tool: {tool_name}")
-
                     # Build execution context
                     context = {
                         "project_id": project_id,
@@ -148,7 +147,7 @@ class BusinessReportAgentService:
                     )
 
                     if is_termination:
-                        print(f"  Completed in {iteration} iterations")
+                        logger.info("Completed in %d iterations", iteration)
                         self._save_execution(
                             project_id, execution_id, job_id, messages,
                             result, started_at, source_id
@@ -166,7 +165,7 @@ class BusinessReportAgentService:
                 messages.append({"role": "user", "content": tool_results})
 
         # Max iterations reached
-        print(f"  Max iterations reached ({self.MAX_ITERATIONS})")
+        logger.warning("Max iterations reached (%d)", self.MAX_ITERATIONS)
         error_result = {
             "success": False,
             "error_message": f"Agent reached maximum iterations ({self.MAX_ITERATIONS})",
@@ -223,7 +222,7 @@ class BusinessReportAgentService:
             }
 
         except Exception as e:
-            print(f"[BusinessReportAgent] Error getting source info: {e}")
+            logger.exception("Error getting source info")
             return {"csv_sources": [], "context_sources": []}
 
     def _build_user_message(

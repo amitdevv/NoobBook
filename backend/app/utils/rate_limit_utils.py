@@ -27,9 +27,12 @@ Used by:
 - image_service (image analysis)
 - Any service that needs to respect API rate limits
 """
+import logging
 import time
 import threading
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 class RateLimiter:
@@ -77,7 +80,7 @@ class RateLimiter:
             if self._requests_this_minute >= self.requests_per_minute:
                 wait_time = 60 - (current_time - self._minute_start_time)
                 if wait_time > 0:
-                    print(f"Rate limit reached ({self.requests_per_minute}/min). Waiting {wait_time:.1f}s...")
+                    logger.warning("Rate limit reached (%s/min). Waiting %.1fs...", self.requests_per_minute, wait_time)
                     time.sleep(wait_time)
                     waited = wait_time
                     # Reset after waiting

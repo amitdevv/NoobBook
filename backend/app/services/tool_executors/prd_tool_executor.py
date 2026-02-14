@@ -7,11 +7,14 @@ Agent handles orchestration, executor handles tool-specific logic.
 Special Note: Uses is_last_section flag for termination instead of a separate tool.
 """
 
+import logging
 from typing import Dict, Any, Tuple
 from datetime import datetime
 
 from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
+
+logger = logging.getLogger(__name__)
 
 
 class PRDToolExecutor:
@@ -81,7 +84,6 @@ class PRDToolExecutor:
         product_name = tool_input.get("product_name", "Unknown Product")
         sections = tool_input.get("sections", [])
 
-        print(f"      Planning: {document_title} ({len(sections)} sections)")
 
         # Update job with plan
         studio_index_service.update_prd_job(
@@ -129,9 +131,8 @@ class PRDToolExecutor:
 
         # Log if there's a mismatch (for debugging)
         if agent_section_number != actual_section_number:
-            print(f"      Note: Agent sent section {agent_section_number}, using actual count {actual_section_number}")
+            logger.warning("Section number mismatch: agent sent %s, using actual count %s", agent_section_number, actual_section_number)
 
-        print(f"      Writing section {actual_section_number}: {section_title} (is_last: {is_last_section})")
 
         try:
             markdown_filename = f"{job_id}.md"
@@ -179,7 +180,7 @@ class PRDToolExecutor:
 
         except Exception as e:
             error_msg = f"Error writing section {actual_section_number}: {str(e)}"
-            print(f"      {error_msg}")
+            logger.exception("Failed to write PRD section %s", actual_section_number)
             return error_msg, False, None
 
     def _finalize_prd(
@@ -229,7 +230,7 @@ class PRDToolExecutor:
 
         except Exception as e:
             error_msg = f"Error finalizing PRD: {str(e)}"
-            print(f"      {error_msg}")
+            logger.exception("Failed to finalize PRD")
 
             studio_index_service.update_prd_job(
                 project_id, job_id,

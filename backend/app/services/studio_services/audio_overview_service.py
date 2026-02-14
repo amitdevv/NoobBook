@@ -14,11 +14,14 @@ Tools:
 - read_source_content: Reads source content (full or chunk by chunk)
 - write_script_section: Writes/appends script sections, signals completion
 """
+import logging
 import uuid
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
+
+logger = logging.getLogger(__name__)
 from app.services.integrations.elevenlabs import tts_service
 from app.services.source_services import source_index_service
 from app.services.studio_services import studio_index_service
@@ -96,8 +99,6 @@ class AudioOverviewService:
             started_at=datetime.now().isoformat()
         )
 
-        print(f"[AudioOverview] Starting job {job_id}")
-
         # Step 1: Get source metadata
         source = source_index_service.get_source_from_index(project_id, source_id)
         if not source:
@@ -113,8 +114,6 @@ class AudioOverviewService:
         embedding_info = source.get("embedding_info", {})
         token_count = embedding_info.get("token_count", 0)
         is_large = token_count >= studio_audio_executor.SMALL_SOURCE_THRESHOLD
-
-        print(f"  Source: {source_name} ({token_count} tokens, large={is_large})")
 
         # Step 2: Setup filenames for Supabase Storage
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -146,8 +145,6 @@ class AudioOverviewService:
                 completed_at=datetime.now().isoformat()
             )
             return script_result
-
-        print(f"  Script generated in Supabase Storage")
 
         # Update progress
         studio_index_service.update_audio_job(
@@ -195,8 +192,6 @@ class AudioOverviewService:
                 completed_at=datetime.now().isoformat()
             )
             return {"success": False, "error": "Failed to upload audio to storage"}
-
-        print(f"  Audio uploaded: {audio_filename}")
 
         # Step 5: Update job as complete
         duration = (datetime.now() - started_at).total_seconds()
@@ -296,8 +291,6 @@ class AudioOverviewService:
                 progress=f"Generating script (step {iteration})..."
             )
 
-            print(f"    Iteration {iteration}/{max_iterations}")
-
             # Call Claude API
             response = claude_service.send_message(
                 messages=messages,
@@ -331,8 +324,6 @@ class AudioOverviewService:
                     tool_input = getattr(block, "input", {}) if hasattr(block, "input") else block.get("input", {})
                     tool_id = getattr(block, "id", "") if hasattr(block, "id") else block.get("id", "")
 
-                    print(f"      Tool: {tool_name}")
-
                     # Execute the tool
                     result, completed = studio_audio_executor.execute(
                         tool_name=tool_name,
@@ -353,12 +344,10 @@ class AudioOverviewService:
                     # Track if this is the last batch of content
                     if "This is the last batch" in result:
                         last_batch_seen = True
-                        print(f"      Last batch detected at iteration {iteration}")
 
                     # Track if we've seen full content (small source)
                     if "FULL SOURCE CONTENT" in result:
                         full_content_seen = True
-                        print(f"      Full content (small source) at iteration {iteration}")
 
             # Add tool results to messages
             if tool_results:
@@ -366,7 +355,6 @@ class AudioOverviewService:
 
             # Check if script generation is complete
             if is_complete:
-                print(f"    Script complete in {iteration} iterations")
                 return {
                     "success": True,
                     "iterations": iteration,
@@ -382,7 +370,6 @@ class AudioOverviewService:
                 # Give Claude 2 extra iterations to finish properly
                 if iterations_since_last_batch >= 2 and storage_service.download_studio_file(project_id, "audio", job_id, "script.txt"):
                     reason = "last batch" if last_batch_seen else "full content"
-                    print(f"    Forcing completion after {iteration} iterations ({reason} seen)")
                     return {
                         "success": True,
                         "iterations": iteration,
@@ -395,7 +382,7 @@ class AudioOverviewService:
 
             # Check for end_turn without tool use (shouldn't happen, but handle it)
             if claude_parsing_utils.is_end_turn(response) and not tool_results:
-                print(f"    Unexpected end_turn at iteration {iteration}")
+                logger.warning("Unexpected end_turn at iteration %s", iteration)
                 # Try to use whatever script was written
                 if storage_service.download_studio_file(project_id, "audio", job_id, "script.txt"):
                     return {
@@ -415,7 +402,7 @@ class AudioOverviewService:
                     }
 
         # Max iterations reached
-        print(f"    Max iterations reached ({max_iterations})")
+        logger.warning("Audio script generation hit max iterations (%s)", max_iterations)
         if storage_service.download_studio_file(project_id, "audio", job_id, "script.txt"):
             return {
                 "success": True,

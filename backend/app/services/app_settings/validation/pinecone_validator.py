@@ -4,11 +4,14 @@ Pinecone API key validator.
 Educational Note: Validates Pinecone API keys and auto-creates the
 "growthxlearn" index if it doesn't exist.
 """
+import logging
 from typing import Tuple, Dict, Optional
 from pinecone import Pinecone
 from pinecone.grpc import PineconeGRPC as Pinecone
 from pinecone import ServerlessSpec
 import time
+
+logger = logging.getLogger(__name__)
 
 
 def validate_pinecone_key(api_key: str) -> Tuple[bool, str, Optional[Dict[str, str]]]:
@@ -36,13 +39,10 @@ def validate_pinecone_key(api_key: str) -> Tuple[bool, str, Optional[Dict[str, s
 
     try:
         # Create Pinecone client with the provided API key
-        print(f"Creating Pinecone client...")
         pc = Pinecone(api_key=api_key)
 
         # Check if the index already exists
-        print(f"Checking if index '{INDEX_NAME}' exists...")
         if pc.has_index(INDEX_NAME):
-            print(f"Index '{INDEX_NAME}' already exists, using existing index")
             # Index exists, just return success
             index_details = {
                 'index_name': INDEX_NAME,
@@ -51,7 +51,7 @@ def validate_pinecone_key(api_key: str) -> Tuple[bool, str, Optional[Dict[str, s
             return True, f"Valid Pinecone API key (using existing index '{INDEX_NAME}')", index_details
         else:
             # Index doesn't exist, create it
-            print(f"Index '{INDEX_NAME}' not found, creating new index...")
+            logger.info("Creating Pinecone index %s", INDEX_NAME)
             pc.create_index(
                 name=INDEX_NAME,
                 vector_type="dense",
@@ -69,7 +69,7 @@ def validate_pinecone_key(api_key: str) -> Tuple[bool, str, Optional[Dict[str, s
             )
 
             # Wait for the index to be ready (with timeout)
-            print(f"Waiting for index '{INDEX_NAME}' to be ready...")
+            logger.info("Waiting for Pinecone index %s to be ready", INDEX_NAME)
             max_wait_time = 60  # seconds
             start_time = time.time()
 
@@ -79,7 +79,6 @@ def validate_pinecone_key(api_key: str) -> Tuple[bool, str, Optional[Dict[str, s
                     index_list = pc.list_indexes()
                     for idx in index_list:
                         if idx['name'] == INDEX_NAME and idx.get('status', {}).get('ready', False):
-                            print(f"Index '{INDEX_NAME}' is ready!")
                             index_details = {
                                 'index_name': INDEX_NAME,
                                 'region': REGION
@@ -89,7 +88,7 @@ def validate_pinecone_key(api_key: str) -> Tuple[bool, str, Optional[Dict[str, s
                     # Wait a bit before checking again
                     time.sleep(2)
                 except Exception as e:
-                    print(f"Error checking index status: {e}")
+                    logger.error("Failed to check Pinecone index status: %s", e)
                     time.sleep(2)
 
             # If we get here, index creation timed out but might still succeed
@@ -111,5 +110,5 @@ def validate_pinecone_key(api_key: str) -> Tuple[bool, str, Optional[Dict[str, s
         elif 'rate' in error_message:
             return True, "Valid API key (rate limited)", {'index_name': INDEX_NAME, 'region': REGION}
         else:
-            print(f"Pinecone validation error: {type(e).__name__}: {str(e)}")
+            logger.error("Pinecone validation error: %s: %s", type(e).__name__, e)
             return False, f"Validation failed: {str(e)[:100]}", None

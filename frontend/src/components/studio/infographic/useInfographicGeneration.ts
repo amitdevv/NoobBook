@@ -8,6 +8,9 @@ import { useState, useRef } from 'react';
 import { infographicsAPI, checkGeminiStatus, type InfographicJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('infographic-generation');
 
 export const useInfographicGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -31,7 +34,7 @@ export const useInfographicGeneration = (projectId: string) => {
         setSavedInfographicJobs(completedInfographics);
       }
     } catch (error) {
-      console.error('Failed to load saved infographic jobs:', error);
+      log.error({ err: error }, 'failed to load saved infographic jobs');
     }
   };
 
@@ -88,7 +91,7 @@ export const useInfographicGeneration = (projectId: string) => {
         showError(finalJob.error || 'Infographic generation failed.');
       }
     } catch (error) {
-      console.error('Infographic generation error:', error);
+      log.error({ err: error }, 'LInfographic generationE failed');
       showError(error instanceof Error ? error.message : 'Infographic generation failed.');
     } finally {
       setIsGeneratingInfographic(false);

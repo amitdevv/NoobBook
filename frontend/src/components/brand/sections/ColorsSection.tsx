@@ -13,6 +13,9 @@ import { Plus, Trash, CircleNotch, Check } from '@phosphor-icons/react';
 import { brandAPI, type ColorPalette, type CustomColor, type ColorEnabled, getDefaultColors, getDefaultColorEnabled } from '../../../lib/api/brand';
 import { ColorPicker } from '../ColorPicker';
 import { useToast } from '@/components/ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('brand-colors');
 
 /** The 5 standard brand color slots with display metadata. */
 const COLOR_FIELDS: { key: keyof Omit<ColorPalette, 'custom' | 'enabled'>; label: string; description: string }[] = [
@@ -43,7 +46,7 @@ export const ColorsSection: React.FC = () => {
         setEnabled(loaded.enabled ?? getDefaultColorEnabled());
       }
     } catch (error) {
-      console.error('Failed to load colors:', error);
+      log.error({ err: error }, 'failed to load colors');
     } finally {
       setLoading(false);
     }
@@ -63,7 +66,7 @@ export const ColorsSection: React.FC = () => {
         setTimeout(() => setSaved(false), 2000);
       }
     } catch (error) {
-      console.error('Failed to save colors:', error);
+      log.error({ err: error }, 'failed to save colors');
       showError('Failed to save colors');
     } finally {
       setSaving(false);

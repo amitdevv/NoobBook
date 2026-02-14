@@ -27,11 +27,14 @@ This allows:
 - Citation back to source page
 - Consistent chunk sizes across all source types
 """
+import logging
 import shutil
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 from app.utils.text.cleaning import clean_text_for_embedding
 from app.utils.text.page_markers import ANY_PAGE_PATTERN, find_all_markers, get_page_number
@@ -508,7 +511,7 @@ def _parse_chunk_file(file_path: Path) -> Optional[Dict[str, Any]]:
             'file_path': str(file_path)
         }
     except Exception as e:
-        print(f"Error parsing chunk file {file_path}: {e}")
+        logger.error("Error parsing chunk file %s: %s", file_path, e)
         return None
 
 
@@ -540,7 +543,7 @@ def delete_chunks_for_source(
     try:
         shutil.rmtree(source_chunks_dir)
     except Exception as e:
-        print(f"Error deleting chunks folder {source_chunks_dir}: {e}")
+        logger.error("Error deleting chunks folder %s: %s", source_chunks_dir, e)
         return 0
 
     return deleted_count

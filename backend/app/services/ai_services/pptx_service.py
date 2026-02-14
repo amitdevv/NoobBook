@@ -12,6 +12,7 @@ while providing presentation-specific prompts that understand slides, not docume
 Processing Flow:
     PPTX → PDF (LibreOffice) → base64 pages → Claude vision → extracted content
 """
+import logging
 import tempfile
 import time
 from pathlib import Path
@@ -30,6 +31,8 @@ from app.utils.pptx_utils import convert_pptx_to_pdf
 from app.utils.rate_limit_utils import RateLimiter
 from app.utils.text import build_processed_output
 from app.utils.embedding_utils import count_tokens
+
+logger = logging.getLogger(__name__)
 
 
 class CancelledException(Exception):
@@ -93,7 +96,7 @@ class PPTXService:
 
                 # Step 2: Get slide count
                 total_slides = get_page_count(pdf_path)
-                print(f"Presentation has {total_slides} slides")
+                logger.info("Presentation has %d slides", total_slides)
 
                 if total_slides == 0:
                     return {
@@ -113,10 +116,8 @@ class PPTXService:
                 rate_limiter = RateLimiter(batches_per_minute)
 
                 # Step 4: Extract all slide bytes and create batches
-                print("Extracting slide bytes...")
                 slide_bytes_list = get_all_page_bytes(pdf_path)
                 batches = create_batches(slide_bytes_list, DEFAULT_BATCH_SIZE)
-                print(f"Created {len(batches)} batches for processing")
 
                 # Step 5: Process batches (parallel for large presentations)
                 all_results = {}
@@ -198,7 +199,7 @@ class PPTXService:
                     metadata=metadata
                 )
 
-                print(f"PPTX extraction complete: {len(all_results)} slides processed")
+                logger.info("PPTX extraction complete: %d slides processed", len(all_results))
 
                 # Return processed content for processor to upload to Supabase Storage
                 return {
@@ -214,7 +215,7 @@ class PPTXService:
                 }
 
             except Exception as e:
-                print(f"Error processing PPTX: {e}")
+                logger.exception("Error processing PPTX")
                 return {
                     "success": False,
                     "error": str(e)
@@ -331,10 +332,11 @@ class PPTXService:
 
                 if "rate" in error_str or "429" in error_str or "overloaded" in error_str:
                     wait_time = (attempt + 1) * 30
-                    print(f"Batch starting slide {batch_start_slide}: Rate limit hit, waiting {wait_time}s")
+                    logger.warning("Batch slide %d: rate limit hit, waiting %ds",
+                                   batch_start_slide, wait_time)
                     time.sleep(wait_time)
                 else:
-                    print(f"Batch starting slide {batch_start_slide}: Error - {e}")
+                    logger.error("Batch slide %d: %s", batch_start_slide, e)
                     if attempt < max_retries - 1:
                         time.sleep(5)
 

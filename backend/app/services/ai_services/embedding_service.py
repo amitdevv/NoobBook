@@ -18,6 +18,7 @@ Flow:
 
 Storage: Chunks are stored in Supabase Storage for retrieval during RAG search.
 """
+import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
@@ -29,6 +30,8 @@ from app.utils.text import (
 from app.services.integrations.openai import openai_service
 from app.services.integrations.pinecone import pinecone_service
 from app.services.integrations.supabase import storage_service
+
+logger = logging.getLogger(__name__)
 
 
 class EmbeddingService:
@@ -82,7 +85,7 @@ class EmbeddingService:
             text=processed_text
         )
 
-        print(f"Embedding check for {source_name}: {reason}")
+        logger.info("Embedding check for %s: %s", source_name, reason)
 
         if not should_embed:
             return {
@@ -120,7 +123,7 @@ class EmbeddingService:
                     "reason": "No chunks created from text"
                 }
 
-            print(f"Created {len(chunks)} chunks for {source_name}")
+            logger.info("Created %d chunks for %s", len(chunks), source_name)
 
             # Step 4: Upload chunks to Supabase Storage
             uploaded_count = 0
@@ -133,13 +136,13 @@ class EmbeddingService:
                 )
                 if storage_path:
                     uploaded_count += 1
-            print(f"Uploaded {uploaded_count} chunks to Supabase Storage")
+            logger.info("Uploaded %d chunks to Supabase Storage", uploaded_count)
 
             # Step 5: Create embeddings for all chunks
             # Educational Note: chunk.text is already cleaned by chunking_service
             chunk_texts = [chunk.text for chunk in chunks]
             embeddings = openai_service.create_embeddings_batch(chunk_texts)
-            print(f"Created {len(embeddings)} embeddings")
+            logger.info("Created %d embeddings", len(embeddings))
 
             # Step 6: Convert to Pinecone format and upsert
             vectors = chunks_to_pinecone_format(chunks, embeddings)
@@ -147,7 +150,7 @@ class EmbeddingService:
                 vectors=vectors,
                 namespace=project_id  # Use project_id as namespace
             )
-            print(f"Upserted {upsert_result.get('upserted_count', 0)} vectors to Pinecone")
+            logger.info("Upserted %d vectors to Pinecone", upsert_result.get("upserted_count", 0))
 
             return {
                 "is_embedded": True,
@@ -158,7 +161,7 @@ class EmbeddingService:
             }
 
         except Exception as e:
-            print(f"Embedding workflow error: {e}")
+            logger.exception("Embedding workflow error")
             return {
                 "is_embedded": False,
                 "embedded_at": None,
@@ -199,17 +202,15 @@ class EmbeddingService:
                     namespace=project_id
                 )
                 results["pinecone_deleted"] = True
-                print(f"Deleted vectors for source {source_id} from Pinecone")
             except Exception as e:
-                print(f"Error deleting from Pinecone: {e}")
+                logger.exception("Error deleting from Pinecone")
 
         # Delete chunk files from Supabase Storage
         try:
             storage_service.delete_source_chunks(project_id, source_id)
             results["chunks_deleted"] = True
-            print(f"Deleted chunk files from Supabase Storage for source {source_id}")
         except Exception as e:
-            print(f"Error deleting chunks from Supabase Storage: {e}")
+            logger.exception("Error deleting chunks from Supabase Storage")
 
         return results
 
@@ -293,7 +294,7 @@ class EmbeddingService:
             return enriched_results
 
         except Exception as e:
-            print(f"Search error: {e}")
+            logger.exception("Search error")
             return []
 
 

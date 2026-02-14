@@ -5,9 +5,12 @@ Educational Note: This service provides methods to query Notion pages and databa
 using the Notion API. It follows NoobBook's service pattern with lazy-loaded
 client initialization and environment-based configuration.
 """
+import logging
 import os
 from typing import Dict, Any, Optional, List
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class NotionService:
@@ -39,9 +42,7 @@ class NotionService:
         self._configured = bool(self._api_key)
 
         if self._configured:
-            print(f"✓ Notion service configured")
-        else:
-            print("⚠ Notion service not configured (missing NOTION_API_KEY)")
+            logger.info("Notion service configured")
 
     def is_configured(self) -> bool:
         """Check if Notion credentials are configured."""

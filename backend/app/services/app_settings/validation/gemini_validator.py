@@ -4,8 +4,11 @@ Gemini 2.5 API key validator.
 Educational Note: Validates Gemini API keys by making a minimal
 text generation request to test if the key is valid.
 """
+import logging
 from typing import Tuple
 from google import genai
+
+logger = logging.getLogger(__name__)
 
 
 def validate_gemini_2_5_key(api_key: str) -> Tuple[bool, str]:
@@ -53,5 +56,5 @@ def validate_gemini_2_5_key(api_key: str) -> Tuple[bool, str]:
         elif 'rate' in error_message:
             return True, "Valid API key (rate limited)"
         else:
-            print(f"Gemini 2.5 validation error: {type(e).__name__}: {str(e)}")
+            logger.error("Gemini 2.5 validation error: %s: %s", type(e).__name__, e)
             return False, f"Validation failed: {str(e)[:100]}"

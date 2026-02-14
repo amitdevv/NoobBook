@@ -4,8 +4,11 @@ Tavily API key validator.
 Educational Note: Validates Tavily API keys by making a minimal
 search request. Tavily is a search API optimized for LLMs and RAG.
 """
+import logging
 from typing import Tuple
 from tavily import TavilyClient
+
+logger = logging.getLogger(__name__)
 
 
 def validate_tavily_key(api_key: str) -> Tuple[bool, str]:
@@ -48,5 +51,5 @@ def validate_tavily_key(api_key: str) -> Tuple[bool, str]:
         elif 'rate' in error_message:
             return True, "Valid API key (rate limited)"
         else:
-            print(f"Tavily validation error: {type(e).__name__}: {str(e)}")
+            logger.error("Tavily validation error: %s: %s", type(e).__name__, e)
             return False, f"Validation failed: {str(e)[:100]}"

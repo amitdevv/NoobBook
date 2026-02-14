@@ -5,9 +5,12 @@ Educational Note: Centralized configuration helps maintain consistency
 and makes it easy to switch between development and production settings.
 Never hardcode sensitive data - use environment variables instead.
 """
+import logging
 import os
 from pathlib import Path
 from typing import List, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 class Config:
@@ -59,11 +62,7 @@ class Config:
             # Deduplicate while preserving order
             app.config['CORS_ALLOWED_ORIGINS'] = list(dict.fromkeys(origins))
 
-        # Log the configuration being used
-        print(f"{cls.APP_NAME} v{cls.VERSION} initialized")
-        print(f"Data directory: {cls.DATA_DIR}")
-        print(f"Debug mode: {cls.DEBUG}")
-        print(f"CORS origins: {app.config['CORS_ALLOWED_ORIGINS']}")
+        logger.info("%s v%s initialized (debug=%s)", cls.APP_NAME, cls.VERSION, cls.DEBUG)
 
 
 class DevelopmentConfig(Config):
@@ -76,6 +75,7 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     """Production configuration with security hardening."""
     DEBUG = False
+    LOG_LEVEL = "INFO"
 
     # Educational Note: We only validate SECRET_KEY when actually using production config
     # The class definition shouldn't fail just because we're importing it
@@ -93,6 +93,7 @@ class ProductionConfig(Config):
 class TestingConfig(Config):
     """Testing configuration with test database."""
     TESTING = True
+    LOG_LEVEL = "DEBUG"
     # Use separate test data directory
     DATA_DIR = Config.BASE_DIR / "test_data"
 

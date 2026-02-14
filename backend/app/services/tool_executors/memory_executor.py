@@ -11,10 +11,13 @@ decides to save user or project memory. The execution flow is:
 
 This design ensures the chat response isn't delayed by memory operations.
 """
+import logging
 from typing import Dict, Any, Optional
 
 from app.services.ai_services.memory_service import memory_service
 from app.services.background_services import task_service
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryExecutor:
@@ -64,7 +67,7 @@ class MemoryExecutor:
                 user_id=user_id,
             )
             storing.append("user memory")
-            print(f"Queued user memory update: {user_memory[:50]}...")
+            logger.info("Queued user memory update: %s...", user_memory[:50])
 
         # Queue project memory update if provided
         if project_memory and project_memory.strip():
@@ -78,7 +81,7 @@ class MemoryExecutor:
                 user_id=user_id,
             )
             storing.append("project memory")
-            print(f"Queued project memory update: {project_memory[:50]}...")
+            logger.info("Queued project memory update: %s...", project_memory[:50])
 
         # Return immediate success
         if storing:

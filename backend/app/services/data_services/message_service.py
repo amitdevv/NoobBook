@@ -23,7 +23,11 @@ from typing import Optional, Dict, List, Any
 from config import Config
 from app.utils import claude_parsing_utils
 from app.utils.path_utils import get_web_agent_dir, get_agents_dir
+import logging
+
 from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+
+logger = logging.getLogger(__name__)
 
 
 class MessageService:
@@ -112,7 +116,6 @@ class MessageService:
         )
 
         if not chat_check.data:
-            print(f"  DEBUG: Chat not found: {chat_id}")
             return None
 
         # Prepare content for JSONB storage
@@ -463,7 +466,6 @@ class MessageService:
             The execution_id if successful, None if failed
         """
         if not project_id:
-            print(f"  No project_id provided, skipping {agent_name} execution log save")
             return None
 
         try:
@@ -490,11 +492,10 @@ class MessageService:
             with open(log_file, "w", encoding="utf-8") as f:
                 json.dump(execution_log, f, indent=2, ensure_ascii=False)
 
-            print(f"  Agent execution log saved: {log_file}")
             return execution_id
 
         except Exception as e:
-            print(f"  Error saving {agent_name} execution log: {e}")
+            logger.error("Failed to save %s execution log: %s", agent_name, e)
             return None
 
     def get_agent_execution(
@@ -525,7 +526,7 @@ class MessageService:
                 return json.load(f)
 
         except (json.JSONDecodeError, IOError) as e:
-            print(f"  Error reading {agent_name} execution log: {e}")
+            logger.error("Failed to read %s execution log: %s", agent_name, e)
             return None
 
     def list_agent_executions(
@@ -574,7 +575,7 @@ class MessageService:
             return executions[:limit]
 
         except Exception as e:
-            print(f"  Error listing {agent_name} executions: {e}")
+            logger.error("Failed to list %s executions: %s", agent_name, e)
             return []
 
 

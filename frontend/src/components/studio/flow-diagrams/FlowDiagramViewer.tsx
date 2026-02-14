@@ -24,6 +24,9 @@ import {
   ArrowsOutCardinal,
 } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('flow-diagram-viewer');
 
 interface FlowDiagramViewerProps {
   mermaidSyntax: string;
@@ -113,7 +116,7 @@ export const FlowDiagramViewer: React.FC<FlowDiagramViewerProps> = ({
         setSvgDimensions({ width, height });
       }
     } catch (err) {
-      console.error('Mermaid render error:', err);
+      log.error({ err }, 'mermaid render failed');
       setError(err instanceof Error ? err.message : 'Failed to render diagram');
     }
   }, [mermaidSyntax]);
@@ -197,7 +200,7 @@ export const FlowDiagramViewer: React.FC<FlowDiagramViewerProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      log.error({ err }, 'failed to copy');
     }
   };
 

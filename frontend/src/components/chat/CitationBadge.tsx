@@ -15,6 +15,9 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui
 import { Badge } from '../ui/badge';
 import { FileText, CircleNotch } from '@phosphor-icons/react';
 import { sourcesAPI, type ChunkContent } from '../../lib/api/sources';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('citation-badge');
 
 interface CitationBadgeProps {
   /** The citation number to display (e.g., 1, 2, 3) */
@@ -67,7 +70,7 @@ export const CitationBadge: React.FC<CitationBadgeProps> = ({
         setChunkContent(content);
         setHasLoaded(true);
       } catch (err) {
-        console.error('Error fetching citation content:', err);
+        log.error({ err }, 'failed to Lfetching citation contentE');
         setError('Failed to load citation content');
       } finally {
         setLoading(false);

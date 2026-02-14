@@ -14,9 +14,12 @@ We preserve basic document structure by converting to markdown-like format:
 The extracted text is then split into pages using the same logic as text files
 (character count + natural break points).
 """
+import logging
 from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 try:
     from docx import Document
@@ -25,7 +28,7 @@ try:
     DOCX_AVAILABLE = True
 except ImportError:
     DOCX_AVAILABLE = False
-    print("Warning: python-docx not installed. DOCX processing unavailable.")
+    logger.warning("python-docx not installed. DOCX processing unavailable.")
 
 
 def is_available() -> bool:

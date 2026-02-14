@@ -8,6 +8,7 @@ handle the splitting for embeddings.
 This creates a single page marker: === TEXT PAGE 1 of 1 ===
 Token-based chunking then splits into ~200 token chunks for embeddings.
 """
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
@@ -17,6 +18,8 @@ from app.utils.embedding_utils import needs_embedding, count_tokens
 from app.services.ai_services.embedding_service import embedding_service
 from app.services.ai_services.summary_service import summary_service
 from app.services.integrations.supabase import storage_service
+
+logger = logging.getLogger(__name__)
 
 
 def process_text(
@@ -129,7 +132,7 @@ def _process_embeddings(
 
         # Update status to "embedding" before starting
         source_service.update_source(project_id, source_id, status="embedding")
-        print(f"Starting embedding for {source_name} ({reason})")
+        logger.info("Starting embedding for %s (%s)", source_name, reason)
 
         # Process embeddings using the embedding service
         # Chunks are automatically uploaded to Supabase Storage
@@ -141,7 +144,7 @@ def _process_embeddings(
         )
 
     except Exception as e:
-        print(f"Error processing embeddings for {source_id}: {e}")
+        logger.exception("Embedding failed for source %s", source_id)
         return {
             "is_embedded": False,
             "embedded_at": None,
@@ -158,16 +161,14 @@ def _generate_summary(
 ) -> Dict[str, Any]:
     """Generate a summary for a processed source."""
     try:
-        print(f"Generating summary for source: {source_id}")
         result = summary_service.generate_summary(
             project_id=project_id,
             source_id=source_id,
             source_metadata=source_metadata
         )
         if result:
-            print(f"Summary generated for {source_id}: {len(result.get('summary', ''))} chars")
             return result
         return {}
     except Exception as e:
-        print(f"Error generating summary for {source_id}: {e}")
+        logger.exception("Summary generation failed for source %s", source_id)
         return {}

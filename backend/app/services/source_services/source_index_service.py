@@ -111,8 +111,6 @@ def add_source_to_index(project_id: str, source_metadata: Dict[str, Any]) -> Non
 
     client.table("sources").insert(source_data).execute()
 
-    print(f"  Added source to index: {source_metadata.get('name')} (ID: {source_metadata.get('id')})")
-
 
 def remove_source_from_index(project_id: str, source_id: str) -> bool:
     """
@@ -142,7 +140,6 @@ def remove_source_from_index(project_id: str, source_id: str) -> bool:
     # Delete the source
     client.table("sources").delete().eq("id", source_id).eq("project_id", project_id).execute()
 
-    print(f"  Removed source from index: {source_id}")
     return True
 
 

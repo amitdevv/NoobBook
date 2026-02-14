@@ -7,6 +7,7 @@ Orchestrates the marketing strategy generation workflow:
 3. Agent signals completion via is_last_section=true flag
 """
 
+import logging
 import uuid
 from typing import Dict, Any, List
 from datetime import datetime
@@ -18,6 +19,8 @@ from app.utils.source_content_utils import get_source_content
 from app.services.data_services import message_service
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.marketing_strategy_tool_executor import marketing_strategy_tool_executor
+
+logger = logging.getLogger(__name__)
 
 
 class MarketingStrategyAgentService:
@@ -78,10 +81,9 @@ class MarketingStrategyAgentService:
         total_output_tokens = 0
         sections_written = 0
 
-        print(f"[MarketingStrategyAgent] Starting (job_id: {job_id[:8]})")
+        logger.info("Starting marketing strategy agent job %s", job_id[:8])
 
         for iteration in range(1, self.MAX_ITERATIONS + 1):
-            print(f"  Iteration {iteration}/{self.MAX_ITERATIONS}")
 
             response = claude_service.send_message(
                 messages=messages,
@@ -112,8 +114,6 @@ class MarketingStrategyAgentService:
                     tool_input = getattr(block, "input", {}) if hasattr(block, "input") else block.get("input", {})
                     tool_id = getattr(block, "id", "") if hasattr(block, "id") else block.get("id", "")
 
-                    print(f"    Tool: {tool_name}")
-
                     # Build execution context
                     context = {
                         "project_id": project_id,
@@ -135,7 +135,7 @@ class MarketingStrategyAgentService:
                         sections_written += 1
 
                     if is_termination:
-                        print(f"  Completed in {iteration} iterations, {sections_written} sections")
+                        logger.info("Completed in %d iterations, %d sections", iteration, sections_written)
                         self._save_execution(
                             project_id, execution_id, job_id, messages,
                             result, started_at, source_id
@@ -153,7 +153,7 @@ class MarketingStrategyAgentService:
                 messages.append({"role": "user", "content": tool_results})
 
         # Max iterations reached
-        print(f"  Max iterations reached ({self.MAX_ITERATIONS})")
+        logger.warning("Max iterations reached (%d)", self.MAX_ITERATIONS)
         error_result = {
             "success": False,
             "error_message": f"Agent reached maximum iterations ({self.MAX_ITERATIONS})",

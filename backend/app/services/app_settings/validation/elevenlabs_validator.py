@@ -4,8 +4,11 @@ ElevenLabs API key validator.
 Educational Note: Validates ElevenLabs API keys by checking user info
 via the /user endpoint - a lightweight way to verify the key.
 """
+import logging
 from typing import Tuple
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 def validate_elevenlabs_key(api_key: str) -> Tuple[bool, str]:
@@ -48,5 +51,5 @@ def validate_elevenlabs_key(api_key: str) -> Tuple[bool, str]:
     except requests.exceptions.Timeout:
         return False, "Validation timed out - try again"
     except requests.exceptions.RequestException as e:
-        print(f"ElevenLabs validation error: {type(e).__name__}: {str(e)}")
+        logger.error("ElevenLabs validation error: %s: %s", type(e).__name__, e)
         return False, f"Validation failed: {str(e)}"

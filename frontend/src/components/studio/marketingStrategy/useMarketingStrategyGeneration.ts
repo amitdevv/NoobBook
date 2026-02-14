@@ -9,6 +9,9 @@ import { marketingStrategiesAPI, type MarketingStrategyJob } from '@/lib/api/stu
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('marketing-strategy-generation');
 
 export const useMarketingStrategyGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -67,7 +70,7 @@ export const useMarketingStrategyGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Marketing strategy generation failed.');
       }
     } catch (error) {
-      console.error('Marketing strategy generation error:', error);
+      log.error({ err: error }, 'LMarketing strategy generationE failed');
       showError(error instanceof Error ? error.message : 'Marketing strategy generation failed.');
     } finally {
       setIsGeneratingMarketingStrategy(false);

@@ -5,6 +5,7 @@ Educational Note: Pasted text is uploaded to Supabase Storage as a .txt file.
 This is the simplest source type - the raw content IS the processed content
 (after adding page markers for large texts).
 """
+import logging
 import uuid
 from datetime import datetime
 from typing import Dict, Any
@@ -12,6 +13,8 @@ from typing import Dict, Any
 from app.services.source_services import source_index_service
 from app.services.background_services import task_service
 from app.services.integrations.supabase import storage_service
+
+logger = logging.getLogger(__name__)
 
 
 def upload_text(
@@ -91,8 +94,6 @@ def upload_text(
     # Add to Supabase sources table
     source_index_service.add_source_to_index(project_id, source_metadata)
 
-    print(f"Uploaded text source to Supabase: {name} ({source_id})")
-
     # Submit processing as background task
     _submit_processing_task(project_id, source_id)
 
@@ -121,4 +122,4 @@ def _submit_processing_task(project_id: str, source_id: str) -> None:
         # Update status to "processing" immediately
         source_service.update_source(project_id, source_id, status="processing")
     except Exception as e:
-        print(f"ERROR: Failed to submit text processing task: {e}")
+        logger.error("Failed to submit text processing task for source %s: %s", source_id, e)

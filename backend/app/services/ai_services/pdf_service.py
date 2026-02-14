@@ -21,6 +21,7 @@ Parallel Processing:
 - Number of workers determined by Anthropic tier setting
 - Rate limiting prevents hitting API limits
 """
+import logging
 import time
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
@@ -40,6 +41,8 @@ from app.utils.text import build_processed_output
 from app.utils.embedding_utils import count_tokens
 
 # Note: Processed output is uploaded to Supabase Storage, not saved locally
+
+logger = logging.getLogger(__name__)
 
 
 class CancelledException(Exception):
@@ -198,11 +201,13 @@ class PDFService:
                 # Check if it's a rate limit error (429)
                 if "rate" in error_str or "429" in error_str or "overloaded" in error_str:
                     wait_time = (attempt + 1) * 30
-                    print(f"Batch starting page {batch_start_page}: Rate limit hit, waiting {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                    logger.warning("Batch page %d: rate limit hit, waiting %ds (attempt %d/%d)",
+                                   batch_start_page, wait_time, attempt + 1, max_retries)
                     time.sleep(wait_time)
                 elif attempt < max_retries - 1:
                     wait_time = (2 ** attempt) * 2
-                    print(f"Batch starting page {batch_start_page}: Error, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                    logger.warning("Batch page %d: error, retrying in %ds (attempt %d/%d)",
+                                   batch_start_page, wait_time, attempt + 1, max_retries)
                     time.sleep(wait_time)
 
         # All retries exhausted
@@ -249,7 +254,7 @@ class PDFService:
         # Check for missing pages (Claude didn't call tool for some pages)
         missing_pages = set(expected_pages) - set(page_results.keys())
         if missing_pages:
-            print(f"WARNING: Missing extractions for pages: {sorted(missing_pages)}")
+            logger.warning("Missing extractions for pages: %s", sorted(missing_pages))
             # Mark missing pages as errors so the whole extraction fails
             for page_num in missing_pages:
                 page_results[page_num] = {
@@ -289,7 +294,7 @@ class PDFService:
         Returns:
             Dict with extraction results
         """
-        print(f"Starting BATCHED TOOL-BASED PDF extraction for source: {source_id}")
+        logger.info("Starting PDF extraction for source %s", source_id[:8])
 
         try:
             # Step 1: Load configurations using centralized loaders
@@ -306,20 +311,18 @@ class PDFService:
             # Create rate limiter for this extraction session
             rate_limiter = RateLimiter(batches_per_minute)
 
-            print(f"Using model: {model}")
-            print(f"Tier config: {max_workers} workers, ~{batches_per_minute} batches/min")
+            logger.info("PDF config: model=%s, workers=%d, ~%d batches/min",
+                        model, max_workers, batches_per_minute)
 
             # Step 2: Get page count and extract all page bytes
             total_pages = get_page_count(pdf_path)
-            print(f"PDF has {total_pages} pages")
+            logger.info("PDF has %d pages", total_pages)
 
-            print("Extracting page bytes...")
             page_bytes_list = get_all_page_bytes(pdf_path)
 
             # Step 3: Create batches using utility
             batches = create_batches(page_bytes_list, DEFAULT_BATCH_SIZE)
             total_batches = len(batches)
-            print(f"Split into {total_batches} batch(es) of up to {DEFAULT_BATCH_SIZE} pages each")
 
             # Step 4: Process batches
             all_page_results: Dict[int, Dict[str, Any]] = {}
@@ -332,7 +335,6 @@ class PDFService:
 
             if total_batches == 1:
                 # Single batch - no need for parallel processing
-                print("Processing single batch...")
                 _, batch_result = self._extract_batch_with_tools(
                     batches[0],
                     total_pages,
@@ -352,7 +354,6 @@ class PDFService:
 
             else:
                 # Multiple batches - process in parallel
-                print(f"Processing {total_batches} batches in parallel with {max_workers} workers...")
 
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
                     future_to_batch = {
@@ -372,7 +373,6 @@ class PDFService:
                     for future in as_completed(future_to_batch):
                         # Check for cancellation
                         if task_service.is_target_cancelled(source_id):
-                            print(f"Processing cancelled for source {source_id}")
                             for f in future_to_batch:
                                 f.cancel()
                             raise CancelledException("Processing cancelled by user")
@@ -384,11 +384,10 @@ class PDFService:
                             all_page_results.update(batch_result.get("page_results", {}))
                             total_input_tokens += batch_result.get("token_usage", {}).get("input_tokens", 0)
                             total_output_tokens += batch_result.get("token_usage", {}).get("output_tokens", 0)
-                            print(f"Batch {batches_completed}/{total_batches} complete (pages starting at {batch_start})")
                         else:
                             failed_pages = batch_result.get("failed_pages", [])
                             error_msg = batch_result.get("error", "Unknown error")
-                            print(f"Batch starting at page {batch_start} FAILED: {error_msg}")
+                            logger.error("Batch starting at page %d failed: %s", batch_start, error_msg)
                             # Mark failed pages
                             for page_num in failed_pages:
                                 all_page_results[page_num] = {
@@ -408,7 +407,7 @@ class PDFService:
                 if len(failed_pages) > 5:
                     error_message += f" (and {len(failed_pages) - 5} more)"
 
-                print(f"Extraction FAILED: {error_message}")
+                logger.error("Extraction failed: %s", error_message)
 
                 return {
                     "success": False,
@@ -419,7 +418,6 @@ class PDFService:
                 }
 
             # Step 7: Build pages list and write using centralized output format
-            print("All pages extracted successfully. Writing to file...")
 
             # Collect pages in order
             pages = []
@@ -459,9 +457,8 @@ class PDFService:
             if not storage_path:
                 raise Exception("Failed to upload processed content to Supabase Storage")
 
-            print(f"Uploaded processed content to Supabase Storage: {storage_path}")
-            print(f"Extraction complete. {total_pages}/{total_pages} pages processed.")
-            print(f"Total tokens: {total_input_tokens} input, {total_output_tokens} output")
+            logger.info("PDF extraction complete: %d pages, %d input tokens, %d output tokens",
+                        total_pages, total_input_tokens, total_output_tokens)
 
             return {
                 "success": True,
@@ -483,8 +480,7 @@ class PDFService:
                 "errors": None
             }
 
-        except CancelledException as e:
-            print(f"PDF extraction cancelled: {e}")
+        except CancelledException:
             # Cleanup handled by Supabase Storage - no local files to delete
             return {
                 "success": False,
@@ -493,7 +489,7 @@ class PDFService:
             }
 
         except FileNotFoundError as e:
-            print(f"File not found: {e}")
+            logger.error("PDF file not found: %s", e)
             return {
                 "success": False,
                 "status": "error",
@@ -501,7 +497,7 @@ class PDFService:
             }
 
         except Exception as e:
-            print(f"PDF extraction failed: {e}")
+            logger.exception("PDF extraction failed")
             # Cleanup handled by Supabase Storage - no local files to delete
             return {
                 "success": False,

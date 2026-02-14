@@ -9,6 +9,9 @@ import { audioAPI, type AudioJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('audio-generation');
 
 export const useAudioGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -34,11 +37,9 @@ export const useAudioGeneration = (projectId: string) => {
   };
 
   const handleAudioGeneration = async (signal: StudioSignal) => {
-    console.log('[useAudioGeneration] handleAudioGeneration called with signal:', signal);
     const sourceId = signal.sources[0]?.source_id;
-    console.log('[useAudioGeneration] Extracted sourceId:', sourceId);
     if (!sourceId) {
-      console.error('[useAudioGeneration] No source_id found in signal.sources:', signal.sources);
+      log.error({ sources: signal.sources }, 'no source_id found in signal');
       showError('No source specified for audio generation.');
       return;
     }
@@ -79,7 +80,7 @@ export const useAudioGeneration = (projectId: string) => {
         showError(finalJob.error || 'Audio generation failed.');
       }
     } catch (error) {
-      console.error('Audio generation error:', error);
+      log.error({ err: error }, 'audio generation failed');
       showError(error instanceof Error ? error.message : 'Audio generation failed.');
     } finally {
       setIsGeneratingAudio(false);
@@ -193,7 +194,7 @@ export const useAudioGeneration = (projectId: string) => {
 
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Failed to download audio:', error);
+      log.error({ err: error }, 'failed to download audio');
       showError('Failed to download audio file');
     }
   };

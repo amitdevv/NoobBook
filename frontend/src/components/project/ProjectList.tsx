@@ -12,6 +12,9 @@ import {
 } from '../ui/dialog';
 import { projectsAPI } from '@/lib/api';
 import { CreateProjectDialog } from '@/components/dashboard/CreateProjectDialog';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('project-list');
 
 /**
  * ProjectList Component
@@ -60,7 +63,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
       setProjects(response.data.projects || []);
     } catch (err) {
       setError('Failed to load projects');
-      console.error('Error loading projects:', err);
+      log.error({ err }, 'failed to Lloading projectsE');
     } finally {
       setLoading(false);
     }
@@ -73,7 +76,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
       // Select the project
       onSelectProject(project);
     } catch (err) {
-      console.error('Error opening project:', err);
+      log.error({ err }, 'failed to Lopening projectE');
     }
   };
 
@@ -90,7 +93,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
       await projectsAPI.delete(projectToDelete);
       loadProjects(); // Refresh the list
     } catch (err) {
-      console.error('Error deleting project:', err);
+      log.error({ err }, 'failed to Ldeleting projectE');
     } finally {
       setDeleteDialogOpen(false);
       setProjectToDelete(null);

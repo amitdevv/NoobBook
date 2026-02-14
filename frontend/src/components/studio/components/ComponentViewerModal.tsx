@@ -18,6 +18,9 @@ import { SquaresFour, Copy, DownloadSimple, Check } from '@phosphor-icons/react'
 import { type ComponentJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('component-viewer');
 
 interface ComponentViewerModalProps {
   projectId: string;
@@ -45,7 +48,7 @@ export const ComponentViewerModal: React.FC<ComponentViewerModalProps> = ({
 
       setTimeout(() => setCopiedIndex(null), 2000);
     } catch (error) {
-      console.error('Failed to copy code:', error);
+      log.error({ err: error }, 'failed to copy code');
     }
   };
 

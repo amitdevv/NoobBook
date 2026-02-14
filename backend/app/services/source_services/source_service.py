@@ -9,9 +9,12 @@ It delegates to specialized modules for cleaner code organization:
 
 CRUD Operations are kept here for backwards compatibility with API routes.
 """
+import logging
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 from werkzeug.datastructures import FileStorage
+
+logger = logging.getLogger(__name__)
 
 from app.services.source_services import source_index_service
 from app.services.source_services.source_upload import (
@@ -187,9 +190,6 @@ class SourceService:
 
         result = source_index_service.update_source_in_index(project_id, source_id, updates)
 
-        if result:
-            print(f"Updated source: {source_id}")
-
         return result
 
     def delete_source(self, project_id: str, source_id: str) -> bool:
@@ -222,7 +222,7 @@ class SourceService:
                     source_id=source_id
                 )
             except Exception as e:
-                print(f"Error deleting embeddings for {source_id}: {e}")
+                logger.error("Error deleting embeddings for %s: %s", source_id, e)
 
         # Delete all files from Supabase Storage
         from app.services.integrations.supabase import storage_service
@@ -234,12 +234,9 @@ class SourceService:
         if stored_filename:
             # Delete raw file, processed file, and chunks
             storage_service.delete_source_files(project_id, source_id, stored_filename)
-            print(f"Deleted source files from Supabase Storage: {source_id}")
 
         # Remove from index
         source_index_service.remove_source_from_index(project_id, source_id)
-
-        print(f"Deleted source: {source_id}")
 
         return True
 

@@ -13,9 +13,12 @@ Features:
     - extract(): Extract content from specific URLs
 """
 
+import logging
 import os
 from typing import Dict, Any, List, Optional
 from tavily import TavilyClient
+
+logger = logging.getLogger(__name__)
 
 
 class TavilyService:
@@ -69,7 +72,6 @@ class TavilyService:
         try:
             client = self._get_client()
 
-            print(f"Tavily search: {query[:50]}...")
 
             # Execute search with optimized fixed params
             response = client.search(
@@ -102,7 +104,7 @@ class TavilyService:
                 "error": str(e)
             }
         except Exception as e:
-            print(f"Tavily search error: {e}")
+            logger.error("Tavily search error: %s", e)
             return {
                 "success": False,
                 "error": f"Search failed: {str(e)}"
@@ -167,7 +169,7 @@ class TavilyService:
         except ValueError as e:
             return {"success": False, "error": str(e)}
         except Exception as e:
-            print(f"Tavily advanced error: {e}")
+            logger.error("Tavily advanced error: %s", e)
             return {"success": False, "error": f"Operation failed: {str(e)}"}
 
     def _execute_search(
@@ -190,7 +192,6 @@ class TavilyService:
         if not query:
             return {"success": False, "error": "Query is required for search"}
 
-        print(f"Tavily advanced search: {query[:50]}... (topic: {topic})")
 
         # Build search params
         search_params = {
@@ -247,7 +248,6 @@ class TavilyService:
         if not urls:
             return {"success": False, "error": "URLs are required for extract"}
 
-        print(f"Tavily extract: {len(urls)} URLs (depth: {search_depth})")
 
         response = client.extract(
             urls=urls,

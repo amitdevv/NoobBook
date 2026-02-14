@@ -8,6 +8,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-business-reports-api');
 
 /**
  * Business report types available for generation
@@ -149,7 +152,7 @@ export const businessReportsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting business report generation:', error);
+      log.error({ err: error }, 'failed to start business report generation');
       throw error;
     }
   },
@@ -167,7 +170,7 @@ export const businessReportsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting business report job status:', error);
+      log.error({ err: error }, 'failed to get business report job status');
       throw error;
     }
   },
@@ -187,7 +190,7 @@ export const businessReportsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing business report jobs:', error);
+      log.error({ err: error }, 'failed to list business report jobs');
       throw error;
     }
   },
@@ -205,7 +208,7 @@ export const businessReportsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error deleting business report job:', error);
+      log.error({ err: error }, 'failed to delete business report job');
       throw error;
     }
   },
@@ -248,7 +251,7 @@ export const businessReportsAPI = {
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching business report preview:', error);
+      log.error({ err: error }, 'failed to fetch business report preview');
       throw error;
     }
   },

@@ -6,10 +6,13 @@ that can be imported throughout the application. It handles configuration
 from environment variables and provides a clean interface for database operations.
 """
 
+import logging
 import os
 from typing import Optional
 from supabase import create_client, Client
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -76,7 +79,7 @@ class SupabaseClient:
             cls._instance = create_client(supabase_url, supabase_key)
             cls._initialized = True
             key_type = "service" if os.getenv("SUPABASE_SERVICE_KEY") else "anon"
-            print(f"✓ Supabase client initialized ({key_type} key): {supabase_url}")
+            logger.info("Supabase client initialized (%s key): %s", key_type, supabase_url)
         except Exception as e:
             raise RuntimeError(f"Failed to initialize Supabase client: {str(e)}")
 

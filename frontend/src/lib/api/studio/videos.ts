@@ -7,6 +7,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-videos-api');
 
 /**
  * Video file information
@@ -108,7 +111,7 @@ export const videosAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting video generation:', error);
+      log.error({ err: error }, 'failed to start video generation');
       throw error;
     }
   },
@@ -126,7 +129,7 @@ export const videosAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting video job status:', error);
+      log.error({ err: error }, 'failed to get video job status');
       throw error;
     }
   },
@@ -146,7 +149,7 @@ export const videosAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing video jobs:', error);
+      log.error({ err: error }, 'failed to list video jobs');
       throw error;
     }
   },

@@ -6,8 +6,11 @@ and launches the website agent as a background task. Similar to email_agent_exec
 tool calls are handled inside website_agent_service itself.
 """
 
+import logging
 from typing import Dict, Any
 import uuid
+
+logger = logging.getLogger(__name__)
 
 
 class WebsiteAgentExecutor:
@@ -68,7 +71,7 @@ class WebsiteAgentExecutor:
         # Launch agent as background task
         def run_agent():
             """Background task to run the website agent."""
-            print(f"[WebsiteAgentExecutor] Starting website agent for job {job_id[:8]}")
+            logger.info("Starting website agent for job %s", job_id[:8])
             try:
                 website_agent_service.generate_website(
                     project_id=project_id,
@@ -77,9 +80,7 @@ class WebsiteAgentExecutor:
                     direction=direction
                 )
             except Exception as e:
-                print(f"[WebsiteAgentExecutor] Error in website agent: {e}")
-                import traceback
-                traceback.print_exc()
+                logger.exception("Website agent failed for job %s", job_id[:8])
                 # Update job on error
                 studio_index_service.update_website_job(
                     project_id, job_id,

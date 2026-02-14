@@ -7,6 +7,7 @@ Orchestrates the component generation workflow:
 """
 
 import base64
+import logging
 import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -23,6 +24,8 @@ from app.services.data_services.brand_config_service import brand_config_service
 from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.component_tool_executor import component_tool_executor
+
+logger = logging.getLogger(__name__)
 
 
 class ComponentAgentService:
@@ -82,7 +85,7 @@ class ComponentAgentService:
                 filename=logo_asset["file_name"]
             )
             if not logo_bytes:
-                print(f"[ComponentAgent] Could not download brand logo")
+                logger.warning("Could not download brand logo")
                 return None
 
             # Build base64 data URI so the logo renders inside iframes
@@ -92,8 +95,6 @@ class ComponentAgentService:
             b64 = base64.b64encode(logo_bytes).decode("ascii")
             data_uri = f"data:{mime};base64,{b64}"
 
-            print(f"[ComponentAgent] Brand logo prepared as data URI ({len(logo_bytes)} bytes)")
-
             return {
                 "filename": original_name,
                 "placeholder": "BRAND_LOGO",
@@ -101,7 +102,7 @@ class ComponentAgentService:
             }
 
         except Exception as e:
-            print(f"[ComponentAgent] Error preparing brand logo: {e}")
+            logger.exception("Error preparing brand logo")
             return None
 
     def generate_components(
@@ -208,10 +209,9 @@ class ComponentAgentService:
         total_input_tokens = 0
         total_output_tokens = 0
 
-        print(f"[ComponentAgent] Starting (job_id: {job_id[:8]})")
+        logger.info("Starting component agent job %s", job_id[:8])
 
         for iteration in range(1, self.MAX_ITERATIONS + 1):
-            print(f"  Iteration {iteration}/{self.MAX_ITERATIONS}")
 
             response = claude_service.send_message(
                 messages=messages,
@@ -242,8 +242,6 @@ class ComponentAgentService:
                     tool_input = getattr(block, "input", {}) if hasattr(block, "input") else block.get("input", {})
                     tool_id = getattr(block, "id", "") if hasattr(block, "id") else block.get("id", "")
 
-                    print(f"    Tool: {tool_name}")
-
                     # Build execution context
                     context = {
                         "project_id": project_id,
@@ -262,7 +260,7 @@ class ComponentAgentService:
                     )
 
                     if is_termination:
-                        print(f"  Completed in {iteration} iterations")
+                        logger.info("Completed in %d iterations", iteration)
                         self._save_execution(
                             project_id, execution_id, job_id, messages,
                             result, started_at, source_id
@@ -280,7 +278,7 @@ class ComponentAgentService:
                 messages.append({"role": "user", "content": tool_results})
 
         # Max iterations reached
-        print(f"  Max iterations reached ({self.MAX_ITERATIONS})")
+        logger.warning("Max iterations reached (%d)", self.MAX_ITERATIONS)
         error_result = {
             "success": False,
             "error_message": f"Agent reached maximum iterations ({self.MAX_ITERATIONS})",

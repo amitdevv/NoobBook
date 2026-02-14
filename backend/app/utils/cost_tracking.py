@@ -8,8 +8,11 @@ Pricing (per 1M tokens):
 - Sonnet: $3 input, $15 output
 - Haiku: $1 input, $5 output
 """
+import logging
 from typing import Dict, Any, Optional
 from threading import Lock
+
+logger = logging.getLogger(__name__)
 
 
 # Pricing per 1M tokens
@@ -75,7 +78,7 @@ def _load_costs(project_id: str, user_id: Optional[str] = None) -> Optional[Dict
             return None
         return project_service.get_project_costs(project_id, user_id=owner_id)
     except Exception as e:
-        print(f"Cost tracking: Error loading costs for {project_id}: {e}")
+        logger.error("Error loading costs for %s: %s", project_id, e)
         return None
 
 
@@ -88,7 +91,7 @@ def _save_costs(project_id: str, costs: Dict[str, Any], user_id: Optional[str] =
             return False
         return project_service.update_project_costs(project_id, costs, user_id=owner_id)
     except Exception as e:
-        print(f"Cost tracking: Error saving costs for {project_id}: {e}")
+        logger.error("Error saving costs for %s: %s", project_id, e)
         return False
 
 
@@ -192,7 +195,7 @@ def add_usage(
         if _save_costs(project_id, costs, user_id=user_id):
             return costs
         else:
-            print(f"Cost tracking: Failed to save costs for project {project_id}")
+            logger.warning("Failed to save costs for project %s", project_id)
             return None
 
 

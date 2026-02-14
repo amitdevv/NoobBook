@@ -10,6 +10,7 @@ vision capabilities. It uses a tool-based approach similar to PDF extraction:
 
 Supported formats: JPEG, PNG, GIF, WebP (max 5MB each per API constraint)
 """
+import logging
 from pathlib import Path
 from typing import Dict, Any, List
 from datetime import datetime
@@ -22,6 +23,8 @@ from app.utils.encoding_utils import encode_file_to_base64, get_media_type
 from app.utils.rate_limit_utils import RateLimiter
 from app.utils.text import build_processed_output
 from app.utils.embedding_utils import count_tokens
+
+logger = logging.getLogger(__name__)
 
 
 class ImageService:
@@ -126,7 +129,7 @@ class ImageService:
         Returns:
             Dict with extraction results
         """
-        print(f"Starting image extraction for source: {source_id}")
+        logger.info("Starting image extraction for source %s", source_id[:8])
 
         try:
             # Load configurations using centralized loaders
@@ -144,12 +147,8 @@ class ImageService:
             requests_per_minute = tier_config.get("pages_per_minute", 100)
             rate_limiter = RateLimiter(requests_per_minute)
 
-            print(f"Using model: {model}")
-
             image_base64 = encode_file_to_base64(image_path)
             media_type = get_media_type(image_path)
-
-            print(f"Image encoded: {image_path.name} ({media_type})")
 
             content_blocks = [
                 {
@@ -212,7 +211,7 @@ class ImageService:
                 metadata=metadata
             )
 
-            print(f"Image extraction complete: {image_path.name}")
+            logger.info("Image extraction complete: %s", image_path.name)
 
             # Return processed content for processor to upload to Supabase Storage
             return {
@@ -229,7 +228,7 @@ class ImageService:
             }
 
         except Exception as e:
-            print(f"Image extraction failed: {e}")
+            logger.exception("Image extraction failed")
             return {
                 "success": False,
                 "status": "error",
@@ -256,7 +255,7 @@ class ImageService:
         Returns:
             Dict with extraction results for all images
         """
-        print(f"Starting batch image extraction for {len(image_paths)} images")
+        logger.info("Starting batch image extraction for %d images", len(image_paths))
 
         try:
             # Load configurations using centralized loaders
@@ -279,10 +278,7 @@ class ImageService:
 
             for idx, image_path in enumerate(image_paths, 1):
                 if task_service.is_target_cancelled(source_id):
-                    print(f"Processing cancelled for source {source_id}")
                     raise Exception("Processing cancelled by user")
-
-                print(f"Processing image {idx}/{len(image_paths)}: {image_path.name}")
 
                 image_base64 = encode_file_to_base64(image_path)
                 media_type = get_media_type(image_path)
@@ -359,7 +355,7 @@ class ImageService:
                 metadata=metadata
             )
 
-            print(f"Batch extraction complete: {len(image_paths)} images processed")
+            logger.info("Batch extraction complete: %d images processed", len(image_paths))
 
             # Return processed content for processor to upload to Supabase Storage
             return {
@@ -378,7 +374,7 @@ class ImageService:
             }
 
         except Exception as e:
-            print(f"Batch image extraction failed: {e}")
+            logger.exception("Batch image extraction failed")
             return {
                 "success": False,
                 "status": "error",

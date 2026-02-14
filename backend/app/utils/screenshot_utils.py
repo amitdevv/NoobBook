@@ -21,9 +21,12 @@ Usage:
 """
 
 import asyncio
+import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from playwright.async_api import async_playwright
+
+logger = logging.getLogger(__name__)
 
 
 # Slide dimensions (standard 16:9 presentation)
@@ -61,7 +64,7 @@ async def _capture_screenshot_async(
         return True
 
     except Exception as e:
-        print(f"[Screenshot] Error capturing {html_path.name}: {e}")
+        logger.error("Error capturing screenshot %s: %s", html_path.name, e)
         return False
 
 
@@ -106,7 +109,6 @@ async def _capture_slides_async(
                     "total": len(slide_files)
                 })
 
-            print(f"[Screenshot] Capturing {slide_file} ({i + 1}/{len(slide_files)})")
 
             success = await _capture_screenshot_async(page, html_path, output_path)
 
@@ -175,7 +177,7 @@ def capture_slides_as_screenshots(
 
     # Validate slides directory exists
     if not slides_path.exists():
-        print(f"[Screenshot] Slides directory not found: {slides_dir}")
+        logger.error("Slides directory not found: %s", slides_dir)
         return []
 
     # Filter to only existing files
@@ -184,10 +186,10 @@ def capture_slides_as_screenshots(
         if (slides_path / slide).exists():
             valid_slides.append(slide)
         else:
-            print(f"[Screenshot] Slide not found, skipping: {slide}")
+            logger.warning("Slide not found, skipping: %s", slide)
 
     if not valid_slides:
-        print("[Screenshot] No valid slides to capture")
+        logger.warning("No valid slides to capture")
         return []
 
     # Run async function in event loop
@@ -198,20 +200,20 @@ def capture_slides_as_screenshots(
     except RuntimeError as e:
         # If already in async context, use the existing loop
         if "cannot be called from a running event loop" in str(e):
-            print(f"[Screenshot] Already in async context, using existing loop")
+            logger.warning("Already in async context, using existing loop")
             loop = asyncio.get_event_loop()
             screenshots = loop.run_until_complete(
                 _capture_slides_async(slides_path, output_path, valid_slides, progress_callback)
             )
         else:
-            print(f"[Screenshot] Error in async screenshot capture: {e}")
+            logger.error("Error in async screenshot capture: %s", e)
             return []
     except Exception as e:
-        print(f"[Screenshot] Error in screenshot capture: {e}")
+        logger.error("Error in screenshot capture: %s", e)
         return []
 
     successful = sum(1 for s in screenshots if s["success"])
-    print(f"[Screenshot] Captured {successful}/{len(valid_slides)} slides")
+    logger.info("Captured %s/%s slides", successful, len(valid_slides))
 
     return screenshots
 

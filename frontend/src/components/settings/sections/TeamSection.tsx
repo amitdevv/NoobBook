@@ -47,6 +47,9 @@ import { useToast } from '@/components/ui/toast';
 import { CreateUserDialog } from '../team/CreateUserDialog';
 import { DeleteUserDialog } from '../team/DeleteUserDialog';
 import { PasswordDisplay } from '../team/PasswordDisplay';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('team-section');
 
 interface TeamSectionProps {
   currentUserId: string;
@@ -77,7 +80,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
       const list = await usersAPI.listUsers();
       setUsers(list);
     } catch (err) {
-      console.error('Failed to load users:', err);
+      log.error({ err }, 'failed to load users');
     } finally {
       setLoading(false);
     }
@@ -90,7 +93,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
       setUsers((prev) => prev.map((u) => (u.id === userId ? updated : u)));
       success('Role updated');
     } catch (err) {
-      console.error('Failed to update role:', err);
+      log.error({ err }, 'failed to update role');
       const axiosErr = err as { response?: { data?: { error?: string } } };
       error(axiosErr.response?.data?.error || 'Failed to update user role');
     } finally {
@@ -115,7 +118,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
       setResetPassword(password);
       success('Password reset successfully');
     } catch (err) {
-      console.error('Failed to reset password:', err);
+      log.error({ err }, 'failed to reset password');
       const axiosErr = err as { response?: { data?: { error?: string } } };
       error(axiosErr.response?.data?.error || 'Failed to reset password');
     } finally {

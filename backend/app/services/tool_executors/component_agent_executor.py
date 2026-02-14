@@ -5,9 +5,12 @@ Educational Note: This executor is triggered by studio signals (from main chat)
 and launches the component agent as a background task to generate 2-4 component variations.
 """
 
+import logging
 from typing import Dict, Any
 import uuid
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class ComponentAgentExecutor:
@@ -72,7 +75,7 @@ class ComponentAgentExecutor:
         # Launch agent as background task
         def run_agent():
             """Background task to run the component agent."""
-            print(f"[ComponentAgentExecutor] Starting component agent for job {job_id[:8]}")
+            logger.info("Starting component agent for job %s", job_id[:8])
             try:
                 component_agent_service.generate_components(
                     project_id=project_id,
@@ -82,9 +85,7 @@ class ComponentAgentExecutor:
                     user_id=user_id
                 )
             except Exception as e:
-                print(f"[ComponentAgentExecutor] Error in component agent: {e}")
-                import traceback
-                traceback.print_exc()
+                logger.exception("Component agent failed for job %s", job_id[:8])
                 # Update job on error
                 studio_index_service.update_component_job(
                     project_id, job_id,

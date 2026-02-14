@@ -11,8 +11,11 @@ Termination is signaled when write_research_to_file has is_last_segment=true.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Dict, Any, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 class DeepResearchExecutor:
@@ -95,11 +98,9 @@ class DeepResearchExecutor:
             if operation == "write":
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(content)
-                print(f"      [Executor] Wrote segment {segment_number} to file")
             else:
                 with open(path, "a", encoding="utf-8") as f:
                     f.write("\n\n" + content)
-                print(f"      [Executor] Appended segment {segment_number} to file")
 
             if is_last_segment:
                 return "Research document completed and saved successfully.", True
@@ -107,7 +108,7 @@ class DeepResearchExecutor:
                 return f"Segment {segment_number} written successfully. Continue your research and write more segments.", False
 
         except Exception as e:
-            print(f"      [Executor] Error writing segment: {e}")
+            logger.exception("Error writing research segment %s", segment_number)
             return f"Error writing segment: {str(e)}", False
 
     def _execute_tavily_search(self, tool_input: Dict[str, Any]) -> str:

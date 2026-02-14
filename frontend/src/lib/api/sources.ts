@@ -6,6 +6,9 @@
 
 import axios from 'axios';
 import { API_BASE_URL } from './client';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('sources-api');
 
 /**
  * Source metadata returned from the API
@@ -151,7 +154,7 @@ class SourcesAPI {
       );
       return response.data.sources;
     } catch (error) {
-      console.error('Error fetching sources:', error);
+      log.error({ err: error }, 'failed to fetch sources');
       throw error;
     }
   }
@@ -183,7 +186,7 @@ class SourcesAPI {
       );
       return response.data.source;
     } catch (error) {
-      console.error('Error uploading source:', error);
+      log.error({ err: error }, 'failed to upload source');
       throw error;
     }
   }
@@ -198,7 +201,7 @@ class SourcesAPI {
       );
       return response.data.source;
     } catch (error) {
-      console.error('Error fetching source:', error);
+      log.error({ err: error }, 'failed to fetch source');
       throw error;
     }
   }
@@ -218,7 +221,7 @@ class SourcesAPI {
       );
       return response.data.source;
     } catch (error) {
-      console.error('Error updating source:', error);
+      log.error({ err: error }, 'failed to update source');
       throw error;
     }
   }
@@ -232,7 +235,7 @@ class SourcesAPI {
         `${API_BASE_URL}/projects/${projectId}/sources/${sourceId}`
       );
     } catch (error) {
-      console.error('Error deleting source:', error);
+      log.error({ err: error }, 'failed to delete source');
       throw error;
     }
   }
@@ -254,7 +257,7 @@ class SourcesAPI {
       );
       return response.data.summary;
     } catch (error) {
-      console.error('Error fetching sources summary:', error);
+      log.error({ err: error }, 'failed to fetch sources summary');
       throw error;
     }
   }
@@ -270,7 +273,7 @@ class SourcesAPI {
         by_category: response.data.by_category,
       };
     } catch (error) {
-      console.error('Error fetching allowed types:', error);
+      log.error({ err: error }, 'failed to fetch allowed types');
       throw error;
     }
   }
@@ -293,7 +296,7 @@ class SourcesAPI {
       );
       return response.data.source;
     } catch (error) {
-      console.error('Error adding URL source:', error);
+      log.error({ err: error }, 'failed to add URL source');
       throw error;
     }
   }
@@ -316,7 +319,7 @@ class SourcesAPI {
       );
       return response.data.source;
     } catch (error) {
-      console.error('Error adding text source:', error);
+      log.error({ err: error }, 'failed to add text source');
       throw error;
     }
   }
@@ -339,7 +342,7 @@ class SourcesAPI {
       );
       return response.data.source;
     } catch (error) {
-      console.error('Error adding research source:', error);
+      log.error({ err: error }, 'failed to add research source');
       throw error;
     }
   }
@@ -360,7 +363,7 @@ class SourcesAPI {
       );
       return response.data.source;
     } catch (error) {
-      console.error('Error adding database source:', error);
+      log.error({ err: error }, 'failed to add database source');
       throw error;
     }
   }
@@ -376,7 +379,7 @@ class SourcesAPI {
         `${API_BASE_URL}/projects/${projectId}/sources/${sourceId}/cancel`
       );
     } catch (error) {
-      console.error('Error cancelling source processing:', error);
+      log.error({ err: error }, 'failed to cancel source processing');
       throw error;
     }
   }
@@ -391,7 +394,7 @@ class SourcesAPI {
         `${API_BASE_URL}/projects/${projectId}/sources/${sourceId}/retry`
       );
     } catch (error) {
-      console.error('Error retrying source processing:', error);
+      log.error({ err: error }, 'failed to retry source processing');
       throw error;
     }
   }
@@ -412,7 +415,7 @@ class SourcesAPI {
       );
       return response.data.chunk;
     } catch (error) {
-      console.error('Error fetching citation content:', error);
+      log.error({ err: error }, 'failed to fetch citation content');
       throw error;
     }
   }
@@ -436,7 +439,7 @@ class SourcesAPI {
         source_name: response.data.source_name,
       };
     } catch (error) {
-      console.error('Error fetching processed content:', error);
+      log.error({ err: error }, 'failed to fetch processed content');
       throw error;
     }
   }

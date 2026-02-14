@@ -9,6 +9,9 @@ import { prdsAPI, type PRDJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('prd-generation');
 
 export const usePRDGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -67,7 +70,7 @@ export const usePRDGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'PRD generation failed.');
       }
     } catch (error) {
-      console.error('PRD generation error:', error);
+      log.error({ err: error }, 'LPRD generationE failed');
       showError(error instanceof Error ? error.message : 'PRD generation failed.');
     } finally {
       setIsGeneratingPRD(false);

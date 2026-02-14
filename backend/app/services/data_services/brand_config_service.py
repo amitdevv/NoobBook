@@ -179,7 +179,6 @@ class BrandConfigService:
         )
 
         if response.data:
-            print(f"Updated brand config for user: {user_id}")
             return response.data[0]
 
         return self.get_config(user_id)
@@ -357,7 +356,6 @@ class BrandConfigService:
         )
 
         if response.data:
-            print(f"Created default brand config for user: {user_id}")
             return response.data[0]
 
         raise RuntimeError("Failed to create default brand config")

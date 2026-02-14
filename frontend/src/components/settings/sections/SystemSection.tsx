@@ -16,6 +16,9 @@ import { CircleNotch } from '@phosphor-icons/react';
 import { processingSettingsAPI } from '@/lib/api/settings';
 import type { AvailableTier } from '@/lib/api/settings';
 import { useToast } from '@/components/ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('system-section');
 
 export const SystemSection: React.FC = () => {
   const [availableTiers, setAvailableTiers] = useState<AvailableTier[]>([]);
@@ -36,7 +39,7 @@ export const SystemSection: React.FC = () => {
       setAvailableTiers(available_tiers);
       setSelectedTier(settings.anthropic_tier);
     } catch (err) {
-      console.error('Failed to load processing settings:', err);
+      log.error({ err }, 'failed to load processing settings');
     } finally {
       setLoading(false);
     }
@@ -50,7 +53,7 @@ export const SystemSection: React.FC = () => {
       setSelectedTier(tier);
       success('Processing tier updated');
     } catch (err) {
-      console.error('Failed to update tier:', err);
+      log.error({ err }, 'failed to update tier');
       error('Failed to update processing tier');
     } finally {
       setTierSaving(false);

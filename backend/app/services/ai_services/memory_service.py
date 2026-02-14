@@ -11,6 +11,7 @@ keeping the content concise (max 150 tokens per memory type).
 
 Storage: Supabase (users.memory and projects.memory columns)
 """
+import logging
 from datetime import datetime
 from typing import Optional, Dict, Any
 
@@ -19,6 +20,8 @@ from app.services.data_services import project_service
 from app.services.data_services.project_service import DEFAULT_USER_ID
 from app.config import tool_loader, prompt_loader
 from app.utils import claude_parsing_utils
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryService:
@@ -68,7 +71,7 @@ class MemoryService:
         try:
             return project_service.get_user_memory(user_id=user_id)
         except Exception as e:
-            print(f"Error reading user memory: {e}")
+            logger.exception("Error reading user memory")
             return None
 
     def get_project_memory(
@@ -91,7 +94,7 @@ class MemoryService:
                 return memory_data.get("memory")
             return None
         except Exception as e:
-            print(f"Error reading project memory: {e}")
+            logger.exception("Error reading project memory")
             return None
 
     def _save_user_memory(
@@ -111,7 +114,7 @@ class MemoryService:
         try:
             return project_service.update_user_memory(memory, user_id=user_id)
         except Exception as e:
-            print(f"Error saving user memory: {e}")
+            logger.exception("Error saving user memory")
             return False
 
     def _save_project_memory(
@@ -137,7 +140,7 @@ class MemoryService:
             }
             return project_service.update_project_memory(project_id, memory_data, user_id=user_id)
         except Exception as e:
-            print(f"Error saving project memory: {e}")
+            logger.exception("Error saving project memory")
             return False
 
     def _build_user_message(
@@ -265,7 +268,7 @@ class MemoryService:
                 saved = self._save_project_memory(project_id, merged_memory, user_id=user_id)
 
             if saved:
-                print(f"Memory updated ({memory_type}): {merged_memory[:50]}...")
+                logger.info("Memory updated (%s)", memory_type)
                 return {
                     "success": True,
                     "memory_type": memory_type,
@@ -281,7 +284,7 @@ class MemoryService:
                 }
 
         except Exception as e:
-            print(f"Error updating memory: {e}")
+            logger.exception("Error updating memory")
             return {
                 "success": False,
                 "error": str(e)
@@ -309,7 +312,7 @@ class MemoryService:
             # Clear the memory by setting it to empty
             return project_service.update_project_memory(project_id, {}, user_id=user_id)
         except Exception as e:
-            print(f"Error clearing project memory: {e}")
+            logger.exception("Error clearing project memory")
             return False
 
 

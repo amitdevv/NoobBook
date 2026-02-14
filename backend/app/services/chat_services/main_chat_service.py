@@ -13,9 +13,12 @@ Message Flow:
 
 The service uses message_service for all message handling and tool parsing.
 """
+import logging
 from typing import Dict, Any, Tuple, List, Optional
 
 from app.services.data_services import chat_service
+
+logger = logging.getLogger(__name__)
 from app.services.integrations.claude import claude_service
 from app.services.data_services import message_service
 from app.config import prompt_loader, tool_loader, context_loader, brand_context_loader
@@ -367,8 +370,6 @@ class MainChatService:
                     tool_name = tool_block.get("name")
                     tool_input = tool_block.get("input", {})
 
-                    print(f"Executing tool: {tool_name} for source: {tool_input.get('source_id', 'unknown')}")
-
                     # Execute tool
                     result = self._execute_tool(
                         project_id,
@@ -388,16 +389,6 @@ class MainChatService:
 
                 # Rebuild messages and call Claude again
                 api_messages = message_service.build_api_messages(project_id, chat_id)
-
-                # Debug: Log message count before follow-up API call
-                print(f"Follow-up API call: {len(api_messages)} messages")
-                if not api_messages:
-                    print("ERROR: api_messages is empty!")
-                    # Try reloading messages to debug
-                    debug_messages = message_service.get_messages(project_id, chat_id)
-                    print(f"  Raw messages in chat: {len(debug_messages)}")
-                    for i, m in enumerate(debug_messages):
-                        print(f"  [{i}] role={m.get('role')}, content_type={type(m.get('content')).__name__}")
 
                 response = claude_service.send_message(
                     messages=api_messages,
@@ -478,9 +469,8 @@ class MainChatService:
             new_title = chat_naming_service.generate_title(user_message, project_id=project_id)
             if new_title:
                 chat_service.update_chat(project_id, chat_id, {"title": new_title})
-                print(f"Auto-renamed chat {chat_id} to: {new_title}")
         except Exception as e:
-            print(f"Error auto-naming chat {chat_id}: {e}")
+            logger.error("Failed to auto-name chat %s: %s", chat_id, e)
 
 
 # Singleton instance

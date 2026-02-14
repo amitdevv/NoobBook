@@ -8,6 +8,9 @@ import { useState, useRef } from 'react';
 import { socialPostsAPI, checkGeminiStatus, type SocialPostJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('social-post-generation');
 
 export const useSocialPostGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -31,7 +34,7 @@ export const useSocialPostGeneration = (projectId: string) => {
         setSavedSocialPostJobs(completedSocialPosts);
       }
     } catch (error) {
-      console.error('Failed to load saved social post jobs:', error);
+      log.error({ err: error }, 'failed to load saved social post jobs');
     }
   };
 
@@ -87,7 +90,7 @@ export const useSocialPostGeneration = (projectId: string) => {
         showError(finalJob.error || 'Social post generation failed.');
       }
     } catch (error) {
-      console.error('Social post generation error:', error);
+      log.error({ err: error }, 'LSocial post generationE failed');
       showError(error instanceof Error ? error.message : 'Social post generation failed.');
     } finally {
       setIsGeneratingSocialPosts(false);

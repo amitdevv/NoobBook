@@ -6,6 +6,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-infographics-api');
 
 /**
  * Infographic image info
@@ -102,7 +105,7 @@ export const infographicsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting infographic generation:', error);
+      log.error({ err: error }, 'failed to start infographic generation');
       throw error;
     }
   },
@@ -120,7 +123,7 @@ export const infographicsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting infographic job status:', error);
+      log.error({ err: error }, 'failed to get infographic job status');
       throw error;
     }
   },
@@ -140,7 +143,7 @@ export const infographicsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing infographic jobs:', error);
+      log.error({ err: error }, 'failed to list infographic jobs');
       throw error;
     }
   },

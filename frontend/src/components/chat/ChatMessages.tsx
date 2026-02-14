@@ -24,6 +24,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '../ui/tooltip';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('chat-messages');
 
 interface ChatMessagesProps {
   messages: Message[];
@@ -220,7 +223,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({ content }) => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       } catch (fallbackErr) {
-        console.error('Failed to copy:', fallbackErr);
+        log.error({ err: fallbackErr }, 'failed to copy text');
       }
     }
   };

@@ -8,6 +8,9 @@ import { useState } from 'react';
 import { flowDiagramsAPI, type FlowDiagramJob } from '@/lib/api/studio';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('flow-diagram-generation');
 
 export const useFlowDiagramGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -66,7 +69,7 @@ export const useFlowDiagramGeneration = (projectId: string) => {
         showError(finalJob.error || 'Flow diagram generation failed.');
       }
     } catch (error) {
-      console.error('Flow diagram generation error:', error);
+      log.error({ err: error }, 'LFlow diagram generationE failed');
       showError(error instanceof Error ? error.message : 'Flow diagram generation failed.');
     } finally {
       setIsGeneratingFlowDiagram(false);

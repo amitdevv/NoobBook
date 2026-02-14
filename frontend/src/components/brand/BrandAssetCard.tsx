@@ -32,6 +32,9 @@ import {
 import { type BrandAsset } from '../../lib/api/brand';
 import { API_HOST } from '../../lib/api/client';
 import { getAccessToken } from '../../lib/auth/session';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('brand-asset-card');
 
 interface BrandAssetCardProps {
   asset: BrandAsset;
@@ -69,10 +72,10 @@ export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
             blobUrlRef.current = objectUrl;
             setImageUrl(objectUrl);
           } else {
-            console.error(`Failed to load image: ${response.status}`);
+            log.error({ status: response.status }, 'failed to load image');
           }
         } catch (error) {
-          console.error('Failed to load image:', error);
+          log.error({ err: error }, 'failed to load image');
         } finally {
           setLoadingImage(false);
         }
@@ -100,10 +103,10 @@ export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
         window.open(blobUrl, '_blank');
         setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
       } else {
-        console.error(`Download failed: ${response.status}`);
+        log.error({ status: response.status }, 'download failed');
       }
     } catch (error) {
-      console.error('Failed to download:', error);
+      log.error({ err: error }, 'failed to download');
     }
   };
 

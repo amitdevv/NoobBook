@@ -36,6 +36,9 @@ import {
 import { googleDriveAPI, databasesAPI } from '@/lib/api/settings';
 import type { GoogleStatus, DatabaseConnection, DatabaseType } from '@/lib/api/settings';
 import { useToast } from '@/components/ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('integrations-section');
 
 export const IntegrationsSection: React.FC = () => {
   // Google Drive State
@@ -81,7 +84,7 @@ export const IntegrationsSection: React.FC = () => {
       const status = await googleDriveAPI.getStatus();
       setGoogleStatus(status);
     } catch (err) {
-      console.error('Failed to load Google status:', err);
+      log.error({ err }, 'failed to load Google status');
     }
   };
 
@@ -110,7 +113,7 @@ export const IntegrationsSection: React.FC = () => {
         setGoogleLoading(false);
       }
     } catch (err) {
-      console.error('Error connecting Google:', err);
+      log.error({ err }, 'failed to Lconnecting GoogleE');
       error('Failed to connect Google Drive');
       setGoogleLoading(false);
     }
@@ -127,7 +130,7 @@ export const IntegrationsSection: React.FC = () => {
         error('Failed to disconnect Google Drive');
       }
     } catch (err) {
-      console.error('Error disconnecting Google:', err);
+      log.error({ err }, 'failed to Ldisconnecting GoogleE');
       error('Failed to disconnect Google Drive');
     } finally {
       setGoogleLoading(false);
@@ -140,7 +143,7 @@ export const IntegrationsSection: React.FC = () => {
       const dbs = await databasesAPI.listDatabases();
       setDbConnections(dbs);
     } catch (err) {
-      console.error('Failed to load databases:', err);
+      log.error({ err }, 'failed to load databases');
     } finally {
       setDbLoading(false);
     }
@@ -175,7 +178,7 @@ export const IntegrationsSection: React.FC = () => {
       setDbValidation({});
       await loadDatabases();
     } catch (err) {
-      console.error('Failed to create database:', err);
+      log.error({ err }, 'failed to create database');
       const axiosErr = err as { response?: { data?: { error?: string } } };
       error(axiosErr.response?.data?.error || 'Failed to save database connection');
     } finally {
@@ -189,7 +192,7 @@ export const IntegrationsSection: React.FC = () => {
       success('Database connection deleted');
       await loadDatabases();
     } catch (err) {
-      console.error('Failed to delete database:', err);
+      log.error({ err }, 'failed to delete database');
       const axiosErr = err as { response?: { data?: { error?: string } } };
       error(axiosErr.response?.data?.error || 'Failed to delete database connection');
     }

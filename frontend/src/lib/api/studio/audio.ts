@@ -7,6 +7,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-audio-api');
 
 /**
  * Audio job status (alias for backwards compatibility)
@@ -105,7 +108,7 @@ export const audioAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting audio generation:', error);
+      log.error({ err: error }, 'failed to start audio generation');
       throw error;
     }
   },
@@ -123,7 +126,7 @@ export const audioAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting job status:', error);
+      log.error({ err: error }, 'failed to get job status');
       throw error;
     }
   },
@@ -143,7 +146,7 @@ export const audioAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing jobs:', error);
+      log.error({ err: error }, 'failed to list jobs');
       throw error;
     }
   },
@@ -156,7 +159,7 @@ export const audioAPI = {
       const response = await axios.get(`${API_BASE_URL}/studio/tts/status`);
       return response.data;
     } catch (error) {
-      console.error('Error checking TTS status:', error);
+      log.error({ err: error }, 'failed to check TTS status');
       return { success: false, configured: false };
     }
   },

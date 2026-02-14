@@ -56,6 +56,9 @@ import {
   CaretRight,
   Plus,
 } from '@phosphor-icons/react';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('sources-panel');
 
 interface SourcesPanelProps {
   projectId: string;
@@ -158,7 +161,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       const data = await sourcesAPI.listSources(projectId);
       setSources(data);
     } catch (err) {
-      console.error('Error loading sources:', err);
+      log.error({ err }, 'failed to Lloading sourcesE');
       errorRef.current('Failed to load sources');
     } finally {
       setLoading(false);
@@ -175,7 +178,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       const data = await sourcesAPI.listSources(projectId);
       setSources(data);
     } catch (err) {
-      console.error('Error refreshing sources:', err);
+      log.error({ err }, 'failed to Lrefreshing sourcesE');
       // Don't show toast on polling errors to avoid spam
     }
   }, [projectId]);
@@ -257,7 +260,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
-      console.error('Error uploading files:', err);
+      log.error({ err }, 'failed to Luploading filesE');
       const errorMessage = err instanceof Error ? err.message : 'Upload failed';
       // Check if it's an axios error with response data
       if (typeof err === 'object' && err !== null && 'response' in err) {
@@ -287,7 +290,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
-      console.error('Error adding URL source:', err);
+      log.error({ err }, 'failed to Ladding URL sourceE');
       const errorMessage = err instanceof Error ? err.message : 'Failed to add URL';
       if (typeof err === 'object' && err !== null && 'response' in err) {
         const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -314,7 +317,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
-      console.error('Error adding text source:', err);
+      log.error({ err }, 'failed to Ladding text sourceE');
       const errorMessage = err instanceof Error ? err.message : 'Failed to add text';
       if (typeof err === 'object' && err !== null && 'response' in err) {
         const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -343,7 +346,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
-      console.error('Error starting research:', err);
+      log.error({ err }, 'failed to Lstarting researchE');
       const errorMessage = err instanceof Error ? err.message : 'Failed to start research';
       if (typeof err === 'object' && err !== null && 'response' in err) {
         const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -369,7 +372,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
-      console.error('Error adding database source:', err);
+      log.error({ err }, 'failed to Ladding database sourceE');
       const errorMessage = err instanceof Error ? err.message : 'Failed to add database';
       if (typeof err === 'object' && err !== null && 'response' in err) {
         const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -391,7 +394,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       // Notify parent that sources changed (triggers ChatPanel refresh)
       onSourcesChange?.();
     } catch (err) {
-      console.error('Error deleting source:', err);
+      log.error({ err }, 'failed to Ldeleting sourceE');
       error('Failed to delete source');
     }
   };
@@ -427,7 +430,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       setRenameDialogOpen(false);
       await loadSources();
     } catch (err) {
-      console.error('Error renaming source:', err);
+      log.error({ err }, 'failed to Lrenaming sourceE');
       error('Failed to rename source');
     }
   };
@@ -448,7 +451,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       // Notify parent that sources changed (triggers ChatPanel refresh)
       onSourcesChange?.();
     } catch (err) {
-      console.error('Error toggling source active state:', err);
+      log.error({ err }, 'failed to Ltoggling source active stateE');
       error('Failed to update source');
       // Reload to get correct state
       await loadSources();
@@ -466,7 +469,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       success('Processing cancelled');
       await loadSources();
     } catch (err) {
-      console.error('Error cancelling processing:', err);
+      log.error({ err }, 'failed to Lcancelling processingE');
       error('Failed to cancel processing');
     }
   };
@@ -480,7 +483,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       success('Processing restarted');
       await loadSources();
     } catch (err) {
-      console.error('Error retrying processing:', err);
+      log.error({ err }, 'failed to Lretrying processingE');
       error('Failed to retry processing');
     }
   };
@@ -497,7 +500,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       setViewerSourceName(data.source_name);
       setViewerOpen(true);
     } catch (err) {
-      console.error('Error fetching processed content:', err);
+      log.error({ err }, 'failed to Lfetching processed contentE');
       error('Failed to load processed content');
     }
   };

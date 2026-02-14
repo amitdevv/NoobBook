@@ -4,6 +4,7 @@ Business Report Tool Executor - Handles tool execution for business report agent
 Executes: plan_business_report, analyze_csv_data, search_source_content, write_business_report
 """
 
+import logging
 import os
 from typing import Dict, Any, List, Tuple
 from datetime import datetime
@@ -12,6 +13,8 @@ from app.utils.path_utils import get_studio_dir
 from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
 from app.services.ai_agents.csv_analyzer_agent import csv_analyzer_agent
+
+logger = logging.getLogger(__name__)
 
 
 class BusinessReportToolExecutor:
@@ -71,7 +74,6 @@ class BusinessReportToolExecutor:
     ) -> str:
         """Execute plan_business_report tool."""
         title = tool_input.get("title", "Business Report")
-        print(f"      Planning: {title[:50]}...")
 
         studio_index_service.update_business_report_job(
             project_id, job_id,
@@ -101,7 +103,6 @@ class BusinessReportToolExecutor:
         analysis_query = tool_input.get("analysis_query", "")
         section_context = tool_input.get("section_context", "")
 
-        print(f"      Analyzing CSV {csv_source_id[:8]}... for: {section_context or 'general'}")
 
         studio_index_service.update_business_report_job(
             project_id, job_id,
@@ -160,13 +161,12 @@ class BusinessReportToolExecutor:
                     response_parts.append(f"  - {chart_path}")
                 response_parts.append("\nUse these exact filenames in your markdown: ![Description](filename.png)")
 
-            print(f"      Charts generated: {len(chart_paths)}")
 
             return "\n".join(response_parts)
 
         except Exception as e:
             error_msg = f"Error during CSV analysis: {str(e)}"
-            print(f"      {error_msg}")
+            logger.exception("CSV analysis failed for source %s", csv_source_id[:8])
             return error_msg
 
     def _execute_search_content(
@@ -184,7 +184,6 @@ class BusinessReportToolExecutor:
         search_query = tool_input.get("search_query", "")
         section_context = tool_input.get("section_context", "")
 
-        print(f"      Searching source {source_id[:8]}... for: {search_query[:30]}")
 
         try:
             # Get content from Supabase Storage
@@ -202,7 +201,7 @@ class BusinessReportToolExecutor:
 
         except Exception as e:
             error_msg = f"Error searching source content: {str(e)}"
-            print(f"      {error_msg}")
+            logger.exception("Source content search failed for %s", source_id[:8])
             return error_msg
 
     def _execute_write_report(
@@ -226,7 +225,6 @@ class BusinessReportToolExecutor:
         # Estimate word count from content
         word_count = len(markdown_content.split()) if markdown_content else 0
 
-        print(f"      Writing markdown ({len(markdown_content)} chars, ~{word_count} words)")
 
         try:
             # Replace chart filenames with full URLs
@@ -246,8 +244,6 @@ class BusinessReportToolExecutor:
 
             with open(markdown_path, "w", encoding="utf-8") as f:
                 f.write(final_markdown)
-
-            print(f"      Saved: {markdown_filename}")
 
             # Get job info for title
             job = studio_index_service.get_business_report_job(project_id, job_id)
@@ -285,7 +281,7 @@ class BusinessReportToolExecutor:
 
         except Exception as e:
             error_msg = f"Error saving business report: {str(e)}"
-            print(f"      {error_msg}")
+            logger.exception("Failed to save business report")
 
             studio_index_service.update_business_report_job(
                 project_id, job_id,

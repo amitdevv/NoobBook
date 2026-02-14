@@ -27,6 +27,9 @@ import { usersAPI } from '@/lib/api/settings';
 import type { UserSummary } from '@/lib/api/settings';
 import { useToast } from '@/components/ui/toast';
 import { PasswordDisplay } from './PasswordDisplay';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('create-user-dialog');
 
 interface CreateUserDialogProps {
   open: boolean;
@@ -77,7 +80,7 @@ export const CreateUserDialog: React.FC<CreateUserDialogProps> = ({
       onUserCreated(user);
       success('User created successfully');
     } catch (err) {
-      console.error('Failed to create user:', err);
+      log.error({ err }, 'failed to create user');
       const axiosErr = err as { response?: { data?: { error?: string } } };
       error(axiosErr.response?.data?.error || 'Failed to create user');
     } finally {

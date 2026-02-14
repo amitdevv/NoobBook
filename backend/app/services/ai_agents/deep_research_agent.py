@@ -10,6 +10,7 @@ Tool execution is delegated to deep_research_executor following the
 standard separation of concerns pattern.
 """
 
+import logging
 import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -20,6 +21,8 @@ from app.services.tool_executors import deep_research_executor
 from app.services.data_services import message_service
 from app.utils import claude_parsing_utils
 from app.utils.path_utils import get_processed_dir
+
+logger = logging.getLogger(__name__)
 
 
 class DeepResearchAgent:
@@ -111,12 +114,9 @@ class DeepResearchAgent:
         total_output_tokens = 0
         segments_written = 0
 
-        print(f"[DeepResearch] Starting research on: {topic}")
-        print(f"[DeepResearch] Execution ID: {execution_id[:8]}")
-        print(f"[DeepResearch] Output: {output_path}")
+        logger.info("Starting deep research on: %s (id: %s)", topic, execution_id[:8])
 
         for iteration in range(1, self.MAX_ITERATIONS + 1):
-            print(f"  Iteration {iteration}/{self.MAX_ITERATIONS}")
 
             # Call Claude API
             response = claude_service.send_message(
@@ -151,8 +151,6 @@ class DeepResearchAgent:
                     tool_input = getattr(block, "input", {}) if hasattr(block, "input") else block.get("input", {})
                     tool_id = getattr(block, "id", "") if hasattr(block, "id") else block.get("id", "")
 
-                    print(f"    Tool: {tool_name}")
-
                     # Track segments for write tool
                     if tool_name == "write_research_to_file":
                         segments_written += 1
@@ -175,8 +173,7 @@ class DeepResearchAgent:
 
                 elif block_type == "server_tool_use":
                     # Server tools (web_search) - Claude handles execution
-                    server_tool_name = getattr(block, "name", "") if hasattr(block, "name") else block.get("name", "")
-                    print(f"    Server tool: {server_tool_name}")
+                    pass
 
             # Add tool results to messages if any
             if tool_results:
@@ -184,7 +181,7 @@ class DeepResearchAgent:
 
             # Check if research is complete
             if research_complete:
-                print(f"  Research completed in {iteration} iterations")
+                logger.info("Research completed in %d iterations", iteration)
                 final_result = {
                     "success": True,
                     "output_path": output_path,
@@ -199,7 +196,7 @@ class DeepResearchAgent:
                 return final_result
 
         # Max iterations reached
-        print(f"  Max iterations reached ({self.MAX_ITERATIONS})")
+        logger.warning("Max iterations reached (%d)", self.MAX_ITERATIONS)
         error_result = {
             "success": False,
             "output_path": output_path,
@@ -246,7 +243,7 @@ class DeepResearchAgent:
                 log_data={**log_data, "messages": messages}
             )
         except Exception as e:
-            print(f"Error saving execution log: {e}")
+            logger.exception("Error saving execution log")
 
 
 # Singleton instance

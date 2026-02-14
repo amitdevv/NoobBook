@@ -6,10 +6,13 @@ Supabase Auth. It provides a clean interface for sign up, sign in, sign out,
 and session management.
 """
 
+import logging
 from typing import Dict, Any, Optional, Iterable
 import os
 from supabase import Client
 from .supabase_client import get_supabase
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -225,7 +228,7 @@ class AuthService:
                 self._ensure_user_profile(created_user.id, normalized_email, role="admin")
                 return True
         except Exception as e:
-            print(f"Warning: Failed to bootstrap admin user: {e}")
+            logger.warning("Failed to bootstrap admin user: %s", e)
 
         return False
 
@@ -246,7 +249,7 @@ class AuthService:
                 {"id": user_id, "email": email, "role": role, "memory": {}, "settings": {}}
             ).execute()
         except Exception as e:
-            print(f"Warning: Failed to create user profile: {e}")
+            logger.warning("Failed to create user profile: %s", e)
 
     def _ensure_user_profile(self, user_id: str, email: str, role: str = "user") -> None:
         """
@@ -259,7 +262,7 @@ class AuthService:
             else:
                 self._create_user_profile(user_id, email, role=role)
         except Exception as e:
-            print(f"Warning: Failed to ensure user profile: {e}")
+            logger.warning("Failed to ensure user profile: %s", e)
 
     def _find_user_by_email(self, email: str):
         try:

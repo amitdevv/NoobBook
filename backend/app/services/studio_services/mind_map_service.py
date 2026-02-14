@@ -12,10 +12,13 @@ service using tool-based extraction:
 The tool-based approach ensures structured output with proper parent-child
 relationships (id, label, parent_id, node_type, description).
 """
+import logging
 from typing import Dict, Any, List
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
+
+logger = logging.getLogger(__name__)
 from app.services.integrations.supabase import storage_service
 from app.services.source_services import source_index_service
 from app.services.studio_services import studio_index_service
@@ -126,8 +129,6 @@ class MindMapService:
             started_at=datetime.now().isoformat()
         )
 
-        print(f"[MindMap] Starting job {job_id}")
-
         try:
             # Get source metadata
             source = source_index_service.get_source_from_index(project_id, source_id)
@@ -204,7 +205,7 @@ class MindMapService:
                 completed_at=datetime.now().isoformat()
             )
 
-            print(f"[MindMap] Generated {len(nodes)} nodes in {generation_time:.1f}s")
+            logger.info("Generated %s mind map nodes in %.1fs", len(nodes), generation_time)
 
             return {
                 "success": True,
@@ -216,7 +217,7 @@ class MindMapService:
             }
 
         except Exception as e:
-            print(f"[MindMap] Error: {e}")
+            logger.exception("Mind map generation failed")
             studio_index_service.update_mind_map_job(
                 project_id, job_id,
                 status="error",
@@ -246,7 +247,7 @@ class MindMapService:
             raise ValueError("Mind map has no root node")
         if len(root_nodes) > 1:
             # Just warn, don't fail - use first as root
-            print(f"[MindMap] Warning: {len(root_nodes)} root nodes found, expected 1")
+            logger.warning("Mind map has %s root nodes, expected 1", len(root_nodes))
 
         # Build id set for validation
         node_ids = {n["id"] for n in nodes}
@@ -255,7 +256,7 @@ class MindMapService:
         for node in nodes:
             parent_id = node.get("parent_id")
             if parent_id is not None and parent_id not in node_ids:
-                print(f"[MindMap] Warning: Node {node['id']} has invalid parent_id: {parent_id}")
+                logger.warning("Mind map node %s has invalid parent_id: %s", node["id"], parent_id)
 
 
 # Singleton instance

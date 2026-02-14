@@ -14,6 +14,7 @@ CSV files are NOT chunked or embedded - they are analyzed on-demand.
 """
 
 import json
+import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
 
@@ -21,6 +22,8 @@ from app.services.integrations.claude import claude_service
 from app.config import prompt_loader, tool_loader
 from app.services.tool_executors.csv_tool_executor import csv_tool_executor
 from app.utils import claude_parsing_utils
+
+logger = logging.getLogger(__name__)
 
 
 class CSVService:
@@ -90,10 +93,9 @@ class CSVService:
         total_input_tokens = 0
         total_output_tokens = 0
 
-        print(f"[CSVService] Analyzing source: {source_id}")
+        logger.info("Analyzing CSV source %s", source_id[:8])
 
         for iteration in range(1, self.MAX_ITERATIONS + 1):
-            print(f"  Iteration {iteration}/{self.MAX_ITERATIONS}")
 
             # Call Claude API
             response = claude_service.send_message(
@@ -121,7 +123,7 @@ class CSVService:
             if not tool_blocks:
                 # No tool calls - check if end_turn
                 if claude_parsing_utils.is_end_turn(response):
-                    print("  End turn without summary tool - unexpected")
+                    logger.warning("End turn without summary tool - unexpected")
                 continue
 
             # Process each tool call
@@ -132,11 +134,9 @@ class CSVService:
                 tool_input = tool_block["input"]
                 tool_id = tool_block["id"]
 
-                print(f"    Tool: {tool_name}")
-
                 # TERMINATION: return_csv_summary means we're done
                 if tool_name == self.TERMINATION_TOOL:
-                    print(f"  Completed in {iteration} iterations")
+                    logger.info("CSV analysis completed in %d iterations", iteration)
                     return self._build_result(
                         tool_input,
                         iteration,
@@ -162,7 +162,7 @@ class CSVService:
                 messages.append({"role": "user", "content": tool_results_content})
 
         # Max iterations reached without summary
-        print(f"  Max iterations reached ({self.MAX_ITERATIONS})")
+        logger.warning("Max iterations reached (%d)", self.MAX_ITERATIONS)
         return {
             "success": False,
             "error": f"Analysis did not complete within {self.MAX_ITERATIONS} iterations",

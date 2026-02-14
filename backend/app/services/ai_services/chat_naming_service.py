@@ -10,11 +10,14 @@ Usage:
 - Generates 1-5 word title that captures the chat's topic
 - Prompt config loaded from data/prompts/chat_naming_prompt.json
 """
+import logging
 from typing import Optional
 
 from app.services.integrations.claude import claude_service
 from app.config import prompt_loader
 from app.utils import claude_parsing_utils
+
+logger = logging.getLogger(__name__)
 
 
 class ChatNamingService:
@@ -93,7 +96,7 @@ class ChatNamingService:
             return title
 
         except Exception as e:
-            print(f"Error generating chat title: {e}")
+            logger.exception("Error generating chat title")
             return None
 
 

@@ -26,6 +26,9 @@ import {
   FONT_WEIGHTS,
 } from '../../../lib/api/brand';
 import { useToast } from '@/components/ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('brand-typography');
 
 type HeadingLevel = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 
@@ -54,7 +57,7 @@ export const TypographySection: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error('Failed to load typography:', error);
+      log.error({ err: error }, 'failed to load typography');
     } finally {
       setLoading(false);
     }
@@ -74,7 +77,7 @@ export const TypographySection: React.FC = () => {
         setTimeout(() => setSaved(false), 2000);
       }
     } catch (error) {
-      console.error('Failed to save typography:', error);
+      log.error({ err: error }, 'failed to save typography');
       showError('Failed to save typography');
     } finally {
       setSaving(false);

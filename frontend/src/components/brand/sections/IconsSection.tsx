@@ -8,6 +8,9 @@ import { Plus, CircleNotch, SquaresFour } from '@phosphor-icons/react';
 import { brandAPI, type BrandAsset } from '../../../lib/api/brand';
 import { BrandAssetCard } from '../BrandAssetCard';
 import { BrandAssetUploader } from '../BrandAssetUploader';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('brand-icons');
 
 export const IconsSection: React.FC = () => {
   const [assets, setAssets] = useState<BrandAsset[]>([]);
@@ -22,7 +25,7 @@ export const IconsSection: React.FC = () => {
         setAssets(response.data.assets);
       }
     } catch (error) {
-      console.error('Failed to load icons:', error);
+      log.error({ err: error }, 'failed to load icons');
     } finally {
       setLoading(false);
     }
@@ -39,7 +42,7 @@ export const IconsSection: React.FC = () => {
         loadAssets();
       }
     } catch (error) {
-      console.error('Failed to delete asset:', error);
+      log.error({ err: error }, 'failed to delete asset');
     }
   };
 
@@ -50,7 +53,7 @@ export const IconsSection: React.FC = () => {
         loadAssets();
       }
     } catch (error) {
-      console.error('Failed to set primary:', error);
+      log.error({ err: error }, 'failed to set primary');
     }
   };
 

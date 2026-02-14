@@ -6,6 +6,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-mind-maps-api');
 
 /**
  * Mind map node from Claude
@@ -93,7 +96,7 @@ export const mindMapsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting mind map generation:', error);
+      log.error({ err: error }, 'failed to start mind map generation');
       throw error;
     }
   },
@@ -111,7 +114,7 @@ export const mindMapsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting mind map job status:', error);
+      log.error({ err: error }, 'failed to get mind map job status');
       throw error;
     }
   },
@@ -131,7 +134,7 @@ export const mindMapsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing mind map jobs:', error);
+      log.error({ err: error }, 'failed to list mind map jobs');
       throw error;
     }
   },

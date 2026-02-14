@@ -24,8 +24,11 @@ Why tiktoken? Chunking calls count_tokens() thousands of times (per page,
 per sentence, per word for long sentences). API calls would take minutes
 due to network latency. tiktoken is local and instant.
 """
+import logging
 from typing import Tuple
 import tiktoken
+
+logger = logging.getLogger(__name__)
 
 # Initialize tiktoken encoder once (cl100k_base is closest to Claude's tokenizer)
 # Educational Note: cl100k_base is used by GPT-4 and Claude uses a similar
@@ -99,7 +102,7 @@ def count_tokens(text: str) -> int:
         return len(_encoder.encode(text))
     except Exception as e:
         # Fallback: estimate ~4 chars per token (rough approximation)
-        print(f"tiktoken encoding failed, using estimation: {e}")
+        logger.warning("tiktoken encoding failed, using estimation: %s", e)
         return len(text) // 4
 
 
@@ -127,7 +130,7 @@ def count_tokens_api(text: str) -> int:
     try:
         return claude_service.count_tokens(messages=messages)
     except Exception as e:
-        print(f"API token counting failed, falling back to tiktoken: {e}")
+        logger.warning("API token counting failed, falling back to tiktoken: %s", e)
         return count_tokens(text)
 
 

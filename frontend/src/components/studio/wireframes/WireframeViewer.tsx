@@ -40,8 +40,6 @@ export const WireframeViewer: React.FC<WireframeViewerProps> = ({
 
   // Convert our skeleton elements to full Excalidraw elements once
   const excalidrawElements = useMemo(() => {
-    console.log('[WireframeViewer] Input elements:', elements.length);
-
     // Create minimal skeleton elements - only what's needed
     // Using 'as' assertion since convertToExcalidrawElements accepts flexible input
     const skeletons = elements.map((elem) => {
@@ -69,17 +67,10 @@ export const WireframeViewer: React.FC<WireframeViewerProps> = ({
       return base;
     });
 
-    console.log('[WireframeViewer] Skeletons created:', skeletons.length);
-    console.log('[WireframeViewer] First skeleton:', JSON.stringify(skeletons[0]));
-
     // Use Excalidraw's official conversion utility
     // Cast to expected type - convertToExcalidrawElements accepts flexible skeleton input
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const converted = convertToExcalidrawElements(skeletons as any);
-    console.log('[WireframeViewer] Converted elements:', converted.length);
-    if (converted.length > 0) {
-      console.log('[WireframeViewer] First converted:', JSON.stringify(converted[0]));
-    }
     return converted;
   }, [elements]);
 

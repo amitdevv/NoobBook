@@ -8,6 +8,9 @@ import { useState, useRef } from 'react';
 import { adsAPI, checkGeminiStatus, type AdJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('ad-generation');
 
 export const useAdGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -31,7 +34,7 @@ export const useAdGeneration = (projectId: string) => {
         setSavedAdJobs(completedAds);
       }
     } catch (error) {
-      console.error('Failed to load saved ad jobs:', error);
+      log.error({ err: error }, 'failed to load saved ad jobs');
     }
   };
 
@@ -85,7 +88,7 @@ export const useAdGeneration = (projectId: string) => {
         showError(finalJob.error || 'Ad generation failed.');
       }
     } catch (error) {
-      console.error('Ad generation error:', error);
+      log.error({ err: error }, 'LAd generationE failed');
       showError(error instanceof Error ? error.message : 'Ad generation failed.');
     } finally {
       setIsGeneratingAd(false);

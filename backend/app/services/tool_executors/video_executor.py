@@ -4,9 +4,12 @@ Video Executor - Handles studio signal execution for video generation.
 Educational Note: This executor is triggered by studio signals (from main chat)
 and launches video generation as a background task.
 """
+import logging
 import uuid
 from datetime import datetime
 from typing import Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 class VideoExecutor:
@@ -77,7 +80,7 @@ class VideoExecutor:
         # Launch video generation as background task
         def run_video_generation():
             """Background task to generate video."""
-            print(f"[VideoExecutor] Starting video generation for job {job_id[:8]}")
+            logger.info("Starting video generation for job %s", job_id[:8])
             try:
                 video_service.generate_video(
                     project_id=project_id,
@@ -89,9 +92,7 @@ class VideoExecutor:
                     number_of_videos=number_of_videos
                 )
             except Exception as e:
-                print(f"[VideoExecutor] Error in video generation: {e}")
-                import traceback
-                traceback.print_exc()
+                logger.exception("Video generation failed for job %s", job_id[:8])
                 # Update job on error
                 studio_index_service.update_video_job(
                     project_id, job_id,

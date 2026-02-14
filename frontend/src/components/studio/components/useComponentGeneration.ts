@@ -8,6 +8,9 @@ import { useState } from 'react';
 import { componentsAPI, type ComponentJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('component-generation');
 
 export const useComponentGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -29,7 +32,7 @@ export const useComponentGeneration = (projectId: string) => {
         setSavedComponentJobs(completedComponents);
       }
     } catch (error) {
-      console.error('Failed to load saved component jobs:', error);
+      log.error({ err: error }, 'failed to load saved component jobs');
     }
   };
 
@@ -78,7 +81,7 @@ export const useComponentGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Component generation failed.');
       }
     } catch (error) {
-      console.error('Component generation error:', error);
+      log.error({ err: error }, 'LComponent generationE failed');
       showError(error instanceof Error ? error.message : 'Component generation failed.');
     } finally {
       setIsGeneratingComponents(false);

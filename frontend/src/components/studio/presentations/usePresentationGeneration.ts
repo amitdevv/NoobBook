@@ -9,6 +9,9 @@ import { presentationsAPI, type PresentationJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('presentation-generation');
 
 export const usePresentationGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -33,7 +36,7 @@ export const usePresentationGeneration = (projectId: string) => {
         setSavedPresentationJobs(completedPresentations);
       }
     } catch (error) {
-      console.error('Failed to load saved presentation jobs:', error);
+      log.error({ err: error }, 'failed to load saved presentation jobs');
     }
   };
 
@@ -80,7 +83,7 @@ export const usePresentationGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Presentation generation failed');
       }
     } catch (error) {
-      console.error('Presentation generation error:', error);
+      log.error({ err: error }, 'LPresentation generationE failed');
       showError('Presentation generation failed');
     } finally {
       setIsGeneratingPresentation(false);

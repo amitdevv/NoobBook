@@ -9,6 +9,9 @@ import { websitesAPI, type WebsiteJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('website-generation');
 
 export const useWebsiteGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -30,7 +33,7 @@ export const useWebsiteGeneration = (projectId: string) => {
         setSavedWebsiteJobs(completedWebsites);
       }
     } catch (error) {
-      console.error('Failed to load saved website jobs:', error);
+      log.error({ err: error }, 'failed to load saved website jobs');
     }
   };
 
@@ -77,7 +80,7 @@ export const useWebsiteGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Website generation failed');
       }
     } catch (error) {
-      console.error('Website generation error:', error);
+      log.error({ err: error }, 'LWebsite generationE failed');
       showError('Website generation failed');
     } finally {
       setIsGeneratingWebsite(false);

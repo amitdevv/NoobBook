@@ -7,6 +7,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-blogs-api');
 
 /**
  * Blog types available for generation
@@ -138,7 +141,7 @@ export const blogsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting blog post generation:', error);
+      log.error({ err: error }, 'failed to start blog post generation');
       throw error;
     }
   },
@@ -156,7 +159,7 @@ export const blogsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting blog job status:', error);
+      log.error({ err: error }, 'failed to get blog job status');
       throw error;
     }
   },
@@ -176,7 +179,7 @@ export const blogsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing blog jobs:', error);
+      log.error({ err: error }, 'failed to list blog jobs');
       throw error;
     }
   },
@@ -194,7 +197,7 @@ export const blogsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error deleting blog job:', error);
+      log.error({ err: error }, 'failed to delete blog job');
       throw error;
     }
   },
@@ -231,7 +234,7 @@ export const blogsAPI = {
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching blog preview:', error);
+      log.error({ err: error }, 'failed to fetch blog preview');
       throw error;
     }
   },

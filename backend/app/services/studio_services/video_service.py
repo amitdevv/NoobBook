@@ -6,10 +6,13 @@ Educational Note: This is a simple service (not an agent) that:
 2. Calls Google Veo API with the generated prompt
 3. Saves videos and updates job status
 """
+import logging
 from datetime import datetime
 from typing import Dict, Any
 
 from app.services.integrations.google.video_service import google_video_service
+
+logger = logging.getLogger(__name__)
 from app.services.ai_services.video_prompt_service import video_prompt_service
 from app.services.studio_services import studio_index_service
 from app.services.integrations.supabase import storage_service
@@ -48,8 +51,6 @@ class VideoService:
         Returns:
             Result dict with success status and video info
         """
-        print(f"[VideoService] Starting generation for job {job_id[:8]}")
-
         # Update job to processing
         studio_index_service.update_video_job(
             project_id, job_id,
@@ -74,7 +75,6 @@ class VideoService:
             return prompt_result
 
         video_prompt = prompt_result["prompt"]
-        print(f"[VideoService] Generated prompt: {video_prompt[:100]}...")
 
         # Update job with generated prompt
         studio_index_service.update_video_job(
@@ -110,7 +110,6 @@ class VideoService:
 
         # Upload videos to Supabase Storage
         videos = result["videos"]
-        print(f"[VideoService] Generated {len(videos)} video(s), uploading to storage...")
 
         # Build video info for job
         video_info = []
@@ -121,7 +120,7 @@ class VideoService:
                 video["filename"], video["video_bytes"], "video/mp4"
             )
             if not storage_path:
-                print(f"[VideoService] Warning: Failed to upload {video['filename']}")
+                logger.warning("Failed to upload video %s to storage", video["filename"])
                 continue
 
             video_info.append({

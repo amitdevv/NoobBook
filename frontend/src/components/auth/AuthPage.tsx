@@ -6,6 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { useToast } from '../ui/toast';
 import { authAPI } from '@/lib/api/auth';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('auth-page');
 
 interface AuthPageProps {
   onAuthenticated: () => Promise<void> | void;
@@ -40,7 +43,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
       success(mode === 'signin' ? 'Signed in' : 'Account created');
       await onAuthenticated();
     } catch (err) {
-      console.error('Auth error:', err);
+      log.error({ err }, 'authentication failed');
       error('Authentication failed');
     } finally {
       setSubmitting(false);

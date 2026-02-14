@@ -4,8 +4,11 @@ OpenAI API key validator.
 Educational Note: Validates OpenAI API keys by making a minimal
 embeddings request - this is cost-effective and tests the key.
 """
+import logging
 from typing import Tuple
 import openai
+
+logger = logging.getLogger(__name__)
 
 
 def validate_openai_key(api_key: str) -> Tuple[bool, str]:
@@ -55,5 +58,5 @@ def validate_openai_key(api_key: str) -> Tuple[bool, str]:
         return True, "Valid API key (insufficient quota)"
     except Exception as e:
         # Log the actual error for debugging
-        print(f"OpenAI validation error: {type(e).__name__}: {str(e)}")
+        logger.error("OpenAI validation error: %s: %s", type(e).__name__, e)
         return False, f"Validation failed: {str(e)}"

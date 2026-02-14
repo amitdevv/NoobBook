@@ -5,6 +5,7 @@ Executes: plan_website, generate_website_image, read_file, create_file,
           update_file_lines, insert_code, finalize_website
 """
 
+import logging
 from typing import Dict, Any, List, Tuple
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +13,8 @@ from pathlib import Path
 from app.services.integrations.google import imagen_service
 from app.services.studio_services import studio_index_service
 from app.utils.path_utils import get_studio_dir
+
+logger = logging.getLogger(__name__)
 
 
 class WebsiteToolExecutor:
@@ -86,7 +89,6 @@ class WebsiteToolExecutor:
         site_name = tool_input.get("site_name", "Unnamed Website")
         pages = tool_input.get("pages", [])
 
-        print(f"      Planning: {site_name} ({len(pages)} pages)")
 
         studio_index_service.update_website_job(
             project_id, job_id,
@@ -115,7 +117,6 @@ class WebsiteToolExecutor:
         image_prompt = tool_input.get("image_prompt", "")
         aspect_ratio = tool_input.get("aspect_ratio", "16:9")
 
-        print(f"      Generating image for: {purpose}")
 
         studio_index_service.update_website_job(
             project_id, job_id,
@@ -157,13 +158,11 @@ class WebsiteToolExecutor:
                 images=generated_images
             )
 
-            print(f"      Saved: {filename}")
-
             return f"Image generated successfully for '{purpose}'. Use placeholder '{image_info['placeholder']}' in your HTML code for this image."
 
         except Exception as e:
             error_msg = f"Error generating image for {purpose}: {str(e)}"
-            print(f"      {error_msg}")
+            logger.exception("Website image generation failed for %s", purpose)
             return error_msg
 
     def _execute_read_file(
@@ -177,7 +176,6 @@ class WebsiteToolExecutor:
         start_line = tool_input.get("start_line")
         end_line = tool_input.get("end_line")
 
-        print(f"      Reading: {filename}" + (f" (lines {start_line}-{end_line})" if start_line else ""))
 
         website_dir = Path(get_studio_dir(project_id)) / "websites" / job_id
         file_path = website_dir / filename
@@ -224,7 +222,6 @@ class WebsiteToolExecutor:
         filename = tool_input.get("filename")
         content = tool_input.get("content", "")
 
-        print(f"      Creating: {filename} ({len(content)} chars)")
 
         try:
             website_dir = Path(get_studio_dir(project_id)) / "websites" / job_id
@@ -252,8 +249,6 @@ class WebsiteToolExecutor:
                 status_message=f"Created {filename} ({len(created_files)} files so far)"
             )
 
-            print(f"      Saved: {filename}")
-
             return f"File '{filename}' created successfully ({line_count} lines, {char_count} characters)"
 
         except Exception as e:
@@ -271,7 +266,6 @@ class WebsiteToolExecutor:
         end_line = tool_input.get("end_line")
         new_content = tool_input.get("new_content", "")
 
-        print(f"      Updating: {filename} lines {start_line}-{end_line}")
 
         website_dir = Path(get_studio_dir(project_id)) / "websites" / job_id
         file_path = website_dir / filename
@@ -314,7 +308,6 @@ class WebsiteToolExecutor:
         after_line = tool_input.get("after_line")
         content = tool_input.get("content", "")
 
-        print(f"      Inserting: {filename} after line {after_line}")
 
         website_dir = Path(get_studio_dir(project_id)) / "websites" / job_id
         file_path = website_dir / filename
@@ -364,7 +357,6 @@ class WebsiteToolExecutor:
         input_tokens = context["input_tokens"]
         output_tokens = context["output_tokens"]
 
-        print(f"      Finalizing website ({len(pages_created)} pages)")
 
         try:
             job = studio_index_service.get_website_job(project_id, job_id)
@@ -405,7 +397,7 @@ class WebsiteToolExecutor:
 
         except Exception as e:
             error_msg = f"Error finalizing website: {str(e)}"
-            print(f"      {error_msg}")
+            logger.exception("Failed to finalize website")
 
             studio_index_service.update_website_job(
                 project_id, job_id,

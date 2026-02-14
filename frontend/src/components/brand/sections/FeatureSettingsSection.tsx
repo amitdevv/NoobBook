@@ -9,6 +9,9 @@ import { Switch } from '../../ui/switch';
 import { CircleNotch, Check } from '@phosphor-icons/react';
 import { brandAPI, type FeatureSettings, getDefaultFeatureSettings } from '../../../lib/api/brand';
 import { useToast } from '@/components/ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('brand-feature-settings');
 
 interface FeatureConfig {
   key: string;
@@ -84,7 +87,7 @@ export const FeatureSettingsSection: React.FC = () => {
         setSettings(response.data.config.feature_settings);
       }
     } catch (error) {
-      console.error('Failed to load settings:', error);
+      log.error({ err: error }, 'failed to load settings');
     } finally {
       setLoading(false);
     }
@@ -104,7 +107,7 @@ export const FeatureSettingsSection: React.FC = () => {
         setTimeout(() => setSaved(false), 2000);
       }
     } catch (error) {
-      console.error('Failed to save settings:', error);
+      log.error({ err: error }, 'failed to save settings');
       showError('Failed to save feature settings');
     } finally {
       setSaving(false);
