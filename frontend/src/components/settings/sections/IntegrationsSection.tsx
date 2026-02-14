@@ -37,7 +37,11 @@ import { googleDriveAPI, databasesAPI } from '@/lib/api/settings';
 import type { GoogleStatus, DatabaseConnection, DatabaseType } from '@/lib/api/settings';
 import { useToast } from '@/components/ui/toast';
 
-export const IntegrationsSection: React.FC = () => {
+interface IntegrationsSectionProps {
+  isAdmin?: boolean;
+}
+
+export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmin = false }) => {
   // Google Drive State
   const [googleStatus, setGoogleStatus] = useState<GoogleStatus>({
     configured: false,
@@ -276,9 +280,10 @@ export const IntegrationsSection: React.FC = () => {
         </div>
       </div>
 
+      {/* Database Connections Section — admin only */}
+      {isAdmin && <>
       <Separator />
 
-      {/* Database Connections Section */}
       <div>
         <h3 className="text-sm font-semibold mb-3">Database Connections</h3>
         <div className="space-y-4">
@@ -466,6 +471,7 @@ export const IntegrationsSection: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </>}
 
       {/* Disconnect Google Drive Confirmation */}
       <AlertDialog open={disconnectGoogleOpen} onOpenChange={setDisconnectGoogleOpen}>
