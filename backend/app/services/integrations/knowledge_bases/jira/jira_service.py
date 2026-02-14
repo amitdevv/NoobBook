@@ -29,7 +29,16 @@ class JiraService:
         self._configured = None  # Cache configuration check
 
     def _load_config(self) -> None:
-        """Lazy-load Jira configuration from environment variables."""
+        """
+        Lazy-load Jira configuration from environment variables.
+
+        Educational Note: Supports both old and new Jira API formats:
+        - Old: https://your-company.atlassian.net/rest/api/3
+        - New: https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3
+
+        If JIRA_CLOUD_ID is provided, uses the new centralized gateway format.
+        Otherwise, falls back to the legacy direct domain format.
+        """
         if self._configured is not None:
             return  # Already loaded
 
@@ -37,19 +46,31 @@ class JiraService:
         jira_domain = os.getenv('JIRA_DOMAIN', '').rstrip('/')
         jira_email = os.getenv('JIRA_EMAIL')
         jira_api_key = os.getenv('JIRA_API_KEY', '').strip('"')
+        jira_cloud_id = os.getenv('JIRA_CLOUD_ID', '').strip()
 
-        # Ensure domain has proper format
-        if jira_domain and not jira_domain.startswith('http'):
-            jira_domain = f"https://{jira_domain}"
+        # Determine base URL format
+        if jira_cloud_id:
+            # New centralized gateway format (API tokens with scopes)
+            self._base_url = f"https://api.atlassian.com/ex/jira/{jira_cloud_id}/rest/api/3"
+            config_label = f"Atlassian API Gateway (Cloud ID: {jira_cloud_id[:8]}...)"
+        elif jira_domain:
+            # Legacy direct domain format (old API tokens)
+            if not jira_domain.startswith('http'):
+                jira_domain = f"https://{jira_domain}"
+            self._base_url = f"{jira_domain}/rest/api/3"
+            config_label = jira_domain
+        else:
+            self._base_url = None
+            config_label = None
 
-        self._base_url = f"{jira_domain}/rest/api/3" if jira_domain else None
+        # Auth remains the same for both formats (Basic Auth with email + token)
         self._auth = HTTPBasicAuth(jira_email, jira_api_key) if jira_email and jira_api_key else None
 
         # Set configured flag
         self._configured = bool(self._base_url and self._auth)
 
         if self._configured:
-            logger.info("Jira service configured: %s", jira_domain)
+            logger.info("Jira service configured: %s", config_label)
 
     def is_configured(self) -> bool:
         """Check if Jira credentials are configured."""
@@ -80,7 +101,7 @@ class JiraService:
         if not self.is_configured():
             return {
                 "success": False,
-                "error": "Jira not configured. Please add JIRA_DOMAIN, JIRA_EMAIL, and JIRA_API_KEY to .env"
+                "error": "Jira not configured. Please add JIRA_EMAIL, JIRA_API_KEY, and either JIRA_CLOUD_ID (new) or JIRA_DOMAIN (legacy) to .env"
             }
 
         try:
