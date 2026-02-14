@@ -56,9 +56,10 @@ def upload_url(
         url = f"https://{url}"
 
     # Check if it looks like a URL
+    # Note: TLD length increased from {2,6} to {2,63} to support modern TLDs like .exchange, .technology, etc.
     url_pattern = re.compile(
         r'^https?://'
-        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,63}\.?|'
         r'localhost|'
         r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'
         r'(?::\d+)?'
