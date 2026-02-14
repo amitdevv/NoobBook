@@ -54,7 +54,7 @@ export const AdSection: React.FC = () => {
         <AdProgressIndicator currentAdJob={currentAdJob} />
       )}
 
-      {hasAdSignal && savedAdJobs.map((job) => (
+      {savedAdJobs.map((job) => (
         <AdListItem
           key={job.id}
           job={job}

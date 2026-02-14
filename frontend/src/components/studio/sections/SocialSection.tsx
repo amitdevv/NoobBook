@@ -52,7 +52,7 @@ export const SocialSection: React.FC = () => {
         <SocialPostProgressIndicator currentSocialPostJob={currentSocialPostJob} />
       )}
 
-      {hasSocialSignal && savedSocialPostJobs.map((job) => (
+      {savedSocialPostJobs.map((job) => (
         <SocialPostListItem
           key={job.id}
           job={job}

@@ -43,7 +43,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
 
   // Handle section change with admin check
   const handleSectionChange = (section: SettingsSection) => {
-    const adminOnlySections: SettingsSection[] = ['team', 'api-keys', 'design', 'system'];
+    const adminOnlySections: SettingsSection[] = ['team', 'api-keys', 'integrations', 'design', 'system'];
     if (!isAdmin && adminOnlySections.includes(section)) {
       return; // Prevent non-admins from switching to admin sections
     }
@@ -67,7 +67,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
       case 'api-keys':
         return isAdmin ? <ApiKeysSection /> : null;
       case 'integrations':
-        return <IntegrationsSection />;
+        return isAdmin ? <IntegrationsSection /> : null;
       case 'design':
         return isAdmin ? <DesignSection /> : null;
       case 'system':
