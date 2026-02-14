@@ -7,6 +7,7 @@ Orchestrates the blog generation workflow:
 3. Agent writes the final markdown (write_blog_post - termination)
 """
 
+import logging
 import uuid
 from typing import Dict, Any, List
 from datetime import datetime
@@ -18,6 +19,8 @@ from app.utils.source_content_utils import get_source_content
 from app.services.data_services import message_service
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.blog_tool_executor import blog_tool_executor
+
+logger = logging.getLogger(__name__)
 
 
 class BlogAgentService:
@@ -87,10 +90,9 @@ class BlogAgentService:
         total_output_tokens = 0
         generated_images = []
 
-        print(f"[BlogAgent] Starting (job_id: {job_id[:8]}, keyword: {target_keyword[:30] if target_keyword else 'auto'})")
+        logger.info("Starting blog agent job %s", job_id[:8])
 
         for iteration in range(1, self.MAX_ITERATIONS + 1):
-            print(f"  Iteration {iteration}/{self.MAX_ITERATIONS}")
 
             response = claude_service.send_message(
                 messages=messages,
@@ -121,8 +123,6 @@ class BlogAgentService:
                     tool_input = getattr(block, "input", {}) if hasattr(block, "input") else block.get("input", {})
                     tool_id = getattr(block, "id", "") if hasattr(block, "id") else block.get("id", "")
 
-                    print(f"    Tool: {tool_name}")
-
                     # Build execution context
                     context = {
                         "project_id": project_id,
@@ -142,7 +142,7 @@ class BlogAgentService:
                     )
 
                     if is_termination:
-                        print(f"  Completed in {iteration} iterations")
+                        logger.info("Completed in %d iterations", iteration)
                         self._save_execution(
                             project_id, execution_id, job_id, messages,
                             result, started_at, source_id
@@ -160,7 +160,7 @@ class BlogAgentService:
                 messages.append({"role": "user", "content": tool_results})
 
         # Max iterations reached
-        print(f"  Max iterations reached ({self.MAX_ITERATIONS})")
+        logger.warning("Max iterations reached (%d)", self.MAX_ITERATIONS)
         error_result = {
             "success": False,
             "error_message": f"Agent reached maximum iterations ({self.MAX_ITERATIONS})",

@@ -7,9 +7,12 @@ this doesn't handle individual tool calls - those are handled inside
 blog_agent_service itself.
 """
 
+import logging
 from typing import Dict, Any
 import uuid
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class BlogAgentExecutor:
@@ -77,7 +80,7 @@ class BlogAgentExecutor:
         # Launch agent as background task
         def run_agent():
             """Background task to run the blog agent."""
-            print(f"[BlogAgentExecutor] Starting blog agent for job {job_id[:8]}")
+            logger.info("Starting blog agent for job %s", job_id[:8])
             try:
                 blog_agent_service.generate_blog_post(
                     project_id=project_id,
@@ -88,9 +91,7 @@ class BlogAgentExecutor:
                     blog_type=blog_type
                 )
             except Exception as e:
-                print(f"[BlogAgentExecutor] Error in blog agent: {e}")
-                import traceback
-                traceback.print_exc()
+                logger.exception("Blog agent failed for job %s", job_id[:8])
                 # Update job on error
                 studio_index_service.update_blog_job(
                     project_id, job_id,

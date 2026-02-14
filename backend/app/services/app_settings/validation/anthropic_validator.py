@@ -4,8 +4,11 @@ Anthropic API key validator.
 Educational Note: Validates Anthropic API keys using the token counting API.
 This is free (no cost) and fast - much better than making a full message request.
 """
+import logging
 from typing import Tuple
 import anthropic
+
+logger = logging.getLogger(__name__)
 
 
 def validate_anthropic_key(api_key: str) -> Tuple[bool, str]:
@@ -42,7 +45,6 @@ def validate_anthropic_key(api_key: str) -> Tuple[bool, str]:
         )
 
         # If we get here with a token count, the key is valid
-        print(f"Validation successful: {response.input_tokens} tokens counted")
         return True, "Valid Anthropic API key"
 
     except anthropic.AuthenticationError as e:
@@ -54,5 +56,5 @@ def validate_anthropic_key(api_key: str) -> Tuple[bool, str]:
         return True, "Valid API key (rate limited)"
     except Exception as e:
         # Log the actual error for debugging
-        print(f"Anthropic validation error: {type(e).__name__}: {str(e)}")
+        logger.error("Anthropic validation error: %s: %s", type(e).__name__, e)
         return False, f"Validation failed: {str(e)}"

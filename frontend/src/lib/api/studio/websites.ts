@@ -7,6 +7,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-websites-api');
 
 /**
  * Website page information
@@ -141,7 +144,7 @@ export const websitesAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting website generation:', error);
+      log.error({ err: error }, 'failed to start website generation');
       throw error;
     }
   },
@@ -159,7 +162,7 @@ export const websitesAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting website job status:', error);
+      log.error({ err: error }, 'failed to get website job status');
       throw error;
     }
   },
@@ -179,7 +182,7 @@ export const websitesAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing website jobs:', error);
+      log.error({ err: error }, 'failed to list website jobs');
       throw error;
     }
   },

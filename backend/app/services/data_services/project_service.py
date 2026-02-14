@@ -118,7 +118,6 @@ class ProjectService:
 
         if response.data:
             project = response.data[0]
-            print(f"Created project: {name} (ID: {project['id']})")
             return self._format_project_metadata(project)
 
         raise RuntimeError("Failed to create project")
@@ -219,7 +218,6 @@ class ProjectService:
         )
 
         if response.data:
-            print(f"Updated project: {project_id}")
             return self._format_project_metadata(response.data[0])
 
         return None
@@ -256,7 +254,6 @@ class ProjectService:
         # Delete the project
         self.supabase.table(self.table).delete().eq("id", project_id).eq("user_id", uid).execute()
 
-        print(f"Deleted project: {project_id}")
         return True
 
     def open_project(self, project_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -317,7 +314,6 @@ class ProjectService:
         )
 
         if response.data:
-            print(f"Updated custom prompt for project: {project_id}")
             return response.data[0]
 
         return None

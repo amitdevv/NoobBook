@@ -7,6 +7,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-marketing-strategies-api');
 
 /**
  * Marketing Strategy job record from the API
@@ -121,7 +124,7 @@ export const marketingStrategiesAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting marketing strategy generation:', error);
+      log.error({ err: error }, 'failed to start marketing strategy generation');
       throw error;
     }
   },
@@ -139,7 +142,7 @@ export const marketingStrategiesAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting marketing strategy job status:', error);
+      log.error({ err: error }, 'failed to get marketing strategy job status');
       throw error;
     }
   },
@@ -159,7 +162,7 @@ export const marketingStrategiesAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing marketing strategy jobs:', error);
+      log.error({ err: error }, 'failed to list marketing strategy jobs');
       throw error;
     }
   },
@@ -177,7 +180,7 @@ export const marketingStrategiesAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting marketing strategy preview:', error);
+      log.error({ err: error }, 'failed to get marketing strategy preview');
       throw error;
     }
   },

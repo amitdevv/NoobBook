@@ -8,6 +8,9 @@ import { useState } from 'react';
 import { flashCardsAPI, type FlashCardJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('flash-card-generation');
 
 export const useFlashCardGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -29,7 +32,7 @@ export const useFlashCardGeneration = (projectId: string) => {
         setSavedFlashCardJobs(completedFlashCards);
       }
     } catch (error) {
-      console.error('Failed to load saved flash card jobs:', error);
+      log.error({ err: error }, 'failed to load saved flash card jobs');
     }
   };
 
@@ -77,7 +80,7 @@ export const useFlashCardGeneration = (projectId: string) => {
         showError(finalJob.error || 'Flash card generation failed.');
       }
     } catch (error) {
-      console.error('Flash card generation error:', error);
+      log.error({ err: error }, 'LFlash card generationE failed');
       showError(error instanceof Error ? error.message : 'Flash card generation failed.');
     } finally {
       setIsGeneratingFlashCards(false);

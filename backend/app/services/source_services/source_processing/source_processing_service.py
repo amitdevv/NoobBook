@@ -26,6 +26,7 @@ The actual processing logic lives in the individual processor modules:
 Storage: Files are stored in Supabase Storage and downloaded to temp
 directories for processing. Processed content is uploaded back to Supabase.
 """
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
@@ -33,6 +34,8 @@ import tempfile
 import shutil
 
 from app.services.integrations.supabase import storage_service
+
+logger = logging.getLogger(__name__)
 
 
 class SourceProcessingService:
@@ -94,13 +97,10 @@ class SourceProcessingService:
         Returns:
             Dict with success status and processing info
         """
-        print(f"DEBUG: process_source called for project={project_id}, source={source_id}")
-
         # Import here to avoid circular imports
         from app.services.source_services import source_service
 
         source = source_service.get_source(project_id, source_id)
-        print(f"DEBUG: Got source: {source is not None}")
         if not source:
             return {"success": False, "error": "Source not found"}
 
@@ -120,7 +120,6 @@ class SourceProcessingService:
 
         try:
             # Download raw file from Supabase Storage to temp directory
-            print(f"Downloading file from Supabase Storage: {stored_filename}")
             file_data = storage_service.download_raw_file(
                 project_id=project_id,
                 source_id=source_id,
@@ -134,7 +133,6 @@ class SourceProcessingService:
             raw_file_path = temp_dir / stored_filename
             with open(raw_file_path, 'wb') as f:
                 f.write(file_data)
-            print(f"File downloaded to temp: {raw_file_path}")
 
             # Determine which processor to use
             processor_type = self.PROCESSOR_MAP.get(file_ext)
@@ -190,7 +188,7 @@ class SourceProcessingService:
                 return {"success": True, "status": "uploaded", "note": "No processing needed"}
 
         except Exception as e:
-            print(f"Error processing source {source_id}: {e}")
+            logger.exception("Error processing source %s", source_id)
             source_service.update_source(
                 project_id,
                 source_id,
@@ -204,9 +202,8 @@ class SourceProcessingService:
             if temp_dir.exists():
                 try:
                     shutil.rmtree(temp_dir)
-                    print(f"Cleaned up temp directory: {temp_dir}")
                 except Exception as e:
-                    print(f"Warning: Could not clean up temp directory {temp_dir}: {e}")
+                    logger.warning("Could not clean up temp directory %s: %s", temp_dir, e)
 
     def cancel_processing(self, project_id: str, source_id: str) -> bool:
         """
@@ -236,15 +233,13 @@ class SourceProcessingService:
 
         # Cancel any running tasks for this source
         cancelled_count = task_service.cancel_tasks_for_target(source_id)
-        print(f"Cancelled {cancelled_count} tasks for source {source_id}")
+        logger.info("Cancelled %s tasks for source %s", cancelled_count, source_id)
 
         # Delete processed file from Supabase Storage (keep raw file!)
         storage_service.delete_processed_file(project_id, source_id)
-        print(f"Deleted partial processed file from Supabase Storage")
 
         # Delete any chunks from Supabase Storage
         storage_service.delete_source_chunks(project_id, source_id)
-        print(f"Deleted partial chunks from Supabase Storage")
 
         # Update source status to uploaded (ready to retry)
         source_service.update_source(

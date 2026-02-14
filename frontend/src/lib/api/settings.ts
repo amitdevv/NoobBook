@@ -6,6 +6,9 @@
 
 import axios from 'axios';
 import { API_BASE_URL } from './client';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('settings-api');
 
 export interface ApiKey {
   id: string;
@@ -58,7 +61,7 @@ class SettingsAPI {
       const response = await axios.get(`${API_BASE_URL}/settings/api-keys`);
       return response.data.api_keys;
     } catch (error) {
-      console.error('Error fetching API keys:', error);
+      log.error({ err: error }, 'failed to fetch API keys');
       throw error;
     }
   }
@@ -73,7 +76,7 @@ class SettingsAPI {
         api_keys: apiKeys
       });
     } catch (error) {
-      console.error('Error updating API keys:', error);
+      log.error({ err: error }, 'failed to update API keys');
       throw error;
     }
   }
@@ -86,7 +89,7 @@ class SettingsAPI {
     try {
       await axios.delete(`${API_BASE_URL}/settings/api-keys/${keyId}`);
     } catch (error) {
-      console.error('Error deleting API key:', error);
+      log.error({ err: error }, 'failed to delete API key');
       throw error;
     }
   }
@@ -106,7 +109,7 @@ class SettingsAPI {
         message: response.data.message
       };
     } catch (error) {
-      console.error('Error validating API key:', error);
+      log.error({ err: error }, 'failed to validate API key');
       return {
         valid: false,
         message: 'Validation failed'
@@ -127,7 +130,7 @@ class DatabasesAPI {
       const response = await axios.get(`${API_BASE_URL}/settings/databases`);
       return response.data.databases || [];
     } catch (error) {
-      console.error('Error fetching databases:', error);
+      log.error({ err: error }, 'failed to fetch databases');
       throw error;
     }
   }
@@ -142,7 +145,7 @@ class DatabasesAPI {
       const response = await axios.post(`${API_BASE_URL}/settings/databases`, payload);
       return response.data.database;
     } catch (error) {
-      console.error('Error creating database:', error);
+      log.error({ err: error }, 'failed to create database');
       throw error;
     }
   }
@@ -151,7 +154,7 @@ class DatabasesAPI {
     try {
       await axios.delete(`${API_BASE_URL}/settings/databases/${connectionId}`);
     } catch (error) {
-      console.error('Error deleting database:', error);
+      log.error({ err: error }, 'failed to delete database');
       throw error;
     }
   }
@@ -167,7 +170,7 @@ class DatabasesAPI {
         message: response.data.message,
       };
     } catch (error) {
-      console.error('Error validating database:', error);
+      log.error({ err: error }, 'failed to validate database');
       const axiosErr = error as { response?: { data?: { error?: string; message?: string } } };
       return {
         valid: false,
@@ -189,7 +192,7 @@ class UsersAPI {
       const response = await axios.get(`${API_BASE_URL}/settings/users`);
       return response.data.users || [];
     } catch (error) {
-      console.error('Error fetching users:', error);
+      log.error({ err: error }, 'failed to fetch users');
       throw error;
     }
   }
@@ -202,7 +205,7 @@ class UsersAPI {
         password: response.data.password,
       };
     } catch (error) {
-      console.error('Error creating user:', error);
+      log.error({ err: error }, 'failed to create user');
       throw error;
     }
   }
@@ -211,7 +214,7 @@ class UsersAPI {
     try {
       await axios.delete(`${API_BASE_URL}/settings/users/${userId}`);
     } catch (error) {
-      console.error('Error deleting user:', error);
+      log.error({ err: error }, 'failed to delete user');
       throw error;
     }
   }
@@ -221,7 +224,7 @@ class UsersAPI {
       const response = await axios.put(`${API_BASE_URL}/settings/users/${userId}/role`, { role });
       return response.data.user;
     } catch (error) {
-      console.error('Error updating user role:', error);
+      log.error({ err: error }, 'failed to update user role');
       throw error;
     }
   }
@@ -231,7 +234,7 @@ class UsersAPI {
       const response = await axios.post(`${API_BASE_URL}/settings/users/${userId}/reset-password`);
       return { password: response.data.password };
     } catch (error) {
-      console.error('Error resetting password:', error);
+      log.error({ err: error }, 'failed to reset password');
       throw error;
     }
   }
@@ -272,7 +275,7 @@ class ProcessingSettingsAPI {
         available_tiers: response.data.available_tiers,
       };
     } catch (error) {
-      console.error('Error fetching processing settings:', error);
+      log.error({ err: error }, 'failed to fetch processing settings');
       throw error;
     }
   }
@@ -286,7 +289,7 @@ class ProcessingSettingsAPI {
       const response = await axios.post(`${API_BASE_URL}/settings/processing`, settings);
       return response.data.settings;
     } catch (error) {
-      console.error('Error updating processing settings:', error);
+      log.error({ err: error }, 'failed to update processing settings');
       throw error;
     }
   }
@@ -340,7 +343,7 @@ class GoogleDriveAPI {
         email: response.data.email,
       };
     } catch (error) {
-      console.error('Error fetching Google status:', error);
+      log.error({ err: error }, 'failed to fetch Google status');
       return {
         configured: false,
         connected: false,
@@ -358,7 +361,7 @@ class GoogleDriveAPI {
       const response = await axios.get(`${API_BASE_URL}/google/auth`);
       return response.data.auth_url;
     } catch (error) {
-      console.error('Error getting Google auth URL:', error);
+      log.error({ err: error }, 'failed to get Google auth URL');
       return null;
     }
   }
@@ -372,7 +375,7 @@ class GoogleDriveAPI {
       const response = await axios.post(`${API_BASE_URL}/google/disconnect`);
       return response.data.success;
     } catch (error) {
-      console.error('Error disconnecting Google:', error);
+      log.error({ err: error }, 'failed to disconnect Google');
       return false;
     }
   }
@@ -395,7 +398,7 @@ class GoogleDriveAPI {
       const response = await axios.get(`${API_BASE_URL}/google/files?${params}`);
       return response.data;
     } catch (error) {
-      console.error('Error listing Google files:', error);
+      log.error({ err: error }, 'failed to list Google files');
       return {
         success: false,
         files: [],
@@ -425,7 +428,7 @@ class GoogleDriveAPI {
         source: response.data.source,
       };
     } catch (error) {
-      console.error('Error importing from Google Drive:', error);
+      log.error({ err: error }, 'failed to import from Google Drive');
       return {
         success: false,
         error: 'Failed to import file',

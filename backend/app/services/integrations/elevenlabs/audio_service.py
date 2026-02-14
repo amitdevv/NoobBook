@@ -23,10 +23,13 @@ Supported Languages (sample):
 Note: This is separate from transcription_service.py which handles real-time
 WebSocket transcription for chat voice input.
 """
+import logging
 import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 # Supported language codes for ElevenLabs Speech-to-Text
@@ -138,16 +141,13 @@ class AudioService:
         try:
             client = self._get_client()
 
-            print(f"Transcribing audio: {audio_path.name}")
+            logger.info("Transcribing audio: %s", audio_path.name)
 
             # Normalize language code: empty string or "auto" -> None for auto-detect
             # Educational Note: ElevenLabs expects None (not empty string) for auto-detection
             normalized_language = None
             if language_code and language_code.strip() and language_code.lower() != "auto":
                 normalized_language = language_code.strip()
-                print(f"Using language code: {normalized_language}")
-            else:
-                print("Using auto language detection")
 
             # Read the audio file
             with open(audio_path, "rb") as audio_file:
@@ -180,7 +180,7 @@ class AudioService:
                 detected_language_code  # Use code as fallback if not in our map
             )
 
-            print(f"Detected language: {detected_language_name} ({detected_language_code})")
+            logger.info("Detected language: %s (%s)", detected_language_name, detected_language_code)
 
             # Build the processed content
             processed_content = self._build_processed_content(
@@ -196,7 +196,7 @@ class AudioService:
             from app.utils.embedding_utils import count_tokens
             token_count = count_tokens(processed_content)
 
-            print(f"Transcript generated: {len(transcript_text)} chars, {token_count} tokens")
+            logger.info("Transcript generated: %s chars, %s tokens", len(transcript_text), token_count)
 
             # Return processed content for processor to upload to Supabase Storage
             return {
@@ -218,7 +218,7 @@ class AudioService:
                 "error": str(e)
             }
         except Exception as e:
-            print(f"Error transcribing audio: {e}")
+            logger.exception("Error transcribing audio")
             return {
                 "success": False,
                 "error": f"Transcription failed: {str(e)}"

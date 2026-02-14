@@ -11,6 +11,7 @@ The agent is triggered by main_chat when user asks about CSV sources.
 Results (including any generated plots) are returned to main_chat.
 """
 
+import logging
 import uuid
 from typing import Dict, Any, List
 from datetime import datetime
@@ -20,6 +21,8 @@ from app.config import prompt_loader, tool_loader
 from app.services.tool_executors.analysis_executor import analysis_executor
 from app.services.data_services import message_service
 from app.utils import claude_parsing_utils
+
+logger = logging.getLogger(__name__)
 
 
 class CSVAnalyzerAgent:
@@ -98,10 +101,9 @@ class CSVAnalyzerAgent:
         # Track generated plot paths across iterations
         generated_plots = []
 
-        print(f"[CSVAnalyzerAgent] Starting analysis for: {query[:50]}...")
+        logger.info("Starting CSV analysis for: %s", query[:50])
 
         for iteration in range(1, self.MAX_ITERATIONS + 1):
-            print(f"  Iteration {iteration}/{self.MAX_ITERATIONS}")
 
             response = claude_service.send_message(
                 messages=messages,
@@ -125,7 +127,7 @@ class CSVAnalyzerAgent:
 
             if not tool_blocks:
                 if claude_parsing_utils.is_end_turn(response):
-                    print("  End turn without return_analysis tool")
+                    logger.warning("End turn without return_analysis tool")
                 continue
 
             tool_results_data = []
@@ -135,15 +137,13 @@ class CSVAnalyzerAgent:
                 tool_input = tool_block["input"]
                 tool_id = tool_block["id"]
 
-                print(f"    Tool: {tool_name}")
-
                 # Execute tool via analysis_executor
                 result, is_termination = analysis_executor.execute_tool(
                     tool_name, tool_input, project_id, source_id
                 )
 
                 if is_termination:
-                    print(f"  Completed in {iteration} iterations")
+                    logger.info("Completed in %d iterations", iteration)
 
                     # Add any plots generated during this session
                     if generated_plots:
@@ -177,7 +177,7 @@ class CSVAnalyzerAgent:
                 tool_results_content = claude_parsing_utils.build_tool_result_content(tool_results_data)
                 messages.append({"role": "user", "content": tool_results_content})
 
-        print(f"  Max iterations reached ({self.MAX_ITERATIONS})")
+        logger.warning("Max iterations reached (%d)", self.MAX_ITERATIONS)
         error_result = {
             "success": False,
             "error": f"Analysis did not complete within {self.MAX_ITERATIONS} iterations",

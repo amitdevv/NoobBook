@@ -5,6 +5,7 @@ Tool handlers extracted from component_agent_service.py for separation of concer
 Agent handles orchestration, executor handles tool-specific logic.
 """
 
+import logging
 import re
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
@@ -12,6 +13,8 @@ from pathlib import Path
 
 from app.utils.path_utils import get_studio_dir
 from app.services.studio_services import studio_index_service
+
+logger = logging.getLogger(__name__)
 
 
 class ComponentToolExecutor:
@@ -79,7 +82,6 @@ class ComponentToolExecutor:
         component_description = tool_input.get("component_description", "")
         variations = tool_input.get("variations", [])
 
-        print(f"      Planning: {component_category} ({len(variations)} variations)")
 
         variation_names = [v.get("variation_name", "Unnamed") for v in variations]
         result = (
@@ -157,9 +159,9 @@ class ComponentToolExecutor:
                 if body_match:
                     insert_pos = body_match.end()
                     html_code = html_code[:insert_pos] + logo_div + html_code[insert_pos:]
-                    print(f"      Logo injected (agent omitted BRAND_LOGO placeholder)")
+                    logger.info("Logo injected (agent omitted BRAND_LOGO placeholder)")
                 else:
-                    print(f"      WARNING: Could not inject brand logo — no <body> tag found")
+                    logger.warning("Could not inject brand logo — no <body> tag found")
 
         # 3. Override CSS :root custom property values with brand colors.
         # Educational Note: The agent might plan correct colors but write
@@ -196,7 +198,6 @@ class ComponentToolExecutor:
         components = tool_input.get("components", [])
         usage_notes = tool_input.get("usage_notes", "")
 
-        print(f"      Writing code for {len(components)} components")
 
         try:
             # Prepare output directory
@@ -225,8 +226,6 @@ class ComponentToolExecutor:
                 file_path = component_dir / filename
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(html_code)
-
-                print(f"      Saved: {filename}")
 
                 # Track component
                 saved_components.append({
@@ -275,7 +274,7 @@ class ComponentToolExecutor:
 
         except Exception as e:
             error_msg = f"Error writing component code: {str(e)}"
-            print(f"      {error_msg}")
+            logger.exception("Failed to write component code")
 
             studio_index_service.update_component_job(
                 project_id, job_id,

@@ -9,12 +9,15 @@ GenerateContentConfig and ImageConfig for aspect ratio and resolution control.
 
 Images are returned as bytes for direct upload to Supabase Storage.
 """
+import logging
 import os
 import io
 import tempfile
 from pathlib import Path
 from typing import Dict, Any, List
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class ImagenService:
@@ -106,10 +109,7 @@ class ImagenService:
             client = self._get_client()
             types = self._get_types()
 
-            print(f"[Imagen] Generating {num_images} images...")
-            print(f"  Model: {self.MODEL_ID}")
-            print(f"  Aspect ratio: {aspect_ratio}, Resolution: {resolution}")
-            print(f"  Prompt: {prompt[:100]}...")
+            logger.info("Generating %s images (%s, %s)", num_images, aspect_ratio, resolution)
 
             # Ensure output directory exists
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -119,7 +119,6 @@ class ImagenService:
 
             # Generate images one by one
             for i in range(num_images):
-                print(f"  Generating image {i+1}/{num_images}...")
 
                 # Use the new API format with GenerateContentConfig and ImageConfig
                 response = client.models.generate_content(
@@ -137,8 +136,7 @@ class ImagenService:
                 # Extract image from response parts
                 for part in response.parts:
                     if part.text is not None:
-                        # Log any text response from the model
-                        print(f"    Model text: {part.text[:100]}...")
+                        pass
                     elif (image := part.as_image()):
                         filename = f"{filename_prefix}_{timestamp}_{i+1}.png"
                         filepath = output_dir / filename
@@ -148,7 +146,6 @@ class ImagenService:
                             "path": str(filepath),
                             "index": i + 1
                         })
-                        print(f"    Saved: {filename}")
                         break  # Got the image, move to next
 
             if not image_paths:
@@ -175,7 +172,7 @@ class ImagenService:
                 "error": str(e)
             }
         except Exception as e:
-            print(f"[Imagen] Error generating images: {e}")
+            logger.exception("Error generating images")
             return {
                 "success": False,
                 "error": f"Image generation failed: {str(e)}"
@@ -223,9 +220,7 @@ class ImagenService:
             client = self._get_client()
             types = self._get_types()
 
-            print(f"[Imagen] Generating image...")
-            print(f"  Aspect ratio: {aspect_ratio}, Resolution: {resolution}")
-            print(f"  Prompt: {prompt[:100]}...")
+            logger.info("Generating single image (%s, %s)", aspect_ratio, resolution)
 
             response = client.models.generate_content(
                 model=self.MODEL_ID,
@@ -242,7 +237,7 @@ class ImagenService:
             # Extract image from response
             for part in response.parts:
                 if part.text is not None:
-                    print(f"    Model text: {part.text[:100]}...")
+                    pass
                 elif (image := part.as_image()):
                     # Google GenAI Image uses .save(filepath), not .save(buffer, format)
                     # So we save to a temp file and read the bytes
@@ -261,8 +256,6 @@ class ImagenService:
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                     filename = f"{filename_prefix}_{timestamp}.png"
 
-                    print(f"    Generated: {filename} ({len(img_bytes)} bytes)")
-
                     return {
                         "success": True,
                         "filename": filename,
@@ -278,7 +271,7 @@ class ImagenService:
         except ValueError as e:
             return {"success": False, "error": str(e)}
         except Exception as e:
-            print(f"[Imagen] Error generating image: {e}")
+            logger.exception("Error generating image")
             return {"success": False, "error": f"Image generation failed: {str(e)}"}
 
     def is_configured(self) -> bool:

@@ -19,9 +19,12 @@ Output Formats:
 - mp3_44100_192: Higher quality (Creator tier+)
 - pcm_16000: Raw PCM for processing
 """
+import logging
 import os
 from typing import Optional, Generator
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class TTSService:
@@ -168,7 +171,7 @@ class TTSService:
         try:
             client = self._get_client()
 
-            print(f"Generating audio bytes: {len(text)} characters")
+            logger.info("Generating TTS audio: %s chars", len(text))
 
             voice = voice_id or self.DEFAULT_VOICE_ID
             model = model_id or self.DEFAULT_MODEL
@@ -176,12 +179,10 @@ class TTSService:
 
             # Split text if it exceeds ElevenLabs limit
             text_chunks = self._split_text_for_tts(text)
-            print(f"Split into {len(text_chunks)} chunk(s) for TTS")
 
             # Generate audio for each chunk
             all_audio_bytes = []
             for i, chunk in enumerate(text_chunks, 1):
-                print(f"  Generating chunk {i}/{len(text_chunks)} ({len(chunk)} chars)")
                 audio_generator = client.text_to_speech.convert(
                     text=chunk,
                     voice_id=voice,
@@ -198,8 +199,7 @@ class TTSService:
             word_count = len(text.split())
             estimated_duration_seconds = (word_count / 150) * 60
 
-            print(f"Audio generated: {len(audio_bytes)} bytes")
-            print(f"Estimated duration: {estimated_duration_seconds:.0f} seconds")
+            logger.info("TTS audio generated: %s bytes, ~%.0fs", len(audio_bytes), estimated_duration_seconds)
 
             return {
                 "success": True,
@@ -217,7 +217,7 @@ class TTSService:
         except ValueError as e:
             return {"success": False, "error": str(e)}
         except Exception as e:
-            print(f"Error generating audio bytes: {e}")
+            logger.exception("Error generating TTS audio")
             return {"success": False, "error": f"TTS generation failed: {str(e)}"}
 
     def generate_audio_stream(

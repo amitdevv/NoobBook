@@ -8,6 +8,9 @@
 import axios from 'axios';
 import type { StudioSignal } from '../../components/studio/types';
 import { API_BASE_URL } from './client';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('chats-api');
 
 /**
  * Educational Note: A message in the conversation.
@@ -98,7 +101,7 @@ class ChatsAPI {
       );
       return response.data.chats;
     } catch (error) {
-      console.error('Error fetching chats:', error);
+      log.error({ err: error }, 'failed to fetch chats');
       throw error;
     }
   }
@@ -115,7 +118,7 @@ class ChatsAPI {
       );
       return response.data.chat;
     } catch (error) {
-      console.error('Error creating chat:', error);
+      log.error({ err: error }, 'failed to create chat');
       throw error;
     }
   }
@@ -131,7 +134,7 @@ class ChatsAPI {
       );
       return response.data.chat;
     } catch (error) {
-      console.error('Error fetching chat:', error);
+      log.error({ err: error }, 'failed to fetch chat');
       throw error;
     }
   }
@@ -156,7 +159,7 @@ class ChatsAPI {
         assistant_message: response.data.assistant_message
       };
     } catch (error) {
-      console.error('Error sending message:', error);
+      log.error({ err: error }, 'failed to send message');
       throw error;
     }
   }
@@ -177,7 +180,7 @@ class ChatsAPI {
       );
       return response.data.chat;
     } catch (error) {
-      console.error('Error updating chat:', error);
+      log.error({ err: error }, 'failed to update chat');
       throw error;
     }
   }
@@ -192,7 +195,7 @@ class ChatsAPI {
         `${API_BASE_URL}/projects/${projectId}/chats/${chatId}`
       );
     } catch (error) {
-      console.error('Error deleting chat:', error);
+      log.error({ err: error }, 'failed to delete chat');
       throw error;
     }
   }
@@ -209,7 +212,7 @@ class ChatsAPI {
       );
       return response.data.prompt;
     } catch (error) {
-      console.error('Error fetching project prompt:', error);
+      log.error({ err: error }, 'failed to fetch project prompt');
       throw error;
     }
   }
@@ -224,7 +227,7 @@ class ChatsAPI {
       const response = await axios.get(`${API_BASE_URL}/prompts/default`);
       return response.data.prompt;
     } catch (error) {
-      console.error('Error fetching default prompt:', error);
+      log.error({ err: error }, 'failed to fetch default prompt');
       throw error;
     }
   }
@@ -239,7 +242,7 @@ class ChatsAPI {
       const response = await axios.get(`${API_BASE_URL}/prompts/all`);
       return response.data.prompts;
     } catch (error) {
-      console.error('Error fetching all prompts:', error);
+      log.error({ err: error }, 'failed to fetch all prompts');
       throw error;
     }
   }
@@ -263,7 +266,7 @@ class ChatsAPI {
         is_custom: response.data.is_custom
       };
     } catch (error) {
-      console.error('Error updating project prompt:', error);
+      log.error({ err: error }, 'failed to update project prompt');
       throw error;
     }
   }
@@ -296,7 +299,7 @@ class ChatsAPI {
         throw new Error(response.data.error || 'Failed to get transcription config');
       }
     } catch (error) {
-      console.error('Error fetching transcription config:', error);
+      log.error({ err: error }, 'failed to fetch transcription config');
       throw error;
     }
   }
@@ -310,7 +313,7 @@ class ChatsAPI {
       const response = await axios.get(`${API_BASE_URL}/transcription/status`);
       return response.data.success && response.data.configured;
     } catch (error) {
-      console.error('Error checking transcription status:', error);
+      log.error({ err: error }, 'failed to check transcription status');
       return false;
     }
   }

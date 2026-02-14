@@ -8,6 +8,9 @@ import { useState } from 'react';
 import { quizzesAPI, type QuizJob } from '@/lib/api/studio';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('quiz-generation');
 
 export const useQuizGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -66,7 +69,7 @@ export const useQuizGeneration = (projectId: string) => {
         showError(finalJob.error || 'Quiz generation failed.');
       }
     } catch (error) {
-      console.error('Quiz generation error:', error);
+      log.error({ err: error }, 'LQuiz generationE failed');
       showError(error instanceof Error ? error.message : 'Quiz generation failed.');
     } finally {
       setIsGeneratingQuiz(false);

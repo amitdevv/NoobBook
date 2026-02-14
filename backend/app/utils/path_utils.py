@@ -31,8 +31,11 @@ Directory Structure:
     ├── tasks/                         # Background task tracking
     └── user_memory.json               # Global user memory
 """
+import logging
 from pathlib import Path
 from config import Config
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -374,4 +377,4 @@ def ensure_base_directories() -> None:
     get_projects_base_dir()
     get_prompts_dir()
     get_tasks_dir()
-    print("Base directories initialized")
+    logger.info("Base directories initialized")

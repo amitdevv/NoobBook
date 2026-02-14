@@ -117,8 +117,6 @@ def upload_research(
     # Add to index
     source_index_service.add_source_to_index(project_id, source_metadata)
 
-    print(f"Created research source: {display_name} ({source_id})")
-
     # Submit processing as background task
     _submit_processing_task(project_id, source_id)
 

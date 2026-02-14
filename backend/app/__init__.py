@@ -10,6 +10,7 @@ from flask_cors import CORS
 from flask_socketio import SocketIO
 
 from config import config
+from app.utils.logger import setup_logging
 
 # Initialize extensions globally but without app context
 socketio = SocketIO(cors_allowed_origins="*")
@@ -29,6 +30,7 @@ def create_app(config_name='development'):
 
     # Load configuration
     app.config.from_object(config[config_name])
+    setup_logging(app.config.get('LOG_LEVEL', 'DEBUG'))
     config[config_name].init_app(app)
 
     # Ensure base directories exist before any routes access them

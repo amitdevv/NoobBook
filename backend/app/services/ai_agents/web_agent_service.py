@@ -16,6 +16,7 @@ Tools:
 """
 
 import json
+import logging
 import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -25,6 +26,8 @@ from app.config import prompt_loader, tool_loader
 from app.services.tool_executors import web_agent_executor
 from app.services.data_services import message_service
 from app.utils import claude_parsing_utils
+
+logger = logging.getLogger(__name__)
 
 
 class WebAgentService:
@@ -106,10 +109,9 @@ class WebAgentService:
         total_input_tokens = 0
         total_output_tokens = 0
 
-        print(f"[WebAgent] Starting (execution_id: {execution_id[:8]})")
+        logger.info("Starting web agent %s", execution_id[:8])
 
         for iteration in range(1, self.MAX_ITERATIONS + 1):
-            print(f"  Iteration {iteration}/{self.MAX_ITERATIONS}")
 
             # Call Claude API
             response = claude_service.send_message(
@@ -144,14 +146,12 @@ class WebAgentService:
                     tool_input = getattr(block, "input", {}) if hasattr(block, "input") else block.get("input", {})
                     tool_id = getattr(block, "id", "") if hasattr(block, "id") else block.get("id", "")
 
-                    print(f"    Tool: {tool_name}")
-
                     # TERMINATION: return_search_result means we're done
                     if tool_name == "return_search_result":
                         final_result = self._build_result(
                             tool_input, iteration, total_input_tokens, total_output_tokens
                         )
-                        print(f"  Completed in {iteration} iterations")
+                        logger.info("Completed in %d iterations", iteration)
 
                         # Save execution log
                         self._save_execution(
@@ -173,15 +173,14 @@ class WebAgentService:
 
                 elif block_type == "server_tool_use":
                     # SERVER TOOLS: web_fetch, web_search - Claude handles, no action needed
-                    server_tool_name = getattr(block, "name", "") if hasattr(block, "name") else block.get("name", "")
-                    print(f"    Server tool: {server_tool_name}")
+                    pass
 
             # Add tool results to messages if any client tools were executed
             if tool_results:
                 messages.append({"role": "user", "content": tool_results})
 
         # Max iterations reached
-        print(f"  Max iterations reached ({self.MAX_ITERATIONS})")
+        logger.warning("Max iterations reached (%d)", self.MAX_ITERATIONS)
         error_result = {
             "success": False,
             "error_message": f"Agent reached maximum iterations ({self.MAX_ITERATIONS})",

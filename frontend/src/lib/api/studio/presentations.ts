@@ -7,6 +7,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-presentations-api');
 
 /**
  * Presentation slide metadata
@@ -162,7 +165,7 @@ export const presentationsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting presentation generation:', error);
+      log.error({ err: error }, 'failed to start presentation generation');
       throw error;
     }
   },
@@ -180,7 +183,7 @@ export const presentationsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting presentation job status:', error);
+      log.error({ err: error }, 'failed to get presentation job status');
       throw error;
     }
   },
@@ -200,7 +203,7 @@ export const presentationsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing presentation jobs:', error);
+      log.error({ err: error }, 'failed to list presentation jobs');
       throw error;
     }
   },
@@ -220,7 +223,7 @@ export const presentationsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting presentation preview:', error);
+      log.error({ err: error }, 'failed to get presentation preview');
       throw error;
     }
   },

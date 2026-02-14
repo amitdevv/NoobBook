@@ -12,10 +12,13 @@ Flow:
 - Output: 3 ad creative images saved to disk
 """
 import json
+import logging
 from typing import Dict, Any
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
+
+logger = logging.getLogger(__name__)
 from app.services.integrations.google.imagen_service import imagen_service
 from app.services.studio_services import studio_index_service
 from app.config import prompt_loader
@@ -75,9 +78,6 @@ class AdCreativeService:
             started_at=datetime.now().isoformat()
         )
 
-        print(f"[AdCreative] Starting job {job_id}")
-        print(f"  Product: {product_name}")
-
         # Step 1: Generate image prompts with Haiku
         prompts_result = self._generate_prompts(
             project_id=project_id,
@@ -96,7 +96,6 @@ class AdCreativeService:
             return prompts_result
 
         prompts = prompts_result.get("prompts", [])
-        print(f"  Generated {len(prompts)} prompts")
 
         # Update progress
         studio_index_service.update_ad_job(
@@ -114,8 +113,6 @@ class AdCreativeService:
 
             if not prompt_text:
                 continue
-
-            print(f"  Generating {prompt_type} image...")
 
             # Update progress
             studio_index_service.update_ad_job(
@@ -174,7 +171,7 @@ class AdCreativeService:
             completed_at=datetime.now().isoformat()
         )
 
-        print(f"  Generated {len(all_images)} images in {duration:.1f}s")
+        logger.info("Generated %s ad images in %.1fs", len(all_images), duration)
 
         return {
             "success": True,

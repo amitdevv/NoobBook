@@ -7,6 +7,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-prds-api');
 
 /**
  * PRD job record from the API
@@ -121,7 +124,7 @@ export const prdsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting PRD generation:', error);
+      log.error({ err: error }, 'failed to start PRD generation');
       throw error;
     }
   },
@@ -139,7 +142,7 @@ export const prdsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting PRD job status:', error);
+      log.error({ err: error }, 'failed to get PRD job status');
       throw error;
     }
   },
@@ -159,7 +162,7 @@ export const prdsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing PRD jobs:', error);
+      log.error({ err: error }, 'failed to list PRD jobs');
       throw error;
     }
   },
@@ -177,7 +180,7 @@ export const prdsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting PRD preview:', error);
+      log.error({ err: error }, 'failed to get PRD preview');
       throw error;
     }
   },

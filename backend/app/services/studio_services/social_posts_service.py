@@ -13,10 +13,13 @@ Platforms:
 All images are stored in Supabase Storage.
 """
 import json
+import logging
 from typing import Dict, Any, List
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
+
+logger = logging.getLogger(__name__)
 from app.services.integrations.google.imagen_service import imagen_service
 from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
@@ -88,9 +91,6 @@ class SocialPostsService:
             started_at=datetime.now().isoformat()
         )
 
-        print(f"[SocialPosts] Starting job {job_id}")
-        print(f"  Topic: {topic}")
-
         # Step 1: Generate copy and image prompts with Claude
         content_result = self._generate_content(
             project_id=project_id,
@@ -114,7 +114,6 @@ class SocialPostsService:
 
         # Safety filter: only keep posts for requested platforms
         posts_data = [p for p in posts_data if p.get("platform", "").lower() in platforms]
-        print(f"  Generated content for {len(posts_data)} platforms (requested: {platforms})")
 
         # Update progress
         studio_index_service.update_social_post_job(
@@ -132,8 +131,6 @@ class SocialPostsService:
 
             if not image_prompt:
                 continue
-
-            print(f"  Generating {platform} image (aspect ratio: {aspect_ratio})...")
 
             # Update progress
             studio_index_service.update_social_post_job(
@@ -181,7 +178,6 @@ class SocialPostsService:
                     post_info["image"] = {"filename": filename}
                     post_info["image_url"] = api_path
                     post_info["storage_path"] = storage_path
-                    print(f"    Uploaded: {filename}")
 
             all_posts.append(post_info)
 
@@ -214,7 +210,7 @@ class SocialPostsService:
             completed_at=datetime.now().isoformat()
         )
 
-        print(f"  Generated {len(posts_with_images)}/{len(all_posts)} posts with images in {duration:.1f}s")
+        logger.info("Generated %s/%s social posts with images in %.1fs", len(posts_with_images), len(all_posts), duration)
 
         return {
             "success": True,

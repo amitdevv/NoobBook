@@ -10,10 +10,13 @@ Files are organized in buckets:
 
 File paths follow the pattern: {project_id}/{source_id}/{filename}
 """
+import logging
 from typing import Optional, BinaryIO, List, Dict, Any
 from pathlib import Path
 
 from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+
+logger = logging.getLogger(__name__)
 
 
 # Bucket names
@@ -72,10 +75,9 @@ def upload_raw_file(
             file=file_data,
             file_options={"content-type": content_type}
         )
-        print(f"  Uploaded raw file: {path}")
         return path
     except Exception as e:
-        print(f"  Error uploading raw file: {e}")
+        logger.error("Failed to upload raw file %s: %s", path, e)
         return None
 
 
@@ -98,7 +100,7 @@ def download_raw_file(project_id: str, source_id: str, filename: str) -> Optiona
         response = client.storage.from_(BUCKET_RAW).download(path)
         return response
     except Exception as e:
-        print(f"  Error downloading raw file: {e}")
+        logger.error("Failed to download raw file %s: %s", path, e)
         return None
 
 
@@ -109,10 +111,9 @@ def delete_raw_file(project_id: str, source_id: str, filename: str) -> bool:
 
     try:
         client.storage.from_(BUCKET_RAW).remove([path])
-        print(f"  Deleted raw file: {path}")
         return True
     except Exception as e:
-        print(f"  Error deleting raw file: {e}")
+        logger.error("Failed to delete raw file %s: %s", path, e)
         return False
 
 
@@ -136,7 +137,7 @@ def get_raw_file_url(project_id: str, source_id: str, filename: str, expires_in:
         response = client.storage.from_(BUCKET_RAW).create_signed_url(path, expires_in)
         return response.get("signedURL")
     except Exception as e:
-        print(f"  Error getting signed URL: {e}")
+        logger.error("Failed to get signed URL for %s: %s", path, e)
         return None
 
 
@@ -170,10 +171,9 @@ def upload_processed_file(
             file=content.encode("utf-8"),
             file_options={"content-type": "text/plain; charset=utf-8"}
         )
-        print(f"  Uploaded processed file: {path}")
         return path
     except Exception as e:
-        print(f"  Error uploading processed file: {e}")
+        logger.error("Failed to upload processed file %s: %s", path, e)
         return None
 
 
@@ -196,7 +196,7 @@ def download_processed_file(project_id: str, source_id: str) -> Optional[str]:
         response = client.storage.from_(BUCKET_PROCESSED).download(path)
         return response.decode("utf-8")
     except Exception as e:
-        print(f"  Error downloading processed file: {e}")
+        logger.error("Failed to download processed file %s: %s", path, e)
         return None
 
 
@@ -210,7 +210,7 @@ def delete_processed_file(project_id: str, source_id: str) -> bool:
         client.storage.from_(BUCKET_PROCESSED).remove([path])
         return True
     except Exception as e:
-        print(f"  Error deleting processed file: {e}")
+        logger.error("Failed to delete processed file %s: %s", path, e)
         return False
 
 
@@ -248,7 +248,7 @@ def upload_chunk(
         )
         return path
     except Exception as e:
-        print(f"  Error uploading chunk: {e}")
+        logger.error("Failed to upload chunk %s: %s", path, e)
         return None
 
 
@@ -272,7 +272,7 @@ def download_chunk(project_id: str, source_id: str, chunk_id: str) -> Optional[s
         response = client.storage.from_(BUCKET_CHUNKS).download(path)
         return response.decode("utf-8")
     except Exception as e:
-        print(f"  Error downloading chunk: {e}")
+        logger.error("Failed to download chunk %s: %s", path, e)
         return None
 
 
@@ -331,7 +331,7 @@ def list_source_chunks(project_id: str, source_id: str) -> List[Dict[str, Any]]:
                     "source_id": source_id
                 }
             except Exception as e:
-                print(f"  Error downloading chunk {chunk_id}: {e}")
+                logger.error("Failed to download chunk %s: %s", chunk_id, e)
                 return None
 
         # Download chunks concurrently to avoid N+1 sequential requests
@@ -346,7 +346,7 @@ def list_source_chunks(project_id: str, source_id: str) -> List[Dict[str, Any]]:
         return chunks
 
     except Exception as e:
-        print(f"  Error listing chunks: {e}")
+        logger.error("Failed to list chunks for %s: %s", prefix, e)
         return []
 
 
@@ -372,7 +372,7 @@ def delete_source_chunks(project_id: str, source_id: str) -> bool:
             client.storage.from_(BUCKET_CHUNKS).remove(paths)
         return True
     except Exception as e:
-        print(f"  Error deleting chunks: {e}")
+        logger.error("Failed to delete chunks for %s: %s", prefix, e)
         return False
 
 
@@ -421,7 +421,6 @@ def upload_studio_file(
             file=content.encode("utf-8"),
             file_options={"content-type": content_type}
         )
-        print(f"  Uploaded studio file: {path}")
         return path
     except Exception as e:
         # If file exists, try to update it
@@ -432,12 +431,11 @@ def upload_studio_file(
                     file=content.encode("utf-8"),
                     file_options={"content-type": content_type}
                 )
-                print(f"  Updated studio file: {path}")
                 return path
             except Exception as update_e:
-                print(f"  Error updating studio file: {update_e}")
+                logger.error("Failed to update studio file %s: %s", path, update_e)
                 return None
-        print(f"  Error uploading studio file: {e}")
+        logger.error("Failed to upload studio file %s: %s", path, e)
         return None
 
 
@@ -501,7 +499,7 @@ def download_studio_file(
         response = client.storage.from_(BUCKET_STUDIO).download(path)
         return response.decode("utf-8")
     except Exception as e:
-        print(f"  Error downloading studio file: {e}")
+        logger.error("Failed to download studio file %s: %s", path, e)
         return None
 
 
@@ -517,10 +515,9 @@ def delete_studio_file(
 
     try:
         client.storage.from_(BUCKET_STUDIO).remove([path])
-        print(f"  Deleted studio file: {path}")
         return True
     except Exception as e:
-        print(f"  Error deleting studio file: {e}")
+        logger.error("Failed to delete studio file %s: %s", path, e)
         return False
 
 
@@ -545,10 +542,9 @@ def delete_studio_job_files(project_id: str, job_type: str, job_id: str) -> bool
         if files:
             paths = [f"{prefix}/{f['name']}" for f in files]
             client.storage.from_(BUCKET_STUDIO).remove(paths)
-            print(f"  Deleted {len(paths)} studio files for job {job_id}")
         return True
     except Exception as e:
-        print(f"  Error deleting studio job files: {e}")
+        logger.error("Failed to delete studio job files for %s: %s", job_id, e)
         return False
 
 
@@ -583,7 +579,6 @@ def upload_studio_binary(
             file=file_data,
             file_options={"content-type": content_type}
         )
-        print(f"  Uploaded studio binary: {path}")
         return path
     except Exception as e:
         if "Duplicate" in str(e) or "already exists" in str(e).lower():
@@ -593,12 +588,11 @@ def upload_studio_binary(
                     file=file_data,
                     file_options={"content-type": content_type}
                 )
-                print(f"  Updated studio binary: {path}")
                 return path
             except Exception as update_e:
-                print(f"  Error updating studio binary: {update_e}")
+                logger.error("Failed to update studio binary %s: %s", path, update_e)
                 return None
-        print(f"  Error uploading studio binary: {e}")
+        logger.error("Failed to upload studio binary %s: %s", path, e)
         return None
 
 
@@ -627,7 +621,7 @@ def download_studio_binary(
         response = client.storage.from_(BUCKET_STUDIO).download(path)
         return response
     except Exception as e:
-        print(f"  Error downloading studio binary: {e}")
+        logger.error("Failed to download studio binary %s: %s", path, e)
         return None
 
 
@@ -659,7 +653,7 @@ def get_studio_public_url(
         response = client.storage.from_(BUCKET_STUDIO).get_public_url(path)
         return response
     except Exception as e:
-        print(f"  Error getting public URL: {e}")
+        logger.error("Failed to get public URL for %s: %s", path, e)
         return ""
 
 
@@ -690,7 +684,7 @@ def get_studio_signed_url(
         response = client.storage.from_(BUCKET_STUDIO).create_signed_url(path, expires_in)
         return response.get("signedURL")
     except Exception as e:
-        print(f"  Error getting signed URL: {e}")
+        logger.error("Failed to get signed URL for %s: %s", path, e)
         return None
 
 
@@ -729,7 +723,6 @@ def upload_ai_image(
             file=file_data,
             file_options={"content-type": content_type}
         )
-        print(f"  Uploaded AI image: {path}")
         return path
     except Exception as e:
         if "Duplicate" in str(e) or "already exists" in str(e).lower():
@@ -739,12 +732,11 @@ def upload_ai_image(
                     file=file_data,
                     file_options={"content-type": content_type}
                 )
-                print(f"  Updated AI image: {path}")
                 return path
             except Exception as update_e:
-                print(f"  Error updating AI image: {update_e}")
+                logger.error("Failed to update AI image %s: %s", path, update_e)
                 return None
-        print(f"  Error uploading AI image: {e}")
+        logger.error("Failed to upload AI image %s: %s", path, e)
         return None
 
 
@@ -766,7 +758,7 @@ def download_ai_image(project_id: str, filename: str) -> Optional[bytes]:
         response = client.storage.from_(BUCKET_STUDIO).download(path)
         return response
     except Exception as e:
-        print(f"  Error downloading AI image: {e}")
+        logger.error("Failed to download AI image %s: %s", path, e)
         return None
 
 
@@ -793,7 +785,7 @@ def get_ai_image_url(
         response = client.storage.from_(BUCKET_STUDIO).create_signed_url(path, expires_in)
         return response.get("signedURL")
     except Exception as e:
-        print(f"  Error getting AI image URL: {e}")
+        logger.error("Failed to get AI image URL for %s: %s", path, e)
         return None
 
 
@@ -869,7 +861,6 @@ def upload_brand_asset(
             file=file_data,
             file_options={"content-type": content_type}
         )
-        print(f"  Uploaded brand asset: {path}")
         return path
     except Exception as e:
         # If file exists, try to update it
@@ -880,12 +871,11 @@ def upload_brand_asset(
                     file=file_data,
                     file_options={"content-type": content_type}
                 )
-                print(f"  Updated brand asset: {path}")
                 return path
             except Exception as update_e:
-                print(f"  Error updating brand asset: {update_e}")
+                logger.error("Failed to update brand asset %s: %s", path, update_e)
                 return None
-        print(f"  Error uploading brand asset: {e}")
+        logger.error("Failed to upload brand asset %s: %s", path, e)
         return None
 
 
@@ -912,7 +902,7 @@ def download_brand_asset(
         response = client.storage.from_(BUCKET_BRAND_ASSETS).download(path)
         return response
     except Exception as e:
-        print(f"  Error downloading brand asset: {e}")
+        logger.error("Failed to download brand asset %s: %s", path, e)
         return None
 
 
@@ -937,10 +927,9 @@ def delete_brand_asset(
 
     try:
         client.storage.from_(BUCKET_BRAND_ASSETS).remove([path])
-        print(f"  Deleted brand asset: {path}")
         return True
     except Exception as e:
-        print(f"  Error deleting brand asset: {e}")
+        logger.error("Failed to delete brand asset %s: %s", path, e)
         return False
 
 
@@ -969,7 +958,7 @@ def get_brand_asset_url(
         response = client.storage.from_(BUCKET_BRAND_ASSETS).create_signed_url(path, expires_in)
         return response.get("signedURL")
     except Exception as e:
-        print(f"  Error getting brand asset signed URL: {e}")
+        logger.error("Failed to get brand asset signed URL for %s: %s", path, e)
         return None
 
 
@@ -1004,8 +993,7 @@ def delete_user_brand_assets(user_id: str) -> bool:
 
             if all_paths:
                 client.storage.from_(BUCKET_BRAND_ASSETS).remove(all_paths)
-                print(f"  Deleted {len(all_paths)} brand assets for user {user_id}")
         return True
     except Exception as e:
-        print(f"  Error deleting project brand assets: {e}")
+        logger.error("Failed to delete brand assets for user %s: %s", user_id, e)
         return False

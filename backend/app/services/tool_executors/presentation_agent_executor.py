@@ -6,9 +6,12 @@ and launches the presentation agent as a background task. After the agent genera
 HTML slides, it captures screenshots and exports to PPTX.
 """
 
+import logging
 from typing import Dict, Any
 import uuid
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class PresentationAgentExecutor:
@@ -74,7 +77,7 @@ class PresentationAgentExecutor:
         # Launch agent as background task
         def run_agent():
             """Background task to run the presentation agent and export to PPTX."""
-            print(f"[PresentationAgentExecutor] Starting presentation agent for job {job_id[:8]}")
+            logger.info("Starting presentation agent for job %s", job_id[:8])
             try:
                 # Phase 1: Generate HTML slides
                 result = presentation_agent_service.generate_presentation(
@@ -85,13 +88,13 @@ class PresentationAgentExecutor:
                 )
 
                 if not result.get("success"):
-                    print(f"[PresentationAgentExecutor] Agent failed: {result.get('error_message')}")
+                    logger.error("Presentation agent failed: %s", result.get("error_message"))
                     return
 
                 # Phase 2: Capture screenshots and export to PPTX
                 slide_files = result.get("slide_files", [])
                 if not slide_files:
-                    print("[PresentationAgentExecutor] No slides to export")
+                    logger.warning("No slides to export for job %s", job_id[:8])
                     return
 
                 # Update status
@@ -108,7 +111,6 @@ class PresentationAgentExecutor:
                 screenshots_dir.mkdir(parents=True, exist_ok=True)
 
                 # Capture screenshots
-                print(f"[PresentationAgentExecutor] Capturing {len(slide_files)} slides")
                 screenshots = capture_slides_as_screenshots(
                     slides_dir=str(slides_dir),
                     output_dir=str(screenshots_dir),
@@ -116,7 +118,7 @@ class PresentationAgentExecutor:
                 )
 
                 if not screenshots:
-                    print("[PresentationAgentExecutor] Screenshot capture failed")
+                    logger.error("Screenshot capture failed for job %s", job_id[:8])
                     studio_index_service.update_presentation_job(
                         project_id, job_id,
                         export_status="error",
@@ -144,7 +146,6 @@ class PresentationAgentExecutor:
                 pptx_output_dir = Path(studio_dir) / "presentations" / job_id
                 pptx_path = pptx_output_dir / pptx_filename
 
-                print(f"[PresentationAgentExecutor] Creating PPTX: {pptx_filename}")
                 pptx_result = create_pptx_from_screenshots(
                     screenshots=screenshots,
                     output_path=str(pptx_path),
@@ -161,19 +162,17 @@ class PresentationAgentExecutor:
                         status_message="Presentation ready for download!",
                         download_url=f"/api/v1/projects/{project_id}/studio/presentations/{job_id}/download"
                     )
-                    print(f"[PresentationAgentExecutor] PPTX created: {pptx_filename}")
+                    logger.info("PPTX created: %s", pptx_filename)
                 else:
                     studio_index_service.update_presentation_job(
                         project_id, job_id,
                         export_status="error",
                         status_message="PPTX export failed"
                     )
-                    print("[PresentationAgentExecutor] PPTX export failed")
+                    logger.error("PPTX export failed for job %s", job_id[:8])
 
             except Exception as e:
-                print(f"[PresentationAgentExecutor] Error in presentation agent: {e}")
-                import traceback
-                traceback.print_exc()
+                logger.exception("Presentation agent failed for job %s", job_id[:8])
                 # Update job on error
                 studio_index_service.update_presentation_job(
                     project_id, job_id,

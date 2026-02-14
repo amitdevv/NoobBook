@@ -11,12 +11,15 @@ Storage: Processed CSV is stored in Supabase Storage for on-demand queries.
 The csv_tool_executor provides comprehensive analysis operations that can be
 used later by the csv_analyzer_agent for detailed queries.
 """
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
 
 from app.services.integrations.supabase import storage_service
 from app.services.ai_services.csv_service import csv_service
+
+logger = logging.getLogger(__name__)
 
 
 def process_csv(
@@ -46,7 +49,6 @@ def process_csv(
     source_name = source.get("name", "unknown")
 
     # Use AI service to analyze CSV and generate summary
-    print(f"[CSV Processor] Analyzing {source_name} with AI service...")
     analysis_result = csv_service.analyze_csv(
         project_id=project_id,
         source_id=source_id,
@@ -80,8 +82,6 @@ def process_csv(
             processing_info={"error": "Failed to upload CSV to storage"}
         )
         return {"success": False, "error": "Failed to upload CSV to storage"}
-
-    print(f"[CSV Processor] Uploaded CSV to Supabase Storage")
 
     # Build processing info from AI analysis
     processing_info = {
@@ -122,5 +122,5 @@ def process_csv(
         summary_info=summary_info
     )
 
-    print(f"[CSV Processor] Completed: {source_name} ({analysis_result.get('row_count', 0)} rows, {analysis_result.get('column_count', 0)} columns)")
+    logger.info("CSV processed: %s (%s rows, %s columns)", source_name, analysis_result.get('row_count', 0), analysis_result.get('column_count', 0))
     return {"success": True, "status": "ready"}

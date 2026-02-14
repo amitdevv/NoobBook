@@ -7,6 +7,9 @@
 
 import axios from 'axios';
 import { getAccessToken } from '../auth/session';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('api-client');
 
 // Base host URL (without /api/v1 path) - used for file URLs, static assets.
 // When VITE_API_HOST is set to "" (Docker via nginx proxy), same-origin requests
@@ -34,15 +37,13 @@ const attachAuthHeader = (config: any) => {
   return config;
 };
 
-// Add request interceptor for debugging (educational purposes)
+// Attach auth header to all requests
 api.interceptors.request.use(
   (config) => {
-    const next = attachAuthHeader(config);
-    console.log('API Request:', config.method?.toUpperCase(), config.url);
-    return next;
+    return attachAuthHeader(config);
   },
   (error) => {
-    console.error('Request Error:', error);
+    log.error({ err: error }, 'request interceptor error');
     return Promise.reject(error);
   }
 );
@@ -50,15 +51,12 @@ api.interceptors.request.use(
 // Ensure global axios requests (non-api instance) include auth header too
 axios.interceptors.request.use(attachAuthHeader);
 
-// Add response interceptor for debugging
+// Response interceptor for error logging
 api.interceptors.response.use(
-  (response) => {
-    console.log('API Response:', response.status, response.config.url);
-    return response;
-  },
+  (response) => response,
   async (error) => {
     const status = error.response?.status;
-    console.error('Response Error:', status, error.response?.data);
+    log.error({ status, data: error.response?.data }, 'API response error');
     return Promise.reject(error);
   }
 );

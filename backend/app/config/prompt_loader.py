@@ -23,10 +23,13 @@ Prompt Hierarchy:
 2. Global default prompt (fallback)
 """
 import json
+import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
 
 from config import Config
+
+logger = logging.getLogger(__name__)
 
 
 class PromptLoader:
@@ -283,7 +286,7 @@ class PromptLoader:
 
                     prompts.append(prompt_data)
             except (json.JSONDecodeError, IOError) as e:
-                print(f"Error loading prompt {prompt_file}: {e}")
+                logger.error("Failed to load prompt %s: %s", prompt_file, e)
                 continue
 
         return prompts

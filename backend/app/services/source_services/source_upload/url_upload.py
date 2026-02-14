@@ -10,6 +10,7 @@ Supports:
 - YouTube URLs (processed by youtube_service)
 """
 import json
+import logging
 import re
 import uuid
 from datetime import datetime
@@ -18,6 +19,8 @@ from typing import Optional, Dict, Any
 from app.services.source_services import source_index_service
 from app.services.background_services import task_service
 from app.services.integrations.supabase import storage_service
+
+logger = logging.getLogger(__name__)
 
 
 def upload_url(
@@ -127,8 +130,6 @@ def upload_url(
     # Add to Supabase sources table
     source_index_service.add_source_to_index(project_id, source_metadata)
 
-    print(f"Uploaded URL source to Supabase: {url} ({source_id})")
-
     # Submit background processing task
     _submit_processing_task(project_id, source_id)
 
@@ -157,4 +158,4 @@ def _submit_processing_task(project_id: str, source_id: str) -> None:
         # Update status to "processing" immediately
         source_service.update_source(project_id, source_id, status="processing")
     except Exception as e:
-        print(f"ERROR: Failed to submit URL processing task: {e}")
+        logger.error("Failed to submit URL processing task for source %s: %s", source_id, e)

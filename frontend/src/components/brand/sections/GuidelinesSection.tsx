@@ -11,6 +11,9 @@ import { Badge } from '../../ui/badge';
 import { Plus, X, CircleNotch, Check, PencilSimple, Trash } from '@phosphor-icons/react';
 import { brandAPI, type BrandVoice, type BestPractices } from '../../../lib/api/brand';
 import { useToast } from '@/components/ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('brand-guidelines');
 
 export const GuidelinesSection: React.FC = () => {
   const [guidelines, setGuidelines] = useState('');
@@ -52,7 +55,7 @@ export const GuidelinesSection: React.FC = () => {
         setBestPractices(config.best_practices);
       }
     } catch (error) {
-      console.error('Failed to load config:', error);
+      log.error({ err: error }, 'failed to load config');
     } finally {
       setLoading(false);
     }
@@ -76,7 +79,7 @@ export const GuidelinesSection: React.FC = () => {
         setTimeout(() => setSaved(false), 2000);
       }
     } catch (error) {
-      console.error('Failed to save:', error);
+      log.error({ err: error }, 'failed to save');
       showError('Failed to save guidelines');
     } finally {
       setSaving(false);

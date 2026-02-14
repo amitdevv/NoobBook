@@ -10,6 +10,7 @@ This agentic approach allows for larger wireframes by distributing output
 across multiple iterations, avoiding token limit issues.
 """
 
+import logging
 import uuid
 from typing import Dict, Any, List
 from datetime import datetime
@@ -22,6 +23,8 @@ from app.services.data_services import message_service
 from app.services.studio_services import studio_index_service
 from app.services.source_services import source_index_service
 from app.services.tool_executors.wireframe_tool_executor import wireframe_tool_executor
+
+logger = logging.getLogger(__name__)
 
 
 class WireframeAgentService:
@@ -78,7 +81,7 @@ class WireframeAgentService:
             started_at=started_at.isoformat(),
         )
 
-        print(f"[WireframeAgent] Starting (job_id: {job_id[:8]})")
+        logger.info("Starting wireframe agent job %s", job_id[:8])
 
         try:
             # Get source metadata
@@ -124,7 +127,6 @@ class WireframeAgentService:
             }
 
             for iteration in range(1, self.MAX_ITERATIONS + 1):
-                print(f"  Iteration {iteration}/{self.MAX_ITERATIONS}")
 
                 # Update progress
                 studio_index_service.update_wireframe_job(
@@ -180,8 +182,6 @@ class WireframeAgentService:
                             else block.get("id", "")
                         )
 
-                        print(f"    Tool: {tool_name}")
-
                         # Build execution context with accumulated state
                         context = {
                             "project_id": project_id,
@@ -207,7 +207,7 @@ class WireframeAgentService:
                             wireframe_metadata = result["wireframe_metadata"]
 
                         if is_termination:
-                            print(f"  Completed in {iteration} iterations")
+                            logger.info("Completed in %d iterations", iteration)
                             generation_time = (
                                 datetime.now() - started_at
                             ).total_seconds()
@@ -274,7 +274,7 @@ class WireframeAgentService:
                     messages.append({"role": "user", "content": tool_results})
 
             # Max iterations reached
-            print(f"  Max iterations reached ({self.MAX_ITERATIONS})")
+            logger.warning("Max iterations reached (%d)", self.MAX_ITERATIONS)
             generation_time = (datetime.now() - started_at).total_seconds()
 
             # If we have accumulated elements, consider it a partial success
@@ -354,7 +354,7 @@ class WireframeAgentService:
             return error_result
 
         except Exception as e:
-            print(f"[WireframeAgent] Error: {e}")
+            logger.exception("Wireframe generation failed")
             studio_index_service.update_wireframe_job(
                 project_id,
                 job_id,

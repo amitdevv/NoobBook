@@ -4,10 +4,13 @@ Service for managing environment variables and .env file operations.
 Educational Note: This service provides a safe way to read, write, and
 update the .env file while maintaining the Flask app's environment.
 """
+import logging
 import os
 from pathlib import Path
 from typing import Optional, Dict
 from dotenv import load_dotenv, set_key, unset_key
+
+logger = logging.getLogger(__name__)
 
 
 class EnvService:
@@ -27,7 +30,6 @@ class EnvService:
         # Create .env file if it doesn't exist
         if not self.env_path.exists():
             self.env_path.touch()
-            print(f"Created new .env file at: {self.env_path}")
 
         # Load current environment variables
         self.reload_env()

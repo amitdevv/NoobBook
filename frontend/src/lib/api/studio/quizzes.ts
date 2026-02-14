@@ -6,6 +6,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-quizzes-api');
 
 /**
  * Quiz option (answer choice)
@@ -103,7 +106,7 @@ export const quizzesAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting quiz generation:', error);
+      log.error({ err: error }, 'failed to start quiz generation');
       throw error;
     }
   },
@@ -121,7 +124,7 @@ export const quizzesAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting quiz job status:', error);
+      log.error({ err: error }, 'failed to get quiz job status');
       throw error;
     }
   },
@@ -141,7 +144,7 @@ export const quizzesAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing quiz jobs:', error);
+      log.error({ err: error }, 'failed to list quiz jobs');
       throw error;
     }
   },

@@ -6,6 +6,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-social-posts-api');
 
 /**
  * Social post image info
@@ -106,7 +109,7 @@ export const socialPostsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting social post generation:', error);
+      log.error({ err: error }, 'failed to start social post generation');
       throw error;
     }
   },
@@ -124,7 +127,7 @@ export const socialPostsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting social post job status:', error);
+      log.error({ err: error }, 'failed to get social post job status');
       throw error;
     }
   },
@@ -142,7 +145,7 @@ export const socialPostsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing social post jobs:', error);
+      log.error({ err: error }, 'failed to list social post jobs');
       throw error;
     }
   },

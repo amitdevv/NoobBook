@@ -98,7 +98,6 @@ class ChatService:
 
         if response.data:
             chat = response.data[0]
-            print(f"Created chat: {title} (ID: {chat['id']})")
             return {
                 "id": chat["id"],
                 "title": chat["title"],
@@ -358,7 +357,6 @@ class ChatService:
         # Delete the chat (messages and signals cascade automatically)
         self.supabase.table(self.table).delete().eq("id", chat_id).eq("project_id", project_id).execute()
 
-        print(f"Deleted chat: {chat_id}")
         return True
 
     def sync_chat_to_index(self, project_id: str, chat_id: str) -> bool:

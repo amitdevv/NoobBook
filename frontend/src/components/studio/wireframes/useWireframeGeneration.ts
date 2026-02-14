@@ -8,6 +8,9 @@ import { useState } from 'react';
 import { wireframesAPI, type WireframeJob } from '@/lib/api/studio/wireframes';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('wireframe-generation');
 
 export const useWireframeGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -66,7 +69,7 @@ export const useWireframeGeneration = (projectId: string) => {
         showError(finalJob.error || 'Wireframe generation failed.');
       }
     } catch (error) {
-      console.error('Wireframe generation error:', error);
+      log.error({ err: error }, 'LWireframe generationE failed');
       showError(error instanceof Error ? error.message : 'Wireframe generation failed.');
     } finally {
       setIsGeneratingWireframe(false);

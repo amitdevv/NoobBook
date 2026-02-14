@@ -8,6 +8,9 @@
 
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-api');
 
 // Shared types
 export type JobStatus = 'pending' | 'processing' | 'ready' | 'error';
@@ -30,7 +33,7 @@ export async function checkGeminiStatus(): Promise<APIStatusResponse> {
     const response = await axios.get(`${API_BASE_URL}/studio/gemini/status`);
     return response.data;
   } catch (error) {
-    console.error('Error checking Gemini status:', error);
+    log.error({ err: error }, 'failed to check Gemini status');
     return { success: false, configured: false };
   }
 }

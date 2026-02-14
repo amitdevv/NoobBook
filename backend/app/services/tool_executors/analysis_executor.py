@@ -12,6 +12,7 @@ making it flexible for any analysis task.
 """
 
 import io
+import logging
 import uuid
 from typing import Dict, Any, Tuple
 
@@ -20,6 +21,8 @@ import numpy as np
 
 from app.utils.path_utils import get_raw_dir
 from app.services.integrations.supabase import storage_service
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisExecutor:
@@ -168,14 +171,13 @@ class AnalysisExecutor:
                         )
                         if result:
                             saved_plots.append(plot_filename)
-                            print(f"  Plot uploaded: {plot_filename}")
                         else:
-                            print(f"  ERROR: Plot upload failed: {plot_filename}")
+                            logger.error("Plot upload failed: %s", plot_filename)
                     else:
-                        print(f"  ERROR: Plot rendered empty: {plot_filename}")
+                        logger.error("Plot rendered empty: %s", plot_filename)
 
                 except Exception as save_error:
-                    print(f"  ERROR saving plot: {save_error}")
+                    logger.exception("Error saving plot")
 
             # Patch both plt.savefig and Figure.savefig
             plt.savefig = custom_savefig

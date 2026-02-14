@@ -13,6 +13,7 @@ Summary Strategy:
 
 The summary is stored in the source index under the 'summary' field.
 """
+import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -20,6 +21,8 @@ from app.services.integrations.claude import claude_service
 from app.services.integrations.supabase import storage_service
 from app.config import prompt_loader
 from app.utils import claude_parsing_utils
+
+logger = logging.getLogger(__name__)
 
 
 class SummaryService:
@@ -251,7 +254,7 @@ class SummaryService:
             pages_sent = total_pages
 
         if not content:
-            print(f"No content found for source {source_id}")
+            logger.warning("No content found for source %s", source_id[:8])
             return None
 
         # Build user message using template from config
@@ -279,7 +282,7 @@ class SummaryService:
             summary_text = claude_parsing_utils.extract_text(response).strip()
 
             if not summary_text:
-                print(f"Empty summary returned for source {source_id}")
+                logger.warning("Empty summary returned for source %s", source_id[:8])
                 return None
 
             return {
@@ -293,7 +296,7 @@ class SummaryService:
             }
 
         except Exception as e:
-            print(f"Error generating summary for source {source_id}: {e}")
+            logger.exception("Error generating summary for source %s", source_id[:8])
             return None
 
 

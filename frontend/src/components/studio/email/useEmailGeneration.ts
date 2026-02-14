@@ -8,6 +8,9 @@ import { useState, useRef } from 'react';
 import { emailsAPI, checkGeminiStatus, type EmailJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('email-generation');
 
 export const useEmailGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -31,7 +34,7 @@ export const useEmailGeneration = (projectId: string) => {
         setSavedEmailJobs(completedEmails);
       }
     } catch (error) {
-      console.error('Failed to load saved email jobs:', error);
+      log.error({ err: error }, 'failed to load saved email jobs');
     }
   };
 
@@ -89,7 +92,7 @@ export const useEmailGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Email template generation failed.');
       }
     } catch (error) {
-      console.error('Email template generation error:', error);
+      log.error({ err: error }, 'LEmail template generationE failed');
       showError(error instanceof Error ? error.message : 'Email template generation failed.');
     } finally {
       setIsGeneratingEmail(false);

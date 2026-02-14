@@ -11,6 +11,7 @@ Educational Note: This service implements a smart search strategy:
 The executor returns chunk_ids that Claude uses for citations.
 Citation format: [[cite:CHUNK_ID]] where CHUNK_ID = {source_id}_page_{page}_chunk_{n}
 """
+import logging
 from typing import Dict, Any, Optional, List
 from difflib import SequenceMatcher
 
@@ -18,6 +19,8 @@ from app.services.source_services import source_service
 from app.services.integrations.openai import openai_service
 from app.services.integrations.pinecone import pinecone_service
 from app.services.integrations.supabase import storage_service
+
+logger = logging.getLogger(__name__)
 
 
 class SourceSearchExecutor:
@@ -307,7 +310,7 @@ class SourceSearchExecutor:
         try:
             # Check if Pinecone is configured
             if not pinecone_service.is_configured():
-                print("Pinecone not configured, skipping semantic search")
+                logger.warning("Pinecone not configured, skipping semantic search")
                 return []
 
             # Create query embedding
@@ -341,7 +344,7 @@ class SourceSearchExecutor:
             return chunks
 
         except Exception as e:
-            print(f"Semantic search failed: {e}")
+            logger.exception("Semantic search failed for source %s", source_id)
             return []
 
     def _dedupe_results(

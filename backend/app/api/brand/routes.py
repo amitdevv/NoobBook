@@ -20,10 +20,13 @@ Configuration Sections:
 - feature_settings: Per-feature toggles for brand application
 """
 import io
+import logging
 from flask import request, jsonify, g, send_file
 from app.api.brand import brand_bp
 from app.services.data_services import brand_asset_service, brand_config_service
 from app.services.integrations.supabase import storage_service
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -320,7 +323,7 @@ def download_asset(asset_id: str):
         return send_file(io.BytesIO(data), mimetype=mimetype, as_attachment=False)
 
     except Exception as e:
-        print(f"[BrandAPI] Error downloading asset {asset_id}: {e}")
+        logger.exception("Failed to download brand asset %s", asset_id)
         return jsonify({
             "success": False,
             "error": "Failed to download brand asset"

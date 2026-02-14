@@ -9,9 +9,12 @@ The key difference from other executors is that business reports can analyze
 multiple CSV sources and incorporate context from non-CSV sources.
 """
 
+import logging
 from typing import Dict, Any, List
 import uuid
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class BusinessReportAgentExecutor:
@@ -89,7 +92,7 @@ class BusinessReportAgentExecutor:
         # Launch agent as background task
         def run_agent():
             """Background task to run the business report agent."""
-            print(f"[BusinessReportAgentExecutor] Starting agent for job {job_id[:8]}")
+            logger.info("Starting business report agent for job %s", job_id[:8])
             try:
                 business_report_agent_service.generate_business_report(
                     project_id=project_id,
@@ -102,9 +105,7 @@ class BusinessReportAgentExecutor:
                     focus_areas=focus_areas
                 )
             except Exception as e:
-                print(f"[BusinessReportAgentExecutor] Error in business report agent: {e}")
-                import traceback
-                traceback.print_exc()
+                logger.exception("Business report agent failed for job %s", job_id[:8])
                 # Update job on error
                 studio_index_service.update_business_report_job(
                     project_id, job_id,

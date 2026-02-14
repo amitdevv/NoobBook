@@ -5,6 +5,7 @@ Tool handlers extracted from email_agent_service.py for separation of concerns.
 Agent handles orchestration, executor handles tool-specific logic.
 """
 
+import logging
 import os
 import re
 from typing import Dict, Any, Tuple, List
@@ -14,6 +15,8 @@ from pathlib import Path
 from app.utils.path_utils import get_studio_dir
 from app.services.studio_services import studio_index_service
 from app.services.integrations.google import imagen_service
+
+logger = logging.getLogger(__name__)
 
 
 class EmailToolExecutor:
@@ -101,7 +104,6 @@ class EmailToolExecutor:
         template_type = tool_input.get("template_type")
         sections = tool_input.get("sections", [])
 
-        print(f"      Planning: {template_name}")
 
         result = (
             f"Template plan saved successfully. "
@@ -158,7 +160,6 @@ class EmailToolExecutor:
         image_prompt = tool_input.get("image_prompt", "")
         aspect_ratio = tool_input.get("aspect_ratio", "16:9")
 
-        print(f"      Generating image for: {section_name}")
 
         # Update status
         studio_index_service.update_email_job(
@@ -215,8 +216,6 @@ class EmailToolExecutor:
                 images=updated_images
             )
 
-            print(f"      Saved: {filename}")
-
             result_msg = (
                 f"Image generated successfully for '{section_name}'. "
                 f"Use placeholder '{image_info['placeholder']}' in your HTML code for this image."
@@ -231,7 +230,7 @@ class EmailToolExecutor:
                 f"Do NOT use placeholder '{placeholder}' in your HTML. "
                 f"Instead, use a CSS gradient or solid brand-color background for that section."
             )
-            print(f"      {error_msg}")
+            logger.exception("Email image generation failed for %s", section_name)
             return error_msg, None
 
     def _handle_write_code(
@@ -250,7 +249,6 @@ class EmailToolExecutor:
         subject_line = tool_input.get("subject_line_suggestion", "")
         preheader_text = tool_input.get("preheader_text", "")
 
-        print(f"      Writing HTML code ({len(html_code)} chars)")
 
         try:
             # Replace IMAGE_N placeholders with actual URLs
@@ -270,7 +268,7 @@ class EmailToolExecutor:
                 final_html
             )
             if stripped_count > 0:
-                print(f"      Removed {stripped_count} unreplaced IMAGE_N placeholder(s) from HTML")
+                logger.warning("Removed %s unreplaced IMAGE_N placeholder(s) from HTML", stripped_count)
 
             # Replace BRAND_LOGO placeholder with actual logo URL
             if logo_info:
@@ -294,15 +292,15 @@ class EmailToolExecutor:
                     if body_table_match:
                         insert_pos = body_table_match.end()
                         final_html = final_html[:insert_pos] + logo_img + final_html[insert_pos:]
-                        print(f"      Logo injected (agent omitted BRAND_LOGO placeholder)")
+                        logger.info("Logo injected (agent omitted BRAND_LOGO placeholder)")
                     else:
                         body_match = re.search(r'(<body[^>]*>)', final_html, re.IGNORECASE)
                         if body_match:
                             insert_pos = body_match.end()
                             final_html = final_html[:insert_pos] + logo_img + final_html[insert_pos:]
-                            print(f"      Logo injected after <body> (no 600px table found)")
+                            logger.info("Logo injected after <body> (no 600px table found)")
                         else:
-                            print(f"      WARNING: Could not inject brand logo — no <body> or 600px table found")
+                            logger.warning("Could not inject brand logo — no <body> or 600px table found")
 
             # Save HTML file
             studio_dir = get_studio_dir(project_id)
@@ -314,8 +312,6 @@ class EmailToolExecutor:
 
             with open(html_path, "w", encoding="utf-8") as f:
                 f.write(final_html)
-
-            print(f"      Saved: {html_filename}")
 
             # Get job info for template_name
             job = studio_index_service.get_email_job(project_id, job_id)
@@ -359,7 +355,7 @@ class EmailToolExecutor:
 
         except Exception as e:
             error_msg = f"Error saving HTML code: {str(e)}"
-            print(f"      {error_msg}")
+            logger.exception("Failed to save email HTML")
 
             studio_index_service.update_email_job(
                 project_id, job_id,

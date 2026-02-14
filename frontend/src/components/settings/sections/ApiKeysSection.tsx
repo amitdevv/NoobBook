@@ -28,6 +28,9 @@ import {
 import { settingsAPI } from '@/lib/api/settings';
 import type { ApiKey } from '@/lib/api/settings';
 import { useToast } from '@/components/ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('api-keys-section');
 
 interface ValidationState {
   [key: string]: {
@@ -58,7 +61,7 @@ export const ApiKeysSection: React.FC = () => {
       setApiKeys(keys);
       setModifiedKeys({});
     } catch (err) {
-      console.error('Failed to load API keys:', err);
+      log.error({ err }, 'failed to load API keys');
       error('Failed to load API keys');
     } finally {
       setLoading(false);
@@ -89,7 +92,7 @@ export const ApiKeysSection: React.FC = () => {
       ));
       success('API key deleted successfully');
     } catch (err) {
-      console.error('Failed to delete API key:', err);
+      log.error({ err }, 'failed to delete API key');
       error('Failed to delete API key');
     }
   };

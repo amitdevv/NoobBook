@@ -32,6 +32,9 @@ import { Input } from '../ui/input';
 import { chatsAPI, type PromptConfig } from '../../lib/api/chats';
 import { projectsAPI, type CostTracking, type MemoryData } from '../../lib/api';
 import { useToast, ToastContainer } from '../ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('project-header');
 
 /**
  * ProjectHeader Component
@@ -111,7 +114,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
         setCosts(response.data.costs);
       }
     } catch (err) {
-      console.error('Error loading costs:', err);
+      log.error({ err }, 'failed to load costs');
       // Silently fail - costs are not critical
     }
   };
@@ -128,7 +131,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
         setMemory(response.data.memory);
       }
     } catch (err) {
-      console.error('Error loading memory:', err);
+      log.error({ err }, 'failed to load memory');
       error('Failed to load memory');
     } finally {
       setLoadingMemory(false);
@@ -154,7 +157,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
       const prompts = await chatsAPI.getAllPrompts();
       setAllPrompts(prompts);
     } catch (err) {
-      console.error('Error loading prompts:', err);
+      log.error({ err }, 'failed to load prompts');
       error('Failed to load prompts');
     } finally {
       setLoadingPrompts(false);
@@ -234,7 +237,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
       await onRename(trimmed);
       setRenameDialogOpen(false);
     } catch (err) {
-      console.error('Error renaming project:', err);
+      log.error({ err }, 'failed to rename project');
       error('Failed to rename project');
     } finally {
       setRenaming(false);
@@ -242,8 +245,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   };
 
   const handleNewProject = () => {
-    console.log('Creating new project...');
-    // For now, just navigate back to project list
+    // Navigate back to project list
     onBack();
   };
 

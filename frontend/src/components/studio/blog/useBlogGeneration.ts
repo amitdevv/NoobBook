@@ -9,6 +9,9 @@ import { blogsAPI, type BlogJob, type BlogType } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('blog-generation');
 
 // Extend StudioSignal for blog-specific fields
 interface BlogSignal extends StudioSignal {
@@ -79,7 +82,7 @@ export const useBlogGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Blog post generation failed.');
       }
     } catch (error) {
-      console.error('Blog post generation error:', error);
+      log.error({ err: error }, 'LBlog post generationE failed');
       showError(error instanceof Error ? error.message : 'Blog post generation failed.');
     } finally {
       setIsGeneratingBlog(false);

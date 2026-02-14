@@ -9,10 +9,13 @@ Infographics are visual summaries that organize information in an
 educational, easy-to-scan format with icons, sections, and visual flow.
 """
 import json
+import logging
 from typing import Dict, Any
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
+
+logger = logging.getLogger(__name__)
 from app.services.integrations.google.imagen_service import imagen_service
 from app.services.source_services import source_index_service
 from app.services.studio_services import studio_index_service
@@ -128,8 +131,6 @@ class InfographicService:
             started_at=datetime.now().isoformat()
         )
 
-        print(f"[Infographic] Starting job {job_id}")
-
         try:
             # Get source metadata
             source = source_index_service.get_source_from_index(project_id, source_id)
@@ -137,7 +138,6 @@ class InfographicService:
                 raise ValueError(f"Source {source_id} not found")
 
             source_name = source.get("name", "Unknown")
-            print(f"  Source: {source_name}")
 
             # Get source content
             content = self._get_source_content(project_id, source_id)
@@ -163,9 +163,6 @@ class InfographicService:
             topic_title = prompt_result.get("topic_title", "Infographic")
             topic_summary = prompt_result.get("topic_summary", "")
             key_sections = prompt_result.get("key_sections", [])
-
-            print(f"  Topic: {topic_title}")
-            print(f"  Sections: {len(key_sections)}")
 
             # Step 2: Generate image with Gemini
             studio_index_service.update_infographic_job(
@@ -219,7 +216,7 @@ class InfographicService:
                 completed_at=datetime.now().isoformat()
             )
 
-            print(f"  Generated infographic in {duration:.1f}s")
+            logger.info("Generated infographic in %.1fs", duration)
 
             return {
                 "success": True,
@@ -234,7 +231,7 @@ class InfographicService:
             }
 
         except Exception as e:
-            print(f"[Infographic] Error: {e}")
+            logger.exception("Infographic generation failed")
             studio_index_service.update_infographic_job(
                 project_id, job_id,
                 status="error",

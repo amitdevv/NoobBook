@@ -29,11 +29,14 @@ Migration Note (2026-01):
     enabling proper multi-user support with isolated Google Drive connections.
 """
 
+import logging
 import os
 from datetime import datetime
 from typing import Dict, Any, Optional, Tuple
 
 from google.oauth2.credentials import Credentials
+
+logger = logging.getLogger(__name__)
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 
@@ -118,7 +121,7 @@ class GoogleAuthService:
                 return result.data[0]["id"]
             return None
         except Exception as e:
-            print(f"Error getting default user: {e}")
+            logger.error("Error getting default user: %s", e)
             return None
 
     def is_configured(self) -> bool:
@@ -301,7 +304,7 @@ class GoogleAuthService:
                 creds.refresh(Request())
                 self._save_credentials(creds, effective_user_id)
             except Exception as e:
-                print(f"Failed to refresh Google credentials: {e}")
+                logger.warning("Failed to refresh Google credentials: %s", e)
                 return None
 
         return creds if creds.valid else None
@@ -345,7 +348,7 @@ class GoogleAuthService:
                 scopes=token_data.get('scopes')
             )
         except Exception as e:
-            print(f"Error loading Google credentials: {e}")
+            logger.error("Error loading Google credentials: %s", e)
             return None
 
     def _save_credentials(self, credentials: Credentials, user_id: str) -> None:
@@ -379,7 +382,7 @@ class GoogleAuthService:
                 {"google_tokens": token_data}
             ).eq("id", user_id).execute()
         except Exception as e:
-            print(f"Error saving Google credentials to Supabase: {e}")
+            logger.error("Error saving Google credentials to Supabase: %s", e)
             raise
 
     def _get_user_email(self, credentials: Credentials) -> Optional[str]:
@@ -404,7 +407,7 @@ class GoogleAuthService:
             about = service.about().get(fields='user(emailAddress)').execute()
             return about.get('user', {}).get('emailAddress')
         except Exception as e:
-            print(f"Failed to get user email: {e}")
+            logger.warning("Failed to get user email: %s", e)
             return None
 
 

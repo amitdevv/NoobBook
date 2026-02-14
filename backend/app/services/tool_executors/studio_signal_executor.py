@@ -10,11 +10,14 @@ identifies opportunities to activate studio generation options. The flow is:
 
 Signals are stored in the studio_signals table and linked to the chat.
 """
+import logging
 import uuid
 from datetime import datetime
 from typing import Dict, Any, List
 
 from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+
+logger = logging.getLogger(__name__)
 
 
 class StudioSignalExecutor:
@@ -65,7 +68,7 @@ class StudioSignalExecutor:
         for signal in signals:
             studio_item = signal.get("studio_item")
             if studio_item not in valid_items:
-                print(f"Invalid studio_item: {studio_item}, skipping")
+                logger.warning("Invalid studio_item: %s, skipping", studio_item)
                 continue
 
             # Build base signal
@@ -108,7 +111,7 @@ class StudioSignalExecutor:
         # with the main chat service which also reads/writes the chat file.
         # Signal storage is fast (just appending to JSON) so no need for background.
         activated = [s["studio_item"] for s in valid_signals]
-        print(f"Storing {len(valid_signals)} studio signals: {activated}")
+        logger.info("Storing %s studio signals: %s", len(valid_signals), activated)
 
         store_result = self._store_signals(
             project_id=project_id,
@@ -180,19 +183,16 @@ class StudioSignalExecutor:
                     "status": "pending"
                 }
 
-                print(f"Inserting studio signal: {signal_data}")
-
                 try:
                     response = client.table("studio_signals").insert(signal_data).execute()
                     if response.data:
                         inserted_count += 1
-                        print(f"Successfully inserted signal: {response.data}")
                     else:
-                        print(f"No data returned from insert")
+                        logger.warning("No data returned from studio signal insert")
                 except Exception as insert_error:
-                    print(f"Error inserting signal: {insert_error}")
+                    logger.error("Error inserting studio signal: %s", insert_error)
 
-            print(f"Stored {inserted_count} studio signals for chat {chat_id}")
+            logger.info("Stored %s studio signals for chat %s", inserted_count, chat_id)
 
             return {
                 "success": True,
@@ -200,7 +200,7 @@ class StudioSignalExecutor:
             }
 
         except Exception as e:
-            print(f"Error storing studio signals: {e}")
+            logger.exception("Failed to store studio signals")
             return {
                 "success": False,
                 "error": str(e)

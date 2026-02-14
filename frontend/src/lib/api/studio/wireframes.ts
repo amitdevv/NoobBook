@@ -8,6 +8,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-wireframes-api');
 
 /**
  * Excalidraw element from the API
@@ -111,7 +114,7 @@ export const wireframesAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting wireframe generation:', error);
+      log.error({ err: error }, 'failed to start wireframe generation');
       throw error;
     }
   },
@@ -129,7 +132,7 @@ export const wireframesAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting wireframe job status:', error);
+      log.error({ err: error }, 'failed to get wireframe job status');
       throw error;
     }
   },
@@ -149,7 +152,7 @@ export const wireframesAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing wireframe jobs:', error);
+      log.error({ err: error }, 'failed to list wireframe jobs');
       throw error;
     }
   },
@@ -178,7 +181,7 @@ export const wireframesAPI = {
       // Handle initial 404s with retry tolerance
       if (!response.success || !response.job) {
         if (initialRetries < maxInitialRetries) {
-          console.log(`Wireframe job not found yet, retrying... (${initialRetries + 1}/${maxInitialRetries})`);
+          log.debug(`wireframe job not found yet, retrying (${initialRetries + 1}/${maxInitialRetries})`);
           initialRetries++;
           await new Promise((resolve) => setTimeout(resolve, 500));
           continue;

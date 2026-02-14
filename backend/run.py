@@ -5,10 +5,13 @@ Educational Note: This file creates and runs the Flask application.
 We keep it separate from the app factory to maintain clean separation
 of concerns and make testing easier.
 """
+import logging
 import os
 import shutil
 from pathlib import Path
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 
 def clear_pycache():
@@ -33,10 +36,10 @@ def clear_pycache():
             shutil.rmtree(pycache_dir)
             pycache_count += 1
         except Exception as e:
-            print(f"Warning: Could not delete {pycache_dir}: {e}")
+            logger.warning("Could not delete %s: %s", pycache_dir, e)
 
     if pycache_count > 0:
-        print(f"Cleared {pycache_count} __pycache__ folders")
+        logger.debug("Cleared %s __pycache__ folders", pycache_count)
 
 
 # Clear pycache on startup
@@ -64,17 +67,7 @@ if __name__ == '__main__':
     port = int(os.getenv('PORT', 5001))
     debug = config_name == 'development'
 
-    print(f"""
-    ========================================
-         NoobBook Backend Server
-    ========================================
-      Running on: http://localhost:{port}
-      Environment: {config_name}
-      Debug Mode: {debug}
-    ========================================
-
-    Press CTRL+C to stop the server
-    """)
+    logger.info("NoobBook Backend Server — http://localhost:%s (%s, debug=%s)", port, config_name, debug)
 
     # Run with SocketIO for WebSocket support
     socketio.run(

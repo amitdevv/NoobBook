@@ -19,11 +19,14 @@ How it works:
 
 Storage: Supabase background_tasks table
 """
+import logging
 import uuid
 import threading
 from concurrent.futures import ThreadPoolExecutor, Future
 from datetime import datetime, timedelta
 from typing import Dict, Any, Callable, Optional, List
+
+logger = logging.getLogger(__name__)
 
 
 def _get_supabase():
@@ -87,9 +90,9 @@ class TaskService:
             )
 
             if response.data:
-                print(f"Marked {len(response.data)} stale tasks as failed")
+                logger.info("Marked %s stale tasks as failed", len(response.data))
         except Exception as e:
-            print(f"Error cleaning up stale tasks: {e}")
+            logger.error("Failed to clean up stale tasks: %s", e)
 
     def submit_task(
         self,
@@ -133,19 +136,16 @@ class TaskService:
             supabase = _get_supabase()
             supabase.table(self.TABLE).insert(task_record).execute()
         except Exception as e:
-            print(f"Error creating task record: {e}")
+            logger.error("Failed to create task record: %s", e)
 
         # Wrapper function that handles status updates
         def task_wrapper():
             try:
-                print(f"DEBUG task_wrapper: Starting task {task_id}", flush=True)
                 # Update status to running
                 self._update_task(task_id, status="running", started_at=datetime.now().isoformat())
 
-                print(f"DEBUG task_wrapper: Executing callable for task {task_id}", flush=True)
                 # Execute the actual task
                 result = callable_func(*args, **kwargs)
-                print(f"DEBUG task_wrapper: Task {task_id} completed with result", flush=True)
 
                 # Update status to completed
                 self._update_task(
@@ -159,16 +159,13 @@ class TaskService:
 
             except Exception as e:
                 # Update status to failed
-                print(f"DEBUG task_wrapper: Task {task_id} EXCEPTION: {e}", flush=True)
-                import traceback
-                traceback.print_exc()
+                logger.exception("Task %s failed", task_id)
                 self._update_task(
                     task_id,
                     status="failed",
                     error_message=str(e),
                     completed_at=datetime.now().isoformat()
                 )
-                print(f"Task {task_id} failed: {e}", flush=True)
 
             finally:
                 # Remove from futures tracking
@@ -180,7 +177,7 @@ class TaskService:
         future = self._executor.submit(task_wrapper)
         self._futures[task_id] = future
 
-        print(f"Task submitted: {task_id} ({task_type} for {target_id})")
+        logger.info("Task submitted: %s (%s for %s)", task_id, task_type, target_id)
 
         return task_id
 
@@ -190,7 +187,7 @@ class TaskService:
             supabase = _get_supabase()
             supabase.table(self.TABLE).update(updates).eq("id", task_id).execute()
         except Exception as e:
-            print(f"Error updating task {task_id}: {e}")
+            logger.error("Failed to update task %s: %s", task_id, e)
 
     def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get a task's current status from Supabase."""
@@ -209,7 +206,7 @@ class TaskService:
                 return task
             return None
         except Exception as e:
-            print(f"Error getting task {task_id}: {e}")
+            logger.error("Failed to get task %s: %s", task_id, e)
             return None
 
     def get_tasks_for_target(self, target_id: str) -> List[Dict[str, Any]]:
@@ -228,7 +225,7 @@ class TaskService:
                 task["type"] = task.get("task_type", "")
             return tasks
         except Exception as e:
-            print(f"Error getting tasks for target {target_id}: {e}")
+            logger.error("Failed to get tasks for target %s: %s", target_id, e)
             return []
 
     def cancel_task(self, task_id: str) -> bool:
@@ -259,9 +256,7 @@ class TaskService:
         # Try to cancel the future if it hasn't started yet
         future = self._futures.get(task_id)
         if future:
-            cancelled = future.cancel()
-            if cancelled:
-                print(f"Task {task_id} cancelled before it started")
+            future.cancel()
 
         # Update task status in Supabase
         self._update_task(
@@ -271,7 +266,6 @@ class TaskService:
             completed_at=datetime.now().isoformat()
         )
 
-        print(f"Task {task_id} cancellation requested")
         return True
 
     def is_cancelled(self, task_id: str) -> bool:
@@ -365,11 +359,10 @@ class TaskService:
                 remaining = supabase.table(self.TABLE).select("id").execute()
                 remaining_ids = {t["id"] for t in (remaining.data or [])}
                 self._cancelled_tasks = self._cancelled_tasks.intersection(remaining_ids)
-                print(f"Cleaned up {removed_count} old tasks")
 
             return removed_count
         except Exception as e:
-            print(f"Error cleaning up old tasks: {e}")
+            logger.error("Failed to clean up old tasks: %s", e)
             return 0
 
     def shutdown(self, wait: bool = True) -> None:
@@ -379,9 +372,9 @@ class TaskService:
         Args:
             wait: If True, wait for running tasks to complete
         """
-        print("Shutting down task service...")
+        logger.info("Shutting down task service...")
         self._executor.shutdown(wait=wait)
-        print("Task service shutdown complete")
+        logger.info("Task service shutdown complete")
 
 
 # Singleton instance

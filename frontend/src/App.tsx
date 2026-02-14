@@ -6,6 +6,9 @@ import { ProjectWorkspace } from './components/project';
 import { projectsAPI } from './lib/api';
 import { AuthPage } from './components/auth/AuthPage';
 import { authAPI } from './lib/api/auth';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('app');
 
 /**
  * Main App Component for NoobBook
@@ -60,8 +63,7 @@ function AppContent({
 }: AppContentProps) {
   const navigate = useNavigate();
 
-  const handleProjectCreated = (project: Project) => {
-    console.log('Project created/updated:', project);
+  const handleProjectCreated = (_project: Project) => {
     setShowCreateDialog(false);
     setRefreshTrigger(prev => prev + 1);
   };
@@ -126,7 +128,7 @@ function ProjectWorkspaceRoute({
         const response = await projectsAPI.get(projectId);
         setProject(response.data.project);
       } catch (error) {
-        console.error('Failed to load project:', error);
+        log.error({ err: error }, 'failed to load project');
         navigate('/');
       } finally {
         setLoading(false);
@@ -142,7 +144,7 @@ function ProjectWorkspaceRoute({
       setRefreshTrigger(prev => prev + 1);
       navigate('/');
     } catch (error) {
-      console.error('Failed to delete project:', error);
+      log.error({ err: error }, 'failed to delete project');
     }
   };
 
@@ -196,7 +198,7 @@ function App() {
       setUserEmail(res?.user?.email || null);
       setUserRole(res?.user?.role || 'user');
     } catch (err) {
-      console.error('Auth check failed:', err);
+      log.error({ err }, 'auth check failed');
       setAuthRequired(false);
       setIsAuthenticated(false);
       setIsAdmin(false);

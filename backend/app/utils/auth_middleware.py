@@ -15,12 +15,15 @@ window is safe — even if a token is revoked, the cache expires quickly.
 Pattern: Decorator-based auth, similar to Flask-Login but using Supabase JWTs.
 """
 import functools
+import logging
 import time
 import threading
 from typing import Optional, Dict, Tuple
 
 from flask import request, jsonify, g
 from app.services.integrations.supabase import get_supabase
+
+logger = logging.getLogger(__name__)
 
 # ─── Token Validation Cache ─────────────────────────────────────────────────
 # Educational Note: Without caching, every API request triggers an HTTP call
@@ -98,7 +101,7 @@ def validate_token() -> Optional[str]:
         token = request.args.get('token', '')
 
     if not token:
-        print(f"[Auth] No token found (header={bool(auth_header)}, query={bool(request.args.get('token'))})")
+        logger.warning("No auth token found (header=%s, query=%s)", bool(auth_header), bool(request.args.get('token')))
         return None
 
     # Check cache first — avoids redundant Supabase Auth calls
@@ -111,14 +114,14 @@ def validate_token() -> Optional[str]:
         user_response = supabase.auth.get_user(token)
 
         if not user_response or not user_response.user:
-            print(f"[Auth] get_user returned no user (response={user_response})")
+            logger.warning("Auth get_user returned no user")
             return None
 
         user_id = str(user_response.user.id)
         _cache_token(token, user_id)
         return user_id
     except Exception as e:
-        print(f"[Auth] Token validation exception: {type(e).__name__}: {e}")
+        logger.warning("Token validation failed: %s: %s", type(e).__name__, e)
         return None
 
 

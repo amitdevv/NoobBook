@@ -4,10 +4,13 @@ Google Video Service - Integration with Google Veo 2.0 for video generation.
 Educational Note: This is a thin wrapper around Google's Veo API.
 The service handles video generation requests and file downloads.
 """
+import logging
 import os
 import time
 import tempfile
 from typing import Dict, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class GoogleVideoService:
@@ -90,7 +93,7 @@ class GoogleVideoService:
                 person_generation=person_generation,
             )
 
-            print(f"[VideoService] Starting video generation (bytes): {prompt[:50]}...")
+            logger.info("Starting video generation: %s...", prompt[:50])
             operation = client.models.generate_videos(
                 model=self.MODEL,
                 prompt=prompt,
@@ -110,7 +113,6 @@ class GoogleVideoService:
                     }
 
                 progress_msg = f"Generating video... (check {poll_count})"
-                print(f"[VideoService] {progress_msg}")
 
                 if on_progress:
                     on_progress(progress_msg)
@@ -126,14 +128,13 @@ class GoogleVideoService:
             if not generated_videos:
                 return {"success": False, "error": "No videos were generated"}
 
-            print(f"[VideoService] Generated {len(generated_videos)} video(s)")
+            logger.info("Generated %s video(s)", len(generated_videos))
             video_files = []
 
             # Save to temp directory and read bytes back
             with tempfile.TemporaryDirectory() as tmp_dir:
                 for idx, generated_video in enumerate(generated_videos):
                     video_uri = generated_video.video.uri
-                    print(f"[VideoService] Downloading: {video_uri}")
 
                     client.files.download(file=generated_video.video)
 
@@ -143,8 +144,6 @@ class GoogleVideoService:
 
                     with open(tmp_path, 'rb') as f:
                         video_bytes = f.read()
-
-                    print(f"[VideoService] Read {len(video_bytes)} bytes for {filename}")
 
                     video_files.append({
                         "filename": filename,
@@ -160,9 +159,7 @@ class GoogleVideoService:
             }
 
         except Exception as e:
-            print(f"[VideoService] Error: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.exception("Video generation error")
             return {"success": False, "error": str(e)}
 
 

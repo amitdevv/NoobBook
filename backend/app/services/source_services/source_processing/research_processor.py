@@ -12,6 +12,7 @@ Storage: Processed content is stored in Supabase Storage. Chunks are also
 stored in Supabase Storage for RAG retrieval.
 """
 import json
+import logging
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +23,8 @@ from app.utils.embedding_utils import needs_embedding, count_tokens
 from app.services.integrations.supabase import storage_service
 from app.services.ai_services.embedding_service import embedding_service
 from app.services.ai_services.summary_service import summary_service
+
+logger = logging.getLogger(__name__)
 
 
 def process_research(
@@ -60,9 +63,7 @@ def process_research(
 
     source_name = source.get("name", topic)
 
-    print(f"Starting deep research for: {topic}")
-    print(f"Description: {description[:100]}...")
-    print(f"Reference links: {len(links)}")
+    logger.info("Starting deep research for: %s", topic)
 
     # Use temp file for agent output
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
@@ -97,10 +98,10 @@ def process_research(
 
         segments_written = research_result.get("segments_written", 0)
         iterations = research_result.get("iterations", 0)
-        print(f"Research complete: {len(research_content)} chars, {segments_written} segments, {iterations} iterations")
+        logger.info("Research complete: %s chars, %s segments, %s iterations", len(research_content), segments_written, iterations)
 
     except Exception as e:
-        print(f"Research agent error: {e}")
+        logger.exception("Research agent failed for topic: %s", topic)
         # Clean up temp file
         if temp_path.exists():
             temp_path.unlink()
@@ -190,7 +191,6 @@ def process_research(
         summary_info=summary_info if summary_info else None
     )
 
-    print(f"Research source ready: {source_name}")
     return {"success": True, "status": "ready"}
 
 
@@ -214,7 +214,7 @@ def _process_embeddings(
 
         # Update status to "embedding" before starting
         source_service.update_source(project_id, source_id, status="embedding")
-        print(f"Starting embedding for research: {source_name} ({reason})")
+        logger.info("Starting embedding for %s (%s)", source_name, reason)
 
         # Process embeddings using the embedding service
         # Chunks are automatically uploaded to Supabase Storage
@@ -226,7 +226,7 @@ def _process_embeddings(
         )
 
     except Exception as e:
-        print(f"Error processing embeddings for research {source_id}: {e}")
+        logger.exception("Embedding failed for source %s", source_id)
         return {
             "is_embedded": False,
             "embedded_at": None,
@@ -243,16 +243,14 @@ def _generate_summary(
 ) -> Dict[str, Any]:
     """Generate a summary for a processed research source."""
     try:
-        print(f"Generating summary for research source: {source_id}")
         result = summary_service.generate_summary(
             project_id=project_id,
             source_id=source_id,
             source_metadata=source_metadata
         )
         if result:
-            print(f"Summary generated for research {source_id}: {len(result.get('summary', ''))} chars")
             return result
         return {}
     except Exception as e:
-        print(f"Error generating summary for research {source_id}: {e}")
+        logger.exception("Summary generation failed for source %s", source_id)
         return {}

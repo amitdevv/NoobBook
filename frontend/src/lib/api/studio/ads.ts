@@ -6,6 +6,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-ads-api');
 
 /**
  * Ad creative image info
@@ -90,7 +93,7 @@ export const adsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting ad generation:', error);
+      log.error({ err: error }, 'failed to start ad generation');
       throw error;
     }
   },
@@ -108,7 +111,7 @@ export const adsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting ad job status:', error);
+      log.error({ err: error }, 'failed to get ad job status');
       throw error;
     }
   },
@@ -126,7 +129,7 @@ export const adsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing ad jobs:', error);
+      log.error({ err: error }, 'failed to list ad jobs');
       throw error;
     }
   },

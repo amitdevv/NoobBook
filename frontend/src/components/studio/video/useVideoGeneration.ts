@@ -10,6 +10,9 @@ import { videosAPI, type VideoJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('video-generation');
 
 export const useVideoGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -31,7 +34,7 @@ export const useVideoGeneration = (projectId: string) => {
         setSavedVideoJobs(completedVideos);
       }
     } catch (error) {
-      console.error('Failed to load saved video jobs:', error);
+      log.error({ err: error }, 'failed to load saved video jobs');
     }
   };
 
@@ -87,7 +90,7 @@ export const useVideoGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Video generation failed');
       }
     } catch (error) {
-      console.error('Video generation error:', error);
+      log.error({ err: error }, 'LVideo generationE failed');
       showError('Video generation failed');
     } finally {
       setIsGeneratingVideo(false);

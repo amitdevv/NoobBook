@@ -19,6 +19,9 @@ import { ChatInput } from './ChatInput';
 import { ChatList } from './ChatList';
 import { ChatEmptyState } from './ChatEmptyState';
 import { exportChatAsMarkdown } from '@/lib/exportChatMarkdown';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('chat-panel');
 
 interface ChatPanelProps {
   projectId: string;
@@ -77,7 +80,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
       const data = await sourcesAPI.listSources(projectId);
       setSources(data);
     } catch (err) {
-      console.error('Error loading sources:', err);
+      log.error({ err }, 'failed to Lloading sourcesE');
     }
   };
 
@@ -89,7 +92,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
       const chat = await chatsAPI.getChat(projectId, chatId);
       setActiveChat(chat);
     } catch (err) {
-      console.error('Error loading chat:', err);
+      log.error({ err }, 'failed to Lloading chatE');
       error('Failed to load chat');
     }
   };
@@ -108,7 +111,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
         await loadFullChat(chats[0].id);
       }
     } catch (err) {
-      console.error('Error loading chats:', err);
+      log.error({ err }, 'failed to Lloading chatsE');
       error('Failed to load chats');
     } finally {
       setLoading(false);
@@ -234,7 +237,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
         }
       }, 4000);
     } catch (err) {
-      console.error('Error sending message:', err);
+      log.error({ err }, 'failed to Lsending messageE');
       error('Failed to send message');
       // Remove the optimistic message on error
       setActiveChat((prev) => {
@@ -260,7 +263,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
       setShowChatList(false);
       success('New chat created');
     } catch (err) {
-      console.error('Error creating chat:', err);
+      log.error({ err }, 'failed to Lcreating chatE');
       error('Failed to create chat');
     }
   };
@@ -288,7 +291,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
       await loadChats();
       success('Chat deleted');
     } catch (err) {
-      console.error('Error deleting chat:', err);
+      log.error({ err }, 'failed to Ldeleting chatE');
       error('Failed to delete chat');
     }
   };
@@ -308,7 +311,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
 
       success('Chat renamed');
     } catch (err) {
-      console.error('Error renaming chat:', err);
+      log.error({ err }, 'failed to Lrenaming chatE');
       error('Failed to rename chat');
     }
   };
@@ -334,7 +337,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
       await exportChatAsMarkdown({ chat: activeChat, projectId, projectName });
       success('Chat exported as Markdown');
     } catch (err) {
-      console.error('Error exporting chat:', err);
+      log.error({ err }, 'failed to Lexporting chatE');
       error('Failed to export chat');
     } finally {
       setExportingChat(false);

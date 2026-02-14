@@ -4,9 +4,12 @@ VEO (Video Generation) API key validator.
 Educational Note: Validates API keys for VEO 2.0 video generation model
 by starting a minimal video generation request.
 """
+import logging
 from typing import Tuple
 from google import genai
 from google.genai import types
+
+logger = logging.getLogger(__name__)
 
 
 def validate_veo_key(api_key: str) -> Tuple[bool, str]:
@@ -67,5 +70,5 @@ def validate_veo_key(api_key: str) -> Tuple[bool, str]:
         elif 'rate' in error_message:
             return True, "Valid API key (rate limited)"
         else:
-            print(f"VEO validation error: {type(e).__name__}: {str(e)}")
+            logger.error("VEO validation error: %s: %s", type(e).__name__, e)
             return False, f"Validation failed: {str(e)[:100]}"

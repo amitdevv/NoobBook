@@ -8,6 +8,9 @@ import { useState } from 'react';
 import { mindMapsAPI, type MindMapJob } from '@/lib/api/studio';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('mind-map-generation');
 
 export const useMindMapGeneration = (projectId: string) => {
   const { success: showSuccess, error: showError } = useToast();
@@ -66,7 +69,7 @@ export const useMindMapGeneration = (projectId: string) => {
         showError(finalJob.error || 'Mind map generation failed.');
       }
     } catch (error) {
-      console.error('Mind map generation error:', error);
+      log.error({ err: error }, 'LMind map generationE failed');
       showError(error instanceof Error ? error.message : 'Mind map generation failed.');
     } finally {
       setIsGeneratingMindMap(false);

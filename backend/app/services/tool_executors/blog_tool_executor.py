@@ -6,12 +6,15 @@ Executes: plan_blog_post, generate_blog_image, write_blog_post
 All files (markdown + images) are stored in Supabase Storage.
 """
 
+import logging
 from typing import Dict, Any, List, Tuple
 from datetime import datetime
 
 from app.services.integrations.google import imagen_service
 from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
+
+logger = logging.getLogger(__name__)
 
 
 class BlogToolExecutor:
@@ -68,7 +71,7 @@ class BlogToolExecutor:
         title = tool_input.get("title", "Untitled Blog Post")
         outline = tool_input.get("outline", [])
 
-        print(f"      Planning: {title[:50]}...")
+        logger.info("Blog planned: %s", title[:50])
 
         studio_index_service.update_blog_job(
             project_id, job_id,
@@ -100,7 +103,6 @@ class BlogToolExecutor:
         alt_text = tool_input.get("alt_text", "Blog image")
         aspect_ratio = tool_input.get("aspect_ratio", "16:9")
 
-        print(f"      Generating image for: {purpose}")
 
         studio_index_service.update_blog_job(
             project_id, job_id,
@@ -158,13 +160,11 @@ class BlogToolExecutor:
                 images=generated_images
             )
 
-            print(f"      Uploaded: {filename}")
-
             return f"Image generated successfully for '{purpose}'. Use placeholder 'IMAGE_{image_index}' in your markdown: ![{alt_text}](IMAGE_{image_index})"
 
         except Exception as e:
             error_msg = f"Error generating image for {purpose}: {str(e)}"
-            print(f"      {error_msg}")
+            logger.exception("Blog image generation failed for %s", purpose)
             return error_msg
 
     def _execute_write_blog(
@@ -184,7 +184,6 @@ class BlogToolExecutor:
         seo_notes = tool_input.get("seo_notes", "")
         generated_images = context["generated_images"]
 
-        print(f"      Writing markdown ({len(markdown_content)} chars, ~{word_count} words)")
 
         try:
             # Replace IMAGE_N placeholders with actual URLs
@@ -211,8 +210,6 @@ class BlogToolExecutor:
 
             # Use backend API path instead of Supabase internal URL
             markdown_url = f"/api/v1/projects/{project_id}/studio/blogs/{job_id}/{markdown_filename}"
-
-            print(f"      Uploaded: {markdown_filename}")
 
             # Get job info for title
             job = studio_index_service.get_blog_job(project_id, job_id)
@@ -256,7 +253,7 @@ class BlogToolExecutor:
 
         except Exception as e:
             error_msg = f"Error saving blog post: {str(e)}"
-            print(f"      {error_msg}")
+            logger.exception("Failed to save blog post")
 
             studio_index_service.update_blog_job(
                 project_id, job_id,

@@ -7,6 +7,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-components-api');
 
 /**
  * Component variation info
@@ -110,7 +113,7 @@ export const componentsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting component generation:', error);
+      log.error({ err: error }, 'failed to start component generation');
       throw error;
     }
   },
@@ -128,7 +131,7 @@ export const componentsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting component job status:', error);
+      log.error({ err: error }, 'failed to get component job status');
       throw error;
     }
   },
@@ -148,7 +151,7 @@ export const componentsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing component jobs:', error);
+      log.error({ err: error }, 'failed to list component jobs');
       throw error;
     }
   },

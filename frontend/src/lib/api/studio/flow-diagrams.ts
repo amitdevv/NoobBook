@@ -7,6 +7,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-flow-diagrams-api');
 
 /**
  * Mermaid diagram types supported
@@ -98,7 +101,7 @@ export const flowDiagramsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting flow diagram generation:', error);
+      log.error({ err: error }, 'failed to start flow diagram generation');
       throw error;
     }
   },
@@ -116,7 +119,7 @@ export const flowDiagramsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting flow diagram job status:', error);
+      log.error({ err: error }, 'failed to get flow diagram job status');
       throw error;
     }
   },
@@ -136,7 +139,7 @@ export const flowDiagramsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing flow diagram jobs:', error);
+      log.error({ err: error }, 'failed to list flow diagram jobs');
       throw error;
     }
   },
@@ -165,7 +168,7 @@ export const flowDiagramsAPI = {
       // Handle initial 404s with retry tolerance
       if (!response.success || !response.job) {
         if (initialRetries < maxInitialRetries) {
-          console.log(`Flow diagram job not found yet, retrying... (${initialRetries + 1}/${maxInitialRetries})`);
+          log.debug(`flow diagram job not found yet, retrying... (${initialRetries + 1}/${maxInitialRetries})`);
           initialRetries++;
           await new Promise((resolve) => setTimeout(resolve, 500));
           continue;

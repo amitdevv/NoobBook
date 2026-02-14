@@ -5,10 +5,13 @@ Educational Note: This service provides methods to query Jira projects and issue
 using the Jira REST API v3. It follows NoobBook's service pattern with lazy-loaded
 client initialization and environment-based configuration.
 """
+import logging
 import os
 from typing import Dict, Any, Optional, List
 import requests
 from requests.auth import HTTPBasicAuth
+
+logger = logging.getLogger(__name__)
 
 
 class JiraService:
@@ -67,11 +70,7 @@ class JiraService:
         self._configured = bool(self._base_url and self._auth)
 
         if self._configured:
-            print(f"✓ Jira service configured: {config_label}")
-        else:
-            print("⚠ Jira service not configured (missing credentials)")
-            print("  Required: JIRA_EMAIL and JIRA_API_KEY")
-            print("  And either: JIRA_CLOUD_ID (new) or JIRA_DOMAIN (legacy)")
+            logger.info("Jira service configured: %s", config_label)
 
     def is_configured(self) -> bool:
         """Check if Jira credentials are configured."""
@@ -278,7 +277,6 @@ class JiraService:
             'maxResults': max_results
         }
 
-        print(f"[DEBUG] Jira search: {jql}")
 
         # Use enhanced JQL endpoint
         result = self._make_request('search/jql', method='POST', json_data=payload)

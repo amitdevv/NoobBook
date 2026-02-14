@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Copy, Check, Eye, EyeSlash, Warning } from '@phosphor-icons/react';
 import { useToast } from '@/components/ui/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('password-display');
 
 interface PasswordDisplayProps {
   password: string;
@@ -45,7 +48,7 @@ export const PasswordDisplay: React.FC<PasswordDisplayProps> = ({
         setTimeout(() => setCopied(false), 2000);
       } catch (fallbackErr) {
         error('Failed to copy password');
-        console.error('Failed to copy:', fallbackErr);
+        log.error({ err: fallbackErr }, 'failed to copy password');
       }
     }
   };

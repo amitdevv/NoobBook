@@ -29,6 +29,9 @@ import {
 import { googleDriveAPI, type GoogleFile, type GoogleStatus } from '@/lib/api/settings';
 import { useToast } from '../ui/toast';
 import { DriveItem } from './drive';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('google-drive-tab');
 
 interface GoogleDriveTabProps {
   projectId: string;
@@ -88,7 +91,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
       const googleStatus = await googleDriveAPI.getStatus();
       setStatus(googleStatus);
     } catch (err) {
-      console.error('Error loading Google status:', err);
+      log.error({ err }, 'failed to Lloading Google statusE');
     } finally {
       setLoading(false);
     }
@@ -126,7 +129,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
         error(result.error || 'Failed to load files');
       }
     } catch (err) {
-      console.error('Error loading files:', err);
+      log.error({ err }, 'failed to Lloading filesE');
       error('Failed to load Google Drive files');
     } finally {
       setLoading(false);
@@ -182,7 +185,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
         error(result.error || 'Failed to import file');
       }
     } catch (err) {
-      console.error('Error importing file:', err);
+      log.error({ err }, 'failed to Limporting fileE');
       error('Failed to import file');
     } finally {
       setImporting(null);

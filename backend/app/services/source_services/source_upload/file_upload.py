@@ -8,6 +8,7 @@ Supports:
 - Direct file uploads from the frontend
 - Creating sources from already-saved files (e.g., Google Drive imports)
 """
+import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +24,8 @@ from app.utils.file_utils import (
     get_file_info,
     validate_file_size,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def upload_file(
@@ -113,12 +116,8 @@ def upload_file(
     # Add to Supabase sources table
     source_index_service.add_source_to_index(project_id, source_metadata)
 
-    print(f"Uploaded source to Supabase: {source_metadata['name']} ({source_id})", flush=True)
-
     # Submit processing as a background task
-    print(f"DEBUG: About to submit processing task...", flush=True)
     _submit_processing_task(project_id, source_id)
-    print(f"DEBUG: Processing task submitted, returning metadata", flush=True)
 
     return source_metadata
 
@@ -182,7 +181,7 @@ def create_from_existing_file(
     try:
         file_path.unlink()
     except Exception as e:
-        print(f"  Warning: Could not delete temp file {file_path}: {e}")
+        logger.warning("Could not delete temp file %s: %s", file_path, e)
 
     # Create source metadata
     timestamp = datetime.now().isoformat()
@@ -207,8 +206,6 @@ def create_from_existing_file(
     # Add to Supabase sources table
     source_index_service.add_source_to_index(project_id, source_metadata)
 
-    print(f"Created source from file: {name} ({source_id})")
-
     # Submit processing as a background task
     _submit_processing_task(project_id, source_id)
 
@@ -223,23 +220,18 @@ def _submit_processing_task(project_id: str, source_id: str) -> None:
     circular imports at module load time.
     """
     try:
-        print(f"DEBUG: Submitting processing task for source {source_id}", flush=True)
         from app.services.source_services.source_processing import source_processing_service
         from app.services.source_services import source_service
 
-        task_id = task_service.submit_task(
+        task_service.submit_task(
             "source_processing",
             source_id,
             source_processing_service.process_source,
             project_id,
             source_id
         )
-        print(f"DEBUG: Task submitted successfully with ID {task_id}", flush=True)
 
         # Update status to "processing" immediately so frontend shows correct state
         source_service.update_source(project_id, source_id, status="processing")
-        print(f"DEBUG: Status updated to 'processing' for source {source_id}", flush=True)
     except Exception as e:
-        print(f"ERROR: Failed to submit processing task: {e}", flush=True)
-        import traceback
-        traceback.print_exc()
+        logger.error("Failed to submit processing task for source %s: %s", source_id, e)

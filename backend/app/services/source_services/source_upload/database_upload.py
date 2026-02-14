@@ -11,12 +11,15 @@ Educational Note: A database source is represented similarly to URL sources:
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 from app.services.background_services import task_service
+
+logger = logging.getLogger(__name__)
 from app.services.data_services.database_connection_service import (
     database_connection_service,
     DEFAULT_USER_ID,
@@ -118,7 +121,6 @@ def add_database_source(
     }
 
     source_index_service.add_source_to_index(project_id, source_metadata)
-    print(f"Created database source: {display_name} ({source_id})")
 
     # Trigger processing in background (uses existing source_processing_service)
     _submit_processing_task(project_id, source_id)
@@ -143,4 +145,4 @@ def _submit_processing_task(project_id: str, source_id: str) -> None:
         # Update status immediately
         source_service.update_source(project_id, source_id, status="processing")
     except Exception as e:
-        print(f"ERROR: Failed to submit database processing task: {e}")
+        logger.error("Failed to submit database processing task for source %s: %s", source_id, e)

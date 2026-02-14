@@ -7,6 +7,9 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('studio-emails-api');
 
 /**
  * Email template section plan
@@ -127,7 +130,7 @@ export const emailsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error starting email template generation:', error);
+      log.error({ err: error }, 'failed to start email template generation');
       throw error;
     }
   },
@@ -145,7 +148,7 @@ export const emailsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error getting email job status:', error);
+      log.error({ err: error }, 'failed to get email job status');
       throw error;
     }
   },
@@ -165,7 +168,7 @@ export const emailsAPI = {
       if (axios.isAxiosError(error) && error.response) {
         return error.response.data;
       }
-      console.error('Error listing email jobs:', error);
+      log.error({ err: error }, 'failed to list email jobs');
       throw error;
     }
   },

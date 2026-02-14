@@ -4,9 +4,12 @@ Nano Banana (Image Generation) API key validator.
 Educational Note: Validates API keys for Gemini 3 Pro Image Preview model
 by making a minimal image generation request.
 """
+import logging
 from typing import Tuple
 from google import genai
 from google.genai import types
+
+logger = logging.getLogger(__name__)
 
 
 def validate_nano_banana_key(api_key: str) -> Tuple[bool, str]:
@@ -75,5 +78,5 @@ def validate_nano_banana_key(api_key: str) -> Tuple[bool, str]:
         elif 'rate' in error_message:
             return True, "Valid API key (rate limited)"
         else:
-            print(f"Nano Banana validation error: {type(e).__name__}: {str(e)}")
+            logger.error("Nano Banana validation error: %s: %s", type(e).__name__, e)
             return False, f"Validation failed: {str(e)[:100]}"

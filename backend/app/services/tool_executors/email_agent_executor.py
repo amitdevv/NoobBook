@@ -7,9 +7,12 @@ this doesn't handle individual tool calls - those are handled inside
 email_agent_service itself.
 """
 
+import logging
 from typing import Dict, Any
 import uuid
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class EmailAgentExecutor:
@@ -73,7 +76,7 @@ class EmailAgentExecutor:
         # Launch agent as background task
         def run_agent():
             """Background task to run the email agent."""
-            print(f"[EmailAgentExecutor] Starting email agent for job {job_id[:8]}")
+            logger.info("Starting email agent for job %s", job_id[:8])
             try:
                 email_agent_service.generate_template(
                     project_id=project_id,
@@ -83,9 +86,7 @@ class EmailAgentExecutor:
                     user_id=user_id
                 )
             except Exception as e:
-                print(f"[EmailAgentExecutor] Error in email agent: {e}")
-                import traceback
-                traceback.print_exc()
+                logger.exception("Email agent failed for job %s", job_id[:8])
                 # Update job on error
                 studio_index_service.update_email_job(
                     project_id, job_id,
