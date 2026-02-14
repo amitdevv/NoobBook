@@ -229,7 +229,7 @@ Get these before running setup:
 | `ELEVENLABS_API_KEY` | [elevenlabs.io](https://elevenlabs.io/) | No — audio features |
 | `TAVILY_API_KEY` | [tavily.com](https://tavily.com/) | No — web search fallback |
 | `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | [Google Cloud Console](https://console.cloud.google.com/) | No — Google Drive import |
-| `JIRA_DOMAIN` + `JIRA_EMAIL` + `JIRA_API_KEY` | [Jira Settings → Security → API tokens](https://id.atlassian.com/manage-profile/security/api-tokens) | No — Jira integration |
+| `JIRA_CLOUD_ID` (or `JIRA_DOMAIN`) + `JIRA_EMAIL` + `JIRA_API_KEY` | [Jira Settings → Security → API tokens](https://id.atlassian.com/manage-profile/security/api-tokens) | No — Jira integration |
 | `NOTION_API_KEY` | [Notion Integrations](https://www.notion.so/my-integrations) | No — Notion integration |
 
 ---
