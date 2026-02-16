@@ -466,7 +466,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       await sourcesAPI.updateSource(projectId, sourceId, { active });
       onSourcesChange?.();
     } catch (err) {
-      log.error({ err }, 'failed to Ltoggling source active stateE');
+      log.error({ err }, 'failed to toggle source active state');
       error('Failed to update source');
       // Revert optimistic update on error
       setSources(prev =>
@@ -474,7 +474,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       );
     } finally {
       // Clear the guard after a delay (allow DB to catch up)
-      setTimeout(() => recentTogglesRef.current.delete(sourceId), 3000);
+      setTimeout(() => recentTogglesRef.current.delete(sourceId), 5000);
     }
   };
 
