@@ -80,33 +80,46 @@ async function tryRefreshToken(): Promise<boolean> {
   return false;
 }
 
+// Shared 401 error handler used by both the `api` instance and global `axios` interceptors.
+// Educational Note: axios.create() instances have separate interceptor chains, so registering
+// on both the `api` instance AND the global `axios` default won't double-fire for `api` requests.
+// The shared `refreshPromise` correctly deduplicates concurrent refresh attempts across both.
+async function handle401Error(error: AxiosError, retryWith: typeof api | typeof axios): Promise<any> {
+  const status = error.response?.status;
+  const originalRequest = error.config as InternalAxiosRequestConfig & { _retried?: boolean };
+
+  // Skip refresh for auth routes (avoid infinite loop) and already-retried requests
+  const isAuthRoute = originalRequest?.url?.includes('/auth/');
+  if (status === 401 && originalRequest && !originalRequest._retried && !isAuthRoute) {
+    // Deduplicate concurrent refresh attempts
+    if (!refreshPromise) {
+      refreshPromise = tryRefreshToken().finally(() => { refreshPromise = null; });
+    }
+
+    const refreshed = await refreshPromise;
+    if (refreshed) {
+      originalRequest._retried = true;
+      // Update the header with the fresh token and retry
+      originalRequest.headers.Authorization = `Bearer ${getAccessToken()}`;
+      return retryWith(originalRequest);
+    }
+  }
+
+  log.error({ status, data: error.response?.data }, 'API response error');
+  return Promise.reject(error);
+}
+
 // Response interceptor: auto-refresh expired tokens, log other errors
 api.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError) => {
-    const status = error.response?.status;
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retried?: boolean };
+  (error: AxiosError) => handle401Error(error, api)
+);
 
-    // Skip refresh for auth routes (avoid infinite loop) and already-retried requests
-    const isAuthRoute = originalRequest?.url?.includes('/auth/');
-    if (status === 401 && originalRequest && !originalRequest._retried && !isAuthRoute) {
-      // Deduplicate concurrent refresh attempts
-      if (!refreshPromise) {
-        refreshPromise = tryRefreshToken().finally(() => { refreshPromise = null; });
-      }
-
-      const refreshed = await refreshPromise;
-      if (refreshed) {
-        originalRequest._retried = true;
-        // Update the header with the fresh token and retry
-        originalRequest.headers.Authorization = `Bearer ${getAccessToken()}`;
-        return api(originalRequest);
-      }
-    }
-
-    log.error({ status, data: error.response?.data }, 'API response error');
-    return Promise.reject(error);
-  }
+// Also cover the 22+ files that use the global `axios` instance directly
+// (studio APIs, chats, sources, settings, etc.)
+axios.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => handle401Error(error, axios)
 );
 
 /**

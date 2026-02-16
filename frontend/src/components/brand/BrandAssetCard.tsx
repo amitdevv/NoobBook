@@ -30,8 +30,7 @@ import {
   CircleNotch,
 } from '@phosphor-icons/react';
 import { type BrandAsset } from '../../lib/api/brand';
-import { API_HOST } from '../../lib/api/client';
-import { getAccessToken } from '../../lib/auth/session';
+import { api } from '../../lib/api/client';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('brand-asset-card');
@@ -61,19 +60,12 @@ export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
       if (asset.mime_type?.startsWith('image/')) {
         setLoadingImage(true);
         try {
-          const token = await getAccessToken();
-          const url = `${API_HOST}/api/v1/brand/assets/${asset.id}/download`;
-          const response = await fetch(url, {
-            headers: { Authorization: `Bearer ${token}` },
+          const response = await api.get(`/brand/assets/${asset.id}/download`, {
+            responseType: 'blob',
           });
-          if (response.ok) {
-            const blob = await response.blob();
-            const objectUrl = URL.createObjectURL(blob);
-            blobUrlRef.current = objectUrl;
-            setImageUrl(objectUrl);
-          } else {
-            log.error({ status: response.status }, 'failed to load image');
-          }
+          const objectUrl = URL.createObjectURL(response.data);
+          blobUrlRef.current = objectUrl;
+          setImageUrl(objectUrl);
         } catch (error) {
           log.error({ err: error }, 'failed to load image');
         } finally {
@@ -92,19 +84,12 @@ export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
 
   const handleDownload = async () => {
     try {
-      const token = await getAccessToken();
-      const url = `${API_HOST}/api/v1/brand/assets/${asset.id}/download`;
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await api.get(`/brand/assets/${asset.id}/download`, {
+        responseType: 'blob',
       });
-      if (response.ok) {
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl, '_blank');
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-      } else {
-        log.error({ status: response.status }, 'download failed');
-      }
+      const blobUrl = URL.createObjectURL(response.data);
+      window.open(blobUrl, '_blank');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
     } catch (error) {
       log.error({ err: error }, 'failed to download');
     }
