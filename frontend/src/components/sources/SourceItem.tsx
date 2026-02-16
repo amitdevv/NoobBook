@@ -114,7 +114,7 @@ const getErrorMessage = (source: Source): string => {
   const error = (source.processing_info as Record<string, string>)?.error || '';
 
   // YouTube IP blocking (common on cloud servers like AWS/GCP/Azure)
-  if (error.toLowerCase().includes('requestblocked') || error.toLowerCase().includes('ip') && error.toLowerCase().includes('cloud')) {
+  if (error.toLowerCase().includes('requestblocked') || (error.toLowerCase().includes('ip') && error.toLowerCase().includes('cloud'))) {
     return 'YouTube blocks cloud server IPs (AWS/GCP/Azure). Works when self-hosted locally.';
   }
   if (error.toLowerCase().includes('no transcript') || error.toLowerCase().includes('disabled')) {
