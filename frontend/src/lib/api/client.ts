@@ -5,8 +5,8 @@
  * This is the single source of truth for API communication.
  */
 
-import axios from 'axios';
-import { getAccessToken } from '../auth/session';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { getAccessToken, getRefreshToken, setSession, clearSession } from '../auth/session';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('api-client');
@@ -51,11 +51,59 @@ api.interceptors.request.use(
 // Ensure global axios requests (non-api instance) include auth header too
 axios.interceptors.request.use(attachAuthHeader);
 
-// Response interceptor for error logging
+// ---------- Auto-refresh on 401 ----------
+// Educational Note: When the JWT expires (default ~1 hour), API calls return 401.
+// Instead of forcing re-login, we intercept the 401, use the stored refresh_token
+// to get a new token pair, then transparently retry the original request.
+// A shared `refreshPromise` ensures concurrent 401s trigger only one refresh call;
+// all queued requests wait on the same promise.
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+
+  try {
+    const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+      refresh_token: refreshToken,
+    });
+    if (data?.success && data.session?.access_token) {
+      setSession(data.session.access_token, data.session.refresh_token);
+      return true;
+    }
+  } catch (err) {
+    log.error({ err }, 'token refresh failed');
+  }
+
+  clearSession();
+  return false;
+}
+
+// Response interceptor: auto-refresh expired tokens, log other errors
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
+  async (error: AxiosError) => {
     const status = error.response?.status;
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retried?: boolean };
+
+    // Skip refresh for auth routes (avoid infinite loop) and already-retried requests
+    const isAuthRoute = originalRequest?.url?.includes('/auth/');
+    if (status === 401 && originalRequest && !originalRequest._retried && !isAuthRoute) {
+      // Deduplicate concurrent refresh attempts
+      if (!refreshPromise) {
+        refreshPromise = tryRefreshToken().finally(() => { refreshPromise = null; });
+      }
+
+      const refreshed = await refreshPromise;
+      if (refreshed) {
+        originalRequest._retried = true;
+        // Update the header with the fresh token and retry
+        originalRequest.headers.Authorization = `Bearer ${getAccessToken()}`;
+        return api(originalRequest);
+      }
+    }
+
     log.error({ status, data: error.response?.data }, 'API response error');
     return Promise.reject(error);
   }

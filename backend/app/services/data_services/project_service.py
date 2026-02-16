@@ -5,11 +5,14 @@ Educational Note: This service layer handles all project-related operations
 using Supabase as the database backend. It provides a clean abstraction
 over database operations.
 """
+import logging
 import uuid
 from datetime import datetime
 from typing import Optional, Dict, List, Any
 
 from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+
+logger = logging.getLogger(__name__)
 
 
 # Default user ID for single-user mode (fallback when no auth token provided)

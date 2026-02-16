@@ -10,11 +10,14 @@ Key Design Decisions:
 - Flexible: Accepts variable parameters for different use cases
 - Reusable: Can be called from main chat, subagents, RAG pipeline, etc.
 """
+import logging
 import os
 from typing import Optional, List, Dict, Any
 import anthropic
 
 from app.utils.cost_tracking import add_usage as add_cost_usage
+
+logger = logging.getLogger(__name__)
 
 
 class ClaudeService:
@@ -43,6 +46,7 @@ class ClaudeService:
         if self._client is None:
             api_key = os.getenv('ANTHROPIC_API_KEY')
             if not api_key:
+                logger.error("ANTHROPIC_API_KEY not found in environment")
                 raise ValueError("ANTHROPIC_API_KEY not found in environment")
             self._client = anthropic.Anthropic(api_key=api_key)
         return self._client

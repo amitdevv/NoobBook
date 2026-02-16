@@ -25,6 +25,7 @@ Multi-user Support:
 - For multi-user mode, pass user_id from authenticated session
 """
 
+import logging
 import os
 import io
 from pathlib import Path
@@ -35,6 +36,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 from app.services.integrations.google.google_auth_service import google_auth_service
+
+logger = logging.getLogger(__name__)
 
 
 class GoogleDriveService:
@@ -221,6 +224,7 @@ class GoogleDriveService:
             }
 
         except Exception as e:
+            logger.error("Failed to list Google Drive files: %s", e)
             return {
                 'success': False,
                 'error': f'Failed to list files: {str(e)}'
@@ -256,6 +260,7 @@ class GoogleDriveService:
             }
 
         except Exception as e:
+            logger.error("Failed to get file info for %s: %s", file_id, e)
             return {
                 'success': False,
                 'error': f'Failed to get file info: {str(e)}'
@@ -304,6 +309,7 @@ class GoogleDriveService:
                 )
 
         except Exception as e:
+            logger.error("Failed to download file %s: %s", file_id, e)
             return False, f'Failed to download file: {str(e)}'
 
     def _download_regular_file(
@@ -347,6 +353,7 @@ class GoogleDriveService:
             return True, f'Downloaded {file_name}'
 
         except Exception as e:
+            logger.error("Download failed for file %s: %s", file_id, e)
             return False, f'Download failed: {str(e)}'
 
     def _export_google_file(
@@ -400,6 +407,7 @@ class GoogleDriveService:
             return True, f'Exported {file_name} as {export_info["extension"]}'
 
         except Exception as e:
+            logger.error("Export failed for Google file %s (%s): %s", file_id, mime_type, e)
             return False, f'Export failed: {str(e)}'
 
     def get_file_extension(self, file_id: str, user_id: Optional[str] = None) -> Optional[str]:
@@ -439,7 +447,8 @@ class GoogleDriveService:
 
             return None
 
-        except Exception:
+        except Exception as e:
+            logger.error("Failed to get file extension for %s: %s", file_id, e)
             return None
 
 

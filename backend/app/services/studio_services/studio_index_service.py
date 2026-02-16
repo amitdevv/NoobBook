@@ -36,9 +36,12 @@ Architecture:
     ├── blog_jobs.py
     └── business_report_jobs.py
 """
+import logging
 from typing import Dict, List, Any, Optional
 
 from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+
+logger = logging.getLogger(__name__)
 
 
 # Top-level columns in the studio_jobs table (everything else goes into job_data JSONB)
@@ -91,32 +94,36 @@ def create_job(
     Returns:
         The created job record (flattened) or None on failure
     """
-    client = _get_client()
+    try:
+        client = _get_client()
 
-    # Extract top-level columns from job_data
-    row = {
-        "project_id": project_id,
-        "job_type": job_type,
-        "id": job_data.pop("id"),
-        "source_id": job_data.pop("source_id", None),
-        "source_name": job_data.pop("source_name", None),
-        "direction": job_data.pop("direction", None),
-        "status": job_data.pop("status", "pending"),
-        "progress": job_data.pop("progress", None),
-        "error_message": job_data.pop("error", job_data.pop("error_message", None)),
-        "started_at": job_data.pop("started_at", None),
-        "completed_at": job_data.pop("completed_at", None),
-    }
+        # Extract top-level columns from job_data
+        row = {
+            "project_id": project_id,
+            "job_type": job_type,
+            "id": job_data.pop("id"),
+            "source_id": job_data.pop("source_id", None),
+            "source_name": job_data.pop("source_name", None),
+            "direction": job_data.pop("direction", None),
+            "status": job_data.pop("status", "pending"),
+            "progress": job_data.pop("progress", None),
+            "error_message": job_data.pop("error", job_data.pop("error_message", None)),
+            "started_at": job_data.pop("started_at", None),
+            "completed_at": job_data.pop("completed_at", None),
+        }
 
-    # Remove fields the DB manages automatically
-    job_data.pop("created_at", None)
-    job_data.pop("updated_at", None)
+        # Remove fields the DB manages automatically
+        job_data.pop("created_at", None)
+        job_data.pop("updated_at", None)
 
-    # Everything remaining goes into job_data JSONB
-    row["job_data"] = job_data
+        # Everything remaining goes into job_data JSONB
+        row["job_data"] = job_data
 
-    response = client.table("studio_jobs").insert(row).execute()
-    return _map_job(response.data[0]) if response.data else None
+        response = client.table("studio_jobs").insert(row).execute()
+        return _map_job(response.data[0]) if response.data else None
+    except Exception as e:
+        logger.error("Failed to create studio job (type=%s, project=%s): %s", job_type, project_id, e)
+        return None
 
 
 def update_job(
@@ -136,49 +143,53 @@ def update_job(
     Returns:
         Updated job record (flattened) or None if not found
     """
-    client = _get_client()
+    try:
+        client = _get_client()
 
-    # Separate top-level columns from job_data fields
-    top_level = {}
-    job_data_updates = {}
+        # Separate top-level columns from job_data fields
+        top_level = {}
+        job_data_updates = {}
 
-    for k, v in updates.items():
-        if v is not None:
-            if k == "error":
-                # Map "error" back to "error_message" column
-                top_level["error_message"] = v
-            elif k in _TOP_COLUMNS:
-                top_level[k] = v
-            else:
-                job_data_updates[k] = v
+        for k, v in updates.items():
+            if v is not None:
+                if k == "error":
+                    # Map "error" back to "error_message" column
+                    top_level["error_message"] = v
+                elif k in _TOP_COLUMNS:
+                    top_level[k] = v
+                else:
+                    job_data_updates[k] = v
 
-    # Merge job_data updates via fetch-merge-update
-    if job_data_updates:
-        current = get_job(project_id, job_id)
-        if not current:
-            return None
-        # Rebuild current job_data (fields not in top-level columns)
-        current_job_data = {}
-        for k, v in current.items():
-            if k not in _TOP_COLUMNS and k not in {
-                "id", "project_id", "job_type", "created_at",
-                "updated_at", "error", "error_message", "job_data",
-            }:
-                current_job_data[k] = v
-        merged = {**current_job_data, **job_data_updates}
-        top_level["job_data"] = merged
+        # Merge job_data updates via fetch-merge-update
+        if job_data_updates:
+            current = get_job(project_id, job_id)
+            if not current:
+                return None
+            # Rebuild current job_data (fields not in top-level columns)
+            current_job_data = {}
+            for k, v in current.items():
+                if k not in _TOP_COLUMNS and k not in {
+                    "id", "project_id", "job_type", "created_at",
+                    "updated_at", "error", "error_message", "job_data",
+                }:
+                    current_job_data[k] = v
+            merged = {**current_job_data, **job_data_updates}
+            top_level["job_data"] = merged
 
-    if not top_level:
-        return get_job(project_id, job_id)
+        if not top_level:
+            return get_job(project_id, job_id)
 
-    response = (
-        client.table("studio_jobs")
-        .update(top_level)
-        .eq("id", job_id)
-        .eq("project_id", project_id)
-        .execute()
-    )
-    return _map_job(response.data[0]) if response.data else None
+        response = (
+            client.table("studio_jobs")
+            .update(top_level)
+            .eq("id", job_id)
+            .eq("project_id", project_id)
+            .execute()
+        )
+        return _map_job(response.data[0]) if response.data else None
+    except Exception as e:
+        logger.error("Failed to update studio job %s: %s", job_id, e)
+        return None
 
 
 def get_job(
@@ -195,15 +206,19 @@ def get_job(
     Returns:
         Job record (flattened) or None if not found
     """
-    client = _get_client()
-    response = (
-        client.table("studio_jobs")
-        .select("*")
-        .eq("id", job_id)
-        .eq("project_id", project_id)
-        .execute()
-    )
-    return _map_job(response.data[0]) if response.data else None
+    try:
+        client = _get_client()
+        response = (
+            client.table("studio_jobs")
+            .select("*")
+            .eq("id", job_id)
+            .eq("project_id", project_id)
+            .execute()
+        )
+        return _map_job(response.data[0]) if response.data else None
+    except Exception as e:
+        logger.error("Failed to get studio job %s: %s", job_id, e)
+        return None
 
 
 def list_jobs(
@@ -222,19 +237,23 @@ def list_jobs(
     Returns:
         List of job records (flattened), newest first
     """
-    client = _get_client()
-    query = (
-        client.table("studio_jobs")
-        .select("*")
-        .eq("project_id", project_id)
-        .eq("job_type", job_type)
-        .order("created_at", desc=True)
-    )
-    if source_id:
-        query = query.eq("source_id", source_id)
+    try:
+        client = _get_client()
+        query = (
+            client.table("studio_jobs")
+            .select("*")
+            .eq("project_id", project_id)
+            .eq("job_type", job_type)
+            .order("created_at", desc=True)
+        )
+        if source_id:
+            query = query.eq("source_id", source_id)
 
-    response = query.execute()
-    return [_map_job(row) for row in (response.data or [])]
+        response = query.execute()
+        return [_map_job(row) for row in (response.data or [])]
+    except Exception as e:
+        logger.error("Failed to list studio jobs (type=%s, project=%s): %s", job_type, project_id, e)
+        return []
 
 
 def delete_job(
@@ -251,15 +270,19 @@ def delete_job(
     Returns:
         True if a row was deleted
     """
-    client = _get_client()
-    response = (
-        client.table("studio_jobs")
-        .delete()
-        .eq("id", job_id)
-        .eq("project_id", project_id)
-        .execute()
-    )
-    return bool(response.data)
+    try:
+        client = _get_client()
+        response = (
+            client.table("studio_jobs")
+            .delete()
+            .eq("id", job_id)
+            .eq("project_id", project_id)
+            .execute()
+        )
+        return bool(response.data)
+    except Exception as e:
+        logger.error("Failed to delete studio job %s: %s", job_id, e)
+        return False
 
 
 # =============================================================================

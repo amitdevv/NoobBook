@@ -58,7 +58,7 @@ export const EmailViewerModal: React.FC<EmailViewerModalProps> = ({
                 src={getAuthUrl(viewingEmailJob.preview_url)}
                 className="w-full h-[600px]"
                 title="Email template preview"
-                sandbox="allow-same-origin"
+                sandbox="allow-same-origin allow-scripts"
               />
             </div>
 
