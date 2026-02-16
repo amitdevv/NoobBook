@@ -5,65 +5,15 @@ Educational Note: This service uses the youtube-transcript-api library to fetch
 existing captions/transcripts from YouTube videos. It's much faster than downloading
 and transcribing audio since it uses YouTube's existing caption data.
 
-Proxy Support: YouTube blocks cloud provider IPs (AWS, GCP, Azure). To work around
-this, configure a proxy via environment variables:
-
-  Option 1 - Webshare (recommended, rotating residential proxies):
-    WEBSHARE_PROXY_USERNAME=your-username
-    WEBSHARE_PROXY_PASSWORD=your-password
-
-  Option 2 - Generic HTTP/HTTPS proxy:
-    YOUTUBE_PROXY_URL=http://user:pass@proxy-host:port
-
 Install: pip install youtube-transcript-api
 """
 
 import logging
-import os
 import re
 from typing import Dict, Any, Optional, List
 from youtube_transcript_api import YouTubeTranscriptApi
 
 logger = logging.getLogger(__name__)
-
-
-def _build_proxy_config():
-    """
-    Build proxy config from environment variables if available.
-
-    Educational Note: YouTube blocks requests from cloud provider IPs (AWS, GCP, Azure).
-    A proxy routes requests through residential IPs to avoid this block.
-    The youtube-transcript-api library has built-in support for Webshare proxies
-    and generic HTTP/HTTPS proxies.
-
-    Returns:
-        Proxy config object or None if no proxy is configured
-    """
-    # Option 1: Webshare rotating residential proxies (recommended)
-    webshare_username = os.getenv("WEBSHARE_PROXY_USERNAME")
-    webshare_password = os.getenv("WEBSHARE_PROXY_PASSWORD")
-
-    if webshare_username and webshare_password:
-        from youtube_transcript_api.proxies import WebshareProxyConfig
-        logger.info("YouTube proxy: Webshare (rotating residential)")
-        return WebshareProxyConfig(
-            proxy_username=webshare_username,
-            proxy_password=webshare_password,
-        )
-
-    # Option 2: Generic HTTP/HTTPS proxy
-    proxy_url = os.getenv("YOUTUBE_PROXY_URL")
-
-    if proxy_url:
-        from youtube_transcript_api.proxies import GenericProxyConfig
-        logger.info("YouTube proxy: Generic (%s)", proxy_url.split("@")[-1] if "@" in proxy_url else proxy_url)
-        return GenericProxyConfig(
-            http_url=proxy_url,
-            https_url=proxy_url,
-        )
-
-    logger.info("YouTube proxy: None (direct connection — may fail on cloud providers)")
-    return None
 
 
 class YouTubeService:
@@ -82,9 +32,8 @@ class YouTubeService:
     ]
 
     def __init__(self):
-        """Initialize the YouTube service with optional proxy support."""
-        proxy_config = _build_proxy_config()
-        self._api = YouTubeTranscriptApi(proxy_config=proxy_config) if proxy_config else YouTubeTranscriptApi()
+        """Initialize the YouTube service."""
+        self._api = YouTubeTranscriptApi()
 
     def extract_video_id(self, url: str) -> Optional[str]:
         """
