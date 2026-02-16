@@ -63,4 +63,8 @@ export const projectsAPI = {
 
   // Get project memory data (user memory + project memory)
   getMemory: (id: string) => api.get(`/projects/${id}/memory`),
+
+  // Update user and/or project memory (both fields optional)
+  updateMemory: (id: string, data: { user_memory?: string; project_memory?: string }) =>
+    api.put(`/projects/${id}/memory`, data),
 };

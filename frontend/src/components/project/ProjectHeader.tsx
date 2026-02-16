@@ -27,6 +27,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '../ui/collapsible';
+import { Textarea } from '../ui/textarea';
 import { ArrowLeft, DotsThreeVertical, Plus, Trash, FolderOpen, Gear, CircleNotch, CurrencyDollar, Brain, CaretDown, CaretRight, PencilSimple, SignOut } from '@phosphor-icons/react';
 import { Input } from '../ui/input';
 import { chatsAPI, type PromptConfig } from '../../lib/api/chats';
@@ -63,7 +64,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   onRename,
   onSignOut,
 }) => {
-  const { toasts, dismissToast, error } = useToast();
+  const { toasts, dismissToast, error, success } = useToast();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
@@ -80,6 +81,9 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   const [memoryDialogOpen, setMemoryDialogOpen] = React.useState(false);
   const [memory, setMemory] = React.useState<MemoryData | null>(null);
   const [loadingMemory, setLoadingMemory] = React.useState(false);
+  const [editedUserMemory, setEditedUserMemory] = React.useState('');
+  const [editedProjectMemory, setEditedProjectMemory] = React.useState('');
+  const [savingMemory, setSavingMemory] = React.useState(false);
 
   // All prompts state (view-only)
   const [allPrompts, setAllPrompts] = React.useState<PromptConfig[]>([]);
@@ -122,13 +126,17 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   /**
    * Load memory data (user + project memory)
    * Educational Note: Memory is loaded when user opens the memory dialog.
+   * Populates both the display state and editable textarea state.
    */
   const loadMemory = async () => {
     try {
       setLoadingMemory(true);
       const response = await projectsAPI.getMemory(project.id);
       if (response.data.success) {
-        setMemory(response.data.memory);
+        const mem = response.data.memory;
+        setMemory(mem);
+        setEditedUserMemory(mem.user_memory || '');
+        setEditedProjectMemory(mem.project_memory || '');
       }
     } catch (err) {
       log.error({ err }, 'failed to load memory');
@@ -146,6 +154,43 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
     setMemoryDialogOpen(true);
     loadMemory();
   };
+
+  /**
+   * Save edited memory to backend.
+   * Only sends fields that actually changed to avoid unnecessary writes.
+   */
+  const handleSaveMemory = async () => {
+    try {
+      setSavingMemory(true);
+      const updates: { user_memory?: string; project_memory?: string } = {};
+
+      if (editedUserMemory !== (memory?.user_memory || '')) {
+        updates.user_memory = editedUserMemory;
+      }
+      if (editedProjectMemory !== (memory?.project_memory || '')) {
+        updates.project_memory = editedProjectMemory;
+      }
+
+      await projectsAPI.updateMemory(project.id, updates);
+
+      // Update local state to reflect saved values
+      setMemory({
+        user_memory: editedUserMemory || null,
+        project_memory: editedProjectMemory || null,
+      });
+      success('Memory saved');
+    } catch (err) {
+      log.error({ err }, 'failed to save memory');
+      error('Failed to save memory');
+    } finally {
+      setSavingMemory(false);
+    }
+  };
+
+  /** Check if memory has unsaved edits */
+  const memoryIsDirty =
+    editedUserMemory !== (memory?.user_memory || '') ||
+    editedProjectMemory !== (memory?.project_memory || '');
 
   /**
    * Load all prompt configurations
@@ -605,7 +650,9 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
       </Dialog>
 
       {/* Memory Dialog */}
-      <Dialog open={memoryDialogOpen} onOpenChange={setMemoryDialogOpen}>
+      <Dialog open={memoryDialogOpen} onOpenChange={(open) => {
+        if (!savingMemory) setMemoryDialogOpen(open);
+      }}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -613,7 +660,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
               Memory
             </DialogTitle>
             <DialogDescription>
-              Information the AI remembers about you and this project
+              Edit what the AI remembers about you and this project
             </DialogDescription>
           </DialogHeader>
 
@@ -627,36 +674,52 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
               <>
                 {/* User Memory Section */}
                 <div className="space-y-2">
-                  <Label>User Memory</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Preferences and context that persist across all your projects
-                  </p>
-                  <div className="p-3 bg-muted/50 rounded-md min-h-[80px]">
-                    {memory?.user_memory ? (
-                      <p className="text-sm whitespace-pre-wrap">{memory.user_memory}</p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">
-                        No user memory stored yet. The AI will remember important details about you as you chat.
-                      </p>
+                  <div className="flex items-center justify-between">
+                    <Label>User Memory</Label>
+                    {editedUserMemory && (
+                      <button
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors border rounded px-2 py-0.5"
+                        onClick={() => setEditedUserMemory('')}
+                      >
+                        Clear
+                      </button>
                     )}
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Persists across all your projects
+                  </p>
+                  <Textarea
+                    value={editedUserMemory}
+                    onChange={(e) => setEditedUserMemory(e.target.value)}
+                    placeholder="The AI will remember important details about you as you chat, or you can add them here."
+                    className="min-h-[100px] resize-y"
+                    disabled={savingMemory}
+                  />
                 </div>
 
                 {/* Project Memory Section */}
                 <div className="space-y-2">
-                  <Label>Project Memory</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Context specific to "{project.name}"
-                  </p>
-                  <div className="p-3 bg-muted/50 rounded-md min-h-[80px]">
-                    {memory?.project_memory ? (
-                      <p className="text-sm whitespace-pre-wrap">{memory.project_memory}</p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">
-                        No project memory stored yet. The AI will remember important project-specific details as you chat.
-                      </p>
+                  <div className="flex items-center justify-between">
+                    <Label>Project Memory</Label>
+                    {editedProjectMemory && (
+                      <button
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors border rounded px-2 py-0.5"
+                        onClick={() => setEditedProjectMemory('')}
+                      >
+                        Clear
+                      </button>
                     )}
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Specific to "{project.name}"
+                  </p>
+                  <Textarea
+                    value={editedProjectMemory}
+                    onChange={(e) => setEditedProjectMemory(e.target.value)}
+                    placeholder="The AI will remember project-specific details as you chat, or you can add them here."
+                    className="min-h-[100px] resize-y"
+                    disabled={savingMemory}
+                  />
                 </div>
               </>
             )}
@@ -666,8 +729,15 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             <Button
               variant="soft"
               onClick={() => setMemoryDialogOpen(false)}
+              disabled={savingMemory}
             >
-              Close
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveMemory}
+              disabled={savingMemory || !memoryIsDirty}
+            >
+              {savingMemory ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>
