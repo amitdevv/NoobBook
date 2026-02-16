@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -202,6 +203,25 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
     }
   };
 
+  const handleToggleVisibility = async (connectionId: string, visibleToAll: boolean) => {
+    // Optimistic update
+    setDbConnections((prev) =>
+      prev.map((db) => (db.id === connectionId ? { ...db, visible_to_all: visibleToAll } : db))
+    );
+    try {
+      await databasesAPI.updateVisibility(connectionId, visibleToAll);
+      success(visibleToAll ? 'Visible to all users' : 'Admin only');
+    } catch (err) {
+      // Revert on failure
+      setDbConnections((prev) =>
+        prev.map((db) => (db.id === connectionId ? { ...db, visible_to_all: !visibleToAll } : db))
+      );
+      log.error({ err }, 'failed to update visibility');
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      error(axiosErr.response?.data?.error || 'Failed to update visibility');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -307,7 +327,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
                       key={db.id}
                       className="flex items-start justify-between gap-4 rounded-lg border p-3 bg-muted/20"
                     >
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium truncate">{db.name}</p>
                           <span className="text-[11px] text-muted-foreground">
@@ -321,14 +341,25 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
                           {db.connection_uri_masked}
                         </p>
                       </div>
-                      <Button
-                        variant="soft"
-                        size="sm"
-                        onClick={() => setDeleteDbId(db.id)}
-                      >
-                        <Trash size={16} className="mr-1" />
-                        Delete
-                      </Button>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <Switch
+                            checked={db.visible_to_all}
+                            onCheckedChange={(checked) => handleToggleVisibility(db.id, checked)}
+                          />
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {db.visible_to_all ? 'All users' : 'Admin only'}
+                          </span>
+                        </label>
+                        <Button
+                          variant="soft"
+                          size="sm"
+                          onClick={() => setDeleteDbId(db.id)}
+                        >
+                          <Trash size={16} className="mr-1" />
+                          Delete
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
