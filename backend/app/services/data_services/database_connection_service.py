@@ -107,7 +107,7 @@ class DatabaseConnectionService:
             "db_type": row.get("db_type"),
             "connection_uri_masked": self.mask_connection_uri(row.get("connection_uri", "")),
             "is_active": bool(row.get("is_active", True)),
-            "visible_to_all": bool(row.get("visible_to_all", False)),
+            "visible_to_all": bool(row.get("visible_to_all", True)),
             "created_at": row.get("created_at"),
             "updated_at": row.get("updated_at"),
         }
@@ -214,17 +214,20 @@ class DatabaseConnectionService:
 
         row = resp.data[0]
 
-        # Allow access if: owner, shared with user, or visible_to_all
-        if row.get("owner_user_id") != user_id and not row.get("visible_to_all"):
-            shared = (
-                self.supabase.table(self.USERS_TABLE)
-                .select("id")
-                .eq("connection_id", connection_id)
-                .eq("user_id", user_id)
-                .execute()
-            )
-            if not (shared.data or []):
-                return None
+        # Access control: visible_to_all grants read-only usage, not credential access
+        if row.get("owner_user_id") != user_id:
+            if not include_secret and row.get("visible_to_all"):
+                pass  # Allow non-credential access for visible connections
+            else:
+                shared = (
+                    self.supabase.table(self.USERS_TABLE)
+                    .select("id")
+                    .eq("connection_id", connection_id)
+                    .eq("user_id", user_id)
+                    .execute()
+                )
+                if not (shared.data or []):
+                    return None
 
         if include_secret:
             return row
