@@ -152,6 +152,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
   // Ref to track previous sources for detecting status changes
   const prevSourcesRef = useRef<Source[]>([]);
 
+  // Ref to track recently toggled source IDs (prevents stale polls from reverting)
+  const recentTogglesRef = useRef<Set<string>>(new Set());
+
   /**
    * Load sources from API (with loading state for initial load)
    */
@@ -176,7 +179,17 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
   const refreshSources = useCallback(async () => {
     try {
       const data = await sourcesAPI.listSources(projectId);
-      setSources(data);
+      setSources(prev => {
+        if (prev.length === 0) return data;
+        // Preserve active state for recently toggled sources (prevents stale polls from reverting)
+        return data.map(source => {
+          if (recentTogglesRef.current.has(source.id)) {
+            const local = prev.find(s => s.id === source.id);
+            if (local) return { ...source, active: local.active };
+          }
+          return source;
+        });
+      });
     } catch (err) {
       log.error({ err }, 'failed to Lrefreshing sourcesE');
       // Don't show toast on polling errors to avoid spam
@@ -442,19 +455,26 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
    * Users can deactivate to exclude from chat without deleting.
    */
   const handleToggleActive = async (sourceId: string, active: boolean) => {
+    // Optimistic update: change checkbox immediately
+    setSources(prev =>
+      prev.map(s => s.id === sourceId ? { ...s, active } : s)
+    );
+    // Guard against stale poll responses overwriting this toggle
+    recentTogglesRef.current.add(sourceId);
+
     try {
       await sourcesAPI.updateSource(projectId, sourceId, { active });
-      // Update local state immediately for responsive UI
-      setSources(prev =>
-        prev.map(s => s.id === sourceId ? { ...s, active } : s)
-      );
-      // Notify parent that sources changed (triggers ChatPanel refresh)
       onSourcesChange?.();
     } catch (err) {
       log.error({ err }, 'failed to Ltoggling source active stateE');
       error('Failed to update source');
-      // Reload to get correct state
-      await loadSources();
+      // Revert optimistic update on error
+      setSources(prev =>
+        prev.map(s => s.id === sourceId ? { ...s, active: !active } : s)
+      );
+    } finally {
+      // Clear the guard after a delay (allow DB to catch up)
+      setTimeout(() => recentTogglesRef.current.delete(sourceId), 3000);
     }
   };
 
