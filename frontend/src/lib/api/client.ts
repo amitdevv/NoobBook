@@ -5,7 +5,8 @@
  * This is the single source of truth for API communication.
  */
 
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError } from 'axios';
+import type { InternalAxiosRequestConfig } from 'axios';
 import { getAccessToken, getRefreshToken, setSession, clearSession } from '../auth/session';
 import { createLogger } from '@/lib/logger';
 
