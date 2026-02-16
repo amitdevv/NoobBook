@@ -123,6 +123,12 @@ API_KEYS_CONFIG = [
         'description': 'Google OAuth client secret for Drive integration',
         'category': 'utility'
     },
+    {
+        'id': 'WEBSHARE_API_KEY',
+        'name': 'Webshare Proxy',
+        'description': 'Proxy rotation for YouTube transcript fetching',
+        'category': 'utility'
+    },
 ]
 
 
