@@ -53,8 +53,22 @@ def process_youtube(
     """
     from app.services.integrations.youtube import youtube_service
 
+    logger.info("YouTube processing started for source %s (url=%s)", source_id, url)
+
     # Fetch transcript
-    result = youtube_service.get_transcript(url, include_timestamps=True)
+    try:
+        result = youtube_service.get_transcript(url, include_timestamps=True)
+    except Exception as e:
+        logger.exception("YouTube transcript fetch crashed for source %s: %s", source_id, e)
+        source_service.update_source(
+            project_id, source_id,
+            status="error",
+            processing_info={"error": f"Transcript fetch exception: {str(e)}", "url": url}
+        )
+        return {"success": False, "error": str(e)}
+
+    logger.info("YouTube transcript result for source %s: success=%s, error=%s",
+                source_id, result.get("success"), result.get("error_message"))
 
     if not result.get("success"):
         error_msg = result.get("error_message", "Failed to fetch YouTube transcript")

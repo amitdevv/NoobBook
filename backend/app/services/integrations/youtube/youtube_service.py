@@ -8,9 +8,12 @@ and transcribing audio since it uses YouTube's existing caption data.
 Install: pip install youtube-transcript-api
 """
 
+import logging
 import re
 from typing import Dict, Any, Optional, List
 from youtube_transcript_api import YouTubeTranscriptApi
+
+logger = logging.getLogger(__name__)
 
 
 class YouTubeService:
@@ -85,10 +88,13 @@ class YouTubeService:
         # Extract video ID
         video_id = self.extract_video_id(url)
         if not video_id:
+            logger.error("Could not extract video ID from URL: %s", url)
             return {
                 "success": False,
                 "error_message": f"Could not extract video ID from URL: {url}"
             }
+
+        logger.info("Fetching transcript for video_id=%s (languages=%s)", video_id, preferred_languages)
 
         try:
             # Fetch transcript using the new API
@@ -128,6 +134,7 @@ class YouTubeService:
 
         except Exception as e:
             error_msg = str(e)
+            logger.exception("YouTube transcript API error for video %s: %s", video_id, error_msg)
 
             # Provide more helpful error messages
             if "disabled" in error_msg.lower():

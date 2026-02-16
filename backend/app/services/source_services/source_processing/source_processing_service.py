@@ -119,6 +119,8 @@ class SourceProcessingService:
         temp_dir = Path(tempfile.mkdtemp(prefix=f"noobbook_{source_id}_"))
 
         try:
+            logger.info("Processing source %s (ext=%s, file=%s)", source_id, file_ext, stored_filename)
+
             # Download raw file from Supabase Storage to temp directory
             file_data = storage_service.download_raw_file(
                 project_id=project_id,
@@ -136,6 +138,7 @@ class SourceProcessingService:
 
             # Determine which processor to use
             processor_type = self.PROCESSOR_MAP.get(file_ext)
+            logger.info("Dispatching source %s to processor: %s", source_id, processor_type)
 
             if processor_type == "pdf":
                 from app.services.source_services.source_processing.pdf_processor import process_pdf
