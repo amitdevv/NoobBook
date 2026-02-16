@@ -106,6 +106,34 @@ const getSourceIcon = (source: Source): { icon: typeof File; weight?: 'bold' } =
 };
 
 /**
+ * Get a human-readable error message from processing_info.
+ * Educational Note: The backend stores detailed error info in processing_info.error.
+ * We extract a short, user-friendly message from it to show in the UI.
+ */
+const getErrorMessage = (source: Source): string => {
+  const error = (source.processing_info as Record<string, string>)?.error || '';
+
+  // YouTube IP blocking (common on cloud servers like AWS/GCP/Azure)
+  if (error.toLowerCase().includes('requestblocked') || error.toLowerCase().includes('ip') && error.toLowerCase().includes('cloud')) {
+    return 'YouTube blocks cloud server IPs (AWS/GCP/Azure). Works when self-hosted locally.';
+  }
+  if (error.toLowerCase().includes('no transcript') || error.toLowerCase().includes('disabled')) {
+    return 'No transcript available for this video.';
+  }
+  if (error.toLowerCase().includes('unavailable') || error.toLowerCase().includes('private')) {
+    return 'Video is unavailable (private, deleted, or region-locked).';
+  }
+  if (error.toLowerCase().includes('api key')) {
+    return 'API key is invalid or expired. Check your settings.';
+  }
+
+  // Return the raw error if short enough, otherwise truncate
+  if (error && error.length <= 100) return error;
+  if (error) return error.substring(0, 100) + '...';
+  return 'Processing failed';
+};
+
+/**
  * Get status display info (icon, color, text)
  * Educational Note: Different statuses indicate processing state:
  * - uploaded: Waiting to be processed (could be fresh upload or cancelled)
@@ -114,7 +142,7 @@ const getSourceIcon = (source: Source): { icon: typeof File; weight?: 'bold' } =
  * - ready: Successfully processed, available for chat
  * - error: Processing failed completely (no partial states - clean failure)
  */
-const getStatusDisplay = (status: Source['status']) => {
+const getStatusDisplay = (status: Source['status'], source?: Source) => {
   switch (status) {
     case 'uploaded':
       // Uploaded but not yet processing - could be cancelled or waiting
@@ -151,7 +179,7 @@ const getStatusDisplay = (status: Source['status']) => {
         icon: Warning,
         color: 'text-destructive',
         animate: false,
-        tooltip: 'Processing failed',
+        tooltip: source ? getErrorMessage(source) : 'Processing failed',
       };
     default:
       return null;
@@ -169,7 +197,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   onViewProcessed,
 }) => {
   const { icon: Icon, weight: iconWeight } = getSourceIcon(source);
-  const statusDisplay = getStatusDisplay(source.status);
+  const statusDisplay = getStatusDisplay(source.status, source);
   // "processing" or "embedding" are actively working - show spinner and allow cancel
   const isProcessing = source.status === 'processing';
   const isEmbedding = source.status === 'embedding';
@@ -284,8 +312,11 @@ export const SourceItem: React.FC<SourceItemProps> = ({
           </p>
           {/* Status indicator text for non-ready states */}
           {source.status !== 'ready' && statusDisplay && (
-            <span className={`text-xs ${statusDisplay.color}`}>
-              {statusDisplay.tooltip}
+            <span
+              className={`text-xs ${statusDisplay.color} truncate max-w-[140px]`}
+              title={statusDisplay.tooltip}
+            >
+              {source.status === 'error' ? 'Processing failed' : statusDisplay.tooltip}
             </span>
           )}
         </div>
@@ -340,7 +371,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
             <button
               onClick={() => onRetryProcessing(source.id)}
               className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-accent transition-colors"
-              title="Click to retry processing"
+              title={statusDisplay?.tooltip || 'Click to retry processing'}
             >
               {/* Warning - visible by default, hidden on hover */}
               <Warning
