@@ -6,10 +6,11 @@ to projects as "DATABASE" sources. We keep credentials server-side and only send
 masked connection URIs to the frontend.
 
 Routes:
-- GET    /settings/databases           - List database connections (masked)
-- POST   /settings/databases           - Create a database connection
-- DELETE /settings/databases/<id>      - Delete a database connection
-- POST   /settings/databases/validate  - Validate connection without saving
+- GET    /settings/databases                - List database connections (masked)
+- POST   /settings/databases                - Create a database connection
+- DELETE /settings/databases/<id>           - Delete a database connection
+- PATCH  /settings/databases/<id>/visibility - Toggle visible_to_all (admin only)
+- POST   /settings/databases/validate       - Validate connection without saving
 """
 
 from flask import jsonify, request, current_app
@@ -28,7 +29,9 @@ def list_databases():
         # Single-user mode still uses DEFAULT_USER_ID for ownership/scoping,
         # but we return masked URIs so non-admins can attach allowed connections.
         user_id = DEFAULT_USER_ID if not identity.is_authenticated else identity.user_id
-        connections = database_connection_service.list_connections(user_id=user_id)
+        connections = database_connection_service.list_connections(
+            user_id=user_id, is_admin=identity.is_admin
+        )
         return jsonify({"success": True, "databases": connections, "count": len(connections)}), 200
     except Exception as e:
         current_app.logger.error(f"Error listing databases: {e}")
@@ -88,6 +91,28 @@ def delete_database(connection_id: str):
         return jsonify({"success": True, "message": "Database connection deleted"}), 200
     except Exception as e:
         current_app.logger.error(f"Error deleting database connection {connection_id}: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@settings_bp.route("/settings/databases/<connection_id>/visibility", methods=["PATCH"])
+@require_admin
+def update_database_visibility(connection_id: str):
+    """Toggle whether a database connection is visible to all users."""
+    try:
+        data = request.get_json() or {}
+        visible_to_all = data.get("visible_to_all")
+        if visible_to_all is None:
+            return jsonify({"success": False, "error": "visible_to_all is required"}), 400
+
+        updated = database_connection_service.update_connection_visibility(
+            connection_id, bool(visible_to_all)
+        )
+        if not updated:
+            return jsonify({"success": False, "error": "Database connection not found"}), 404
+
+        return jsonify({"success": True, "database": updated}), 200
+    except Exception as e:
+        current_app.logger.error(f"Error updating database visibility {connection_id}: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 

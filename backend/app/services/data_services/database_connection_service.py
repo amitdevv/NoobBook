@@ -37,6 +37,7 @@ class DatabaseConnection:
     db_type: str  # "postgresql" | "mysql"
     connection_uri: str
     is_active: bool
+    visible_to_all: bool
     created_at: str
     updated_at: str
 
@@ -106,6 +107,7 @@ class DatabaseConnectionService:
             "db_type": row.get("db_type"),
             "connection_uri_masked": self.mask_connection_uri(row.get("connection_uri", "")),
             "is_active": bool(row.get("is_active", True)),
+            "visible_to_all": bool(row.get("visible_to_all", True)),
             "created_at": row.get("created_at"),
             "updated_at": row.get("updated_at"),
         }
@@ -114,8 +116,24 @@ class DatabaseConnectionService:
     # CRUD
     # ---------------------------------------------------------------------
 
-    def list_connections(self, user_id: str = DEFAULT_USER_ID) -> List[Dict[str, Any]]:
-        """List all connections the user can access (owner + shared)."""
+    def list_connections(
+        self, user_id: str = DEFAULT_USER_ID, is_admin: bool = False
+    ) -> List[Dict[str, Any]]:
+        """
+        List all connections the user can access.
+
+        Admins see ALL connections. Non-admins see owned + shared + visible_to_all.
+        """
+        if is_admin:
+            all_resp = (
+                self.supabase.table(self.TABLE)
+                .select("*")
+                .order("created_at", desc=True)
+                .execute()
+            )
+            return [self._format_for_frontend(row) for row in (all_resp.data or [])]
+
+        # Non-admin: owned connections
         owned_resp = (
             self.supabase.table(self.TABLE)
             .select("*")
@@ -124,6 +142,9 @@ class DatabaseConnectionService:
             .execute()
         )
         connections = owned_resp.data or []
+
+        # Track IDs the user directly owns or is shared with (they can see URIs)
+        privileged_ids: set = {c.get("id") for c in connections}
 
         # Shared connections (multi-user mode)
         shared_resp = (
@@ -143,6 +164,17 @@ class DatabaseConnectionService:
                 .execute()
             )
             connections.extend(shared_connections_resp.data or [])
+            privileged_ids.update(shared_ids)
+
+        # Connections marked visible to all users
+        visible_resp = (
+            self.supabase.table(self.TABLE)
+            .select("*")
+            .eq("visible_to_all", True)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        connections.extend(visible_resp.data or [])
 
         # Dedupe by id
         deduped: Dict[str, Dict[str, Any]] = {}
@@ -151,7 +183,14 @@ class DatabaseConnectionService:
             if cid:
                 deduped[cid] = c
 
-        return [self._format_for_frontend(row) for row in deduped.values()]
+        # Strip masked URI from connections the user only has access to via visible_to_all
+        results = []
+        for row in deduped.values():
+            formatted = self._format_for_frontend(row)
+            if row.get("id") not in privileged_ids:
+                formatted["connection_uri_masked"] = ""
+            results.append(formatted)
+        return results
 
     def get_connection(
         self,
@@ -175,19 +214,20 @@ class DatabaseConnectionService:
 
         row = resp.data[0]
 
-        # Owner check (single-user mode). For shared connections, row-level security
-        # should enforce access in multi-user mode.
+        # Access control: visible_to_all grants read-only usage, not credential access
         if row.get("owner_user_id") != user_id:
-            # Allow if shared
-            shared = (
-                self.supabase.table(self.USERS_TABLE)
-                .select("id")
-                .eq("connection_id", connection_id)
-                .eq("user_id", user_id)
-                .execute()
-            )
-            if not (shared.data or []):
-                return None
+            if not include_secret and row.get("visible_to_all"):
+                pass  # Allow non-credential access for visible connections
+            else:
+                shared = (
+                    self.supabase.table(self.USERS_TABLE)
+                    .select("id")
+                    .eq("connection_id", connection_id)
+                    .eq("user_id", user_id)
+                    .execute()
+                )
+                if not (shared.data or []):
+                    return None
 
         if include_secret:
             return row
@@ -235,6 +275,20 @@ class DatabaseConnectionService:
 
         self.supabase.table(self.TABLE).delete().eq("id", connection_id).execute()
         return True
+
+    def update_connection_visibility(
+        self, connection_id: str, visible_to_all: bool
+    ) -> Optional[Dict[str, Any]]:
+        """Toggle whether a connection is visible to all users (admin only)."""
+        resp = (
+            self.supabase.table(self.TABLE)
+            .update({"visible_to_all": visible_to_all})
+            .eq("id", connection_id)
+            .execute()
+        )
+        if not resp.data:
+            return None
+        return self._format_for_frontend(resp.data[0])
 
     # ---------------------------------------------------------------------
     # Validation

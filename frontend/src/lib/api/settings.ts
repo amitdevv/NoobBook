@@ -39,6 +39,7 @@ export interface DatabaseConnection {
   db_type: DatabaseType;
   connection_uri_masked: string;
   is_active: boolean;
+  visible_to_all: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -155,6 +156,19 @@ class DatabasesAPI {
       await axios.delete(`${API_BASE_URL}/settings/databases/${connectionId}`);
     } catch (error) {
       log.error({ err: error }, 'failed to delete database');
+      throw error;
+    }
+  }
+
+  async updateVisibility(connectionId: string, visibleToAll: boolean): Promise<DatabaseConnection> {
+    try {
+      const response = await axios.patch(
+        `${API_BASE_URL}/settings/databases/${connectionId}/visibility`,
+        { visible_to_all: visibleToAll }
+      );
+      return response.data.database;
+    } catch (error) {
+      log.error({ err: error }, 'failed to update database visibility');
       throw error;
     }
   }
