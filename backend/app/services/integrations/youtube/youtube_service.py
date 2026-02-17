@@ -282,7 +282,7 @@ class YouTubeService:
         elif "no transcript" in error_lower:
             friendly = "No transcript available for this video"
         else:
-            friendly = f"Error fetching transcript: {error_msg}"
+            friendly = "Error fetching transcript. Check server logs for details."
 
         return {
             "success": False,
