@@ -16,7 +16,7 @@ import { Button } from '../../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { SquaresFour, Copy, DownloadSimple, Check } from '@phosphor-icons/react';
 import { type ComponentJob } from '@/lib/api/studio';
-import { getAuthUrl } from '@/lib/api/client';
+import { api, getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
 import { createLogger } from '@/lib/logger';
 
@@ -39,8 +39,8 @@ export const ComponentViewerModal: React.FC<ComponentViewerModalProps> = ({
   const copyToClipboard = async (previewUrl: string, index: number) => {
     try {
       // Fetch the HTML content from the preview URL
-      const response = await fetch(getAuthUrl(previewUrl));
-      const htmlContent = await response.text();
+      const response = await api.get(previewUrl, { responseType: 'text' });
+      const htmlContent = response.data;
 
       await navigator.clipboard.writeText(htmlContent);
       setCopiedIndex(index);

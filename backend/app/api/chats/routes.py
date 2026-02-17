@@ -108,13 +108,26 @@ def update_chat(project_id, chat_id):
     try:
         data = request.get_json()
 
-        if not data or 'title' not in data:
+        if not data:
             return jsonify({
                 'success': False,
-                'error': 'Title is required'
+                'error': 'Request body is required'
             }), 400
 
-        chat = chat_service.update_chat(project_id, chat_id, {"title": data['title']})
+        # Build updates from allowed fields
+        updates = {}
+        if 'title' in data:
+            updates['title'] = data['title']
+        if 'selected_source_ids' in data:
+            updates['selected_source_ids'] = data['selected_source_ids']
+
+        if not updates:
+            return jsonify({
+                'success': False,
+                'error': 'No valid fields to update'
+            }), 400
+
+        chat = chat_service.update_chat(project_id, chat_id, updates)
 
         if not chat:
             return jsonify({

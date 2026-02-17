@@ -54,6 +54,7 @@ export interface Chat {
   updated_at: string;
   messages: Message[];
   studio_signals: StudioSignal[];
+  selected_source_ids: string[] | null;
   metadata: {
     source_references: unknown[];
     sub_agents: unknown[];
@@ -181,6 +182,27 @@ class ChatsAPI {
       return response.data.chat;
     } catch (error) {
       log.error({ err: error }, 'failed to update chat');
+      throw error;
+    }
+  }
+
+  /**
+   * Update which sources are selected for a specific chat.
+   * Educational Note: Per-chat source selection — each chat maintains its own
+   * set of selected sources independently.
+   */
+  async updateChatSources(
+    projectId: string,
+    chatId: string,
+    selectedSourceIds: string[]
+  ): Promise<void> {
+    try {
+      await axios.put(
+        `${API_BASE_URL}/projects/${projectId}/chats/${chatId}`,
+        { selected_source_ids: selectedSourceIds }
+      );
+    } catch (error) {
+      log.error({ err: error }, 'failed to update chat sources');
       throw error;
     }
   }

@@ -98,7 +98,7 @@ class TavilyService:
             }
 
         except ValueError as e:
-            # API key not configured
+            logger.error("Tavily search config error: %s", e)
             return {
                 "success": False,
                 "error": str(e)
@@ -167,6 +167,7 @@ class TavilyService:
                 )
 
         except ValueError as e:
+            logger.error("Tavily advanced config error: %s", e)
             return {"success": False, "error": str(e)}
         except Exception as e:
             logger.error("Tavily advanced error: %s", e)

@@ -215,6 +215,7 @@ class TTSService:
             }
 
         except ValueError as e:
+            logger.error("TTS configuration error: %s", e)
             return {"success": False, "error": str(e)}
         except Exception as e:
             logger.exception("Error generating TTS audio")

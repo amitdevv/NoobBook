@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS database_connections (
   db_type TEXT NOT NULL,
   connection_uri TEXT NOT NULL,
   is_active BOOLEAN DEFAULT true,
+  visible_to_all BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT valid_db_type CHECK (db_type IN ('postgresql', 'mysql')),
