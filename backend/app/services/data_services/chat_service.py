@@ -296,7 +296,7 @@ class ChatService:
             return None
 
         # Filter allowed updates
-        allowed_fields = ["title"]
+        allowed_fields = ["title", "selected_source_ids"]
         filtered_updates = {k: v for k, v in updates.items() if k in allowed_fields}
 
         if not filtered_updates:

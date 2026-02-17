@@ -25,30 +25,45 @@ class ContextLoader:
     - Project memory (specific to current project)
     """
 
-    def get_active_sources(self, project_id: str) -> List[Dict[str, Any]]:
+    def get_active_sources(
+        self,
+        project_id: str,
+        selected_source_ids: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Get list of active and ready sources for a project.
 
-        Educational Note: A source must be both:
-        - status: "ready" (processing complete)
-        - active: True (user hasn't disabled it)
+        Educational Note: When selected_source_ids is provided (per-chat selection),
+        only sources in that list with status "ready" are returned.
+        When None or empty, returns an empty list (no sources in context).
 
         Args:
             project_id: The project UUID
+            selected_source_ids: Per-chat source selection (None = no sources)
 
         Returns:
-            List of source metadata dicts for active/ready sources
+            List of source metadata dicts for selected/ready sources
         """
+        # Per-chat selection: empty or None means no sources selected
+        if not selected_source_ids:
+            return []
+
         all_sources = source_service.list_sources(project_id)
 
+        # Filter to selected sources that are ready
+        selected_set = set(selected_source_ids)
         active_sources = [
             source for source in all_sources
-            if source.get("status") == "ready" and source.get("active", False)
+            if source.get("id") in selected_set and source.get("status") == "ready"
         ]
 
         return active_sources
 
-    def build_source_context(self, project_id: str) -> str:
+    def build_source_context(
+        self,
+        project_id: str,
+        selected_source_ids: Optional[List[str]] = None,
+    ) -> str:
         """
         Build formatted source context for the system prompt.
 
@@ -58,11 +73,12 @@ class ContextLoader:
 
         Args:
             project_id: The project UUID
+            selected_source_ids: Per-chat source selection (None = no sources)
 
         Returns:
             Formatted string to append to system prompt, or empty string if no sources
         """
-        active_sources = self.get_active_sources(project_id)
+        active_sources = self.get_active_sources(project_id, selected_source_ids=selected_source_ids)
 
         if not active_sources:
             return ""
@@ -210,7 +226,12 @@ class ContextLoader:
 
         return "\n".join(lines)
 
-    def build_full_context(self, project_id: str, user_id: Optional[str] = None) -> str:
+    def build_full_context(
+        self,
+        project_id: str,
+        user_id: Optional[str] = None,
+        selected_source_ids: Optional[List[str]] = None,
+    ) -> str:
         """
         Build complete context including sources and memory.
 
@@ -219,6 +240,7 @@ class ContextLoader:
 
         Args:
             project_id: The project UUID
+            selected_source_ids: Per-chat source selection (None = no sources)
 
         Returns:
             Complete context string to append to system prompt
@@ -231,7 +253,7 @@ class ContextLoader:
             parts.append(memory_context)
 
         # Add source context (available tools)
-        source_context = self.build_source_context(project_id)
+        source_context = self.build_source_context(project_id, selected_source_ids=selected_source_ids)
         if source_context:
             parts.append(source_context)
 

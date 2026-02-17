@@ -11,6 +11,7 @@ import {
   isSourceViewable,
   type Source,
 } from '../../lib/api/sources';
+import { chatsAPI } from '../../lib/api/chats';
 import { useToast, ToastContainer } from '../ui/toast';
 import { SourcesHeader } from './SourcesHeader';
 import { SourcesList } from './SourcesList';
@@ -65,6 +66,9 @@ interface SourcesPanelProps {
   isCollapsed?: boolean;
   onExpand?: () => void;
   onSourcesChange?: () => void;
+  activeChatId?: string | null;
+  selectedSourceIds?: string[];
+  onSelectedSourcesChange?: (ids: string[]) => void;
 }
 
 /**
@@ -116,7 +120,15 @@ const getSourceIcon = (source: Source): typeof File => {
   }
 };
 
-export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollapsed, onExpand, onSourcesChange }) => {
+export const SourcesPanel: React.FC<SourcesPanelProps> = ({
+  projectId,
+  isCollapsed,
+  onExpand,
+  onSourcesChange,
+  activeChatId,
+  selectedSourceIds = [],
+  onSelectedSourcesChange,
+}) => {
   const { toasts, dismissToast, success, error } = useToast();
 
   // State
@@ -155,6 +167,10 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
   // Ref to track recently toggled source IDs (prevents stale polls from reverting)
   const recentTogglesRef = useRef<Set<string>>(new Set());
 
+  // Ref for selectedSourceIds to use in callbacks without re-creating them
+  const selectedSourceIdsRef = useRef(selectedSourceIds);
+  selectedSourceIdsRef.current = selectedSourceIds;
+
   /**
    * Load sources from API (with loading state for initial load)
    */
@@ -162,7 +178,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
     try {
       setLoading(true);
       const data = await sourcesAPI.listSources(projectId);
-      setSources(data);
+      // Override active flag with per-chat selection
+      const ids = selectedSourceIdsRef.current;
+      setSources(data.map(s => ({ ...s, active: ids.includes(s.id) })));
     } catch (err) {
       log.error({ err }, 'failed to Lloading sourcesE');
       errorRef.current('Failed to load sources');
@@ -179,15 +197,17 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
   const refreshSources = useCallback(async () => {
     try {
       const data = await sourcesAPI.listSources(projectId);
+      const ids = selectedSourceIdsRef.current;
       setSources(prev => {
-        if (prev.length === 0) return data;
+        if (prev.length === 0) return data.map(s => ({ ...s, active: ids.includes(s.id) }));
         // Preserve active state for recently toggled sources (prevents stale polls from reverting)
         return data.map(source => {
           if (recentTogglesRef.current.has(source.id)) {
             const local = prev.find(s => s.id === source.id);
             if (local) return { ...source, active: local.active };
           }
-          return source;
+          // Override active from per-chat selection
+          return { ...source, active: ids.includes(source.id) };
         });
       });
     } catch (err) {
@@ -225,6 +245,17 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
       onSourcesChangeRef.current?.();
     }
   }, [sources]);
+
+  /**
+   * Derive source.active from per-chat selectedSourceIds.
+   * Educational Note: Source checkboxes now reflect the active chat's selection,
+   * not the global is_active flag from the backend.
+   */
+  useEffect(() => {
+    setSources(prev =>
+      prev.map(s => ({ ...s, active: selectedSourceIds.includes(s.id) }))
+    );
+  }, [selectedSourceIds]);
 
   /**
    * Polling for source status updates
@@ -449,26 +480,38 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({ projectId, isCollaps
   };
 
   /**
-   * Toggle source active state
-   * Educational Note: Active sources are included in chat context.
-   * When a source becomes "ready", it's active by default.
-   * Users can deactivate to exclude from chat without deleting.
+   * Toggle source active state (per-chat selection).
+   * Educational Note: Instead of updating the source's global is_active flag,
+   * we now update the chat's selected_source_ids array. Each chat maintains
+   * its own set of selected sources independently.
    */
   const handleToggleActive = async (sourceId: string, active: boolean) => {
+    if (!activeChatId) return; // No chat selected — can't toggle
+
+    // Compute new selection
+    const newIds = active
+      ? [...selectedSourceIds, sourceId]
+      : selectedSourceIds.filter(id => id !== sourceId);
+
     // Optimistic update: change checkbox immediately
     setSources(prev =>
       prev.map(s => s.id === sourceId ? { ...s, active } : s)
     );
+    onSelectedSourcesChange?.(newIds);
+
     // Guard against stale poll responses overwriting this toggle
     recentTogglesRef.current.add(sourceId);
 
     try {
-      await sourcesAPI.updateSource(projectId, sourceId, { active });
-      onSourcesChange?.();
+      await chatsAPI.updateChatSources(projectId, activeChatId, newIds);
     } catch (err) {
-      log.error({ err }, 'failed to toggle source active state');
-      error('Failed to update source');
+      log.error({ err }, 'failed to update chat source selection');
+      error('Failed to update source selection');
       // Revert optimistic update on error
+      const revertedIds = active
+        ? selectedSourceIds.filter(id => id !== sourceId)
+        : [...selectedSourceIds, sourceId];
+      onSelectedSourcesChange?.(revertedIds);
       setSources(prev =>
         prev.map(s => s.id === sourceId ? { ...s, active: !active } : s)
       );

@@ -5,7 +5,7 @@
  * and manages chat state and API interactions.
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sparkle } from '@phosphor-icons/react';
 import { Skeleton } from '../ui/skeleton';
 import { chatsAPI } from '@/lib/api/chats';
@@ -29,9 +29,19 @@ interface ChatPanelProps {
   sourcesVersion?: number;
   onCostsChange?: () => void; // Called after message sent to trigger cost refresh
   onSignalsChange?: (signals: StudioSignal[]) => void; // Called when studio signals change
+  selectedSourceIds: string[]; // Per-chat source selection from parent
+  onActiveChatChange: (chatId: string | null, selectedSourceIds: string[]) => void; // Notify parent of chat change
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, sourcesVersion, onCostsChange, onSignalsChange }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({
+  projectId,
+  projectName,
+  sourcesVersion,
+  onCostsChange,
+  onSignalsChange,
+  selectedSourceIds,
+  onActiveChatChange,
+}) => {
   const { toasts, dismissToast, success, error } = useToast();
 
   // Chat state
@@ -46,11 +56,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
   // Sources state for header display
   const [sources, setSources] = useState<Source[]>([]);
 
-  // Memoize active sources count to prevent recalculation on every render
-  const activeSources = useMemo(
-    () => sources.filter(s => s.status === 'ready' && s.active).length,
-    [sources]
-  );
+  // Active sources count derived from per-chat selection
+  const activeSources = selectedSourceIds.length;
 
   // Voice recording hook
   const {
@@ -91,6 +98,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
     try {
       const chat = await chatsAPI.getChat(projectId, chatId);
       setActiveChat(chat);
+      // Notify parent of per-chat source selection
+      onActiveChatChange(chat.id, chat.selected_source_ids ?? []);
     } catch (err) {
       log.error({ err }, 'failed to Lloading chatE');
       error('Failed to load chat');
@@ -260,6 +269,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
       const newChat = await chatsAPI.createChat(projectId, 'New Chat');
       await loadChats();
       await loadFullChat(newChat.id);
+      // New chats start with no sources selected (loadFullChat will call onActiveChatChange)
       setShowChatList(false);
       success('New chat created');
     } catch (err) {
@@ -283,9 +293,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ projectId, projectName, so
     try {
       await chatsAPI.deleteChat(projectId, chatId);
 
-      // If the deleted chat was active, clear it
+      // If the deleted chat was active, clear it and reset source selection
       if (activeChat?.id === chatId) {
         setActiveChat(null);
+        onActiveChatChange(null, []);
       }
 
       await loadChats();
