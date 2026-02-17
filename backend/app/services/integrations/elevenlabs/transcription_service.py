@@ -7,8 +7,11 @@ to connect to ElevenLabs' real-time WebSocket transcription API.
 Security Note: We never expose the API key to the frontend. Instead, we
 generate a short-lived token that the frontend uses for WebSocket auth.
 """
+import logging
 import os
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class TranscriptionService:
@@ -50,6 +53,7 @@ class TranscriptionService:
         api_key = os.getenv('ELEVENLABS_API_KEY')
 
         if not api_key:
+            logger.error("ELEVENLABS_API_KEY not found in environment")
             raise ValueError("ELEVENLABS_API_KEY not found in environment")
 
         # Request a single-use token from ElevenLabs
@@ -60,6 +64,7 @@ class TranscriptionService:
         )
 
         if response.status_code != 200:
+            logger.error("Failed to generate ElevenLabs scribe token: %s", response.text)
             raise Exception(f"Failed to generate token: {response.text}")
 
         data = response.json()

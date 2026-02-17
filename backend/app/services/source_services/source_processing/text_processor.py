@@ -77,7 +77,14 @@ def process_text(
     )
 
     if not storage_path:
-        raise ValueError("Failed to upload processed text to storage")
+        logger.error("Failed to upload processed text to storage for source %s", source_id)
+        source_service.update_source(
+            project_id,
+            source_id,
+            status="error",
+            processing_info={"error": "Failed to upload processed text to storage"}
+        )
+        return {"success": False, "error": "Failed to upload processed text to storage"}
 
     processing_info = {
         "processor": "text_processor",

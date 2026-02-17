@@ -12,9 +12,12 @@ Our application uses:
 - Metric: cosine similarity
 - Namespace: project_id (isolate vectors by project)
 """
+import logging
 import os
 from typing import List, Dict, Any, Optional
 from pinecone import Pinecone
+
+logger = logging.getLogger(__name__)
 
 
 class PineconeService:
@@ -287,7 +290,8 @@ class PineconeService:
 
             client = self._get_client()
             return client.has_index(self.INDEX_NAME)
-        except Exception:
+        except Exception as e:
+            logger.error("Pinecone configuration check failed: %s", e)
             return False
 
 

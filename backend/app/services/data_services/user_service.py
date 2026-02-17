@@ -7,6 +7,7 @@ which causes auth.admin methods to use the user's token instead of the
 service_role key. By creating a separate client here, we ensure admin
 operations always use the service_role key.
 """
+import logging
 import os
 from typing import Dict, List, Optional, Tuple
 
@@ -14,6 +15,8 @@ from supabase import create_client
 
 from app.services.integrations.supabase import is_supabase_enabled
 from app.utils.password_utils import generate_secure_password
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:

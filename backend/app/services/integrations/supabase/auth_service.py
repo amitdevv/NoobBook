@@ -155,6 +155,26 @@ class AuthService:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def refresh_with_token(self, refresh_token: str) -> Dict[str, Any]:
+        """
+        Refresh session using a client-provided refresh token.
+
+        Educational Note: Unlike refresh_session() which uses the server-side session,
+        this method accepts a refresh token from the client. This is needed because
+        the frontend stores its own tokens and the server doesn't maintain session state.
+        When the access_token (JWT) expires, the client sends its refresh_token here
+        to get a new token pair without requiring the user to re-login.
+        """
+        try:
+            response = self.supabase.auth.refresh_session(refresh_token)
+            return {
+                "success": True,
+                "session": self._serialize_session(response.session),
+            }
+        except Exception as e:
+            logger.error("Token refresh failed: %s", e)
+            return {"success": False, "error": "Token refresh failed"}
+
     def reset_password_email(self, email: str) -> Dict[str, Any]:
         """
         Send a password reset email to the user.

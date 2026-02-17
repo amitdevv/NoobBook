@@ -10,10 +10,13 @@ Separation of Concerns:
 - message_service.py: Message persistence
 - prompt_loader.py: Prompt management
 """
+import logging
 from datetime import datetime
 from typing import Optional, Dict, List, Any
 
 from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+
+logger = logging.getLogger(__name__)
 
 
 class ChatService:

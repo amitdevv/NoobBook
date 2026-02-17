@@ -47,6 +47,7 @@ def process_csv(
         Dict with success status
     """
     source_name = source.get("name", "unknown")
+    logger.info("Processing CSV source: %s", source_name)
 
     # Use AI service to analyze CSV and generate summary
     analysis_result = csv_service.analyze_csv(
@@ -65,8 +66,18 @@ def process_csv(
         return {"success": False, "error": analysis_result.get("error")}
 
     # Read CSV content and upload to processed storage
-    with open(raw_file_path, "r", encoding="utf-8") as f:
-        csv_content = f.read()
+    try:
+        with open(raw_file_path, "r", encoding="utf-8") as f:
+            csv_content = f.read()
+    except Exception as e:
+        logger.error("Failed to read CSV file %s: %s", raw_file_path, e)
+        source_service.update_source(
+            project_id,
+            source_id,
+            status="error",
+            processing_info={"error": f"Failed to read CSV file: {e}"}
+        )
+        return {"success": False, "error": f"Failed to read CSV file: {e}"}
 
     storage_path = storage_service.upload_processed_file(
         project_id=project_id,
@@ -75,6 +86,7 @@ def process_csv(
     )
 
     if not storage_path:
+        logger.error("Failed to upload CSV to storage for source %s", source_id)
         source_service.update_source(
             project_id,
             source_id,

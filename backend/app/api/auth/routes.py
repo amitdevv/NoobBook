@@ -2,10 +2,11 @@
 Identity and authentication endpoints.
 
 Routes:
-- GET  /auth/me      - return current user's identity + RBAC role
-- POST /auth/signup  - Create new user account
-- POST /auth/signin  - Sign in with email/password
-- POST /auth/signout - Sign out
+- GET  /auth/me       - return current user's identity + RBAC role
+- POST /auth/signup   - Create new user account
+- POST /auth/signin   - Sign in with email/password
+- POST /auth/signout  - Sign out
+- POST /auth/refresh  - Refresh expired JWT using refresh token
 """
 
 from flask import jsonify, request
@@ -85,3 +86,25 @@ def signout():
     if not result.get("success"):
         return jsonify({"success": False, "error": result.get("error", "Sign out failed")}), 400
     return jsonify({"success": True}), 200
+
+
+@auth_bp.route("/auth/refresh", methods=["POST"])
+def refresh():
+    """
+    Refresh an expired JWT using the client's refresh token.
+
+    Educational Note: JWTs expire after ~1 hour. Long-running operations (like
+    studio blog generation) can outlast the token. Instead of forcing re-login,
+    the frontend sends its stored refresh_token here to get a fresh token pair.
+    This endpoint is excluded from auth checks (the before_request hook in
+    app/api/__init__.py skips /auth/* routes).
+    """
+    data = request.get_json() or {}
+    refresh_token = data.get("refresh_token")
+    if not refresh_token:
+        return jsonify({"success": False, "error": "refresh_token is required"}), 400
+
+    result = auth_service.refresh_with_token(refresh_token)
+    if not result.get("success"):
+        return jsonify(result), 401
+    return jsonify(result), 200

@@ -142,12 +142,14 @@ class TaskService:
         def task_wrapper():
             try:
                 # Update status to running
+                logger.info("Task %s starting (%s for %s)", task_id, task_type, target_id)
                 self._update_task(task_id, status="running", started_at=datetime.now().isoformat())
 
                 # Execute the actual task
                 result = callable_func(*args, **kwargs)
 
                 # Update status to completed
+                logger.info("Task %s completed (%s for %s)", task_id, task_type, target_id)
                 self._update_task(
                     task_id,
                     status="completed",
@@ -159,7 +161,7 @@ class TaskService:
 
             except Exception as e:
                 # Update status to failed
-                logger.exception("Task %s failed", task_id)
+                logger.exception("Task %s failed (%s for %s): %s", task_id, task_type, target_id, e)
                 self._update_task(
                     task_id,
                     status="failed",

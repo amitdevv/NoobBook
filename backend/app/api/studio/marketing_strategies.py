@@ -40,8 +40,8 @@ def generate_marketing_strategy(project_id: str):
     """
     from app.services.ai_agents import marketing_strategy_agent_service
     from app.services.source_services import source_service
+    from app.services.background_services.task_service import task_service
     import uuid
-    from concurrent.futures import ThreadPoolExecutor
 
     try:
         data = request.get_json()
@@ -75,16 +75,16 @@ def generate_marketing_strategy(project_id: str):
             direction=direction
         )
 
-        # Start background task
-        executor = ThreadPoolExecutor(max_workers=1)
-        executor.submit(
-            marketing_strategy_agent_service.marketing_strategy_agent_service.generate_marketing_strategy,
-            project_id,
-            source_id,
-            job_id,
-            direction
+        # Start background task using centralized task_service
+        task_service.submit_task(
+            task_type="marketing_strategy",
+            target_id=job_id,
+            callable_func=marketing_strategy_agent_service.marketing_strategy_agent_service.generate_marketing_strategy,
+            project_id=project_id,
+            source_id=source_id,
+            job_id=job_id,
+            direction=direction,
         )
-        executor.shutdown(wait=False)
 
         return jsonify({
             'success': True,

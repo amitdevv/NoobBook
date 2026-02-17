@@ -6,7 +6,7 @@
 
 import { useState, useRef } from 'react';
 import { audioAPI, type AudioJob } from '@/lib/api/studio';
-import { getAuthUrl } from '@/lib/api/client';
+import { api, getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
 import { createLogger } from '@/lib/logger';
@@ -183,8 +183,8 @@ export const useAudioGeneration = (projectId: string) => {
     if (!job.audio_url) return;
 
     try {
-      const response = await fetch(getAuthUrl(job.audio_url));
-      const blob = await response.blob();
+      const response = await api.get(job.audio_url, { responseType: 'blob' });
+      const blob = new Blob([response.data]);
       const url = URL.createObjectURL(blob);
 
       const link = document.createElement('a');
