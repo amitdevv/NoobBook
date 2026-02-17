@@ -101,7 +101,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       // Notify parent of per-chat source selection
       onActiveChatChange(chat.id, chat.selected_source_ids ?? []);
     } catch (err) {
-      log.error({ err }, 'failed to Lloading chatE');
+      log.error({ err }, 'failed to load chat');
       error('Failed to load chat');
     }
   };

@@ -33,22 +33,33 @@ class ContextLoader:
         """
         Get list of active and ready sources for a project.
 
-        Educational Note: When selected_source_ids is provided (per-chat selection),
-        only sources in that list with status "ready" are returned.
-        When None or empty, returns an empty list (no sources in context).
+        Educational Note: When selected_source_ids is a list, only those sources
+        with status "ready" are returned. When None (legacy chats that predate
+        per-chat selection), falls back to all ready+active sources for backwards
+        compatibility. An empty list [] means explicitly no sources selected.
 
         Args:
             project_id: The project UUID
-            selected_source_ids: Per-chat source selection (None = no sources)
+            selected_source_ids: Per-chat source selection
+                - None = legacy chat, use all ready+active sources
+                - [] = explicitly no sources selected
+                - [...] = only these sources
 
         Returns:
             List of source metadata dicts for selected/ready sources
         """
-        # Per-chat selection: empty or None means no sources selected
-        if not selected_source_ids:
-            return []
-
         all_sources = source_service.list_sources(project_id)
+
+        if selected_source_ids is None:
+            # Legacy chat (column is NULL) — fall back to global active flag
+            return [
+                source for source in all_sources
+                if source.get("status") == "ready" and source.get("active", False)
+            ]
+
+        if not selected_source_ids:
+            # Explicitly empty selection
+            return []
 
         # Filter to selected sources that are ready
         selected_set = set(selected_source_ids)

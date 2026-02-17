@@ -486,7 +486,10 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
    * its own set of selected sources independently.
    */
   const handleToggleActive = async (sourceId: string, active: boolean) => {
-    if (!activeChatId) return; // No chat selected — can't toggle
+    if (!activeChatId) {
+      error('Create or select a chat first to toggle sources');
+      return;
+    }
 
     // Compute new selection
     const newIds = active

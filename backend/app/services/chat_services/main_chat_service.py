@@ -295,7 +295,9 @@ class MainChatService:
 
         # Step 2: Get config and build system prompt
         # Per-chat source selection: read which sources this chat has selected
-        selected_source_ids = chat.get("selected_source_ids") or []
+        # None = legacy chat (never set) → fall back to all ready sources
+        # [] = explicitly no sources selected
+        selected_source_ids = chat.get("selected_source_ids")
         prompt_config = prompt_loader.get_project_prompt_config(project_id)
         base_prompt = prompt_config.get("system_prompt", "")
         system_prompt = self._build_system_prompt(
