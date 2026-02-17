@@ -136,17 +136,20 @@ class MainChatService:
         project_id: str,
         base_prompt: str,
         user_id: Optional[str] = None,
+        selected_source_ids: Optional[List[str]] = None,
     ) -> str:
         """
         Build system prompt with memory and source context appended.
 
         Educational Note: Context is rebuilt on every message to reflect
-        current state (memory updates, active/inactive sources).
+        current state (memory updates, per-chat source selections).
         Includes both memory context (personalization) and source context (tools).
         """
         parts = [base_prompt]
 
-        full_context = context_loader.build_full_context(project_id, user_id=user_id)
+        full_context = context_loader.build_full_context(
+            project_id, user_id=user_id, selected_source_ids=selected_source_ids
+        )
         if full_context:
             parts.append(full_context)
 
@@ -291,12 +294,18 @@ class MainChatService:
         user_msg = message_service.add_user_message(project_id, chat_id, user_message_text)
 
         # Step 2: Get config and build system prompt
+        # Per-chat source selection: read which sources this chat has selected
+        # None = legacy chat (never set) → fall back to all ready sources
+        # [] = explicitly no sources selected
+        selected_source_ids = chat.get("selected_source_ids")
         prompt_config = prompt_loader.get_project_prompt_config(project_id)
         base_prompt = prompt_config.get("system_prompt", "")
-        system_prompt = self._build_system_prompt(project_id, base_prompt, user_id=user_id)
+        system_prompt = self._build_system_prompt(
+            project_id, base_prompt, user_id=user_id, selected_source_ids=selected_source_ids
+        )
 
         # Step 3: Get tools (memory always available, search for non-CSV, analyzer for CSV)
-        active_sources = context_loader.get_active_sources(project_id)
+        active_sources = context_loader.get_active_sources(project_id, selected_source_ids=selected_source_ids)
         # Separate sources by file extension (stored inside embedding_info)
         def _file_ext(source: Dict[str, Any]) -> str:
             embedding_info = source.get("embedding_info", {}) or {}

@@ -70,6 +70,21 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     setStudioSignals(signals);
   }, []);
 
+  // Per-chat source selection state
+  // Educational Note: Each chat maintains its own selected sources independently.
+  // activeChatId tracks which chat is open; selectedSourceIds tracks that chat's selections.
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
+
+  const handleActiveChatChange = useCallback((chatId: string | null, sourceIds: string[]) => {
+    setActiveChatId(chatId);
+    setSelectedSourceIds(sourceIds);
+  }, []);
+
+  const handleSelectedSourcesChange = useCallback((newIds: string[]) => {
+    setSelectedSourceIds(newIds);
+  }, []);
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Project Header - sits on background layer */}
@@ -105,6 +120,9 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   isCollapsed={!leftPanelOpen}
                   onExpand={() => leftPanelRef.current?.expand()}
                   onSourcesChange={handleSourcesChange}
+                  activeChatId={activeChatId}
+                  selectedSourceIds={selectedSourceIds}
+                  onSelectedSourcesChange={handleSelectedSourcesChange}
                 />
                 {leftPanelOpen && (
                   <Button
@@ -130,6 +148,8 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   sourcesVersion={sourcesVersion}
                   onCostsChange={handleCostsChange}
                   onSignalsChange={handleSignalsChange}
+                  selectedSourceIds={selectedSourceIds}
+                  onActiveChatChange={handleActiveChatChange}
                 />
               </div>
             </ResizablePanel>
