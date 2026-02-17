@@ -182,7 +182,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       const ids = selectedSourceIdsRef.current;
       setSources(data.map(s => ({ ...s, active: ids.includes(s.id) })));
     } catch (err) {
-      log.error({ err }, 'failed to Lloading sourcesE');
+      log.error({ err }, 'failed to load sources');
       errorRef.current('Failed to load sources');
     } finally {
       setLoading(false);
