@@ -292,22 +292,15 @@ def process_database(
         "table_count": len(tables),
     }
 
-    # Embed schema snapshot
-    source_service.update_source(project_id, source_id, status="embedding")
-    embed_result = embedding_service.process_embeddings(
-        project_id=project_id,
-        source_id=source_id,
-        source_name=source.get("name", "Database"),
-        processed_text=processed_text,
-    )
-
-    # Preserve database metadata in embedding_info
+    # Skip embedding — database sources are queried via the dedicated
+    # analyze_database_agent tool, not through RAG search_sources.
     merged_embedding_info = {
         **embedding_info,
         "connection_id": connection_id,
         "db_type": db_type,
         "database_name": database_name,
-        **(embed_result or {}),
+        "is_embedded": False,
+        "file_extension": ".database",
     }
 
     # Summarize schema snapshot (AI)

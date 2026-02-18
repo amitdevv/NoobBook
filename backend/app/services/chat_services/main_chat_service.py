@@ -313,7 +313,7 @@ class MainChatService:
 
         csv_sources = [s for s in active_sources if _file_ext(s) == ".csv"]
         database_sources = [s for s in active_sources if _file_ext(s) == ".database"]
-        non_csv_sources = [s for s in active_sources if _file_ext(s) != ".csv"]
+        non_csv_sources = [s for s in active_sources if _file_ext(s) not in (".csv", ".database")]
         tools = self._get_tools(
             has_active_sources=bool(non_csv_sources),
             has_csv_sources=bool(csv_sources),
