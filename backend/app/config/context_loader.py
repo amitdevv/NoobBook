@@ -101,7 +101,7 @@ class ContextLoader:
             "",
             "You have access to the following sources.",
             "",
-            "- Use the search_sources tool to retrieve information from embedded sources (documents, links, schema snapshots, etc.).",
+            "- Use the search_sources tool to retrieve information from embedded sources (documents, links, etc.).",
             "- For CSV sources, use analyze_csv_agent when the user asks questions that require calculations/plots from the CSV data.",
             "- For DATABASE sources, use analyze_database_agent when the user asks questions that require LIVE data from the database (counts, metrics, lists, trends).",
             "",

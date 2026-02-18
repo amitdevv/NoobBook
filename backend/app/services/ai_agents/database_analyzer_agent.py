@@ -89,6 +89,7 @@ class DatabaseAnalyzerAgent:
                     temperature=temperature,
                     tools=tools,
                     tool_choice={"type": "any"},
+                    extra_headers={"anthropic-beta": "context-1m-2025-08-07"},
                     project_id=project_id,
                 )
 
