@@ -34,7 +34,10 @@ export const StudioToolItem: React.FC<StudioToolItemProps> = ({
           ? 'hover:bg-accent border-primary/30 bg-primary/5'
           : 'opacity-50 hover:opacity-70 hover:bg-muted cursor-default'
       )}
-      onClick={() => isActive && onClick(option.id, signals)}
+      onClick={() => {
+        console.error('[Studio] Button clicked:', option.id, 'isActive:', isActive, 'signals:', signals.length, 'sources:', JSON.stringify(signals.map(s => s.sources)));
+        if (isActive) onClick(option.id, signals);
+      }}
       disabled={!isActive}
     >
       <Icon
