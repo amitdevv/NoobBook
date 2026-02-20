@@ -42,16 +42,9 @@ export const useBlogGeneration = (projectId: string) => {
   };
 
   const handleBlogGeneration = async (signal: BlogSignal) => {
+    // source_id is optional — blog can be generated from direction alone
     const sources = signal.sources || [];
-    const sourceId = sources[0]?.source_id;
-    if (!sourceId) {
-      console.error('[Studio] Blog: no sourceId in signal', JSON.stringify(signal));
-      if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
-      setConfigError('No source found in signal — re-ask the AI to generate a blog post.');
-      configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
-      showError('No source specified for blog post generation.');
-      return;
-    }
+    const sourceId = sources[0]?.source_id || '';
 
     setIsGeneratingBlog(true);
     setCurrentBlogJob(null);

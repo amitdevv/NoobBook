@@ -137,8 +137,8 @@ class EmailAgentService:
             status_message="Starting email template generation..."
         )
 
-        # Get source content using shared utility
-        source_content = get_source_content(project_id, source_id, max_chars=10000)
+        # Get source content (or use direction as content when no source)
+        source_content = get_source_content(project_id, source_id, max_chars=10000) if source_id else "No source document provided. Use the direction below as the basis for your email template."
 
         # Build user message from config
         effective_direction = direction if direction else config.get("default_direction", "")

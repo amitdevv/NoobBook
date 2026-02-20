@@ -66,8 +66,8 @@ class BlogAgentService:
             status_message="Starting blog post generation..."
         )
 
-        # Get source content and build user message from config
-        source_content = get_source_content(project_id, source_id)
+        # Get source content (or use direction as content when no source)
+        source_content = get_source_content(project_id, source_id) if source_id else "No source document provided. Use the direction below as the basis for your blog post."
         blog_types = config.get("blog_types", {})
         blog_type_display = blog_types.get(blog_type, blog_type.replace("_", " ").title())
 

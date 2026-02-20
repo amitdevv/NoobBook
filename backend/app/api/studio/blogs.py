@@ -54,14 +54,8 @@ def generate_blog_post(project_id: str):
     try:
         data = request.get_json()
 
-        # Validate input
-        source_id = data.get('source_id')
-        if not source_id:
-            return jsonify({
-                'success': False,
-                'error': 'source_id is required'
-            }), 400
-
+        # source_id is optional — blog can be generated from direction alone
+        source_id = data.get('source_id', '')
         direction = data.get('direction', '')
         target_keyword = data.get('target_keyword', '')
         blog_type = data.get('blog_type', 'how_to_guide')

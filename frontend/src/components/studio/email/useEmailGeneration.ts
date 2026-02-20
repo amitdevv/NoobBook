@@ -42,15 +42,9 @@ export const useEmailGeneration = (projectId: string) => {
    * Handle email template generation
    */
   const handleEmailGeneration = async (signal: StudioSignal) => {
+    // source_id is optional — email can be generated from direction alone
     const sources = signal.sources || [];
-    const sourceId = sources[0]?.source_id;
-    if (!sourceId) {
-      console.error('[Studio] Email: no sourceId in signal', JSON.stringify(signal));
-      if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
-      setConfigError('No source found in signal — re-ask the AI to generate an email template.');
-      configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
-      return;
-    }
+    const sourceId = sources[0]?.source_id || '';
 
     setIsGeneratingEmail(true);
     setCurrentEmailJob(null);

@@ -192,6 +192,7 @@ export const useFilteredJobs = <T extends { source_id: string }>(jobs: T[]): T[]
   const { validSourceIds } = useStudioContext();
 
   return useMemo(() => {
-    return jobs.filter(job => validSourceIds.has(job.source_id));
+    // Jobs without a source_id (generated from direction alone) are always shown
+    return jobs.filter(job => !job.source_id || validSourceIds.has(job.source_id));
   }, [jobs, validSourceIds]);
 };

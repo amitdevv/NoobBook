@@ -53,14 +53,8 @@ def generate_email_template(project_id: str):
     try:
         data = request.get_json()
 
-        # Validate input
-        source_id = data.get('source_id')
-        if not source_id:
-            return jsonify({
-                'success': False,
-                'error': 'source_id is required'
-            }), 400
-
+        # source_id is optional — email can be generated from direction alone
+        source_id = data.get('source_id', '')
         direction = data.get('direction', '')
 
         # Execute via email_agent_executor (creates job and launches agent)
