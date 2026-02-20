@@ -175,6 +175,21 @@ class StudioSignalExecutor:
                         # Handle case where it's already a string
                         source_ids.append(src)
 
+                # Auto-fill empty source_ids with project's active embedded sources.
+                # Educational Note: Claude sometimes omits source_ids in studio signals
+                # even when sources exist in the project. This fallback ensures signals
+                # have valid source references so the frontend generation handlers work.
+                # If the project has NO embedded sources (e.g. user pasted text in chat
+                # without adding any source files), this correctly leaves source_ids
+                # empty — the frontend handles that case with an error banner.
+                if not source_ids:
+                    source_ids = self._get_fallback_source_ids(project_id)
+                    if source_ids:
+                        logger.info(
+                            "Auto-filled %d source_ids for signal '%s' (Claude omitted sources)",
+                            len(source_ids), signal.get("studio_item")
+                        )
+
                 signal_data = {
                     "chat_id": chat_id,
                     "studio_item": signal.get("studio_item"),
@@ -205,6 +220,42 @@ class StudioSignalExecutor:
                 "success": False,
                 "error": str(e)
             }
+
+    def _get_fallback_source_ids(self, project_id: str) -> List[str]:
+        """
+        Get fallback source IDs from the project's active embedded sources.
+
+        Educational Note: When Claude creates a studio signal but forgets to
+        include source references, we fall back to the project's ready,
+        embedded sources. DB and CSV sources are excluded since studio
+        generators (email, blog, etc.) need document text, not structured data.
+
+        Args:
+            project_id: The project UUID
+
+        Returns:
+            List of source ID strings (may be empty if no embedded sources exist)
+        """
+        try:
+            from app.services.source_services import source_service
+            all_sources = source_service.list_sources(project_id)
+            fallback_ids = []
+            for src in all_sources:
+                if src.get("status") != "ready":
+                    continue
+                embedding_info = src.get("embedding_info") or {}
+                file_ext = embedding_info.get("file_extension", "")
+                # Skip non-embeddable sources (DB, CSV) — studio generators need text content
+                if file_ext in (".database", ".csv"):
+                    continue
+                if not embedding_info.get("is_embedded", False):
+                    continue
+                if src.get("id"):
+                    fallback_ids.append(src["id"])
+            return fallback_ids
+        except Exception as e:
+            logger.error("Failed to get fallback source_ids: %s", e)
+            return []
 
 
 # Singleton instance
