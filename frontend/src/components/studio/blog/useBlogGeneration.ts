@@ -4,7 +4,7 @@
  * Blog posts are created by an agent that plans, generates images, and writes markdown.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { blogsAPI, type BlogJob, type BlogType } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
@@ -26,18 +26,29 @@ export const useBlogGeneration = (projectId: string) => {
   const [currentBlogJob, setCurrentBlogJob] = useState<BlogJob | null>(null);
   const [isGeneratingBlog, setIsGeneratingBlog] = useState(false);
   const [viewingBlogJob, setViewingBlogJob] = useState<BlogJob | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadSavedJobs = async () => {
-    const response = await blogsAPI.listJobs(projectId);
-    if (response.success && response.jobs) {
-      const completedJobs = response.jobs.filter((job) => job.status === 'ready');
-      setSavedBlogJobs(completedJobs);
+    try {
+      const response = await blogsAPI.listJobs(projectId);
+      if (response.success && response.jobs) {
+        const completedJobs = response.jobs.filter((job) => job.status === 'ready');
+        setSavedBlogJobs(completedJobs);
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to load saved blog jobs');
     }
   };
 
   const handleBlogGeneration = async (signal: BlogSignal) => {
-    const sourceId = signal.sources[0]?.source_id;
+    const sources = signal.sources || [];
+    const sourceId = sources[0]?.source_id;
     if (!sourceId) {
+      console.error('[Studio] Blog: no sourceId in signal', JSON.stringify(signal));
+      if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
+      setConfigError('No source found in signal — re-ask the AI to generate a blog post.');
+      configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
       showError('No source specified for blog post generation.');
       return;
     }
@@ -59,6 +70,10 @@ export const useBlogGeneration = (projectId: string) => {
       );
 
       if (!startResponse.success || !startResponse.job_id) {
+        console.error('[Studio] Blog: API start failed', startResponse);
+        if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
+        setConfigError(startResponse.error || 'Failed to start blog post generation.');
+        configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         showError(startResponse.error || 'Failed to start blog post generation.');
         setIsGeneratingBlog(false);
         return;
@@ -82,7 +97,8 @@ export const useBlogGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Blog post generation failed.');
       }
     } catch (error) {
-      log.error({ err: error }, 'LBlog post generationE failed');
+      console.error('[Studio] Blog: generation failed', error);
+      log.error({ err: error }, 'Blog post generation failed');
       showError(error instanceof Error ? error.message : 'Blog post generation failed.');
     } finally {
       setIsGeneratingBlog(false);
@@ -101,6 +117,7 @@ export const useBlogGeneration = (projectId: string) => {
     isGeneratingBlog,
     viewingBlogJob,
     setViewingBlogJob,
+    configError,
     loadSavedJobs,
     handleBlogGeneration,
     downloadBlog,

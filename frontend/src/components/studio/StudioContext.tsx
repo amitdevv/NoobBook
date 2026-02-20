@@ -105,12 +105,15 @@ export const StudioProvider: React.FC<StudioProviderProps> = ({
 
     const handler = generationHandlers.get(optionId);
     if (handler) {
+      console.error('[Studio] Calling handler for:', optionId, 'signal:', signal);
       try {
         await handler(signal);
       } catch (error) {
+        console.error('[Studio] Handler threw error for:', optionId, error);
         log.error({ err: error }, 'generation handler threw error');
       }
     } else {
+      console.error('[Studio] No handler registered for:', optionId, 'registered:', [...generationHandlers.keys()]);
       log.warn(`no generation handler registered for: ${optionId}`);
     }
   }, [generationHandlers]);

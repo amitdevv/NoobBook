@@ -42,8 +42,10 @@ export const useEmailGeneration = (projectId: string) => {
    * Handle email template generation
    */
   const handleEmailGeneration = async (signal: StudioSignal) => {
-    const sourceId = signal.sources[0]?.source_id;
+    const sources = signal.sources || [];
+    const sourceId = sources[0]?.source_id;
     if (!sourceId) {
+      console.error('[Studio] Email: no sourceId in signal', JSON.stringify(signal));
       showError('No source specified for email template generation.');
       return;
     }
@@ -55,6 +57,7 @@ export const useEmailGeneration = (projectId: string) => {
       // Check Gemini status (email agent uses Gemini for images)
       const geminiStatus = await checkGeminiStatus();
       if (!geminiStatus.configured) {
+        console.error('[Studio] Email: Gemini not configured', geminiStatus);
         if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
         setConfigError('Add your Gemini API key in Admin Settings to generate email templates with images.');
         configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
@@ -69,6 +72,7 @@ export const useEmailGeneration = (projectId: string) => {
       );
 
       if (!startResponse.success || !startResponse.job_id) {
+        console.error('[Studio] Email: API start failed', startResponse);
         showError(startResponse.error || 'Failed to start email template generation.');
         setIsGeneratingEmail(false);
         return;
@@ -92,7 +96,8 @@ export const useEmailGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Email template generation failed.');
       }
     } catch (error) {
-      log.error({ err: error }, 'LEmail template generationE failed');
+      console.error('[Studio] Email: generation failed', error);
+      log.error({ err: error }, 'Email template generation failed');
       showError(error instanceof Error ? error.message : 'Email template generation failed.');
     } finally {
       setIsGeneratingEmail(false);

@@ -9,6 +9,7 @@ import { useBlogGeneration } from '../blog/useBlogGeneration';
 import { BlogListItem } from '../blog/BlogListItem';
 import { BlogProgressIndicator } from '../blog/BlogProgressIndicator';
 import { BlogViewerModal } from '../blog/BlogViewerModal';
+import { ConfigErrorBanner } from '../shared/ConfigErrorBanner';
 
 export const BlogSection: React.FC = () => {
   const { projectId, registerGenerationHandler } = useStudioContext();
@@ -19,6 +20,7 @@ export const BlogSection: React.FC = () => {
     isGeneratingBlog,
     viewingBlogJob,
     setViewingBlogJob,
+    configError,
     loadSavedJobs,
     handleBlogGeneration,
     downloadBlog,
@@ -38,12 +40,14 @@ export const BlogSection: React.FC = () => {
     registerGenerationHandler('blog', handleGenerate);
   }, [registerGenerationHandler, handleGenerate]);
 
-  if (filteredJobs.length === 0 && !isGeneratingBlog) {
+  if (filteredJobs.length === 0 && !isGeneratingBlog && !configError) {
     return null;
   }
 
   return (
     <>
+      <ConfigErrorBanner message={configError} />
+
       {isGeneratingBlog && (
         <BlogProgressIndicator currentBlogJob={currentBlogJob} />
       )}
