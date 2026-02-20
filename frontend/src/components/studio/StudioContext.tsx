@@ -121,8 +121,12 @@ export const StudioProvider: React.FC<StudioProviderProps> = ({
   // Handle generation request from tools list
   // If multiple signals exist for an item, show picker. Otherwise generate directly.
   const handleGenerate = useCallback((optionId: StudioItemId, itemSignals: StudioSignal[]) => {
-    if (itemSignals.length === 0) return;
+    if (itemSignals.length === 0) {
+      console.error('[Studio] handleGenerate called with 0 signals for:', optionId);
+      return;
+    }
 
+    console.error('[Studio] handleGenerate dispatching:', optionId, 'signals:', itemSignals.length);
     if (itemSignals.length === 1) {
       // Single signal - generate directly
       triggerGeneration(optionId, itemSignals[0]);

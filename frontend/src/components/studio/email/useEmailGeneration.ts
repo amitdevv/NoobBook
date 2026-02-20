@@ -46,7 +46,9 @@ export const useEmailGeneration = (projectId: string) => {
     const sourceId = sources[0]?.source_id;
     if (!sourceId) {
       console.error('[Studio] Email: no sourceId in signal', JSON.stringify(signal));
-      showError('No source specified for email template generation.');
+      if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
+      setConfigError('No source found in signal — re-ask the AI to generate an email template.');
+      configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
       return;
     }
 
@@ -73,7 +75,9 @@ export const useEmailGeneration = (projectId: string) => {
 
       if (!startResponse.success || !startResponse.job_id) {
         console.error('[Studio] Email: API start failed', startResponse);
-        showError(startResponse.error || 'Failed to start email template generation.');
+        if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
+        setConfigError(startResponse.error || 'Failed to start email template generation.');
+        configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         setIsGeneratingEmail(false);
         return;
       }
