@@ -1,6 +1,6 @@
 {
-  "model": "claude-sonnet-4-5-20250929",
-  "temperature": 0.4,
+  "model": "claude-sonnet-4-6",
+  "temperature": 0.0,
   "max_tokens": 4000,
   "user_message": "Create a comprehensive Product Requirements Document (PRD) based on the following source content.\n\n=== SOURCE CONTENT ===\n{source_content}\n=== END SOURCE CONTENT ===\n\nDirection from user: {direction}\n\nPlease create a complete PRD following the workflow:\n1. First, plan the document structure using the plan_prd tool\n2. Then write each section one at a time using the write_prd_section tool\n3. Set is_last_section=true when you write the final section",
   "default_direction": "No specific direction provided - create a complete PRD covering all relevant aspects of the product/feature.",

@@ -613,6 +613,6 @@ def get_model(response: Dict[str, Any]) -> str:
         response: Response dict from claude_service.send_message()
 
     Returns:
-        Model string (e.g., "claude-sonnet-4-5-20250929")
+        Model string (e.g., "claude-sonnet-4-6")
     """
     return response.get("model", "")

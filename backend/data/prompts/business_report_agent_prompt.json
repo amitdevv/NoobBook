@@ -1,6 +1,6 @@
 {
-  "model": "claude-sonnet-4-5-20250929",
-  "temperature": 0.5,
+  "model": "claude-sonnet-4-6",
+  "temperature": 0.0,
   "max_tokens": 8000,
   "user_message": "Create a concise {report_type_display} (500-1000 words) based on the available data.\n\n{csv_sources_section}\n{context_sources_section}\n{focus_areas_section}\n{direction_section}\n\nWorkflow: plan_business_report -> analyze_csv_data (1-2 times) -> write_business_report\nKeep the report SHORT and focused with only 1-2 charts.",
   "report_types": {

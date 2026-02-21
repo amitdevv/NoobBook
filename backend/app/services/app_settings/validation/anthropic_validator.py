@@ -35,7 +35,7 @@ def validate_anthropic_key(api_key: str) -> Tuple[bool, str]:
 
         # Use count_tokens API - this is FREE and validates the key
         response = client.messages.count_tokens(
-            model="claude-sonnet-4-5-20250929",
+            model="claude-sonnet-4-6",
             messages=[
                 {
                     "role": "user",

@@ -30,7 +30,7 @@ def _get_model_key(model_string: str) -> str:
     Extract model key (sonnet/haiku) from full model string.
 
     Args:
-        model_string: Full model ID like "claude-sonnet-4-5-20250929"
+        model_string: Full model ID like "claude-sonnet-4-6"
 
     Returns:
         "sonnet" or "haiku"
@@ -161,7 +161,7 @@ def add_usage(
 
     Args:
         project_id: The project UUID
-        model: Full model string (e.g., "claude-sonnet-4-5-20250929")
+        model: Full model string (e.g., "claude-sonnet-4-6")
         input_tokens: Number of input tokens used
         output_tokens: Number of output tokens used
 

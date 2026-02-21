@@ -55,13 +55,13 @@ class DatabaseAnalyzerAgent:
 
         # Defensive defaults: prompt configs live in a writable volume in Docker,
         # so a missing/new prompt file shouldn't crash the agent.
-        model = config.get("model") or "claude-sonnet-4-5-20250929"
+        model = config.get("model") or "claude-sonnet-4-6"
         max_tokens = config.get("max_tokens")
         if not isinstance(max_tokens, int) or max_tokens <= 0:
             max_tokens = 4500
         temperature = config.get("temperature")
         if not isinstance(temperature, (int, float)):
-            temperature = 0.2
+            temperature = 0.0
         system_prompt = config.get("system_prompt") or ""
 
         user_message_template = config.get("user_message") or "Database source ID: {source_id}\n\nUser question: {query}"

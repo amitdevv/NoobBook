@@ -348,7 +348,7 @@ class ProjectService:
 
         # Return settings with defaults
         return {
-            "ai_model": "claude-sonnet-4-5-20250929",
+            "ai_model": "claude-sonnet-4-6",
             "auto_save": True,
             "custom_prompt": project.get("custom_prompt")
         }

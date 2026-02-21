@@ -10,7 +10,7 @@ Prompt Config Structure (consistent across all prompt files):
     "version": "2.0",
     "name": "prompt_name",
     "description": "What this prompt is for",
-    "model": "claude-sonnet-4-5-20250929",
+    "model": "claude-sonnet-4-6",
     "max_tokens": 4096,
     "temperature": 0.7,
     "system_prompt": "The actual prompt text...",

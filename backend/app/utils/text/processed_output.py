@@ -12,7 +12,7 @@ Output Format:
     # Type: PDF
     # Total pages: 5
     # Processed at: 2024-01-15T10:30:00
-    # model_used: claude-sonnet-4-5-20250929
+    # model_used: claude-sonnet-4-6
     # character_count: 15000
     # token_count: 3750
     # ---

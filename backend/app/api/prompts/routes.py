@@ -158,7 +158,7 @@ def list_all_prompts():
                 {
                     "name": "default_chat_prompt",
                     "description": "Default system prompt...",
-                    "model": "claude-sonnet-4-5-20250929",
+                    "model": "claude-sonnet-4-6",
                     "max_tokens": 16000,
                     "temperature": 0.5,
                     "system_prompt": "...",

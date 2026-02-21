@@ -55,9 +55,9 @@ class ClaudeService:
         self,
         messages: List[Dict[str, Any]],
         system_prompt: Optional[str] = None,
-        model: str = "claude-sonnet-4-5-20250929",
+        model: str = "claude-sonnet-4-6",
         max_tokens: int = 4096,
-        temperature: float = 0.2,
+        temperature: float = 0.0,
         tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[Dict[str, Any]] = None,
         extra_headers: Optional[Dict[str, str]] = None,
@@ -75,7 +75,7 @@ class ClaudeService:
         Args:
             messages: List of message dicts with 'role' and 'content'
             system_prompt: Optional system prompt for this conversation
-            model: Claude model to use (default: claude-sonnet-4-5-20250929)
+            model: Claude model to use (default: claude-sonnet-4-6)
             max_tokens: Maximum tokens in response (default: 4096)
             temperature: Sampling temperature (default: 0.2)
             tools: Optional list of tool definitions for tool use
@@ -148,7 +148,7 @@ class ClaudeService:
         self,
         messages: List[Dict[str, Any]],
         system_prompt: Optional[str] = None,
-        model: str = "claude-sonnet-4-5-20250929",
+        model: str = "claude-sonnet-4-6",
         tools: Optional[List[Dict[str, Any]]] = None,
     ) -> int:
         """
