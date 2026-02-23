@@ -55,8 +55,12 @@ jobs:
             docker compose up migrate --build
 
             echo "=== Rebuilding app containers ==="
-            # Only rebuilds backend + frontend. Supabase containers stay untouched.
-            docker compose up -d --build --no-deps backend frontend
+            # Build separately from start so --no-cache works if ever needed manually.
+            # GIT_SHA build-arg stamps the image and busts Docker cache every deploy.
+            docker compose build --build-arg GIT_SHA=$LOCAL_SHA backend frontend
+            # --force-recreate ensures containers are recreated even if Docker thinks
+            # the image hasn't changed. Only backend + frontend — Supabase stays untouched.
+            docker compose up -d --force-recreate --no-deps backend frontend
 
             echo "=== Waiting for backend to be ready ==="
             # Poll backend health — warning only, not fatal.
@@ -82,6 +86,15 @@ jobs:
             # Verify both containers are running
             docker ps --filter "name=noobbook-backend" --format "{{.Names}}" | grep -q "noobbook-backend" || { echo "FAIL: backend not running"; exit 1; }
             docker ps --filter "name=noobbook-frontend" --format "{{.Names}}" | grep -q "noobbook-frontend" || { echo "FAIL: frontend not running"; exit 1; }
+
+            echo "=== Verifying deployed code ==="
+            # Confirm the container has the exact commit we just built
+            CONTAINER_SHA=$(docker exec noobbook-backend cat /app/.deploy_sha 2>/dev/null || echo "none")
+            if [ "$CONTAINER_SHA" != "$LOCAL_SHA" ]; then
+              echo "FAIL: container has stale code (container=$CONTAINER_SHA, expected=$LOCAL_SHA)"
+              exit 1
+            fi
+            echo "Container verified at $CONTAINER_SHA"
 
             echo "=== Cleaning up old images ==="
             docker image prune -f

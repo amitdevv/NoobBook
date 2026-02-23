@@ -36,6 +36,12 @@ RUN playwright install chromium
 # Copy application code
 COPY . .
 
+# Stamp the image with the git SHA for deploy verification.
+# Because this ARG changes every deploy, it also invalidates the Docker cache
+# from this layer onward, guaranteeing COPY . . results are fresh.
+ARG GIT_SHA=unknown
+RUN echo "$GIT_SHA" > /app/.deploy_sha
+
 # Stage prompt files so entrypoint can copy them into the mounted volume.
 # The data/ volume mount would shadow the baked-in data/ directory, so we
 # keep a pristine copy under /_prompts_staging/ to seed the volume on first run.
