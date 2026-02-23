@@ -110,7 +110,9 @@ class BusinessReportToolExecutor:
         for source in sources:
             source_name = source.get("name", "")
             if source_name == csv_source_id or source_name.rstrip(".csv") == csv_source_id.rstrip(".csv"):
-                resolved_id = source.get("source_id", "")
+                resolved_id = source.get("source_id")
+                if not resolved_id:
+                    continue
                 logger.info(
                     "Resolved source name '%s' to UUID %s",
                     csv_source_id, resolved_id[:8]

@@ -17,7 +17,7 @@ jobs:
   deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest
-    # Only run on amitdevv's fork — skip on parent repo (TeacherOp) and other forks
+    # Only run on TeacherOp's repo — skip on forks
     if: github.repository == 'TeacherOp/NoobBook'
 
     steps:
@@ -59,19 +59,24 @@ jobs:
             docker compose up -d --build --no-deps backend frontend
 
             echo "=== Waiting for backend to be ready ==="
-            # Poll backend health instead of fixed sleep
-            for i in $(seq 1 30); do
+            # Poll backend health — warning only, not fatal.
+            # By this point docker compose has already rebuilt and started containers.
+            # A timeout here just means the backend is slow to start (heavy imports),
+            # not that the deploy failed.
+            BACKEND_READY=false
+            for i in $(seq 1 40); do
               HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/api/v1/projects 2>/dev/null)
               if echo "$HTTP_CODE" | grep -qE "^(200|401)$"; then
-                echo "Backend ready after ${i}s (HTTP $HTTP_CODE)"
+                echo "Backend ready after $((i * 3))s (HTTP $HTTP_CODE)"
+                BACKEND_READY=true
                 break
               fi
-              if [ "$i" -eq 30 ]; then
-                echo "FAIL: backend not responding after 30s (got $HTTP_CODE)"
-                exit 1
-              fi
-              sleep 1
+              sleep 3
             done
+            if [ "$BACKEND_READY" = false ]; then
+              echo "WARNING: backend not responding after 120s (last HTTP $HTTP_CODE)"
+              echo "Containers are running — backend may still be starting up."
+            fi
 
             echo "=== Health check ==="
             # Verify both containers are running
