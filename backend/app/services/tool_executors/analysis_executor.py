@@ -143,9 +143,11 @@ class AnalysisExecutor:
                 Plots are rendered to an in-memory buffer and uploaded to Supabase
                 Storage (studio-outputs bucket) instead of local disk.
 
-                Bug fix: Only plt.savefig is patched — NOT Figure.savefig. If both are
-                patched, plt.savefig → original_plt_savefig → Figure.savefig (patched)
-                creates a recursive double-call where the outer buffer stays empty.
+                Bug fix: Both plt.savefig and Figure.savefig are patched to the same
+                custom_savefig, which always calls original_fig_savefig directly.
+                Previously, plt.savefig called original_plt_savefig which internally
+                called Figure.savefig (patched), creating a recursive double-call
+                where the outer buffer stayed empty.
                 """
                 # Always use auto-generated unique name (full UUID for uniqueness)
                 plot_id = str(uuid.uuid4())

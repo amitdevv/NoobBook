@@ -157,7 +157,10 @@ class BusinessReportToolExecutor:
         Calls csv_analyzer_agent internally for data analysis and chart generation.
         """
         csv_source_id = tool_input.get("csv_source_id", "")
-        csv_source_id = self._resolve_source_id(project_id, csv_source_id, csv_only=True)
+        try:
+            csv_source_id = self._resolve_source_id(project_id, csv_source_id, csv_only=True)
+        except ValueError as e:
+            return f"Error resolving CSV source: {e}"
         analysis_query = tool_input.get("analysis_query", "")
         section_context = tool_input.get("section_context", "")
 
@@ -239,7 +242,10 @@ class BusinessReportToolExecutor:
         Searches non-CSV sources for context.
         """
         source_id = tool_input.get("source_id", "")
-        source_id = self._resolve_source_id(project_id, source_id)
+        try:
+            source_id = self._resolve_source_id(project_id, source_id)
+        except ValueError as e:
+            return f"Error resolving source: {e}"
         search_query = tool_input.get("search_query", "")
         section_context = tool_input.get("section_context", "")
 
