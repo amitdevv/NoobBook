@@ -1,0 +1,56 @@
+# Auto-deploy NoobBook to AWS EC2
+# Triggers on push to develop branch.
+# SSHs into EC2, pulls latest code, runs migrations, rebuilds app containers.
+# Supabase containers are NOT touched — only backend + frontend rebuild.
+
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - develop
+
+  # Allow manual trigger from GitHub UI
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          timeout: 300s
+          script: |
+            set -e
+
+            echo "=== Navigating to project ==="
+            cd ~/NoobBook
+
+            echo "=== Pulling latest code ==="
+            git fetch origin develop
+            git checkout develop
+            git pull origin develop
+
+            echo "=== Running migrations ==="
+            # Runs init.sql (if fresh DB) + applies any new migration files.
+            # Safe to run every deploy — idempotent (skips already-applied migrations).
+            docker compose up migrate --build --force-recreate
+
+            echo "=== Rebuilding app containers ==="
+            # Only rebuilds backend + frontend. Supabase containers stay untouched.
+            docker compose up -d --build --no-deps backend frontend
+
+            echo "=== Cleaning up old images ==="
+            docker image prune -f
+
+            echo "=== Verifying containers are running ==="
+            docker ps --filter "name=noobbook-backend" --filter "name=noobbook-frontend"
+
+            echo "=== Deploy complete ==="
