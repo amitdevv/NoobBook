@@ -18,7 +18,7 @@ jobs:
     name: Deploy to EC2
     runs-on: ubuntu-latest
     # Only run on amitdevv's fork — skip on parent repo (TeacherOp) and other forks
-    if: github.repository == 'amitdevv/NoobBook'
+    if: github.repository == 'TeacherOp/NoobBook'
 
     steps:
       - name: Deploy via SSH
