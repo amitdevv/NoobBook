@@ -55,8 +55,10 @@ jobs:
             docker ps --filter "name=noobbook-backend" --format "{{.Names}}" | grep -q "noobbook-backend" || { echo "FAIL: backend not running"; exit 1; }
             docker ps --filter "name=noobbook-frontend" --format "{{.Names}}" | grep -q "noobbook-frontend" || { echo "FAIL: frontend not running"; exit 1; }
 
-            # Verify backend responds
-            curl -sf http://localhost:5001/api/v1/projects > /dev/null 2>&1 || curl -sf -o /dev/null -w "%{http_code}" http://localhost:5001/api/v1/projects | grep -q "401\|200" || { echo "FAIL: backend not responding"; exit 1; }
+            # Verify backend responds (200 or 401 both mean it's alive)
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/api/v1/projects)
+            echo "Backend HTTP status: $HTTP_CODE"
+            echo "$HTTP_CODE" | grep -qE "^(200|401)$" || { echo "FAIL: backend not responding (got $HTTP_CODE)"; exit 1; }
 
             echo "=== Cleaning up old images ==="
             docker image prune -f
