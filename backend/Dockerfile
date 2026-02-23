@@ -37,8 +37,9 @@ RUN playwright install chromium
 COPY . .
 
 # Stamp the image with the git SHA for deploy verification.
-# Because this ARG changes every deploy, it also invalidates the Docker cache
-# from this layer onward, guaranteeing COPY . . results are fresh.
+# Note: This ARG busts the Docker cache from this point onward, ensuring
+# the staging copy and later layers are re-run. The COPY . . layer above
+# is already invalidated naturally whenever source files change.
 ARG GIT_SHA=unknown
 RUN echo "$GIT_SHA" > /app/.deploy_sha
 

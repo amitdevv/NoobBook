@@ -112,10 +112,11 @@ class BusinessReportToolExecutor:
         sources = source_service.list_sources(project_id)
 
         # Try matching by name
+        # Note: Supabase returns "id" not "source_id" — check both for safety
         for source in sources:
             source_name = source.get("name", "")
             if source_name == source_id or source_name.rstrip(".csv") == source_id.rstrip(".csv"):
-                resolved_id = source.get("source_id")
+                resolved_id = source.get("id") or source.get("source_id")
                 if not resolved_id:
                     continue
                 logger.info(
@@ -130,10 +131,10 @@ class BusinessReportToolExecutor:
         if csv_only:
             csv_sources = [
                 s for s in sources
-                if s.get("source_id") and s.get("name", "").lower().endswith(".csv")
+                if (s.get("id") or s.get("source_id")) and s.get("name", "").lower().endswith(".csv")
             ]
             if csv_sources:
-                fallback_id = csv_sources[0]["source_id"]
+                fallback_id = csv_sources[0].get("id") or csv_sources[0].get("source_id")
                 logger.warning(
                     "Could not match '%s' — falling back to first CSV source %s (%s)",
                     source_id, fallback_id[:8], csv_sources[0].get("name")
