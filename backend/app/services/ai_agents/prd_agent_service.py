@@ -29,7 +29,7 @@ class PRDAgentService:
     """PRD generation agent - orchestration only."""
 
     AGENT_NAME = "prd_agent"
-    MAX_ITERATIONS = 10  # Brief PRDs: 1 plan + ~5 sections
+    MAX_ITERATIONS = 15  # Detailed PRDs: 1 plan + 6-8 sections
 
     def __init__(self):
         self._prompt_config = None
