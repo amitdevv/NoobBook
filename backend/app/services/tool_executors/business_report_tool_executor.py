@@ -103,10 +103,11 @@ class BusinessReportToolExecutor:
         except (ValueError, AttributeError):
             pass
 
-        # Not a UUID — try to find the source by name
+        # Not a UUID — try to find the source by name or fallback to first CSV
         from app.services.source_services import source_service
         sources = source_service.list_sources(project_id)
 
+        # Try matching by name
         for source in sources:
             source_name = source.get("name", "")
             if source_name == csv_source_id or source_name.rstrip(".csv") == csv_source_id.rstrip(".csv"):
@@ -119,8 +120,21 @@ class BusinessReportToolExecutor:
                 )
                 return resolved_id
 
-        # Fallback: return as-is (will likely fail, but logs will show the issue)
-        logger.warning("Could not resolve csv_source_id '%s' to a UUID", csv_source_id)
+        # Fallback: if Claude invented an identifier (e.g. "csv_source_1"),
+        # return the first CSV source in the project as a best-effort fix
+        csv_sources = [
+            s for s in sources
+            if s.get("source_id") and s.get("name", "").lower().endswith(".csv")
+        ]
+        if csv_sources:
+            fallback_id = csv_sources[0]["source_id"]
+            logger.warning(
+                "Could not match '%s' — falling back to first CSV source %s (%s)",
+                csv_source_id, fallback_id[:8], csv_sources[0].get("name")
+            )
+            return fallback_id
+
+        logger.warning("Could not resolve csv_source_id '%s' to any UUID", csv_source_id)
         return csv_source_id
 
     def _execute_analyze_csv(

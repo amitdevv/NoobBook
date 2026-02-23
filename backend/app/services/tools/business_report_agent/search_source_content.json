@@ -6,7 +6,7 @@
     "properties": {
       "source_id": {
         "type": "string",
-        "description": "The source_id of the non-CSV source to search (from context_source_ids)"
+        "description": "The exact UUID of the source to search. Copy the source_id UUID from the 'CONTEXT SOURCES' list in the user message (e.g., 'a1b2c3d4-e5f6-...'). Do NOT invent identifiers."
       },
       "search_query": {
         "type": "string",
