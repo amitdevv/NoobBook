@@ -249,14 +249,18 @@ class StudioSignalExecutor:
                     continue
                 embedding_info = src.get("embedding_info") or {}
                 file_ext = embedding_info.get("file_extension", "")
+                # Also check source name extension — CSV processor doesn't set file_extension
+                source_name = src.get("name", "")
+                is_csv = file_ext == ".csv" or source_name.lower().endswith(".csv")
+                is_db = file_ext == ".database"
                 # Skip DB sources always — no generator uses them directly
-                if file_ext == ".database":
+                if is_db:
                     continue
                 # Skip CSV sources unless explicitly requested (business_report needs them)
-                if file_ext == ".csv" and not include_csv:
+                if is_csv and not include_csv:
                     continue
                 # For non-CSV sources, require embedding
-                if file_ext != ".csv" and not embedding_info.get("is_embedded", False):
+                if not is_csv and not embedding_info.get("is_embedded", False):
                     continue
                 if src.get("id"):
                     fallback_ids.append(src["id"])
