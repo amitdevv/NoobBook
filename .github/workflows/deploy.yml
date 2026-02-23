@@ -26,7 +26,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: true
-          timeout: 300s
+          timeout: 600s
           script: |
             set -e
 
@@ -41,16 +41,24 @@ jobs:
             echo "=== Running migrations ==="
             # Runs init.sql (if fresh DB) + applies any new migration files.
             # Safe to run every deploy — idempotent (skips already-applied migrations).
-            docker compose up migrate --build --force-recreate
+            docker compose up migrate --build
 
             echo "=== Rebuilding app containers ==="
             # Only rebuilds backend + frontend. Supabase containers stay untouched.
             docker compose up -d --build --no-deps backend frontend
 
+            echo "=== Waiting for containers to stabilize ==="
+            sleep 10
+
+            echo "=== Health check ==="
+            # Verify both containers are running (fail deploy if not)
+            docker ps --filter "name=noobbook-backend" --format "{{.Names}}" | grep -q "noobbook-backend" || { echo "FAIL: backend not running"; exit 1; }
+            docker ps --filter "name=noobbook-frontend" --format "{{.Names}}" | grep -q "noobbook-frontend" || { echo "FAIL: frontend not running"; exit 1; }
+
+            # Verify backend responds
+            curl -sf http://localhost:5001/api/v1/projects > /dev/null 2>&1 || curl -sf -o /dev/null -w "%{http_code}" http://localhost:5001/api/v1/projects | grep -q "401\|200" || { echo "FAIL: backend not responding"; exit 1; }
+
             echo "=== Cleaning up old images ==="
             docker image prune -f
-
-            echo "=== Verifying containers are running ==="
-            docker ps --filter "name=noobbook-backend" --filter "name=noobbook-frontend"
 
             echo "=== Deploy complete ==="
