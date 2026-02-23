@@ -6,6 +6,7 @@ Executes: plan_business_report, analyze_csv_data, search_source_content, write_b
 
 import logging
 import os
+import uuid as uuid_module
 from typing import Dict, Any, List, Tuple
 from datetime import datetime
 
@@ -86,6 +87,40 @@ class BusinessReportToolExecutor:
 
         return f"Report plan saved. Title: '{title}', Sections: {num_sections}. Proceed to analyze data and write the report."
 
+    def _resolve_csv_source_id(self, project_id: str, csv_source_id: str) -> str:
+        """
+        Resolve csv_source_id to a valid UUID.
+
+        Educational Note: Claude sometimes passes the source NAME (e.g. "customers-100.csv")
+        instead of the UUID as csv_source_id. This causes storage downloads to fail with 404
+        because the storage path uses UUIDs: {project_id}/{source_id}/{source_id}.csv.
+        We resolve names to UUIDs by looking up sources in the project.
+        """
+        # Check if it's already a valid UUID
+        try:
+            uuid_module.UUID(csv_source_id)
+            return csv_source_id
+        except (ValueError, AttributeError):
+            pass
+
+        # Not a UUID — try to find the source by name
+        from app.services.source_services import source_service
+        sources = source_service.list_sources(project_id)
+
+        for source in sources:
+            source_name = source.get("name", "")
+            if source_name == csv_source_id or source_name.rstrip(".csv") == csv_source_id.rstrip(".csv"):
+                resolved_id = source.get("source_id", "")
+                logger.info(
+                    "Resolved source name '%s' to UUID %s",
+                    csv_source_id, resolved_id[:8]
+                )
+                return resolved_id
+
+        # Fallback: return as-is (will likely fail, but logs will show the issue)
+        logger.warning("Could not resolve csv_source_id '%s' to a UUID", csv_source_id)
+        return csv_source_id
+
     def _execute_analyze_csv(
         self,
         project_id: str,
@@ -100,6 +135,7 @@ class BusinessReportToolExecutor:
         Calls csv_analyzer_agent internally for data analysis and chart generation.
         """
         csv_source_id = tool_input.get("csv_source_id", "")
+        csv_source_id = self._resolve_csv_source_id(project_id, csv_source_id)
         analysis_query = tool_input.get("analysis_query", "")
         section_context = tool_input.get("section_context", "")
 
@@ -181,6 +217,7 @@ class BusinessReportToolExecutor:
         Searches non-CSV sources for context.
         """
         source_id = tool_input.get("source_id", "")
+        source_id = self._resolve_csv_source_id(project_id, source_id)
         search_query = tool_input.get("search_query", "")
         section_context = tool_input.get("section_context", "")
 
