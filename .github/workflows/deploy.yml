@@ -38,6 +38,15 @@ jobs:
             git checkout develop
             git pull origin develop
 
+            # Verify pull succeeded by checking HEAD matches remote
+            LOCAL_SHA=$(git rev-parse HEAD)
+            REMOTE_SHA=$(git rev-parse origin/develop)
+            if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
+              echo "FAIL: git pull incomplete (local=$LOCAL_SHA remote=$REMOTE_SHA)"
+              exit 1
+            fi
+            echo "Code verified at $LOCAL_SHA"
+
             echo "=== Running migrations ==="
             # Runs init.sql (if fresh DB) + applies any new migration files.
             # Safe to run every deploy — idempotent (skips already-applied migrations).
@@ -47,18 +56,25 @@ jobs:
             # Only rebuilds backend + frontend. Supabase containers stay untouched.
             docker compose up -d --build --no-deps backend frontend
 
-            echo "=== Waiting for containers to stabilize ==="
-            sleep 10
+            echo "=== Waiting for backend to be ready ==="
+            # Poll backend health instead of fixed sleep
+            for i in $(seq 1 30); do
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/api/v1/projects 2>/dev/null)
+              if echo "$HTTP_CODE" | grep -qE "^(200|401)$"; then
+                echo "Backend ready after ${i}s (HTTP $HTTP_CODE)"
+                break
+              fi
+              if [ "$i" -eq 30 ]; then
+                echo "FAIL: backend not responding after 30s (got $HTTP_CODE)"
+                exit 1
+              fi
+              sleep 1
+            done
 
             echo "=== Health check ==="
-            # Verify both containers are running (fail deploy if not)
+            # Verify both containers are running
             docker ps --filter "name=noobbook-backend" --format "{{.Names}}" | grep -q "noobbook-backend" || { echo "FAIL: backend not running"; exit 1; }
             docker ps --filter "name=noobbook-frontend" --format "{{.Names}}" | grep -q "noobbook-frontend" || { echo "FAIL: frontend not running"; exit 1; }
-
-            # Verify backend responds (200 or 401 both mean it's alive)
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/api/v1/projects)
-            echo "Backend HTTP status: $HTTP_CODE"
-            echo "$HTTP_CODE" | grep -qE "^(200|401)$" || { echo "FAIL: backend not responding (got $HTTP_CODE)"; exit 1; }
 
             echo "=== Cleaning up old images ==="
             docker image prune -f
