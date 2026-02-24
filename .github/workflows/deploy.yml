@@ -69,7 +69,7 @@ jobs:
             # not that the deploy failed.
             BACKEND_READY=false
             for i in $(seq 1 40); do
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/api/v1/projects 2>/dev/null)
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/api/v1/projects 2>/dev/null || true)
               if echo "$HTTP_CODE" | grep -qE "^(200|401)$"; then
                 echo "Backend ready after $((i * 3))s (HTTP $HTTP_CODE)"
                 BACKEND_READY=true
