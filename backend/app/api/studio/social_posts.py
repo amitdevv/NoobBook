@@ -27,7 +27,7 @@ Routes:
 """
 import io
 import uuid
-from flask import jsonify, request, current_app, send_file
+from flask import g, jsonify, request, current_app, send_file
 from app.api.studio import studio_bp
 from app.api.studio.logo_utils import resolve_logo
 from app.services.studio_services import studio_index_service
@@ -109,7 +109,8 @@ def generate_social_posts(project_id: str):
             direction=direction,
             platforms=platforms,
             logo_image_bytes=logo_image_bytes,
-            logo_mime_type=logo_mime_type
+            logo_mime_type=logo_mime_type,
+            user_id=g.user_id
         )
 
         return jsonify({

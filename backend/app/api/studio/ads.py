@@ -27,7 +27,7 @@ Routes:
 """
 import io
 import uuid
-from flask import jsonify, request, current_app, send_file
+from flask import g, jsonify, request, current_app, send_file
 from app.api.studio import studio_bp
 from app.api.studio.logo_utils import resolve_logo
 from app.services.studio_services import studio_index_service
@@ -97,7 +97,8 @@ def generate_ad_creative(project_id: str):
             product_name=product_name,
             direction=direction,
             logo_image_bytes=logo_image_bytes,
-            logo_mime_type=logo_mime_type
+            logo_mime_type=logo_mime_type,
+            user_id=g.user_id
         )
 
         return jsonify({

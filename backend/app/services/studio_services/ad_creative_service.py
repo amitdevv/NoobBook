@@ -21,7 +21,7 @@ from app.services.integrations.claude import claude_service
 logger = logging.getLogger(__name__)
 from app.services.integrations.google.imagen_service import imagen_service
 from app.services.studio_services import studio_index_service
-from app.config import prompt_loader
+from app.config import prompt_loader, brand_context_loader
 from app.services.integrations.supabase import storage_service
 
 
@@ -51,7 +51,8 @@ class AdCreativeService:
         product_name: str,
         direction: str = "",
         logo_image_bytes: Optional[bytes] = None,
-        logo_mime_type: str = "image/png"
+        logo_mime_type: str = "image/png",
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate ad creatives for a product.
@@ -88,7 +89,8 @@ class AdCreativeService:
             product_name=product_name,
             direction=direction,
             job_id=job_id,
-            has_logo=logo_image_bytes is not None
+            has_logo=logo_image_bytes is not None,
+            user_id=user_id
         )
 
         if not prompts_result.get("success"):
@@ -206,7 +208,8 @@ class AdCreativeService:
         product_name: str,
         direction: str,
         job_id: str,
-        has_logo: bool = False
+        has_logo: bool = False,
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate image prompts using Claude Haiku.
@@ -237,10 +240,18 @@ class AdCreativeService:
 
         messages = [{"role": "user", "content": user_message}]
 
+        # Load brand context so Claude knows brand name, colors, voice, etc.
+        brand_context = brand_context_loader.load_brand_context(
+            project_id, "ads_creative", user_id=user_id
+        )
+        system_prompt = config["system_prompt"]
+        if brand_context:
+            system_prompt = f"{system_prompt}\n\n{brand_context}"
+
         try:
             response = claude_service.send_message(
                 messages=messages,
-                system_prompt=config["system_prompt"],
+                system_prompt=system_prompt,
                 model=config["model"],
                 max_tokens=config["max_tokens"],
                 temperature=config["temperature"],
