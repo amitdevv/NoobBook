@@ -214,10 +214,12 @@ class DatabaseConnectionService:
 
         row = resp.data[0]
 
-        # Access control: visible_to_all grants read-only usage, not credential access
+        # Access control: visible_to_all grants usage access (credentials used
+        # server-side only, never exposed to the frontend). Shared connections
+        # also grant full usage access.
         if row.get("owner_user_id") != user_id:
-            if not include_secret and row.get("visible_to_all"):
-                pass  # Allow non-credential access for visible connections
+            if row.get("visible_to_all"):
+                pass  # Allow access for connections visible to all users
             else:
                 shared = (
                     self.supabase.table(self.USERS_TABLE)

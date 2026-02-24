@@ -13,6 +13,7 @@ import logging
 import os
 import io
 import tempfile
+import time
 from pathlib import Path
 from typing import Dict, Any, List
 from datetime import datetime
@@ -32,6 +33,10 @@ class ImagenService:
     MODEL_ID = "gemini-3-pro-image-preview"
     DEFAULT_ASPECT_RATIO = "9:16"  # Mobile-first for Facebook/Instagram Stories & Reels
     DEFAULT_RESOLUTION = "1K"  # Options: 1K, 2K, 4K
+
+    # Retry config for transient errors (503, 429, etc.)
+    MAX_RETRIES = 3
+    RETRY_BASE_DELAY = 2  # seconds — doubles each retry: 2s, 4s, 8s
 
     def __init__(self):
         """Initialize the Imagen service."""
@@ -64,6 +69,39 @@ class ImagenService:
         """Get the google.genai.types module for config objects."""
         from google.genai import types
         return types
+
+    def _is_transient_error(self, error: Exception) -> bool:
+        """Check if an error is transient and worth retrying (503, 429, 502, 500)."""
+        from google.genai.errors import ServerError, ClientError
+        if isinstance(error, ServerError):
+            return True  # 500, 502, 503
+        if isinstance(error, ClientError) and getattr(error, 'code', None) == 429:
+            return True  # Rate limited
+        return False
+
+    def _call_with_retry(self, api_call, description: str = "API call"):
+        """
+        Execute an API call with exponential backoff for transient errors.
+
+        Educational Note: Google's generative AI APIs can return 503 during
+        high-demand periods. Retrying with exponential backoff (2s → 4s → 8s)
+        handles these transient spikes gracefully.
+        """
+        last_error = None
+        for attempt in range(self.MAX_RETRIES + 1):
+            try:
+                return api_call()
+            except Exception as e:
+                last_error = e
+                if not self._is_transient_error(e) or attempt == self.MAX_RETRIES:
+                    raise
+                delay = self.RETRY_BASE_DELAY * (2 ** attempt)
+                logger.warning(
+                    "%s failed (attempt %d/%d), retrying in %ds: %s",
+                    description, attempt + 1, self.MAX_RETRIES + 1, delay, e
+                )
+                time.sleep(delay)
+        raise last_error  # Should not reach here, but satisfies type checker
 
     def generate_images(
         self,
@@ -117,20 +155,23 @@ class ImagenService:
             image_paths = []
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
-            # Generate images one by one
+            # Generate images one by one (with retry for transient errors)
             for i in range(num_images):
 
                 # Use the new API format with GenerateContentConfig and ImageConfig
-                response = client.models.generate_content(
-                    model=self.MODEL_ID,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_modalities=['TEXT', 'IMAGE'],
-                        image_config=types.ImageConfig(
-                            aspect_ratio=aspect_ratio,
-                            image_size=resolution
-                        ),
-                    )
+                response = self._call_with_retry(
+                    lambda: client.models.generate_content(
+                        model=self.MODEL_ID,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            response_modalities=['TEXT', 'IMAGE'],
+                            image_config=types.ImageConfig(
+                                aspect_ratio=aspect_ratio,
+                                image_size=resolution
+                            ),
+                        )
+                    ),
+                    description=f"Image generation {i+1}/{num_images}"
                 )
 
                 # Extract image from response parts
@@ -222,16 +263,19 @@ class ImagenService:
 
             logger.info("Generating single image (%s, %s)", aspect_ratio, resolution)
 
-            response = client.models.generate_content(
-                model=self.MODEL_ID,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=['TEXT', 'IMAGE'],
-                    image_config=types.ImageConfig(
-                        aspect_ratio=aspect_ratio,
-                        image_size=resolution
-                    ),
-                )
+            response = self._call_with_retry(
+                lambda: client.models.generate_content(
+                    model=self.MODEL_ID,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_modalities=['TEXT', 'IMAGE'],
+                        image_config=types.ImageConfig(
+                            aspect_ratio=aspect_ratio,
+                            image_size=resolution
+                        ),
+                    )
+                ),
+                description="Single image generation"
             )
 
             # Extract image from response
