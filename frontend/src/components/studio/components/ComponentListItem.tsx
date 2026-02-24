@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { SquaresFour } from '@phosphor-icons/react';
+import { Cube } from '@phosphor-icons/react';
 import type { ComponentJob } from '@/lib/api/studio';
 
 interface ComponentListItemProps {
@@ -24,7 +24,7 @@ export const ComponentListItem: React.FC<ComponentListItemProps> = ({ job, onCli
       onClick={onClick}
     >
       <div className="p-1.5 bg-purple-500/10 rounded-md flex-shrink-0">
-        <SquaresFour size={16} className="text-purple-600" />
+        <Cube size={16} className="text-purple-600" />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
         <p className="text-xs font-medium truncate">

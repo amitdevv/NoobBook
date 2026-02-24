@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Browser } from '@phosphor-icons/react';
+import { Layout } from '@phosphor-icons/react';
 import type { WireframeJob } from '@/lib/api/studio/wireframes';
 
 interface WireframeListItemProps {
@@ -20,7 +20,7 @@ export const WireframeListItem: React.FC<WireframeListItemProps> = ({ job, onCli
       onClick={onClick}
     >
       <div className="p-1.5 bg-purple-500/10 rounded-md flex-shrink-0">
-        <Browser size={16} className="text-purple-600" />
+        <Layout size={16} className="text-purple-600" />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
         <p className="text-xs font-medium truncate">

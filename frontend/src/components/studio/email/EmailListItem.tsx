@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { ShareNetwork } from '@phosphor-icons/react';
+import { EnvelopeSimple } from '@phosphor-icons/react';
 import type { EmailJob } from '@/lib/api/studio';
 
 interface EmailListItemProps {
@@ -19,7 +19,7 @@ export const EmailListItem: React.FC<EmailListItemProps> = ({ job, onClick }) =>
       onClick={onClick}
     >
       <div className="p-1.5 bg-blue-500/10 rounded-md flex-shrink-0">
-        <ShareNetwork size={16} className="text-blue-600" />
+        <EnvelopeSimple size={16} className="text-blue-600" />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
         <p className="text-xs font-medium truncate">

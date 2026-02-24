@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { PlayCircle, DownloadSimple } from '@phosphor-icons/react';
+import { VideoCamera, DownloadSimple } from '@phosphor-icons/react';
 import type { VideoJob } from '@/lib/api/studio';
 
 interface VideoListItemProps {
@@ -24,7 +24,7 @@ export const VideoListItem: React.FC<VideoListItemProps> = ({
       onClick={onOpen}
       className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-orange-500/10 cursor-pointer transition-colors"
     >
-      <PlayCircle size={16} weight="duotone" className="text-orange-600 mt-0.5 flex-shrink-0" />
+      <VideoCamera size={16} weight="duotone" className="text-orange-600 mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium text-gray-900 truncate">
           {job.source_name || 'Video'}

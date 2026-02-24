@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { ChartLine, DownloadSimple } from '@phosphor-icons/react';
+import { Target, DownloadSimple } from '@phosphor-icons/react';
 import type { MarketingStrategyJob } from '@/lib/api/studio';
 
 interface MarketingStrategyListItemProps {
@@ -21,7 +21,7 @@ export const MarketingStrategyListItem: React.FC<MarketingStrategyListItemProps>
       onClick={onOpen}
     >
       <div className="p-1.5 bg-emerald-500/10 rounded-md flex-shrink-0">
-        <ChartLine size={16} className="text-emerald-600" />
+        <Target size={16} className="text-emerald-600" />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
         <p className="text-xs font-medium truncate">
