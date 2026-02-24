@@ -1,0 +1,108 @@
+"""
+Logo resolution utilities for studio routes.
+
+Shared helpers for resolving brand logo/icon bytes from brand assets
+or project image sources. Used by social posts and ad creatives routes
+to pass logo images to Gemini's multimodal image generation.
+"""
+import logging
+from typing import Optional, Tuple
+
+from flask import g
+
+from app.services.integrations.supabase import storage_service
+
+logger = logging.getLogger(__name__)
+
+
+def resolve_brand_logo() -> Tuple[Optional[bytes], str]:
+    """
+    Fetch brand icon (or logo fallback) for the current user.
+
+    Checks for a primary icon first, then falls back to primary logo.
+    Requires Flask request context (uses g.user_id).
+
+    Returns:
+        Tuple of (image_bytes, mime_type). Bytes is None if not found.
+    """
+    from app.services.data_services.brand_asset_service import brand_asset_service
+
+    try:
+        user_id = g.user_id
+        # Prefer primary icon, fall back to primary logo
+        icon = brand_asset_service.get_primary_asset(user_id, 'icon')
+        if not icon:
+            icon = brand_asset_service.get_primary_asset(user_id, 'logo')
+
+        if icon:
+            image_bytes = storage_service.download_brand_asset(
+                user_id, icon['id'], icon['file_name']
+            )
+            mime_type = icon.get('mime_type', 'image/png')
+            if image_bytes:
+                logger.info("Resolved brand logo (type=%s)", icon.get('asset_type'))
+                return image_bytes, mime_type
+    except Exception as e:
+        logger.warning("Failed to fetch brand icon: %s", e)
+
+    return None, "image/png"
+
+
+def resolve_source_logo(project_id: str, source_id: str) -> Tuple[Optional[bytes], str]:
+    """
+    Fetch an image source's raw file to use as a logo.
+
+    Only works for IMAGE type sources. Downloads the raw file from
+    Supabase Storage.
+
+    Args:
+        project_id: The project UUID
+        source_id: The source UUID (must be IMAGE type)
+
+    Returns:
+        Tuple of (image_bytes, mime_type). Bytes is None if not found.
+    """
+    from app.services.source_services.source_service import source_service
+
+    try:
+        source = source_service.get_source(project_id, source_id)
+        if source and source.get('type') == 'IMAGE':
+            embedding_info = source.get('embedding_info', {})
+            stored_filename = embedding_info.get('stored_filename', '')
+            if stored_filename:
+                image_bytes = storage_service.download_raw_file(
+                    project_id, source_id, stored_filename
+                )
+                mime_type = embedding_info.get('mime_type', 'image/png')
+                if image_bytes:
+                    logger.info("Resolved source image as logo (source=%s)", source_id)
+                    return image_bytes, mime_type
+    except Exception as e:
+        logger.warning("Failed to fetch source image as logo: %s", e)
+
+    return None, "image/png"
+
+
+def resolve_logo(data: dict, project_id: str) -> Tuple[Optional[bytes], str]:
+    """
+    Resolve logo bytes from request data.
+
+    Reads logo_source and logo_source_id from the request body and
+    resolves the logo image accordingly.
+
+    Args:
+        data: Request JSON body
+        project_id: The project UUID
+
+    Returns:
+        Tuple of (image_bytes, mime_type). Bytes is None if no logo found.
+    """
+    logo_source = data.get('logo_source', 'auto')
+
+    if logo_source in ('brand_icon', 'auto'):
+        return resolve_brand_logo()
+
+    if logo_source == 'source' and data.get('logo_source_id'):
+        return resolve_source_logo(project_id, data['logo_source_id'])
+
+    return None, "image/png"

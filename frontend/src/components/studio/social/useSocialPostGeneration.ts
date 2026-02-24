@@ -59,11 +59,15 @@ export const useSocialPostGeneration = (projectId: string) => {
         return;
       }
 
+      // Logo source defaults to 'auto' — backend auto-detects brand icon/logo.
+      // Signal sources don't carry type metadata, so source-based logos
+      // would need explicit UI selection (future enhancement).
       const startResponse = await socialPostsAPI.startGeneration(
         projectId,
         topic,
         signal.direction,
-        ['linkedin', 'instagram', 'twitter']
+        ['linkedin', 'instagram', 'twitter'],
+        'auto'
       );
 
       if (!startResponse.success || !startResponse.job_id) {

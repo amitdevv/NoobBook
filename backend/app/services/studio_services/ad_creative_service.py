@@ -13,7 +13,7 @@ Flow:
 """
 import json
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -49,7 +49,9 @@ class AdCreativeService:
         project_id: str,
         job_id: str,
         product_name: str,
-        direction: str = ""
+        direction: str = "",
+        logo_image_bytes: Optional[bytes] = None,
+        logo_mime_type: str = "image/png"
     ) -> Dict[str, Any]:
         """
         Generate ad creatives for a product.
@@ -64,6 +66,8 @@ class AdCreativeService:
             job_id: The job ID for status tracking
             product_name: Name of the product to create ads for
             direction: Additional context/direction from the user
+            logo_image_bytes: Optional brand logo/icon bytes to incorporate in images
+            logo_mime_type: MIME type of the logo image
 
         Returns:
             Dict with success status, image paths, and metadata
@@ -83,7 +87,8 @@ class AdCreativeService:
             project_id=project_id,
             product_name=product_name,
             direction=direction,
-            job_id=job_id
+            job_id=job_id,
+            has_logo=logo_image_bytes is not None
         )
 
         if not prompts_result.get("success"):
@@ -120,11 +125,23 @@ class AdCreativeService:
                 progress=f"Generating {prompt_type} image ({i+1}/{len(prompts)})..."
             )
 
-            # Generate single image as bytes
-            result = imagen_service.generate_image_bytes(
-                prompt=prompt_text,
-                filename_prefix=f"ad_{job_id[:8]}_{prompt_type}_{timestamp}"
-            )
+            # Generate image — use multimodal method if logo is available
+            if logo_image_bytes:
+                enhanced_prompt = (
+                    "Create an ad creative image that naturally incorporates "
+                    "the provided brand logo/icon into the design. " + prompt_text
+                )
+                result = imagen_service.generate_image_with_reference(
+                    prompt=enhanced_prompt,
+                    reference_image_bytes=logo_image_bytes,
+                    reference_mime_type=logo_mime_type,
+                    filename_prefix=f"ad_{job_id[:8]}_{prompt_type}_{timestamp}"
+                )
+            else:
+                result = imagen_service.generate_image_bytes(
+                    prompt=prompt_text,
+                    filename_prefix=f"ad_{job_id[:8]}_{prompt_type}_{timestamp}"
+                )
 
             if result.get("success"):
                 image_bytes = result["image_bytes"]
@@ -188,20 +205,34 @@ class AdCreativeService:
         project_id: str,
         product_name: str,
         direction: str,
-        job_id: str
+        job_id: str,
+        has_logo: bool = False
     ) -> Dict[str, Any]:
         """
         Generate image prompts using Claude Haiku.
 
         Educational Note: Haiku reads the product info and generates
         optimized prompts for the image generation model.
+        When a brand logo is available, Haiku is instructed to write
+        prompts that describe incorporating the logo into the design.
         """
         config = self._load_config()
+
+        # Logo context — tells Claude to write prompts that reference the logo
+        logo_context = ""
+        if has_logo:
+            logo_context = (
+                "\nNOTE: A brand logo/icon will be provided to the image generator. "
+                "Write image prompts that describe incorporating it naturally into "
+                "the design — mention logo placement (corner, centered, as part of "
+                "the composition) and how design elements should complement it."
+            )
 
         # Build user message
         user_message = config["user_message"].format(
             product_name=product_name,
-            direction=direction or "Create compelling ad creatives for Facebook and Instagram."
+            direction=direction or "Create compelling ad creatives for Facebook and Instagram.",
+            logo_context=logo_context
         )
 
         messages = [{"role": "user", "content": user_message}]

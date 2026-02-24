@@ -93,16 +93,22 @@ export const socialPostsAPI = {
     projectId: string,
     topic: string,
     direction?: string,
-    platforms?: string[]
+    platforms?: string[],
+    logoSource?: 'auto' | 'brand_icon' | 'source' | 'none',
+    logoSourceId?: string
   ): Promise<StartSocialPostsResponse> {
     try {
+      const body: Record<string, unknown> = {
+        topic,
+        direction: direction || 'Create engaging social media posts for this topic.',
+        ...(platforms && { platforms }),
+        logo_source: logoSource || 'auto',
+      };
+      if (logoSourceId) body.logo_source_id = logoSourceId;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/social-posts`,
-        {
-          topic: topic,
-          direction: direction || 'Create engaging social media posts for this topic.',
-          ...(platforms && { platforms }),
-        }
+        body
       );
       return response.data;
     } catch (error) {

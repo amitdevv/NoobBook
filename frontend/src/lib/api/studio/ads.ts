@@ -78,15 +78,21 @@ export const adsAPI = {
   async startGeneration(
     projectId: string,
     productName: string,
-    direction?: string
+    direction?: string,
+    logoSource?: 'auto' | 'brand_icon' | 'source' | 'none',
+    logoSourceId?: string
   ): Promise<StartAdResponse> {
     try {
+      const body: Record<string, unknown> = {
+        product_name: productName,
+        direction: direction || 'Create compelling ad creatives for Facebook and Instagram.',
+        logo_source: logoSource || 'auto',
+      };
+      if (logoSourceId) body.logo_source_id = logoSourceId;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/ad-creative`,
-        {
-          product_name: productName,
-          direction: direction || 'Create compelling ad creatives for Facebook and Instagram.',
-        }
+        body
       );
       return response.data;
     } catch (error) {
