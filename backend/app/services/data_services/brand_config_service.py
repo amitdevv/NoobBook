@@ -8,9 +8,12 @@ to maintain consistent branding across all projects' generated content.
 The config is created on first access with sensible defaults and can be
 updated incrementally (e.g., update just colors without touching typography).
 """
+import logging
 from typing import Optional, Dict, Any
 
 from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+
+logger = logging.getLogger(__name__)
 
 
 # Default brand configuration values
@@ -305,8 +308,16 @@ class BrandConfigService:
             True if brand should be applied for this feature
         """
         config = self.get_config(user_id)
-        feature_settings = config.get("feature_settings", DEFAULT_FEATURE_SETTINGS)
-        return feature_settings.get(feature_name, False)
+        stored = config.get("feature_settings") or {}
+        # Merge with defaults so newly added features (e.g. "chat") inherit
+        # their default value for users whose config predates the feature.
+        feature_settings = {**DEFAULT_FEATURE_SETTINGS, **stored}
+        enabled = feature_settings.get(feature_name, False)
+        if feature_name not in stored:
+            logger.info("Brand feature '%s' missing from stored settings for user %s, using default: %s",
+                        feature_name, user_id[:8], enabled)
+        logger.debug("Brand feature check: %s=%s (user=%s)", feature_name, enabled, user_id[:8])
+        return enabled
 
     def delete_config(self, user_id: str) -> bool:
         """

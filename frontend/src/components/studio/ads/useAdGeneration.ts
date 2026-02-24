@@ -58,10 +58,12 @@ export const useAdGeneration = (projectId: string) => {
         return;
       }
 
+      // Logo source defaults to 'auto' — backend auto-detects brand icon/logo
       const startResponse = await adsAPI.startGeneration(
         projectId,
         productName,
-        signal.direction
+        signal.direction,
+        'auto'
       );
 
       if (!startResponse.success || !startResponse.job_id) {

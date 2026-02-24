@@ -63,16 +63,16 @@ export const DesignSection: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="flex flex-col h-full -m-6">
+      <div className="flex-shrink-0 px-6 pt-4 pb-1">
         <h2 className="text-lg font-semibold text-stone-900">Design</h2>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground">
           Brand kit applied across all projects' studio-generated content.
         </p>
       </div>
 
       {/* Horizontal tab bar */}
-      <div className="border-b border-stone-200">
+      <div className="flex-shrink-0 border-b border-stone-200 px-6">
         <div className="flex gap-1 -mb-px">
           {tabs.map((tab) => (
             <button
@@ -92,8 +92,8 @@ export const DesignSection: React.FC = () => {
         </div>
       </div>
 
-      {/* Tab content */}
-      <div>{renderContent()}</div>
+      {/* Tab content — scrolls independently */}
+      <div className="flex-1 overflow-y-auto px-6 pb-6">{renderContent()}</div>
     </div>
   );
 };

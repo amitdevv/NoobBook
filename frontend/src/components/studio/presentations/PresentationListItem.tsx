@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Presentation, DownloadSimple } from '@phosphor-icons/react';
+import { PresentationChart, DownloadSimple } from '@phosphor-icons/react';
 import type { PresentationJob } from '@/lib/api/studio';
 
 interface PresentationListItemProps {
@@ -24,7 +24,7 @@ export const PresentationListItem: React.FC<PresentationListItemProps> = ({
       onClick={onOpen}
       className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-amber-500/10 cursor-pointer transition-colors"
     >
-      <Presentation size={16} weight="duotone" className="text-amber-600 mt-0.5 flex-shrink-0" />
+      <PresentationChart size={16} weight="duotone" className="text-amber-600 mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium text-gray-900 truncate">
           {job.presentation_title || 'Presentation'}

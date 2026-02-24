@@ -27,8 +27,9 @@ Routes:
 """
 import io
 import uuid
-from flask import jsonify, request, current_app, send_file
+from flask import g, jsonify, request, current_app, send_file
 from app.api.studio import studio_bp
+from app.api.studio.logo_utils import resolve_logo
 from app.services.studio_services import studio_index_service
 from app.services.studio_services.ad_creative_service import ad_creative_service
 from app.services.integrations.google.imagen_service import imagen_service
@@ -74,6 +75,9 @@ def generate_ad_creative(project_id: str):
                 'error': 'Gemini API key not configured. Please add it in Admin Settings.'
             }), 400
 
+        # Resolve logo image bytes (brand icon or image source)
+        logo_image_bytes, logo_mime_type = resolve_logo(data, project_id)
+
         # Create job record
         job_id = str(uuid.uuid4())
         studio_index_service.create_ad_job(
@@ -91,7 +95,10 @@ def generate_ad_creative(project_id: str):
             project_id=project_id,
             job_id=job_id,
             product_name=product_name,
-            direction=direction
+            direction=direction,
+            logo_image_bytes=logo_image_bytes,
+            logo_mime_type=logo_mime_type,
+            user_id=g.user_id
         )
 
         return jsonify({

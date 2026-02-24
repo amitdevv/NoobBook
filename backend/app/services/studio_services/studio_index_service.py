@@ -102,7 +102,7 @@ def create_job(
             "project_id": project_id,
             "job_type": job_type,
             "id": job_data.pop("id"),
-            "source_id": job_data.pop("source_id", None),
+            "source_id": job_data.pop("source_id", None) or None,
             "source_name": job_data.pop("source_name", None),
             "direction": job_data.pop("direction", None),
             "status": job_data.pop("status", "pending"),

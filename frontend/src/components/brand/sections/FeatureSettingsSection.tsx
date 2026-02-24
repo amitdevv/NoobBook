@@ -150,7 +150,7 @@ export const FeatureSettingsSection: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Sticky header — stays visible while scrolling within the settings panel */}
-      <div className="sticky top-0 z-10 bg-card pb-4 -mx-6 px-6 pt-1 -mt-1">
+      <div className="sticky top-0 z-10 bg-white pb-3 -mx-6 px-6 pt-3">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold">Feature Settings</h2>

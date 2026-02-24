@@ -12,10 +12,13 @@ that can be injected into studio agent system prompts. The context includes:
 Brand config is now user-level (workspace setting). Studio agents pass
 project_id, which is resolved to user_id here — so agents need zero changes.
 """
+import logging
 from typing import Dict, Any, Optional
 
 from app.services.data_services.brand_config_service import brand_config_service
 from app.services.data_services.brand_asset_service import brand_asset_service
+
+logger = logging.getLogger(__name__)
 
 
 class BrandContextLoader:
@@ -76,17 +79,20 @@ class BrandContextLoader:
         if not user_id:
             user_id = self._resolve_user_id(project_id)
         if not user_id:
+            logger.warning("Brand context skipped: could not resolve user_id (project=%s)", project_id[:8])
             return ""
 
         # Check if brand is enabled for this feature
         if not brand_config_service.is_feature_enabled(user_id, feature_name):
+            logger.info("Brand context skipped: feature '%s' disabled (user=%s)", feature_name, user_id[:8])
             return ""
 
         # Get brand config
         config = brand_config_service.get_config(user_id)
 
-        # Build context sections
+        # Build context sections, tracking which parts are present
         sections = []
+        included_parts = []
 
         sections.append("## Brand Guidelines")
         sections.append("")
@@ -95,39 +101,49 @@ class BrandContextLoader:
         color_context = self._build_color_context(config)
         if color_context:
             sections.append(color_context)
+            included_parts.append("colors")
 
         # Add typography
         typography_context = self._build_typography_context(config)
         if typography_context:
             sections.append(typography_context)
+            included_parts.append("typography")
 
         # Add brand assets info
         assets_context = self._build_assets_context(user_id)
         if assets_context:
             sections.append(assets_context)
+            included_parts.append("assets")
 
         # Add brand voice
         voice_context = self._build_voice_context(config)
         if voice_context:
             sections.append(voice_context)
+            included_parts.append("voice")
 
         # Add guidelines text
         guidelines_context = self._build_guidelines_context(config)
         if guidelines_context:
             sections.append(guidelines_context)
+            included_parts.append("guidelines")
 
         # Add best practices
         practices_context = self._build_practices_context(config)
         if practices_context:
             sections.append(practices_context)
+            included_parts.append("practices")
 
         if len(sections) <= 2:  # Only header and empty line
+            logger.info("Brand context empty: no sections have content (user=%s, feature=%s)", user_id[:8], feature_name)
             return ""
 
         sections.append("**MANDATORY**: All generated content MUST use these exact brand colors, fonts, voice, and logo. Do NOT substitute with defaults or generic values.")
         sections.append("")
 
-        return "\n".join(sections)
+        context = "\n".join(sections)
+        logger.info("Brand context loaded: feature=%s, user=%s, sections=[%s], length=%d chars",
+                     feature_name, user_id[:8], ", ".join(included_parts), len(context))
+        return context
 
     def _build_color_context(self, config: Dict[str, Any]) -> str:
         """Build color palette context section, respecting per-color enabled toggles."""

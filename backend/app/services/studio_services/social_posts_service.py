@@ -14,7 +14,7 @@ All images are stored in Supabase Storage.
 """
 import json
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 from app.services.integrations.google.imagen_service import imagen_service
 from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
-from app.config import prompt_loader
+from app.config import prompt_loader, brand_context_loader
 
 
 # Platform to Gemini aspect ratio mapping
@@ -59,7 +59,10 @@ class SocialPostsService:
         job_id: str,
         topic: str,
         direction: str = "",
-        platforms: List[str] | None = None
+        platforms: List[str] | None = None,
+        logo_image_bytes: Optional[bytes] = None,
+        logo_mime_type: str = "image/png",
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate social media posts for selected platforms.
@@ -75,6 +78,8 @@ class SocialPostsService:
             topic: The topic/content to create posts about
             direction: Additional context/direction from the user
             platforms: List of platforms to generate for (default: all 3)
+            logo_image_bytes: Optional brand logo/icon bytes to incorporate in images
+            logo_mime_type: MIME type of the logo image
 
         Returns:
             Dict with success status, posts data, and metadata
@@ -97,7 +102,9 @@ class SocialPostsService:
             topic=topic,
             direction=direction,
             job_id=job_id,
-            platforms=platforms
+            platforms=platforms,
+            has_logo=logo_image_bytes is not None,
+            user_id=user_id
         )
 
         if not content_result.get("success"):
@@ -149,12 +156,25 @@ class SocialPostsService:
                 "storage_path": None
             }
 
-            # Generate image and get bytes (not saved to disk)
-            result = imagen_service.generate_image_bytes(
-                prompt=image_prompt,
-                filename_prefix=f"social_{job_id[:8]}_{platform}",
-                aspect_ratio=aspect_ratio
-            )
+            # Generate image — use multimodal method if logo is available
+            if logo_image_bytes:
+                enhanced_prompt = (
+                    "Create a social media post image that naturally incorporates "
+                    "the provided brand logo/icon into the design. " + image_prompt
+                )
+                result = imagen_service.generate_image_with_reference(
+                    prompt=enhanced_prompt,
+                    reference_image_bytes=logo_image_bytes,
+                    reference_mime_type=logo_mime_type,
+                    filename_prefix=f"social_{job_id[:8]}_{platform}",
+                    aspect_ratio=aspect_ratio
+                )
+            else:
+                result = imagen_service.generate_image_bytes(
+                    prompt=image_prompt,
+                    filename_prefix=f"social_{job_id[:8]}_{platform}",
+                    aspect_ratio=aspect_ratio
+                )
 
             if result.get("success"):
                 filename = result["filename"]
@@ -229,13 +249,17 @@ class SocialPostsService:
         topic: str,
         direction: str,
         job_id: str,
-        platforms: List[str] | None = None
+        platforms: List[str] | None = None,
+        has_logo: bool = False,
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate social media content using Claude.
 
         Educational Note: Claude creates platform-specific copy and image prompts
         tailored to each platform's style, tone, and image dimensions.
+        When a brand logo is available, Claude is instructed to write image prompts
+        that describe incorporating the logo into the design.
         """
         if platforms is None:
             platforms = ["linkedin", "instagram", "twitter"]
@@ -254,19 +278,38 @@ class SocialPostsService:
         else:
             platforms_str = platform_names[0]
 
+        # Logo context — tells Claude to write prompts that reference the logo
+        logo_context = ""
+        if has_logo:
+            logo_context = (
+                "\nNOTE: A brand logo/icon will be provided to the image generator. "
+                "Write image prompts that describe incorporating it naturally into "
+                "the design — mention logo placement (corner, centered, as part of "
+                "the composition) and how design elements should complement it."
+            )
+
         # Build user message
         user_message = config["user_message"].format(
             topic=topic,
             direction=direction or "Create engaging social media posts for this topic.",
-            platforms=platforms_str
+            platforms=platforms_str,
+            logo_context=logo_context
         )
 
         messages = [{"role": "user", "content": user_message}]
 
+        # Load brand context so Claude knows brand name, colors, voice, etc.
+        brand_context = brand_context_loader.load_brand_context(
+            project_id, "social_post", user_id=user_id
+        )
+        system_prompt = config["system_prompt"]
+        if brand_context:
+            system_prompt = f"{system_prompt}\n\n{brand_context}"
+
         try:
             response = claude_service.send_message(
                 messages=messages,
-                system_prompt=config["system_prompt"],
+                system_prompt=system_prompt,
                 model=config["model"],
                 max_tokens=config["max_tokens"],
                 temperature=config["temperature"],
