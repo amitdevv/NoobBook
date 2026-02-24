@@ -142,6 +142,12 @@ class AnalysisExecutor:
                 conflicts and caching issues. Whatever filename Claude passes is ignored.
                 Plots are rendered to an in-memory buffer and uploaded to Supabase
                 Storage (studio-outputs bucket) instead of local disk.
+
+                Bug fix: Both plt.savefig and Figure.savefig are patched to the same
+                custom_savefig, which always calls original_fig_savefig directly.
+                Previously, plt.savefig called original_plt_savefig which internally
+                called Figure.savefig (patched), creating a recursive double-call
+                where the outer buffer stayed empty.
                 """
                 # Always use auto-generated unique name (full UUID for uniqueness)
                 plot_id = str(uuid.uuid4())
@@ -153,13 +159,14 @@ class AnalysisExecutor:
 
                 try:
                     buf = io.BytesIO()
-                    # Determine if called as fig.savefig(filename) or plt.savefig(filename)
                     if args and isinstance(args[0], Figure):
                         # Called as fig.savefig() - first arg is figure instance
                         original_fig_savefig(args[0], buf, **kwargs)
                     else:
-                        # Called as plt.savefig() - ignore any filename arg
-                        original_plt_savefig(buf, **kwargs)
+                        # Called as plt.savefig() - save current figure
+                        # Use gcf() + original Figure.savefig to avoid recursion
+                        fig = plt.gcf()
+                        original_fig_savefig(fig, buf, **kwargs)
 
                     buf.seek(0)
                     image_data = buf.read()
@@ -179,7 +186,9 @@ class AnalysisExecutor:
                 except Exception as save_error:
                     logger.exception("Error saving plot")
 
-            # Patch both plt.savefig and Figure.savefig
+            # Only patch plt.savefig and Figure.savefig — both redirect to the
+            # same custom function that uses original_fig_savefig directly,
+            # avoiding the recursive double-call bug.
             plt.savefig = custom_savefig
             Figure.savefig = custom_savefig
 

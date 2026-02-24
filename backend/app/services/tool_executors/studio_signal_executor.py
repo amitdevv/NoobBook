@@ -183,7 +183,9 @@ class StudioSignalExecutor:
                 # without adding any source files), this correctly leaves source_ids
                 # empty — the frontend handles that case with an error banner.
                 if not source_ids:
-                    source_ids = self._get_fallback_source_ids(project_id)
+                    # Business reports need CSV sources; other generators need embedded text sources
+                    include_csv = signal.get("studio_item") == "business_report"
+                    source_ids = self._get_fallback_source_ids(project_id, include_csv=include_csv)
                     if source_ids:
                         logger.info(
                             "Auto-filled %d source_ids for signal '%s' (Claude omitted sources)",
@@ -221,20 +223,22 @@ class StudioSignalExecutor:
                 "error": str(e)
             }
 
-    def _get_fallback_source_ids(self, project_id: str) -> List[str]:
+    def _get_fallback_source_ids(self, project_id: str, include_csv: bool = False) -> List[str]:
         """
-        Get fallback source IDs from the project's active embedded sources.
+        Get fallback source IDs from the project's active sources.
 
         Educational Note: When Claude creates a studio signal but forgets to
-        include source references, we fall back to the project's ready,
-        embedded sources. DB and CSV sources are excluded since studio
-        generators (email, blog, etc.) need document text, not structured data.
+        include source references, we fall back to the project's ready sources.
+        By default, DB and CSV sources are excluded since most studio generators
+        (email, blog, etc.) need document text, not structured data.
+        Business reports are the exception — they specifically need CSV sources.
 
         Args:
             project_id: The project UUID
+            include_csv: If True, include CSV sources (used for business_report signals)
 
         Returns:
-            List of source ID strings (may be empty if no embedded sources exist)
+            List of source ID strings (may be empty if no sources exist)
         """
         try:
             from app.services.source_services import source_service
@@ -245,10 +249,18 @@ class StudioSignalExecutor:
                     continue
                 embedding_info = src.get("embedding_info") or {}
                 file_ext = embedding_info.get("file_extension", "")
-                # Skip non-embeddable sources (DB, CSV) — studio generators need text content
-                if file_ext in (".database", ".csv"):
+                # Also check source name extension — CSV processor doesn't set file_extension
+                source_name = src.get("name", "")
+                is_csv = file_ext == ".csv" or source_name.lower().endswith(".csv")
+                is_db = file_ext == ".database"
+                # Skip DB sources always — no generator uses them directly
+                if is_db:
                     continue
-                if not embedding_info.get("is_embedded", False):
+                # Skip CSV sources unless explicitly requested (business_report needs them)
+                if is_csv and not include_csv:
+                    continue
+                # For non-CSV sources, require embedding
+                if not is_csv and not embedding_info.get("is_embedded", False):
                     continue
                 if src.get("id"):
                     fallback_ids.append(src["id"])

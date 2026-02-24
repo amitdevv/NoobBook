@@ -6,7 +6,7 @@
     "properties": {
       "csv_source_id": {
         "type": "string",
-        "description": "The source_id of the CSV file to analyze (from the available csv_source_ids)"
+        "description": "The exact UUID of the CSV source to analyze. Copy the source_id UUID from the 'CSV DATA SOURCES' list in the user message (e.g., 'a1b2c3d4-e5f6-...'). Do NOT invent identifiers."
       },
       "analysis_query": {
         "type": "string",

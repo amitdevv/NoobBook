@@ -6,6 +6,7 @@ Executes: plan_business_report, analyze_csv_data, search_source_content, write_b
 
 import logging
 import os
+import uuid as uuid_module
 from typing import Dict, Any, List, Tuple
 from datetime import datetime
 
@@ -86,6 +87,62 @@ class BusinessReportToolExecutor:
 
         return f"Report plan saved. Title: '{title}', Sections: {num_sections}. Proceed to analyze data and write the report."
 
+    def _resolve_source_id(self, project_id: str, source_id: str, csv_only: bool = False) -> str:
+        """
+        Resolve a source identifier to a valid UUID.
+
+        Educational Note: Claude sometimes passes the source NAME (e.g. "customers-100.csv")
+        instead of the UUID as source_id. This causes storage downloads to fail with 404
+        because the storage path uses UUIDs: {project_id}/{source_id}/{source_id}.csv.
+        We resolve names to UUIDs by looking up sources in the project.
+
+        Args:
+            csv_only: If True, falls back to the first CSV source when name matching fails.
+                      Used by analyze_csv_data where we know the target is a CSV.
+        """
+        # Check if it's already a valid UUID
+        try:
+            uuid_module.UUID(source_id)
+            return source_id
+        except (ValueError, AttributeError):
+            pass
+
+        # Not a UUID — try to find the source by name
+        from app.services.source_services import source_service
+        sources = source_service.list_sources(project_id)
+
+        # Try matching by name
+        # Note: Supabase returns "id" not "source_id" — check both for safety
+        for source in sources:
+            source_name = source.get("name", "")
+            if source_name == source_id or source_name.rstrip(".csv") == source_id.rstrip(".csv"):
+                resolved_id = source.get("id") or source.get("source_id")
+                if not resolved_id:
+                    continue
+                logger.info(
+                    "Resolved source name '%s' to UUID %s",
+                    source_id, resolved_id[:8]
+                )
+                return resolved_id
+
+        # Fallback: if Claude invented an identifier (e.g. "csv_source_1"),
+        # return the first CSV source in the project as a best-effort fix.
+        # Only applies when we know we're looking for a CSV source.
+        if csv_only:
+            csv_sources = [
+                s for s in sources
+                if (s.get("id") or s.get("source_id")) and s.get("name", "").lower().endswith(".csv")
+            ]
+            if csv_sources:
+                fallback_id = csv_sources[0].get("id") or csv_sources[0].get("source_id")
+                logger.warning(
+                    "Could not match '%s' — falling back to first CSV source %s (%s)",
+                    source_id, fallback_id[:8], csv_sources[0].get("name")
+                )
+                return fallback_id
+
+        raise ValueError(f"Could not resolve source_id '{source_id}' to any UUID in project {project_id}")
+
     def _execute_analyze_csv(
         self,
         project_id: str,
@@ -100,6 +157,10 @@ class BusinessReportToolExecutor:
         Calls csv_analyzer_agent internally for data analysis and chart generation.
         """
         csv_source_id = tool_input.get("csv_source_id", "")
+        try:
+            csv_source_id = self._resolve_source_id(project_id, csv_source_id, csv_only=True)
+        except ValueError as e:
+            return f"Error resolving CSV source: {e}"
         analysis_query = tool_input.get("analysis_query", "")
         section_context = tool_input.get("section_context", "")
 
@@ -181,6 +242,10 @@ class BusinessReportToolExecutor:
         Searches non-CSV sources for context.
         """
         source_id = tool_input.get("source_id", "")
+        try:
+            source_id = self._resolve_source_id(project_id, source_id)
+        except ValueError as e:
+            return f"Error resolving source: {e}"
         search_query = tool_input.get("search_query", "")
         section_context = tool_input.get("section_context", "")
 
