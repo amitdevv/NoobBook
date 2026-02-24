@@ -96,7 +96,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
 
           {/* Content area */}
           <div className="flex-1 overflow-y-auto p-6 bg-white">
-            <div>{renderSection()}</div>
+            <div className="h-full">{renderSection()}</div>
           </div>
         </div>
       </DialogContent>
