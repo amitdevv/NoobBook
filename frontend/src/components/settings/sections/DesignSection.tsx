@@ -93,7 +93,7 @@ export const DesignSection: React.FC = () => {
       </div>
 
       {/* Tab content — scrolls independently */}
-      <div className="flex-1 overflow-y-auto px-6 pt-4 pb-6">{renderContent()}</div>
+      <div className="flex-1 overflow-y-auto px-6 pb-6">{renderContent()}</div>
     </div>
   );
 };
