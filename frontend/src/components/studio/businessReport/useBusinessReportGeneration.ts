@@ -4,7 +4,7 @@
  * Business reports combine written analysis with charts from CSV data.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { businessReportsAPI, type BusinessReportJob, type BusinessReportType } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
@@ -27,6 +27,7 @@ export const useBusinessReportGeneration = (projectId: string) => {
   const [savedBusinessReportJobs, setSavedBusinessReportJobs] = useState<BusinessReportJob[]>([]);
   const [currentBusinessReportJob, setCurrentBusinessReportJob] = useState<BusinessReportJob | null>(null);
   const [isGeneratingBusinessReport, setIsGeneratingBusinessReport] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingBusinessReportJob, setViewingBusinessReportJob] = useState<BusinessReportJob | null>(null);
 
   const loadSavedJobs = async () => {
@@ -39,11 +40,12 @@ export const useBusinessReportGeneration = (projectId: string) => {
         setSavedBusinessReportJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingBusinessReport) {
+        if (!isGeneratingBusinessReport && !pollingRef.current) {
           const inProgressJob = response.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingBusinessReport(true);
             setCurrentBusinessReportJob(inProgressJob);
             try {
@@ -58,6 +60,7 @@ export const useBusinessReportGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingBusinessReport(false);
               setCurrentBusinessReportJob(null);
             }

@@ -19,6 +19,7 @@ export const useEmailGeneration = (projectId: string) => {
   const [savedEmailJobs, setSavedEmailJobs] = useState<EmailJob[]>([]);
   const [currentEmailJob, setCurrentEmailJob] = useState<EmailJob | null>(null);
   const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingEmailJob, setViewingEmailJob] = useState<EmailJob | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -36,11 +37,12 @@ export const useEmailGeneration = (projectId: string) => {
         setSavedEmailJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingEmail) {
+        if (!isGeneratingEmail && !pollingRef.current) {
           const inProgressJob = emailResponse.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingEmail(true);
             setCurrentEmailJob(inProgressJob);
             try {
@@ -55,6 +57,7 @@ export const useEmailGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingEmail(false);
               setCurrentEmailJob(null);
             }

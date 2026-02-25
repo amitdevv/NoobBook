@@ -19,6 +19,7 @@ export const useSocialPostGeneration = (projectId: string) => {
   const [savedSocialPostJobs, setSavedSocialPostJobs] = useState<SocialPostJob[]>([]);
   const [currentSocialPostJob, setCurrentSocialPostJob] = useState<SocialPostJob | null>(null);
   const [isGeneratingSocialPosts, setIsGeneratingSocialPosts] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingSocialPostJob, setViewingSocialPostJob] = useState<SocialPostJob | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -36,11 +37,12 @@ export const useSocialPostGeneration = (projectId: string) => {
         setSavedSocialPostJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingSocialPosts) {
+        if (!isGeneratingSocialPosts && !pollingRef.current) {
           const inProgressJob = socialPostResponse.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingSocialPosts(true);
             setCurrentSocialPostJob(inProgressJob);
             try {
@@ -55,6 +57,7 @@ export const useSocialPostGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingSocialPosts(false);
               setCurrentSocialPostJob(null);
             }

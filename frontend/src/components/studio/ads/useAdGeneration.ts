@@ -19,6 +19,7 @@ export const useAdGeneration = (projectId: string) => {
   const [savedAdJobs, setSavedAdJobs] = useState<AdJob[]>([]);
   const [currentAdJob, setCurrentAdJob] = useState<AdJob | null>(null);
   const [isGeneratingAd, setIsGeneratingAd] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingAdJob, setViewingAdJob] = useState<AdJob | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -36,11 +37,12 @@ export const useAdGeneration = (projectId: string) => {
         setSavedAdJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingAd) {
+        if (!isGeneratingAd && !pollingRef.current) {
           const inProgressJob = adResponse.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingAd(true);
             setCurrentAdJob(inProgressJob);
             try {
@@ -55,6 +57,7 @@ export const useAdGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingAd(false);
               setCurrentAdJob(null);
             }

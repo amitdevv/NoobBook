@@ -19,6 +19,7 @@ export const useInfographicGeneration = (projectId: string) => {
   const [savedInfographicJobs, setSavedInfographicJobs] = useState<InfographicJob[]>([]);
   const [currentInfographicJob, setCurrentInfographicJob] = useState<InfographicJob | null>(null);
   const [isGeneratingInfographic, setIsGeneratingInfographic] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingInfographicJob, setViewingInfographicJob] = useState<InfographicJob | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -36,11 +37,12 @@ export const useInfographicGeneration = (projectId: string) => {
         setSavedInfographicJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingInfographic) {
+        if (!isGeneratingInfographic && !pollingRef.current) {
           const inProgressJob = infographicResponse.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingInfographic(true);
             setCurrentInfographicJob(inProgressJob);
             try {
@@ -55,6 +57,7 @@ export const useInfographicGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingInfographic(false);
               setCurrentInfographicJob(null);
             }

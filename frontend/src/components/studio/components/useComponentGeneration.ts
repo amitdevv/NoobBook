@@ -4,7 +4,7 @@
  * Handles state management, API calls, and polling.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { componentsAPI, type ComponentJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
@@ -19,6 +19,7 @@ export const useComponentGeneration = (projectId: string) => {
   const [savedComponentJobs, setSavedComponentJobs] = useState<ComponentJob[]>([]);
   const [currentComponentJob, setCurrentComponentJob] = useState<ComponentJob | null>(null);
   const [isGeneratingComponents, setIsGeneratingComponents] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingComponentJob, setViewingComponentJob] = useState<ComponentJob | null>(null);
 
   /**
@@ -34,11 +35,12 @@ export const useComponentGeneration = (projectId: string) => {
         setSavedComponentJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingComponents) {
+        if (!isGeneratingComponents && !pollingRef.current) {
           const inProgressJob = componentResponse.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingComponents(true);
             setCurrentComponentJob(inProgressJob);
             try {
@@ -53,6 +55,7 @@ export const useComponentGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingComponents(false);
               setCurrentComponentJob(null);
             }

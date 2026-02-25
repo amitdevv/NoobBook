@@ -4,7 +4,7 @@
  * Handles state management, API calls, and polling.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { flashCardsAPI, type FlashCardJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
@@ -19,6 +19,7 @@ export const useFlashCardGeneration = (projectId: string) => {
   const [savedFlashCardJobs, setSavedFlashCardJobs] = useState<FlashCardJob[]>([]);
   const [currentFlashCardJob, setCurrentFlashCardJob] = useState<FlashCardJob | null>(null);
   const [isGeneratingFlashCards, setIsGeneratingFlashCards] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingFlashCardJob, setViewingFlashCardJob] = useState<FlashCardJob | null>(null);
 
   /**
@@ -34,11 +35,12 @@ export const useFlashCardGeneration = (projectId: string) => {
         setSavedFlashCardJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingFlashCards) {
+        if (!isGeneratingFlashCards && !pollingRef.current) {
           const inProgressJob = flashCardResponse.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingFlashCards(true);
             setCurrentFlashCardJob(inProgressJob);
             try {
@@ -53,6 +55,7 @@ export const useFlashCardGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingFlashCards(false);
               setCurrentFlashCardJob(null);
             }

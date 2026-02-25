@@ -4,7 +4,7 @@
  * Handles state management, API calls, and polling.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { presentationsAPI, type PresentationJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
@@ -20,6 +20,7 @@ export const usePresentationGeneration = (projectId: string) => {
   const [savedPresentationJobs, setSavedPresentationJobs] = useState<PresentationJob[]>([]);
   const [currentPresentationJob, setCurrentPresentationJob] = useState<PresentationJob | null>(null);
   const [isGeneratingPresentation, setIsGeneratingPresentation] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingPresentationJob, setViewingPresentationJob] = useState<PresentationJob | null>(null);
 
   /**
@@ -38,11 +39,12 @@ export const usePresentationGeneration = (projectId: string) => {
         setSavedPresentationJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingPresentation) {
+        if (!isGeneratingPresentation && !pollingRef.current) {
           const inProgressJob = response.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingPresentation(true);
             setCurrentPresentationJob(inProgressJob);
             try {
@@ -57,6 +59,7 @@ export const usePresentationGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingPresentation(false);
               setCurrentPresentationJob(null);
             }

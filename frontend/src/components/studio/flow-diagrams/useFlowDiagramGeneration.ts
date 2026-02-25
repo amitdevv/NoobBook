@@ -4,7 +4,7 @@
  * Creates various diagram types (flowchart, sequence, state, ER, etc.) for visualization.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { flowDiagramsAPI, type FlowDiagramJob } from '@/lib/api/studio';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
@@ -18,6 +18,7 @@ export const useFlowDiagramGeneration = (projectId: string) => {
   const [savedFlowDiagramJobs, setSavedFlowDiagramJobs] = useState<FlowDiagramJob[]>([]);
   const [currentFlowDiagramJob, setCurrentFlowDiagramJob] = useState<FlowDiagramJob | null>(null);
   const [isGeneratingFlowDiagram, setIsGeneratingFlowDiagram] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingFlowDiagramJob, setViewingFlowDiagramJob] = useState<FlowDiagramJob | null>(null);
 
   const loadSavedJobs = async () => {
@@ -30,11 +31,12 @@ export const useFlowDiagramGeneration = (projectId: string) => {
         setSavedFlowDiagramJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingFlowDiagram) {
+        if (!isGeneratingFlowDiagram && !pollingRef.current) {
           const inProgressJob = response.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingFlowDiagram(true);
             setCurrentFlowDiagramJob(inProgressJob);
             try {
@@ -49,6 +51,7 @@ export const useFlowDiagramGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingFlowDiagram(false);
               setCurrentFlowDiagramJob(null);
             }

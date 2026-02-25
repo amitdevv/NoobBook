@@ -4,7 +4,7 @@
  * Creates UI/UX wireframes for visual prototyping.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { wireframesAPI, type WireframeJob } from '@/lib/api/studio/wireframes';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
@@ -18,6 +18,7 @@ export const useWireframeGeneration = (projectId: string) => {
   const [savedWireframeJobs, setSavedWireframeJobs] = useState<WireframeJob[]>([]);
   const [currentWireframeJob, setCurrentWireframeJob] = useState<WireframeJob | null>(null);
   const [isGeneratingWireframe, setIsGeneratingWireframe] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingWireframeJob, setViewingWireframeJob] = useState<WireframeJob | null>(null);
 
   const loadSavedJobs = async () => {
@@ -30,11 +31,12 @@ export const useWireframeGeneration = (projectId: string) => {
         setSavedWireframeJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingWireframe) {
+        if (!isGeneratingWireframe && !pollingRef.current) {
           const inProgressJob = response.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingWireframe(true);
             setCurrentWireframeJob(inProgressJob);
             try {
@@ -49,6 +51,7 @@ export const useWireframeGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingWireframe(false);
               setCurrentWireframeJob(null);
             }

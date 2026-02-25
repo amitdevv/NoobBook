@@ -4,7 +4,7 @@
  * PRDs are created incrementally by the agent and stored as markdown files.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { prdsAPI, type PRDJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
@@ -19,6 +19,7 @@ export const usePRDGeneration = (projectId: string) => {
   const [savedPRDJobs, setSavedPRDJobs] = useState<PRDJob[]>([]);
   const [currentPRDJob, setCurrentPRDJob] = useState<PRDJob | null>(null);
   const [isGeneratingPRD, setIsGeneratingPRD] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingPRDJob, setViewingPRDJob] = useState<PRDJob | null>(null);
 
   const loadSavedJobs = async () => {
@@ -31,11 +32,12 @@ export const usePRDGeneration = (projectId: string) => {
         setSavedPRDJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingPRD) {
+        if (!isGeneratingPRD && !pollingRef.current) {
           const inProgressJob = prdResponse.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingPRD(true);
             setCurrentPRDJob(inProgressJob);
             try {
@@ -50,6 +52,7 @@ export const usePRDGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingPRD(false);
               setCurrentPRDJob(null);
             }

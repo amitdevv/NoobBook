@@ -25,6 +25,7 @@ export const useBlogGeneration = (projectId: string) => {
   const [savedBlogJobs, setSavedBlogJobs] = useState<BlogJob[]>([]);
   const [currentBlogJob, setCurrentBlogJob] = useState<BlogJob | null>(null);
   const [isGeneratingBlog, setIsGeneratingBlog] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingBlogJob, setViewingBlogJob] = useState<BlogJob | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -39,11 +40,12 @@ export const useBlogGeneration = (projectId: string) => {
         setSavedBlogJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingBlog) {
+        if (!isGeneratingBlog && !pollingRef.current) {
           const inProgressJob = response.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingBlog(true);
             setCurrentBlogJob(inProgressJob);
             try {
@@ -58,6 +60,7 @@ export const useBlogGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingBlog(false);
               setCurrentBlogJob(null);
             }

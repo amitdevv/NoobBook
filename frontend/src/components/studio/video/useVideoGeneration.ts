@@ -5,7 +5,7 @@
  * Videos are generated in two steps: Claude creates optimized prompt -> Google Veo generates video.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { videosAPI, type VideoJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
@@ -21,6 +21,7 @@ export const useVideoGeneration = (projectId: string) => {
   const [savedVideoJobs, setSavedVideoJobs] = useState<VideoJob[]>([]);
   const [currentVideoJob, setCurrentVideoJob] = useState<VideoJob | null>(null);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingVideoJob, setViewingVideoJob] = useState<VideoJob | null>(null);
 
   /**
@@ -36,11 +37,12 @@ export const useVideoGeneration = (projectId: string) => {
         setSavedVideoJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingVideo) {
+        if (!isGeneratingVideo && !pollingRef.current) {
           const inProgressJob = videoResponse.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingVideo(true);
             setCurrentVideoJob(inProgressJob);
             try {
@@ -55,6 +57,7 @@ export const useVideoGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingVideo(false);
               setCurrentVideoJob(null);
             }

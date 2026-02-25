@@ -19,6 +19,7 @@ export const useAudioGeneration = (projectId: string) => {
   const [savedAudioJobs, setSavedAudioJobs] = useState<AudioJob[]>([]);
   const [currentAudioJob, setCurrentAudioJob] = useState<AudioJob | null>(null);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const pollingRef = useRef(false);
   const [playingJobId, setPlayingJobId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -38,11 +39,12 @@ export const useAudioGeneration = (projectId: string) => {
         setSavedAudioJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingAudio) {
+        if (!isGeneratingAudio && !pollingRef.current) {
           const inProgressJob = audioResponse.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingAudio(true);
             setCurrentAudioJob(inProgressJob);
             try {
@@ -57,6 +59,7 @@ export const useAudioGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingAudio(false);
               setCurrentAudioJob(null);
             }

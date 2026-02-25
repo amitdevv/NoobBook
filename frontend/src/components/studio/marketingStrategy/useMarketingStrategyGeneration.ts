@@ -4,7 +4,7 @@
  * Marketing strategies are created incrementally by the agent and stored as markdown files.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { marketingStrategiesAPI, type MarketingStrategyJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
@@ -19,6 +19,7 @@ export const useMarketingStrategyGeneration = (projectId: string) => {
   const [savedMarketingStrategyJobs, setSavedMarketingStrategyJobs] = useState<MarketingStrategyJob[]>([]);
   const [currentMarketingStrategyJob, setCurrentMarketingStrategyJob] = useState<MarketingStrategyJob | null>(null);
   const [isGeneratingMarketingStrategy, setIsGeneratingMarketingStrategy] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingMarketingStrategyJob, setViewingMarketingStrategyJob] = useState<MarketingStrategyJob | null>(null);
 
   const loadSavedJobs = async () => {
@@ -31,11 +32,12 @@ export const useMarketingStrategyGeneration = (projectId: string) => {
         setSavedMarketingStrategyJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingMarketingStrategy) {
+        if (!isGeneratingMarketingStrategy && !pollingRef.current) {
           const inProgressJob = response.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingMarketingStrategy(true);
             setCurrentMarketingStrategyJob(inProgressJob);
             try {
@@ -50,6 +52,7 @@ export const useMarketingStrategyGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingMarketingStrategy(false);
               setCurrentMarketingStrategyJob(null);
             }

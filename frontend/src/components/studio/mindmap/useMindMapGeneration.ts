@@ -4,7 +4,7 @@
  * Creates hierarchical node structures for visualization.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { mindMapsAPI, type MindMapJob } from '@/lib/api/studio';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
@@ -18,6 +18,7 @@ export const useMindMapGeneration = (projectId: string) => {
   const [savedMindMapJobs, setSavedMindMapJobs] = useState<MindMapJob[]>([]);
   const [currentMindMapJob, setCurrentMindMapJob] = useState<MindMapJob | null>(null);
   const [isGeneratingMindMap, setIsGeneratingMindMap] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingMindMapJob, setViewingMindMapJob] = useState<MindMapJob | null>(null);
 
   const loadSavedJobs = async () => {
@@ -30,11 +31,12 @@ export const useMindMapGeneration = (projectId: string) => {
         setSavedMindMapJobs(finishedJobs);
 
         // Resume polling for in-progress jobs (survives refresh/navigation)
-        if (!isGeneratingMindMap) {
+        if (!isGeneratingMindMap && !pollingRef.current) {
           const inProgressJob = mindMapResponse.jobs.find(
             (job) => job.status === 'pending' || job.status === 'processing'
           );
           if (inProgressJob) {
+            pollingRef.current = true;
             setIsGeneratingMindMap(true);
             setCurrentMindMapJob(inProgressJob);
             try {
@@ -49,6 +51,7 @@ export const useMindMapGeneration = (projectId: string) => {
             } catch {
               // Polling failed — job stays visible via next load
             } finally {
+              pollingRef.current = false;
               setIsGeneratingMindMap(false);
               setCurrentMindMapJob(null);
             }
