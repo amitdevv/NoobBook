@@ -132,17 +132,13 @@ class InfographicService:
         )
 
         try:
-            # Get source metadata
-            source = source_index_service.get_source_from_index(project_id, source_id)
-            if not source:
-                raise ValueError(f"Source {source_id} not found")
-
-            source_name = source.get("name", "Unknown")
-
-            # Get source content
-            content = self._get_source_content(project_id, source_id)
-            if not content:
-                raise ValueError("No content found for source")
+            # Get source content if a source is provided
+            content = ""
+            if source_id:
+                source = source_index_service.get_source_from_index(project_id, source_id)
+                if not source:
+                    raise ValueError(f"Source {source_id} not found")
+                content = self._get_source_content(project_id, source_id)
 
             # Step 1: Generate image prompt with Claude
             studio_index_service.update_infographic_job(
@@ -258,9 +254,19 @@ class InfographicService:
         """
         config = self._load_config()
 
+        # Build source section — include source content block only if available
+        if source_content:
+            source_section = (
+                "=== SOURCE CONTENT ===\n"
+                f"{source_content[:15000]}\n"
+                "=== END SOURCE CONTENT ==="
+            )
+        else:
+            source_section = "(No source document provided — generate the infographic based on the direction below.)"
+
         # Build user message
         user_message = config["user_message"].format(
-            source_content=source_content[:15000],  # Limit content
+            source_section=source_section,
             direction=direction or "Create an informative infographic summarizing the key concepts."
         )
 

@@ -89,7 +89,7 @@ export const infographicsAPI = {
    */
   async startGeneration(
     projectId: string,
-    sourceId: string,
+    sourceId: string = '',
     direction?: string
   ): Promise<StartInfographicResponse> {
     try {

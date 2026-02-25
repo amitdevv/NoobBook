@@ -42,11 +42,7 @@ export const useInfographicGeneration = (projectId: string) => {
    * Handle infographic generation
    */
   const handleInfographicGeneration = async (signal: StudioSignal) => {
-    const sourceId = signal.sources[0]?.source_id;
-    if (!sourceId) {
-      showError('No source specified for infographic generation.');
-      return;
-    }
+    const sourceId = signal.sources[0]?.source_id || '';
 
     setIsGeneratingInfographic(true);
     setCurrentInfographicJob(null);
@@ -73,7 +69,10 @@ export const useInfographicGeneration = (projectId: string) => {
         return;
       }
 
-      showSuccess(`Generating infographic for ${startResponse.source_name}...`);
+      const toastLabel = startResponse.source_name && startResponse.source_name !== 'Chat Context'
+        ? startResponse.source_name
+        : 'your topic';
+      showSuccess(`Generating infographic for ${toastLabel}...`);
 
       const finalJob = await infographicsAPI.pollJobStatus(
         projectId,

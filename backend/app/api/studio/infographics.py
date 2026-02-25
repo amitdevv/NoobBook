@@ -46,7 +46,7 @@ def generate_infographic(project_id: str):
     content in an educational format with icons, sections, and visual flow.
 
     Request Body:
-        - source_id: UUID of the source to generate infographic from (required)
+        - source_id: UUID of the source (optional - empty string for no source)
         - direction: Optional guidance for what to focus on
 
     Response:
@@ -57,13 +57,7 @@ def generate_infographic(project_id: str):
     try:
         data = request.get_json() or {}
 
-        source_id = data.get('source_id')
-        if not source_id:
-            return jsonify({
-                'success': False,
-                'error': 'source_id is required'
-            }), 400
-
+        source_id = data.get('source_id', '')
         direction = data.get('direction', 'Create an informative infographic summarizing the key concepts.')
 
         # Check if Gemini is configured
@@ -73,15 +67,16 @@ def generate_infographic(project_id: str):
                 'error': 'Gemini API key not configured. Please add it in Admin Settings.'
             }), 400
 
-        # Get source info for the job record
-        source = source_index_service.get_source_from_index(project_id, source_id)
-        if not source:
-            return jsonify({
-                'success': False,
-                'error': f'Source not found: {source_id}'
-            }), 404
-
-        source_name = source.get('name', 'Unknown')
+        # Look up source if provided, otherwise use "Chat Context"
+        source_name = 'Chat Context'
+        if source_id:
+            source = source_index_service.get_source_from_index(project_id, source_id)
+            if not source:
+                return jsonify({
+                    'success': False,
+                    'error': f'Source not found: {source_id}'
+                }), 404
+            source_name = source.get('name', 'Unknown')
 
         # Create job record
         job_id = str(uuid.uuid4())
