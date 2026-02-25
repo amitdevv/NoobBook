@@ -4,7 +4,7 @@
  * Handles state management, API calls, and polling.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { componentsAPI, type ComponentJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
@@ -19,6 +19,7 @@ export const useComponentGeneration = (projectId: string) => {
   const [savedComponentJobs, setSavedComponentJobs] = useState<ComponentJob[]>([]);
   const [currentComponentJob, setCurrentComponentJob] = useState<ComponentJob | null>(null);
   const [isGeneratingComponents, setIsGeneratingComponents] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingComponentJob, setViewingComponentJob] = useState<ComponentJob | null>(null);
 
   /**
@@ -28,8 +29,38 @@ export const useComponentGeneration = (projectId: string) => {
     try {
       const componentResponse = await componentsAPI.listJobs(projectId);
       if (componentResponse.success && componentResponse.jobs) {
-        const completedComponents = componentResponse.jobs.filter((job) => job.status === 'ready');
-        setSavedComponentJobs(completedComponents);
+        const finishedJobs = componentResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedComponentJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingComponents && !pollingRef.current) {
+          const inProgressJob = componentResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingComponents(true);
+            setCurrentComponentJob(inProgressJob);
+            try {
+              const finalJob = await componentsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentComponentJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedComponentJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingComponents(false);
+              setCurrentComponentJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved component jobs');

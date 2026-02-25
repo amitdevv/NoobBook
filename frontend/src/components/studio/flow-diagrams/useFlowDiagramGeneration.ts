@@ -4,7 +4,7 @@
  * Creates various diagram types (flowchart, sequence, state, ER, etc.) for visualization.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { flowDiagramsAPI, type FlowDiagramJob } from '@/lib/api/studio';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
@@ -18,13 +18,48 @@ export const useFlowDiagramGeneration = (projectId: string) => {
   const [savedFlowDiagramJobs, setSavedFlowDiagramJobs] = useState<FlowDiagramJob[]>([]);
   const [currentFlowDiagramJob, setCurrentFlowDiagramJob] = useState<FlowDiagramJob | null>(null);
   const [isGeneratingFlowDiagram, setIsGeneratingFlowDiagram] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingFlowDiagramJob, setViewingFlowDiagramJob] = useState<FlowDiagramJob | null>(null);
 
   const loadSavedJobs = async () => {
-    const response = await flowDiagramsAPI.listJobs(projectId);
-    if (response.success && response.jobs) {
-      const completedDiagrams = response.jobs.filter((job) => job.status === 'ready');
-      setSavedFlowDiagramJobs(completedDiagrams);
+    try {
+      const response = await flowDiagramsAPI.listJobs(projectId);
+      if (response.success && response.jobs) {
+        const finishedJobs = response.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedFlowDiagramJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingFlowDiagram && !pollingRef.current) {
+          const inProgressJob = response.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingFlowDiagram(true);
+            setCurrentFlowDiagramJob(inProgressJob);
+            try {
+              const finalJob = await flowDiagramsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentFlowDiagramJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedFlowDiagramJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingFlowDiagram(false);
+              setCurrentFlowDiagramJob(null);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to load saved flow diagram jobs');
     }
   };
 

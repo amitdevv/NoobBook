@@ -4,7 +4,7 @@
  * Marketing strategies are created incrementally by the agent and stored as markdown files.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { marketingStrategiesAPI, type MarketingStrategyJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
@@ -19,13 +19,48 @@ export const useMarketingStrategyGeneration = (projectId: string) => {
   const [savedMarketingStrategyJobs, setSavedMarketingStrategyJobs] = useState<MarketingStrategyJob[]>([]);
   const [currentMarketingStrategyJob, setCurrentMarketingStrategyJob] = useState<MarketingStrategyJob | null>(null);
   const [isGeneratingMarketingStrategy, setIsGeneratingMarketingStrategy] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingMarketingStrategyJob, setViewingMarketingStrategyJob] = useState<MarketingStrategyJob | null>(null);
 
   const loadSavedJobs = async () => {
-    const response = await marketingStrategiesAPI.listJobs(projectId);
-    if (response.success && response.jobs) {
-      const completedJobs = response.jobs.filter((job) => job.status === 'ready');
-      setSavedMarketingStrategyJobs(completedJobs);
+    try {
+      const response = await marketingStrategiesAPI.listJobs(projectId);
+      if (response.success && response.jobs) {
+        const finishedJobs = response.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedMarketingStrategyJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingMarketingStrategy && !pollingRef.current) {
+          const inProgressJob = response.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingMarketingStrategy(true);
+            setCurrentMarketingStrategyJob(inProgressJob);
+            try {
+              const finalJob = await marketingStrategiesAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentMarketingStrategyJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedMarketingStrategyJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingMarketingStrategy(false);
+              setCurrentMarketingStrategyJob(null);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to load saved marketing strategy jobs');
     }
   };
 

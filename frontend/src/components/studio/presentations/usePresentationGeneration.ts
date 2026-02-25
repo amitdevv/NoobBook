@@ -4,7 +4,7 @@
  * Handles state management, API calls, and polling.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { presentationsAPI, type PresentationJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
@@ -20,6 +20,7 @@ export const usePresentationGeneration = (projectId: string) => {
   const [savedPresentationJobs, setSavedPresentationJobs] = useState<PresentationJob[]>([]);
   const [currentPresentationJob, setCurrentPresentationJob] = useState<PresentationJob | null>(null);
   const [isGeneratingPresentation, setIsGeneratingPresentation] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingPresentationJob, setViewingPresentationJob] = useState<PresentationJob | null>(null);
 
   /**
@@ -29,11 +30,41 @@ export const usePresentationGeneration = (projectId: string) => {
     try {
       const response = await presentationsAPI.listJobs(projectId);
       if (response.success && response.jobs) {
-        // Only show jobs that are ready and have PPTX exported
-        const completedPresentations = response.jobs.filter(
-          (job) => job.status === 'ready' && job.export_status === 'ready'
+        // Show fully exported presentations + error jobs
+        const finishedJobs = response.jobs.filter(
+          (job) =>
+            (job.status === 'ready' && job.export_status === 'ready') ||
+            job.status === 'error'
         );
-        setSavedPresentationJobs(completedPresentations);
+        setSavedPresentationJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingPresentation && !pollingRef.current) {
+          const inProgressJob = response.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingPresentation(true);
+            setCurrentPresentationJob(inProgressJob);
+            try {
+              const finalJob = await presentationsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentPresentationJob(job)
+              );
+              if ((finalJob.status === 'ready' && finalJob.export_status === 'ready') || finalJob.status === 'error') {
+                setSavedPresentationJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingPresentation(false);
+              setCurrentPresentationJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved presentation jobs');
