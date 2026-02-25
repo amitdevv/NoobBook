@@ -21,10 +21,42 @@ export const useFlowDiagramGeneration = (projectId: string) => {
   const [viewingFlowDiagramJob, setViewingFlowDiagramJob] = useState<FlowDiagramJob | null>(null);
 
   const loadSavedJobs = async () => {
-    const response = await flowDiagramsAPI.listJobs(projectId);
-    if (response.success && response.jobs) {
-      const completedDiagrams = response.jobs.filter((job) => job.status === 'ready');
-      setSavedFlowDiagramJobs(completedDiagrams);
+    try {
+      const response = await flowDiagramsAPI.listJobs(projectId);
+      if (response.success && response.jobs) {
+        const finishedJobs = response.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedFlowDiagramJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingFlowDiagram) {
+          const inProgressJob = response.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            setIsGeneratingFlowDiagram(true);
+            setCurrentFlowDiagramJob(inProgressJob);
+            try {
+              const finalJob = await flowDiagramsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentFlowDiagramJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedFlowDiagramJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              setIsGeneratingFlowDiagram(false);
+              setCurrentFlowDiagramJob(null);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to load saved flow diagram jobs');
     }
   };
 

@@ -30,8 +30,36 @@ export const useEmailGeneration = (projectId: string) => {
     try {
       const emailResponse = await emailsAPI.listJobs(projectId);
       if (emailResponse.success && emailResponse.jobs) {
-        const completedEmails = emailResponse.jobs.filter((job) => job.status === 'ready');
-        setSavedEmailJobs(completedEmails);
+        const finishedJobs = emailResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedEmailJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingEmail) {
+          const inProgressJob = emailResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            setIsGeneratingEmail(true);
+            setCurrentEmailJob(inProgressJob);
+            try {
+              const finalJob = await emailsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentEmailJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedEmailJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              setIsGeneratingEmail(false);
+              setCurrentEmailJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved email jobs');

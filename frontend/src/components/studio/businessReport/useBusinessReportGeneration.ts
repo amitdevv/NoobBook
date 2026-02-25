@@ -30,10 +30,42 @@ export const useBusinessReportGeneration = (projectId: string) => {
   const [viewingBusinessReportJob, setViewingBusinessReportJob] = useState<BusinessReportJob | null>(null);
 
   const loadSavedJobs = async () => {
-    const response = await businessReportsAPI.listJobs(projectId);
-    if (response.success && response.jobs) {
-      const completedJobs = response.jobs.filter((job) => job.status === 'ready');
-      setSavedBusinessReportJobs(completedJobs);
+    try {
+      const response = await businessReportsAPI.listJobs(projectId);
+      if (response.success && response.jobs) {
+        const finishedJobs = response.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedBusinessReportJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingBusinessReport) {
+          const inProgressJob = response.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            setIsGeneratingBusinessReport(true);
+            setCurrentBusinessReportJob(inProgressJob);
+            try {
+              const finalJob = await businessReportsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentBusinessReportJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedBusinessReportJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              setIsGeneratingBusinessReport(false);
+              setCurrentBusinessReportJob(null);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to load saved business report jobs');
     }
   };
 

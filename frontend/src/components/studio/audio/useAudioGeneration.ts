@@ -29,10 +29,42 @@ export const useAudioGeneration = (projectId: string) => {
   const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 1.75, 2] as const;
 
   const loadSavedJobs = async () => {
-    const audioResponse = await audioAPI.listJobs(projectId);
-    if (audioResponse.success && audioResponse.jobs) {
-      const completedAudio = audioResponse.jobs.filter((job) => job.status === 'ready');
-      setSavedAudioJobs(completedAudio);
+    try {
+      const audioResponse = await audioAPI.listJobs(projectId);
+      if (audioResponse.success && audioResponse.jobs) {
+        const finishedJobs = audioResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedAudioJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingAudio) {
+          const inProgressJob = audioResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            setIsGeneratingAudio(true);
+            setCurrentAudioJob(inProgressJob);
+            try {
+              const finalJob = await audioAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentAudioJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedAudioJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              setIsGeneratingAudio(false);
+              setCurrentAudioJob(null);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to load saved audio jobs');
     }
   };
 

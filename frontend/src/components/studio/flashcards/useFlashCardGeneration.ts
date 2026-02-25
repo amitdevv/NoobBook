@@ -28,8 +28,36 @@ export const useFlashCardGeneration = (projectId: string) => {
     try {
       const flashCardResponse = await flashCardsAPI.listJobs(projectId);
       if (flashCardResponse.success && flashCardResponse.jobs) {
-        const completedFlashCards = flashCardResponse.jobs.filter((job) => job.status === 'ready');
-        setSavedFlashCardJobs(completedFlashCards);
+        const finishedJobs = flashCardResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedFlashCardJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingFlashCards) {
+          const inProgressJob = flashCardResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            setIsGeneratingFlashCards(true);
+            setCurrentFlashCardJob(inProgressJob);
+            try {
+              const finalJob = await flashCardsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentFlashCardJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedFlashCardJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              setIsGeneratingFlashCards(false);
+              setCurrentFlashCardJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved flash card jobs');

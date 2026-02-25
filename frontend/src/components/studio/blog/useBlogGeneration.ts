@@ -33,8 +33,36 @@ export const useBlogGeneration = (projectId: string) => {
     try {
       const response = await blogsAPI.listJobs(projectId);
       if (response.success && response.jobs) {
-        const completedJobs = response.jobs.filter((job) => job.status === 'ready');
-        setSavedBlogJobs(completedJobs);
+        const finishedJobs = response.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedBlogJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingBlog) {
+          const inProgressJob = response.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            setIsGeneratingBlog(true);
+            setCurrentBlogJob(inProgressJob);
+            try {
+              const finalJob = await blogsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentBlogJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedBlogJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              setIsGeneratingBlog(false);
+              setCurrentBlogJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved blog jobs');

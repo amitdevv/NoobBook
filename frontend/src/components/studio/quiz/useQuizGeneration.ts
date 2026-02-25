@@ -21,10 +21,42 @@ export const useQuizGeneration = (projectId: string) => {
   const [viewingQuizJob, setViewingQuizJob] = useState<QuizJob | null>(null);
 
   const loadSavedJobs = async () => {
-    const quizResponse = await quizzesAPI.listJobs(projectId);
-    if (quizResponse.success && quizResponse.jobs) {
-      const completedQuizzes = quizResponse.jobs.filter((job) => job.status === 'ready');
-      setSavedQuizJobs(completedQuizzes);
+    try {
+      const quizResponse = await quizzesAPI.listJobs(projectId);
+      if (quizResponse.success && quizResponse.jobs) {
+        const finishedJobs = quizResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedQuizJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingQuiz) {
+          const inProgressJob = quizResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            setIsGeneratingQuiz(true);
+            setCurrentQuizJob(inProgressJob);
+            try {
+              const finalJob = await quizzesAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentQuizJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedQuizJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              setIsGeneratingQuiz(false);
+              setCurrentQuizJob(null);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to load saved quiz jobs');
     }
   };
 

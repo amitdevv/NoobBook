@@ -30,8 +30,36 @@ export const useAdGeneration = (projectId: string) => {
     try {
       const adResponse = await adsAPI.listJobs(projectId);
       if (adResponse.success && adResponse.jobs) {
-        const completedAds = adResponse.jobs.filter((job) => job.status === 'ready');
-        setSavedAdJobs(completedAds);
+        const finishedJobs = adResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedAdJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingAd) {
+          const inProgressJob = adResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            setIsGeneratingAd(true);
+            setCurrentAdJob(inProgressJob);
+            try {
+              const finalJob = await adsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentAdJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedAdJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              setIsGeneratingAd(false);
+              setCurrentAdJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved ad jobs');

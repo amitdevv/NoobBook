@@ -22,10 +22,42 @@ export const useMarketingStrategyGeneration = (projectId: string) => {
   const [viewingMarketingStrategyJob, setViewingMarketingStrategyJob] = useState<MarketingStrategyJob | null>(null);
 
   const loadSavedJobs = async () => {
-    const response = await marketingStrategiesAPI.listJobs(projectId);
-    if (response.success && response.jobs) {
-      const completedJobs = response.jobs.filter((job) => job.status === 'ready');
-      setSavedMarketingStrategyJobs(completedJobs);
+    try {
+      const response = await marketingStrategiesAPI.listJobs(projectId);
+      if (response.success && response.jobs) {
+        const finishedJobs = response.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedMarketingStrategyJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingMarketingStrategy) {
+          const inProgressJob = response.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            setIsGeneratingMarketingStrategy(true);
+            setCurrentMarketingStrategyJob(inProgressJob);
+            try {
+              const finalJob = await marketingStrategiesAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentMarketingStrategyJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedMarketingStrategyJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              setIsGeneratingMarketingStrategy(false);
+              setCurrentMarketingStrategyJob(null);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to load saved marketing strategy jobs');
     }
   };
 

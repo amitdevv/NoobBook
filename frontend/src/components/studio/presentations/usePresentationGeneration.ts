@@ -29,11 +29,39 @@ export const usePresentationGeneration = (projectId: string) => {
     try {
       const response = await presentationsAPI.listJobs(projectId);
       if (response.success && response.jobs) {
-        // Only show jobs that are ready and have PPTX exported
-        const completedPresentations = response.jobs.filter(
-          (job) => job.status === 'ready' && job.export_status === 'ready'
+        // Show fully exported presentations + error jobs
+        const finishedJobs = response.jobs.filter(
+          (job) =>
+            (job.status === 'ready' && job.export_status === 'ready') ||
+            job.status === 'error'
         );
-        setSavedPresentationJobs(completedPresentations);
+        setSavedPresentationJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingPresentation) {
+          const inProgressJob = response.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            setIsGeneratingPresentation(true);
+            setCurrentPresentationJob(inProgressJob);
+            try {
+              const finalJob = await presentationsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentPresentationJob(job)
+              );
+              if ((finalJob.status === 'ready' && finalJob.export_status === 'ready') || finalJob.status === 'error') {
+                setSavedPresentationJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              setIsGeneratingPresentation(false);
+              setCurrentPresentationJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved presentation jobs');

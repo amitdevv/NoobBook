@@ -30,8 +30,36 @@ export const useVideoGeneration = (projectId: string) => {
     try {
       const videoResponse = await videosAPI.listJobs(projectId);
       if (videoResponse.success && videoResponse.jobs) {
-        const completedVideos = videoResponse.jobs.filter((job) => job.status === 'ready');
-        setSavedVideoJobs(completedVideos);
+        const finishedJobs = videoResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedVideoJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingVideo) {
+          const inProgressJob = videoResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            setIsGeneratingVideo(true);
+            setCurrentVideoJob(inProgressJob);
+            try {
+              const finalJob = await videosAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentVideoJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedVideoJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              setIsGeneratingVideo(false);
+              setCurrentVideoJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved video jobs');

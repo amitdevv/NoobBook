@@ -30,8 +30,36 @@ export const useInfographicGeneration = (projectId: string) => {
     try {
       const infographicResponse = await infographicsAPI.listJobs(projectId);
       if (infographicResponse.success && infographicResponse.jobs) {
-        const completedInfographics = infographicResponse.jobs.filter((job) => job.status === 'ready');
-        setSavedInfographicJobs(completedInfographics);
+        const finishedJobs = infographicResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedInfographicJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingInfographic) {
+          const inProgressJob = infographicResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            setIsGeneratingInfographic(true);
+            setCurrentInfographicJob(inProgressJob);
+            try {
+              const finalJob = await infographicsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentInfographicJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedInfographicJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              setIsGeneratingInfographic(false);
+              setCurrentInfographicJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved infographic jobs');

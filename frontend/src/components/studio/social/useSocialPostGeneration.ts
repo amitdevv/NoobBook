@@ -30,8 +30,36 @@ export const useSocialPostGeneration = (projectId: string) => {
     try {
       const socialPostResponse = await socialPostsAPI.listJobs(projectId);
       if (socialPostResponse.success && socialPostResponse.jobs) {
-        const completedSocialPosts = socialPostResponse.jobs.filter((job) => job.status === 'ready');
-        setSavedSocialPostJobs(completedSocialPosts);
+        const finishedJobs = socialPostResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedSocialPostJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingSocialPosts) {
+          const inProgressJob = socialPostResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            setIsGeneratingSocialPosts(true);
+            setCurrentSocialPostJob(inProgressJob);
+            try {
+              const finalJob = await socialPostsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentSocialPostJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedSocialPostJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              setIsGeneratingSocialPosts(false);
+              setCurrentSocialPostJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved social post jobs');
