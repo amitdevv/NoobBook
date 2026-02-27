@@ -25,6 +25,7 @@ export const useBlogGeneration = (projectId: string) => {
   const [savedBlogJobs, setSavedBlogJobs] = useState<BlogJob[]>([]);
   const [currentBlogJob, setCurrentBlogJob] = useState<BlogJob | null>(null);
   const [isGeneratingBlog, setIsGeneratingBlog] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingBlogJob, setViewingBlogJob] = useState<BlogJob | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -33,8 +34,38 @@ export const useBlogGeneration = (projectId: string) => {
     try {
       const response = await blogsAPI.listJobs(projectId);
       if (response.success && response.jobs) {
-        const completedJobs = response.jobs.filter((job) => job.status === 'ready');
-        setSavedBlogJobs(completedJobs);
+        const finishedJobs = response.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedBlogJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingBlog && !pollingRef.current) {
+          const inProgressJob = response.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingBlog(true);
+            setCurrentBlogJob(inProgressJob);
+            try {
+              const finalJob = await blogsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentBlogJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedBlogJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingBlog(false);
+              setCurrentBlogJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved blog jobs');

@@ -4,7 +4,7 @@
  * Creates hierarchical node structures for visualization.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { mindMapsAPI, type MindMapJob } from '@/lib/api/studio';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
@@ -18,13 +18,48 @@ export const useMindMapGeneration = (projectId: string) => {
   const [savedMindMapJobs, setSavedMindMapJobs] = useState<MindMapJob[]>([]);
   const [currentMindMapJob, setCurrentMindMapJob] = useState<MindMapJob | null>(null);
   const [isGeneratingMindMap, setIsGeneratingMindMap] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingMindMapJob, setViewingMindMapJob] = useState<MindMapJob | null>(null);
 
   const loadSavedJobs = async () => {
-    const mindMapResponse = await mindMapsAPI.listJobs(projectId);
-    if (mindMapResponse.success && mindMapResponse.jobs) {
-      const completedMindMaps = mindMapResponse.jobs.filter((job) => job.status === 'ready');
-      setSavedMindMapJobs(completedMindMaps);
+    try {
+      const mindMapResponse = await mindMapsAPI.listJobs(projectId);
+      if (mindMapResponse.success && mindMapResponse.jobs) {
+        const finishedJobs = mindMapResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedMindMapJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingMindMap && !pollingRef.current) {
+          const inProgressJob = mindMapResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingMindMap(true);
+            setCurrentMindMapJob(inProgressJob);
+            try {
+              const finalJob = await mindMapsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentMindMapJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedMindMapJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingMindMap(false);
+              setCurrentMindMapJob(null);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to load saved mind map jobs');
     }
   };
 

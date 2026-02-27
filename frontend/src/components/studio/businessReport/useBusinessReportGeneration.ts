@@ -4,7 +4,7 @@
  * Business reports combine written analysis with charts from CSV data.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { businessReportsAPI, type BusinessReportJob, type BusinessReportType } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
@@ -27,13 +27,48 @@ export const useBusinessReportGeneration = (projectId: string) => {
   const [savedBusinessReportJobs, setSavedBusinessReportJobs] = useState<BusinessReportJob[]>([]);
   const [currentBusinessReportJob, setCurrentBusinessReportJob] = useState<BusinessReportJob | null>(null);
   const [isGeneratingBusinessReport, setIsGeneratingBusinessReport] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingBusinessReportJob, setViewingBusinessReportJob] = useState<BusinessReportJob | null>(null);
 
   const loadSavedJobs = async () => {
-    const response = await businessReportsAPI.listJobs(projectId);
-    if (response.success && response.jobs) {
-      const completedJobs = response.jobs.filter((job) => job.status === 'ready');
-      setSavedBusinessReportJobs(completedJobs);
+    try {
+      const response = await businessReportsAPI.listJobs(projectId);
+      if (response.success && response.jobs) {
+        const finishedJobs = response.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedBusinessReportJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingBusinessReport && !pollingRef.current) {
+          const inProgressJob = response.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingBusinessReport(true);
+            setCurrentBusinessReportJob(inProgressJob);
+            try {
+              const finalJob = await businessReportsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentBusinessReportJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedBusinessReportJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingBusinessReport(false);
+              setCurrentBusinessReportJob(null);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to load saved business report jobs');
     }
   };
 

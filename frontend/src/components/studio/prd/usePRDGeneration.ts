@@ -4,7 +4,7 @@
  * PRDs are created incrementally by the agent and stored as markdown files.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { prdsAPI, type PRDJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
@@ -19,13 +19,48 @@ export const usePRDGeneration = (projectId: string) => {
   const [savedPRDJobs, setSavedPRDJobs] = useState<PRDJob[]>([]);
   const [currentPRDJob, setCurrentPRDJob] = useState<PRDJob | null>(null);
   const [isGeneratingPRD, setIsGeneratingPRD] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingPRDJob, setViewingPRDJob] = useState<PRDJob | null>(null);
 
   const loadSavedJobs = async () => {
-    const prdResponse = await prdsAPI.listJobs(projectId);
-    if (prdResponse.success && prdResponse.jobs) {
-      const completedPRDs = prdResponse.jobs.filter((job) => job.status === 'ready');
-      setSavedPRDJobs(completedPRDs);
+    try {
+      const prdResponse = await prdsAPI.listJobs(projectId);
+      if (prdResponse.success && prdResponse.jobs) {
+        const finishedJobs = prdResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedPRDJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingPRD && !pollingRef.current) {
+          const inProgressJob = prdResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingPRD(true);
+            setCurrentPRDJob(inProgressJob);
+            try {
+              const finalJob = await prdsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentPRDJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedPRDJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingPRD(false);
+              setCurrentPRDJob(null);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to load saved PRD jobs');
     }
   };
 

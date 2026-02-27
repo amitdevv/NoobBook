@@ -4,7 +4,7 @@
  * Handles state management, API calls, and polling.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { flashCardsAPI, type FlashCardJob } from '@/lib/api/studio';
 import { useToast } from '../../ui/toast';
 import type { StudioSignal } from '../types';
@@ -19,6 +19,7 @@ export const useFlashCardGeneration = (projectId: string) => {
   const [savedFlashCardJobs, setSavedFlashCardJobs] = useState<FlashCardJob[]>([]);
   const [currentFlashCardJob, setCurrentFlashCardJob] = useState<FlashCardJob | null>(null);
   const [isGeneratingFlashCards, setIsGeneratingFlashCards] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingFlashCardJob, setViewingFlashCardJob] = useState<FlashCardJob | null>(null);
 
   /**
@@ -28,8 +29,38 @@ export const useFlashCardGeneration = (projectId: string) => {
     try {
       const flashCardResponse = await flashCardsAPI.listJobs(projectId);
       if (flashCardResponse.success && flashCardResponse.jobs) {
-        const completedFlashCards = flashCardResponse.jobs.filter((job) => job.status === 'ready');
-        setSavedFlashCardJobs(completedFlashCards);
+        const finishedJobs = flashCardResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedFlashCardJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingFlashCards && !pollingRef.current) {
+          const inProgressJob = flashCardResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingFlashCards(true);
+            setCurrentFlashCardJob(inProgressJob);
+            try {
+              const finalJob = await flashCardsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentFlashCardJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedFlashCardJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingFlashCards(false);
+              setCurrentFlashCardJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved flash card jobs');

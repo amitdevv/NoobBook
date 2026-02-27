@@ -19,6 +19,7 @@ export const useSocialPostGeneration = (projectId: string) => {
   const [savedSocialPostJobs, setSavedSocialPostJobs] = useState<SocialPostJob[]>([]);
   const [currentSocialPostJob, setCurrentSocialPostJob] = useState<SocialPostJob | null>(null);
   const [isGeneratingSocialPosts, setIsGeneratingSocialPosts] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingSocialPostJob, setViewingSocialPostJob] = useState<SocialPostJob | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -30,8 +31,38 @@ export const useSocialPostGeneration = (projectId: string) => {
     try {
       const socialPostResponse = await socialPostsAPI.listJobs(projectId);
       if (socialPostResponse.success && socialPostResponse.jobs) {
-        const completedSocialPosts = socialPostResponse.jobs.filter((job) => job.status === 'ready');
-        setSavedSocialPostJobs(completedSocialPosts);
+        const finishedJobs = socialPostResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedSocialPostJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingSocialPosts && !pollingRef.current) {
+          const inProgressJob = socialPostResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingSocialPosts(true);
+            setCurrentSocialPostJob(inProgressJob);
+            try {
+              const finalJob = await socialPostsAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentSocialPostJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedSocialPostJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingSocialPosts(false);
+              setCurrentSocialPostJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved social post jobs');

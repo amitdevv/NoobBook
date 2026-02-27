@@ -5,7 +5,7 @@
  * Videos are generated in two steps: Claude creates optimized prompt -> Google Veo generates video.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { videosAPI, type VideoJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
@@ -21,6 +21,7 @@ export const useVideoGeneration = (projectId: string) => {
   const [savedVideoJobs, setSavedVideoJobs] = useState<VideoJob[]>([]);
   const [currentVideoJob, setCurrentVideoJob] = useState<VideoJob | null>(null);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingVideoJob, setViewingVideoJob] = useState<VideoJob | null>(null);
 
   /**
@@ -30,8 +31,38 @@ export const useVideoGeneration = (projectId: string) => {
     try {
       const videoResponse = await videosAPI.listJobs(projectId);
       if (videoResponse.success && videoResponse.jobs) {
-        const completedVideos = videoResponse.jobs.filter((job) => job.status === 'ready');
-        setSavedVideoJobs(completedVideos);
+        const finishedJobs = videoResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedVideoJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingVideo && !pollingRef.current) {
+          const inProgressJob = videoResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingVideo(true);
+            setCurrentVideoJob(inProgressJob);
+            try {
+              const finalJob = await videosAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentVideoJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedVideoJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingVideo(false);
+              setCurrentVideoJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved video jobs');

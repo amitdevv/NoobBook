@@ -4,7 +4,7 @@
  * Handles state management, API calls, and polling.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { websitesAPI, type WebsiteJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/toast';
@@ -20,6 +20,7 @@ export const useWebsiteGeneration = (projectId: string) => {
   const [savedWebsiteJobs, setSavedWebsiteJobs] = useState<WebsiteJob[]>([]);
   const [currentWebsiteJob, setCurrentWebsiteJob] = useState<WebsiteJob | null>(null);
   const [isGeneratingWebsite, setIsGeneratingWebsite] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingWebsiteJob, setViewingWebsiteJob] = useState<WebsiteJob | null>(null);
 
   /**
@@ -29,8 +30,38 @@ export const useWebsiteGeneration = (projectId: string) => {
     try {
       const websiteResponse = await websitesAPI.listJobs(projectId);
       if (websiteResponse.success && websiteResponse.jobs) {
-        const completedWebsites = websiteResponse.jobs.filter((job) => job.status === 'ready');
-        setSavedWebsiteJobs(completedWebsites);
+        const finishedJobs = websiteResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedWebsiteJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingWebsite && !pollingRef.current) {
+          const inProgressJob = websiteResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingWebsite(true);
+            setCurrentWebsiteJob(inProgressJob);
+            try {
+              const finalJob = await websitesAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentWebsiteJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedWebsiteJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingWebsite(false);
+              setCurrentWebsiteJob(null);
+            }
+          }
+        }
       }
     } catch (error) {
       log.error({ err: error }, 'failed to load saved website jobs');

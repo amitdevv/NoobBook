@@ -19,6 +19,7 @@ export const useAudioGeneration = (projectId: string) => {
   const [savedAudioJobs, setSavedAudioJobs] = useState<AudioJob[]>([]);
   const [currentAudioJob, setCurrentAudioJob] = useState<AudioJob | null>(null);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const pollingRef = useRef(false);
   const [playingJobId, setPlayingJobId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -29,10 +30,44 @@ export const useAudioGeneration = (projectId: string) => {
   const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 1.75, 2] as const;
 
   const loadSavedJobs = async () => {
-    const audioResponse = await audioAPI.listJobs(projectId);
-    if (audioResponse.success && audioResponse.jobs) {
-      const completedAudio = audioResponse.jobs.filter((job) => job.status === 'ready');
-      setSavedAudioJobs(completedAudio);
+    try {
+      const audioResponse = await audioAPI.listJobs(projectId);
+      if (audioResponse.success && audioResponse.jobs) {
+        const finishedJobs = audioResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedAudioJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingAudio && !pollingRef.current) {
+          const inProgressJob = audioResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingAudio(true);
+            setCurrentAudioJob(inProgressJob);
+            try {
+              const finalJob = await audioAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentAudioJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedAudioJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingAudio(false);
+              setCurrentAudioJob(null);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to load saved audio jobs');
     }
   };
 

@@ -4,7 +4,7 @@
  * Creates interactive quiz questions with multiple choice answers.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { quizzesAPI, type QuizJob } from '@/lib/api/studio';
 import type { StudioSignal } from '../types';
 import { useToast } from '../../ui/toast';
@@ -18,13 +18,48 @@ export const useQuizGeneration = (projectId: string) => {
   const [savedQuizJobs, setSavedQuizJobs] = useState<QuizJob[]>([]);
   const [currentQuizJob, setCurrentQuizJob] = useState<QuizJob | null>(null);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+  const pollingRef = useRef(false);
   const [viewingQuizJob, setViewingQuizJob] = useState<QuizJob | null>(null);
 
   const loadSavedJobs = async () => {
-    const quizResponse = await quizzesAPI.listJobs(projectId);
-    if (quizResponse.success && quizResponse.jobs) {
-      const completedQuizzes = quizResponse.jobs.filter((job) => job.status === 'ready');
-      setSavedQuizJobs(completedQuizzes);
+    try {
+      const quizResponse = await quizzesAPI.listJobs(projectId);
+      if (quizResponse.success && quizResponse.jobs) {
+        const finishedJobs = quizResponse.jobs.filter(
+          (job) => job.status === 'ready' || job.status === 'error'
+        );
+        setSavedQuizJobs(finishedJobs);
+
+        // Resume polling for in-progress jobs (survives refresh/navigation)
+        if (!isGeneratingQuiz && !pollingRef.current) {
+          const inProgressJob = quizResponse.jobs.find(
+            (job) => job.status === 'pending' || job.status === 'processing'
+          );
+          if (inProgressJob) {
+            pollingRef.current = true;
+            setIsGeneratingQuiz(true);
+            setCurrentQuizJob(inProgressJob);
+            try {
+              const finalJob = await quizzesAPI.pollJobStatus(
+                projectId,
+                inProgressJob.id,
+                (job) => setCurrentQuizJob(job)
+              );
+              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+                setSavedQuizJobs((prev) => [finalJob, ...prev]);
+              }
+            } catch {
+              // Polling failed — job stays visible via next load
+            } finally {
+              pollingRef.current = false;
+              setIsGeneratingQuiz(false);
+              setCurrentQuizJob(null);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to load saved quiz jobs');
     }
   };
 
