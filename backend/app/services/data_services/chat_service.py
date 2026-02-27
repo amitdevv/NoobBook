@@ -151,36 +151,35 @@ class ChatService:
 
         messages = messages_response.data or []
 
-        # Filter out tool_use and tool_result messages for display
-        # Keep only user and assistant messages with string content
+        # Filter out tool chain messages for display
+        # Educational Note: During a tool_use loop, main_chat_service stores:
+        #   1. Intermediate assistant messages with LIST content (serialized content
+        #      blocks containing text + tool_use blocks)
+        #   2. Tool_result user messages with LIST content
+        #   3. Final assistant message with DICT content ({"text": "..."})
+        # The final message already contains all accumulated text from the tool
+        # chain, so intermediate list-content messages must be skipped to avoid
+        # showing duplicate responses.
         display_messages = []
         for msg in messages:
             content = msg.get("content")
             role = msg.get("role")
 
-            # Skip tool_use and tool_result messages
             if role not in ["user", "assistant"]:
                 continue
 
-            # Extract text content - stored as {text: "..."} in JSONB
-            # Educational Note: Content can also be a list of content blocks
-            # (tool_use responses) — extract only text blocks from those.
+            # Skip list-content messages — these are tool chain intermediates
+            # (tool_use assistant responses and tool_result user messages)
+            if isinstance(content, list):
+                continue
+
             if isinstance(content, dict):
                 text_content = content.get("text", "")
             elif isinstance(content, str):
                 text_content = content
-            elif isinstance(content, list):
-                # Extract only text blocks, skip tool_use/tool_result blocks
-                text_parts = [
-                    block.get("text", "")
-                    for block in content
-                    if isinstance(block, dict) and block.get("type") == "text"
-                ]
-                text_content = "\n\n".join(part for part in text_parts if part.strip())
             else:
                 text_content = str(content) if content else ""
 
-            # Skip messages with no displayable text (pure tool_use/tool_result)
             if not text_content.strip():
                 continue
 
