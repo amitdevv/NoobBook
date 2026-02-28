@@ -30,11 +30,12 @@ Routes:
 """
 import io
 import zipfile
-from flask import jsonify, request, current_app, send_file, Response
+from flask import jsonify, request, current_app, send_file, Response, g
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.blog_agent_executor import blog_agent_executor
 from app.services.integrations.supabase import storage_service
+from app.api.studio.logo_utils import resolve_logo
 
 
 @studio_bp.route('/projects/<project_id>/studio/blog', methods=['POST'])
@@ -69,13 +70,19 @@ def generate_blog_post(project_id: str):
         if blog_type not in valid_blog_types:
             blog_type = 'how_to_guide'
 
+        # Resolve brand logo for image generation
+        logo_image_bytes, logo_mime_type = resolve_logo(data, project_id)
+
         # Execute via blog_agent_executor (creates job and launches agent)
         result = blog_agent_executor.execute(
             project_id=project_id,
             source_id=source_id,
             direction=direction,
             target_keyword=target_keyword,
-            blog_type=blog_type
+            blog_type=blog_type,
+            logo_image_bytes=logo_image_bytes,
+            logo_mime_type=logo_mime_type,
+            user_id=g.user_id
         )
 
         if not result.get('success'):

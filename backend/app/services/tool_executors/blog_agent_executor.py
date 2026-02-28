@@ -8,7 +8,7 @@ blog_agent_service itself.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import uuid
 from datetime import datetime
 
@@ -33,7 +33,10 @@ class BlogAgentExecutor:
         source_id: str,
         direction: str = "",
         target_keyword: str = "",
-        blog_type: str = "how_to_guide"
+        blog_type: str = "how_to_guide",
+        logo_image_bytes: Optional[bytes] = None,
+        logo_mime_type: str = "image/png",
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Execute blog post generation as a background task.
@@ -89,7 +92,10 @@ class BlogAgentExecutor:
                     job_id=job_id,
                     direction=direction,
                     target_keyword=target_keyword,
-                    blog_type=blog_type
+                    blog_type=blog_type,
+                    logo_image_bytes=logo_image_bytes,
+                    logo_mime_type=logo_mime_type,
+                    user_id=user_id
                 )
             except Exception as e:
                 logger.exception("Blog agent failed for job %s", job_id[:8])
