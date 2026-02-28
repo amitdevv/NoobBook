@@ -10,7 +10,7 @@ educational, easy-to-scan format with icons, sections, and visual flow.
 """
 import json
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 from app.services.integrations.google.imagen_service import imagen_service
 from app.services.source_services import source_index_service
 from app.services.studio_services import studio_index_service
-from app.config import prompt_loader
+from app.config import prompt_loader, brand_context_loader
 from app.services.integrations.supabase import storage_service
 
 
@@ -101,7 +101,10 @@ class InfographicService:
         project_id: str,
         source_id: str,
         job_id: str,
-        direction: str = ""
+        direction: str = "",
+        logo_image_bytes: Optional[bytes] = None,
+        logo_mime_type: str = "image/png",
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate an infographic image for a source.
@@ -146,10 +149,18 @@ class InfographicService:
                 progress="Designing infographic layout..."
             )
 
+            # Load brand context — only use logo if brand is enabled
+            brand_context = brand_context_loader.load_brand_context(
+                project_id, "infographic", user_id=user_id
+            )
+            effective_logo = logo_image_bytes if brand_context else None
+
             prompt_result = self._generate_image_prompt(
                 project_id=project_id,
                 source_content=content,
-                direction=direction
+                direction=direction,
+                has_logo=effective_logo is not None,
+                user_id=user_id
             )
 
             if not prompt_result.get("success"):
@@ -168,11 +179,25 @@ class InfographicService:
 
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
-            image_result = imagen_service.generate_image_bytes(
-                prompt=image_prompt,
-                filename_prefix=f"infographic_{job_id[:8]}_{timestamp}",
-                aspect_ratio=INFOGRAPHIC_ASPECT_RATIO
-            )
+            # Use multimodal method if logo is available (same pattern as social posts)
+            if effective_logo:
+                enhanced_prompt = (
+                    "Create an infographic image that naturally incorporates "
+                    "the provided brand logo/icon into the design. " + image_prompt
+                )
+                image_result = imagen_service.generate_image_with_reference(
+                    prompt=enhanced_prompt,
+                    reference_image_bytes=effective_logo,
+                    reference_mime_type=logo_mime_type,
+                    filename_prefix=f"infographic_{job_id[:8]}_{timestamp}",
+                    aspect_ratio=INFOGRAPHIC_ASPECT_RATIO
+                )
+            else:
+                image_result = imagen_service.generate_image_bytes(
+                    prompt=image_prompt,
+                    filename_prefix=f"infographic_{job_id[:8]}_{timestamp}",
+                    aspect_ratio=INFOGRAPHIC_ASPECT_RATIO
+                )
 
             if not image_result.get("success"):
                 raise ValueError(image_result.get("error", "Failed to generate image"))
@@ -243,7 +268,9 @@ class InfographicService:
         self,
         project_id: str,
         source_content: str,
-        direction: str
+        direction: str,
+        has_logo: bool = False,
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate infographic image prompt using Claude.
@@ -264,18 +291,37 @@ class InfographicService:
         else:
             source_section = "(No source document provided — generate the infographic based on the direction below.)"
 
+        # Logo context — tells Claude to write prompts that reference the logo
+        logo_context = ""
+        if has_logo:
+            logo_context = (
+                "\nNOTE: A brand logo/icon will be provided to the image generator. "
+                "Write image prompts that describe incorporating it naturally into "
+                "the design — mention logo placement (top-left corner, header area) "
+                "and how design elements should complement it."
+            )
+
         # Build user message
         user_message = config["user_message"].format(
             source_section=source_section,
-            direction=direction or "Create an informative infographic summarizing the key concepts."
+            direction=direction or "Create an informative infographic summarizing the key concepts.",
+            logo_context=logo_context
         )
 
         messages = [{"role": "user", "content": user_message}]
 
+        # Load brand context so Claude knows brand colors, voice, etc.
+        brand_context = brand_context_loader.load_brand_context(
+            project_id, "infographic", user_id=user_id
+        )
+        system_prompt = config["system_prompt"]
+        if brand_context:
+            system_prompt = f"{system_prompt}\n\n{brand_context}"
+
         try:
             response = claude_service.send_message(
                 messages=messages,
-                system_prompt=config["system_prompt"],
+                system_prompt=system_prompt,
                 model=config["model"],
                 max_tokens=config["max_tokens"],
                 temperature=config["temperature"],

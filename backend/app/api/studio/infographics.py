@@ -27,7 +27,7 @@ Routes:
 """
 import io
 import uuid
-from flask import jsonify, request, current_app, send_file
+from flask import jsonify, request, current_app, send_file, g
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.services.studio_services.infographic_service import infographic_service
@@ -35,6 +35,7 @@ from app.services.source_services import source_index_service
 from app.services.integrations.google.imagen_service import imagen_service
 from app.services.integrations.supabase import storage_service
 from app.services.background_services.task_service import task_service
+from app.api.studio.logo_utils import resolve_logo
 
 
 @studio_bp.route('/projects/<project_id>/studio/infographic', methods=['POST'])
@@ -88,6 +89,9 @@ def generate_infographic(project_id: str):
             direction=direction
         )
 
+        # Resolve brand logo for image generation
+        logo_image_bytes, logo_mime_type = resolve_logo(data, project_id)
+
         # Submit background task
         task_service.submit_task(
             task_type="infographic",
@@ -96,7 +100,10 @@ def generate_infographic(project_id: str):
             project_id=project_id,
             source_id=source_id,
             job_id=job_id,
-            direction=direction
+            direction=direction,
+            logo_image_bytes=logo_image_bytes,
+            logo_mime_type=logo_mime_type,
+            user_id=g.user_id
         )
 
         return jsonify({

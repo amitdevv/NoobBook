@@ -9,7 +9,7 @@ Orchestrates the blog generation workflow:
 
 import logging
 import uuid
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -50,7 +50,10 @@ class BlogAgentService:
         job_id: str,
         direction: str = "",
         target_keyword: str = "",
-        blog_type: str = "how_to_guide"
+        blog_type: str = "how_to_guide",
+        logo_image_bytes: Optional[bytes] = None,
+        logo_mime_type: str = "image/png",
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Run the agent to generate a blog post."""
         config = self._load_config()
@@ -81,10 +84,21 @@ class BlogAgentService:
         messages = [{"role": "user", "content": user_message}]
 
         # Load brand context if configured for blog feature
-        brand_context = brand_context_loader.load_brand_context(project_id, "blog")
+        brand_context = brand_context_loader.load_brand_context(
+            project_id, "blog", user_id=user_id
+        )
         system_prompt = config["system_prompt"]
         if brand_context:
             system_prompt = f"{system_prompt}\n\n{brand_context}"
+
+        # Only use logo if brand is enabled (tied to brand context being non-empty)
+        effective_logo = logo_image_bytes if brand_context else None
+        if effective_logo:
+            system_prompt += (
+                "\n\nNOTE: A brand logo/icon is available and will be passed to "
+                "the image generator. When calling generate_blog_image, write image "
+                "prompts that describe incorporating the logo naturally into the design."
+            )
 
         total_input_tokens = 0
         total_output_tokens = 0
@@ -133,7 +147,9 @@ class BlogAgentService:
                         "input_tokens": total_input_tokens,
                         "output_tokens": total_output_tokens,
                         "target_keyword": target_keyword,
-                        "blog_type": blog_type
+                        "blog_type": blog_type,
+                        "logo_image_bytes": effective_logo,
+                        "logo_mime_type": logo_mime_type
                     }
 
                     # Execute tool via executor
