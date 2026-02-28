@@ -48,7 +48,7 @@ class BlogToolExecutor:
 
         elif tool_name == "generate_blog_image":
             result = self._execute_generate_image(
-                project_id, job_id, tool_input, context["generated_images"]
+                project_id, job_id, tool_input, context
             )
             return {"success": True, "message": result}, False
 
@@ -90,13 +90,18 @@ class BlogToolExecutor:
         project_id: str,
         job_id: str,
         tool_input: Dict[str, Any],
-        generated_images: List[Dict[str, str]]
+        context: Dict[str, Any]
     ) -> str:
         """
         Execute generate_blog_image tool.
 
         Generates image via Imagen API and uploads to Supabase Storage.
+        Uses multimodal generation with brand logo when available.
         """
+        generated_images = context["generated_images"]
+        logo_image_bytes = context.get("logo_image_bytes")
+        logo_mime_type = context.get("logo_mime_type", "image/png")
+
         purpose = tool_input.get("purpose", "unknown")
         section_heading = tool_input.get("section_heading", "")
         image_prompt = tool_input.get("image_prompt", "")
@@ -113,12 +118,26 @@ class BlogToolExecutor:
             image_index = len(generated_images) + 1
             filename_prefix = f"{job_id}_image_{image_index}"
 
-            # Generate image and get bytes (not saved to disk)
-            image_result = imagen_service.generate_image_bytes(
-                prompt=image_prompt,
-                filename_prefix=filename_prefix,
-                aspect_ratio=aspect_ratio
-            )
+            # Use multimodal method if logo is available (same pattern as social posts)
+            if logo_image_bytes:
+                enhanced_prompt = (
+                    "Create a blog post image that naturally incorporates "
+                    "the provided brand logo/icon into the design. " + image_prompt
+                )
+                image_result = imagen_service.generate_image_with_reference(
+                    prompt=enhanced_prompt,
+                    reference_image_bytes=logo_image_bytes,
+                    reference_mime_type=logo_mime_type,
+                    filename_prefix=filename_prefix,
+                    aspect_ratio=aspect_ratio
+                )
+            else:
+                # Generate image and get bytes (not saved to disk)
+                image_result = imagen_service.generate_image_bytes(
+                    prompt=image_prompt,
+                    filename_prefix=filename_prefix,
+                    aspect_ratio=aspect_ratio
+                )
 
             if not image_result.get("success"):
                 return f"Error generating image for {purpose}: {image_result.get('error', 'Unknown error')}"
