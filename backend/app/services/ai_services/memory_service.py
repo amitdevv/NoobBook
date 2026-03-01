@@ -232,6 +232,8 @@ class MemoryService:
 
         try:
             # Call Haiku AI with the save_memory tool
+            # Educational Note: tool_choice forces the model to call save_memory,
+            # preventing it from responding with text instead of using the tool.
             response = claude_service.send_message(
                 messages=[{"role": "user", "content": user_message}],
                 system_prompt=config.get('system_prompt', ''),
@@ -239,6 +241,7 @@ class MemoryService:
                 max_tokens=config.get('max_tokens'),
                 temperature=config.get('temperature'),
                 tools=[tool_def],
+                tool_choice={"type": "tool", "name": "save_memory"},
                 project_id=project_id  # Track costs for project memory
             )
 
@@ -246,6 +249,10 @@ class MemoryService:
             tool_inputs = claude_parsing_utils.extract_tool_inputs(response, "save_memory")
 
             if not tool_inputs:
+                logger.error(
+                    "Memory merge: save_memory tool not found in response. "
+                    "Content blocks: %s", response.get("content_blocks")
+                )
                 return {
                     "success": False,
                     "error": "AI did not use save_memory tool"
@@ -256,10 +263,13 @@ class MemoryService:
             merged_memory = tool_input.get("memory", "")
 
             if not merged_memory:
-                return {
-                    "success": False,
-                    "error": "AI returned empty memory"
-                }
+                logger.error(
+                    "Memory merge: tool called but memory is empty. "
+                    "Full tool input: %s", tool_input
+                )
+                # Fallback: use the new_memory directly rather than losing it
+                merged_memory = new_memory
+                logger.info("Memory merge: falling back to raw new_memory")
 
             # Save the merged memory
             if memory_type == "user":
