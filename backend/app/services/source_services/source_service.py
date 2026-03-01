@@ -25,8 +25,7 @@ from app.services.source_services.source_upload import (
     upload_research,
     add_database_source,
 )
-# Note: Local path utils kept for backwards compatibility with other processors
-# that haven't been migrated to Supabase Storage yet
+# Local path utils used for temp file staging during source processing
 from app.utils.path_utils import (
     get_raw_dir,
     get_processed_dir,

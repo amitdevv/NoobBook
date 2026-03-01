@@ -55,10 +55,6 @@ from app.utils.text.chunking import (
     parse_processed_text,
     parse_extracted_text,  # Backward compatibility alias
     chunks_to_pinecone_format,
-    save_chunks_to_files,
-    load_chunk_by_id,
-    load_chunks_for_source,
-    delete_chunks_for_source
 )
 
 __all__ = [
@@ -85,8 +81,4 @@ __all__ = [
     "parse_processed_text",
     "parse_extracted_text",
     "chunks_to_pinecone_format",
-    "save_chunks_to_files",
-    "load_chunk_by_id",
-    "load_chunks_for_source",
-    "delete_chunks_for_source",
 ]

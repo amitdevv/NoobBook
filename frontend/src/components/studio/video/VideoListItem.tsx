@@ -22,7 +22,7 @@ export const VideoListItem: React.FC<VideoListItemProps> = ({
   return (
     <div
       onClick={onOpen}
-      className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-orange-500/10 cursor-pointer transition-colors"
+      className="flex items-start gap-2.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 cursor-pointer transition-colors"
     >
       <VideoCamera size={16} weight="duotone" className="text-orange-600 mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">

@@ -25,12 +25,12 @@ Routes:
 - GET  /projects/<id>/studio/component-jobs                  - List jobs
 - GET  /projects/<id>/studio/components/<id>/preview/<file>  - Preview HTML
 """
-from pathlib import Path
-from flask import g, jsonify, request, current_app, send_file
+import io
+from flask import g, jsonify, request, current_app, send_file, Response
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.component_agent_executor import component_agent_executor
-from app.utils.path_utils import get_studio_dir
+from app.services.integrations.supabase import storage_service
 
 
 @studio_bp.route('/projects/<project_id>/studio/components', methods=['POST'])
@@ -151,29 +151,17 @@ def preview_component(project_id: str, job_id: str, filename: str):
         - HTML file for rendering in iframe
     """
     try:
-        component_dir = get_studio_dir(project_id) / "components" / job_id
-        filepath = component_dir / filename
-
-        if not filepath.exists():
+        # Download from Supabase Storage
+        content = storage_service.download_studio_file(
+            project_id, "components", job_id, filename
+        )
+        if content is None:
             return jsonify({
                 'success': False,
                 'error': f'Component file not found: {filename}'
             }), 404
 
-        # Validate the file is within the expected directory (security)
-        try:
-            filepath.resolve().relative_to(component_dir.resolve())
-        except ValueError:
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file path'
-            }), 400
-
-        return send_file(
-            filepath,
-            mimetype='text/html',
-            as_attachment=False
-        )
+        return Response(content, mimetype='text/html')
 
     except Exception as e:
         current_app.logger.error(f"Error serving component preview: {e}")
@@ -193,38 +181,30 @@ def serve_component_asset(project_id: str, job_id: str, filename: str):
     that are referenced by the generated HTML components.
     """
     try:
-        component_dir = get_studio_dir(project_id) / "components" / job_id
-        filepath = component_dir / filename
-
-        if not filepath.exists():
+        # Download binary from Supabase Storage
+        file_data = storage_service.download_studio_binary(
+            project_id, "components", job_id, filename
+        )
+        if file_data is None:
             return jsonify({
                 'success': False,
                 'error': f'Asset not found: {filename}'
             }), 404
 
-        # Security: ensure file is within expected directory
-        try:
-            filepath.resolve().relative_to(component_dir.resolve())
-        except ValueError:
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file path'
-            }), 400
-
         # Determine mimetype from extension
-        ext = filepath.suffix.lower()
-        mimetypes = {
-            '.png': 'image/png',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.svg': 'image/svg+xml',
-            '.gif': 'image/gif',
-            '.webp': 'image/webp',
-            '.ico': 'image/x-icon',
+        ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+        mimetypes_map = {
+            'png': 'image/png',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'svg': 'image/svg+xml',
+            'gif': 'image/gif',
+            'webp': 'image/webp',
+            'ico': 'image/x-icon',
         }
-        mimetype = mimetypes.get(ext, 'application/octet-stream')
+        mimetype = mimetypes_map.get(ext, 'application/octet-stream')
 
-        return send_file(filepath, mimetype=mimetype, as_attachment=False)
+        return send_file(io.BytesIO(file_data), mimetype=mimetype, as_attachment=False)
 
     except Exception as e:
         current_app.logger.error(f"Error serving component asset: {e}")

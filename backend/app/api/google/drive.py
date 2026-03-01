@@ -23,14 +23,16 @@ Routes:
 - GET  /google/files                              - List files from Drive
 - POST /projects/<id>/sources/google-import       - Import file to project
 """
+import shutil
+import tempfile
 import uuid
+from pathlib import Path
 from typing import Optional
 from flask import jsonify, request, current_app
 from app.api.google import google_bp
 from app.services.integrations.google import google_drive_service
 from app.services.auth.rbac import get_request_identity
 from app.services.source_services import source_service
-from app.utils.path_utils import get_raw_dir
 
 
 def _get_current_user_id() -> Optional[str]:
@@ -108,7 +110,8 @@ def google_import_file(project_id):
     4. Create source entry (triggers processing pipeline)
 
     The source_service.create_source_from_file() handles:
-    - Creating source metadata in sources_index.json
+    - Creating source metadata in Supabase sources table
+    - Uploading file to Supabase Storage
     - Triggering background processing (extraction, embedding)
 
     Request Body:
@@ -164,39 +167,42 @@ def google_import_file(project_id):
         # Determine category based on MIME type
         category = _get_category_from_mime_type(mime_type, extension)
 
-        # Build destination path
-        # Note: get_raw_dir auto-creates directories if they don't exist
-        raw_dir = get_raw_dir(project_id)
-        stored_filename = f"{source_id}{extension}"
-        destination_path = raw_dir / stored_filename
+        # Download to temp directory (cleaned up after source creation uploads to Supabase)
+        temp_dir = tempfile.mkdtemp(prefix="noobbook_gdrive_")
+        try:
+            stored_filename = f"{source_id}{extension}"
+            destination_path = Path(temp_dir) / stored_filename
 
-        # Download/export file from Drive
-        success, message = google_drive_service.download_file(file_id, destination_path, user_id=user_id)
-        if not success:
+            # Download/export file from Drive
+            success, message = google_drive_service.download_file(file_id, destination_path, user_id=user_id)
+            if not success:
+                return jsonify({
+                    'success': False,
+                    'error': message
+                }), 500
+
+            # Map Google MIME types to standard types
+            actual_mime_type = _map_google_mime_type(mime_type)
+
+            # Create source entry (uploads to Supabase Storage, triggers background processing)
+            created_source = source_service.create_source_from_file(
+                project_id=project_id,
+                file_path=destination_path,
+                name=file_name,
+                original_filename=file_name,
+                category=category,
+                mime_type=actual_mime_type,
+                description='Imported from Google Drive'
+            )
+
             return jsonify({
-                'success': False,
-                'error': message
-            }), 500
-
-        # Map Google MIME types to standard types
-        actual_mime_type = _map_google_mime_type(mime_type)
-
-        # Create source entry (also triggers background processing)
-        created_source = source_service.create_source_from_file(
-            project_id=project_id,
-            file_path=destination_path,
-            name=file_name,
-            original_filename=file_name,
-            category=category,
-            mime_type=actual_mime_type,
-            description='Imported from Google Drive'
-        )
-
-        return jsonify({
-            'success': True,
-            'source': created_source,
-            'message': f'Imported {file_name} from Google Drive'
-        }), 201
+                'success': True,
+                'source': created_source,
+                'message': f'Imported {file_name} from Google Drive'
+            }), 201
+        finally:
+            # Clean up temp directory
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     except Exception as e:
         current_app.logger.error(f"Error importing from Google Drive: {e}")

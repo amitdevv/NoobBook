@@ -17,7 +17,6 @@ from app.services.integrations.claude import claude_service
 from app.config import prompt_loader, tool_loader, brand_context_loader
 from app.utils import claude_parsing_utils
 from app.utils.source_content_utils import get_source_content
-from app.utils.path_utils import get_studio_dir
 from app.services.data_services import message_service, project_service
 from app.services.data_services.brand_asset_service import brand_asset_service
 from app.services.data_services.brand_config_service import brand_config_service

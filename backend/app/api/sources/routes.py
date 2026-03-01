@@ -11,8 +11,8 @@ Educational Note: These endpoints handle the lifecycle of source files:
 File Upload Flow:
 1. Frontend sends multipart/form-data with file
 2. We validate file type against allowed extensions
-3. File is saved to data/projects/{id}/sources/raw/
-4. Source entry created in sources_index.json
+3. File is uploaded to Supabase Storage (raw-files bucket)
+4. Source entry created in Supabase sources table
 5. Background processing triggered automatically
 
 Supported File Types (by category):
@@ -249,11 +249,11 @@ def delete_source(project_id: str, source_id: str):
     Delete a source and all associated data.
 
     Educational Note: This is a HARD delete that removes:
-    - Raw file from disk
-    - Processed text file
-    - All chunks
+    - Raw file from Supabase Storage
+    - Processed text file from Supabase Storage
+    - All chunks from Supabase Storage
     - Embeddings from Pinecone
-    - Entry from sources_index.json
+    - Entry from Supabase sources table
 
     There is no undo - consider soft delete (active=false) for recoverable hiding.
 

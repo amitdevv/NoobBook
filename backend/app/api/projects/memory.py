@@ -6,12 +6,12 @@ allows the AI to maintain context across conversations.
 
 Memory Types in NoobBook:
 
-1. User Memory (data/user_memory.json)
+1. User Memory (Supabase users.memory column)
    - Global preferences that apply to ALL projects
    - Example: "User prefers concise responses"
    - Persists across all conversations, all projects
 
-2. Project Memory (data/projects/{id}/memory.json)
+2. Project Memory (Supabase projects.memory column)
    - Context specific to THIS project
    - Example: "This project is about a React e-commerce app"
    - Deleted when project is deleted

@@ -9,9 +9,8 @@ import logging
 import re
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
-from pathlib import Path
 
-from app.utils.path_utils import get_studio_dir
+from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
 
 logger = logging.getLogger(__name__)
@@ -200,12 +199,7 @@ class ComponentToolExecutor:
 
 
         try:
-            # Prepare output directory
-            studio_dir = get_studio_dir(project_id)
-            component_dir = Path(studio_dir) / "components" / job_id
-            component_dir.mkdir(parents=True, exist_ok=True)
-
-            # Save each component as HTML file
+            # Save each component as HTML file to Supabase Storage
             saved_components = []
             for idx, component in enumerate(components):
                 variation_name = component.get("variation_name", f"Variation {idx + 1}")
@@ -222,10 +216,15 @@ class ComponentToolExecutor:
                 safe_name = safe_name.replace(' ', '_').lower()
                 filename = f"{safe_name}.html"
 
-                # Save HTML file
-                file_path = component_dir / filename
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write(html_code)
+                # Upload HTML file to Supabase Storage
+                storage_service.upload_studio_file(
+                    project_id=project_id,
+                    job_type="components",
+                    job_id=job_id,
+                    filename=filename,
+                    content=html_code,
+                    content_type="text/html; charset=utf-8"
+                )
 
                 # Track component
                 saved_components.append({

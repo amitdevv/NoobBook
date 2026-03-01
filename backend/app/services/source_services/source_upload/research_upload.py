@@ -6,19 +6,22 @@ Educational Note: Deep research sources are created by an AI agent that:
 2. Analyzes any provided reference links
 3. Synthesizes findings into a comprehensive document
 
-The research request is stored as a .research JSON file containing:
+The research request is uploaded to Supabase Storage as a .research JSON file containing:
 - topic: The main research topic
 - description: Focus areas and specific questions to answer
 - links: Optional list of reference URLs to include
 """
 import json
+import logging
 import uuid
 from datetime import datetime
 from typing import Dict, Any, List
 
 from app.services.source_services import source_index_service
 from app.services.background_services import task_service
-from app.utils.path_utils import get_raw_dir
+from app.services.integrations.supabase import storage_service
+
+logger = logging.getLogger(__name__)
 
 
 def upload_research(
@@ -30,9 +33,9 @@ def upload_research(
     """
     Create a deep research source for a project.
 
-    Educational Note: This creates a .research file containing the research
-    parameters. The actual research is performed by a background task using
-    an AI agent with web search capabilities.
+    Educational Note: This uploads a .research file to Supabase Storage containing
+    the research parameters. The actual research is performed by a background task
+    using an AI agent with web search capabilities.
 
     Args:
         project_id: The project UUID
@@ -67,10 +70,9 @@ def upload_research(
                 link = f"https://{link}"
             validated_links.append(link)
 
-    # Generate source ID and paths
+    # Generate source ID and filename
     source_id = str(uuid.uuid4())
     stored_filename = f"{source_id}.research"
-    raw_dir = get_raw_dir(project_id)
 
     # Create research request JSON
     research_request = {
@@ -80,38 +82,47 @@ def upload_research(
         "created_at": datetime.now().isoformat()
     }
 
-    # Save the research request
-    file_path = raw_dir / stored_filename
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(research_request, f, indent=2)
+    # Upload to Supabase Storage (same pattern as text_upload.py and url_upload.py)
+    file_data = json.dumps(research_request, indent=2).encode('utf-8')
+    file_size = len(file_data)
 
-    file_size = file_path.stat().st_size
+    storage_path = storage_service.upload_raw_file(
+        project_id=project_id,
+        source_id=source_id,
+        filename=stored_filename,
+        file_data=file_data,
+        content_type="application/json"
+    )
+
+    if not storage_path:
+        raise ValueError("Failed to upload research request to storage")
 
     # Create a display name from the topic (truncate if too long)
     display_name = topic if len(topic) <= 50 else topic[:47] + "..."
 
-    # Create source metadata
-    timestamp = datetime.now().isoformat()
+    # Create source metadata (matching text_upload.py / url_upload.py format)
     source_metadata = {
         "id": source_id,
         "project_id": project_id,
         "name": display_name,
-        "original_filename": f"{display_name}.research",
         "description": description[:200] if len(description) > 200 else description,
-        "category": "document",  # Research outputs are documents
-        "mime_type": "application/json",
-        "file_extension": ".research",
-        "file_size": file_size,
-        "stored_filename": stored_filename,
+        "type": "RESEARCH",
         "status": "uploaded",
-        "active": False,
+        "raw_file_path": storage_path,
+        "file_size": file_size,
+        "is_active": False,
+        "embedding_info": {
+            "original_filename": f"{display_name}.research",
+            "mime_type": "application/json",
+            "file_extension": ".research",
+            "stored_filename": stored_filename,
+            "source_type": "deep_research"
+        },
         "processing_info": {
             "source_type": "deep_research",
             "topic": topic,
             "link_count": len(validated_links)
-        },
-        "created_at": timestamp,
-        "updated_at": timestamp
+        }
     }
 
     # Add to index

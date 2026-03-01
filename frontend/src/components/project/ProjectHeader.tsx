@@ -109,7 +109,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
   /**
    * Load project cost tracking data
-   * Educational Note: Costs are tracked cumulatively in project.json
+   * Educational Note: Costs are tracked cumulatively in Supabase projects table
    */
   const loadCosts = async () => {
     try {

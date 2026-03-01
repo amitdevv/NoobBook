@@ -6,16 +6,18 @@ decides to save user or project memory. The execution flow is:
 
 1. Main chat Claude calls store_memory tool with user_memory/project_memory
 2. This executor immediately returns "memory stored" (non-blocking)
-3. Actual memory merge is triggered as background task via task_service
-4. Background task uses memory_service to merge with AI and save
+3. Actual memory merge runs in a background thread (fire-and-forget)
+4. Background thread uses memory_service to merge with AI and save
 
-This design ensures the chat response isn't delayed by memory operations.
+Why not task_service? Memory updates are fire-and-forget — they don't need
+the task tracking (status, progress, cancellation) that task_service provides.
+Using a simple thread avoids UUID/RLS issues with the background_tasks table.
 """
 import logging
+import threading
 from typing import Dict, Any, Optional
 
 from app.services.ai_services.memory_service import memory_service
-from app.services.background_services import task_service
 
 logger = logging.getLogger(__name__)
 
@@ -56,32 +58,32 @@ class MemoryExecutor:
         # Track what we're storing
         storing = []
 
-        # Queue user memory update if provided
+        # Run user memory update in background thread if provided
         if user_memory and user_memory.strip():
-            task_service.submit_task(
-                "memory_update",           # task_type
-                "user_memory",             # target_id
-                self._update_user_memory,  # callable_func
-                new_memory=user_memory,
-                reason=why_generated,
-                user_id=user_id,
+            thread = threading.Thread(
+                target=self._update_user_memory,
+                kwargs=dict(new_memory=user_memory, reason=why_generated, user_id=user_id),
+                daemon=True,
             )
+            thread.start()
             storing.append("user memory")
-            logger.info("Queued user memory update: %s...", user_memory[:50])
+            logger.info("Started user memory update: %s...", user_memory[:50])
 
-        # Queue project memory update if provided
+        # Run project memory update in background thread if provided
         if project_memory and project_memory.strip():
-            task_service.submit_task(
-                "memory_update",              # task_type
-                f"project_memory_{project_id}",  # target_id
-                self._update_project_memory,  # callable_func
-                project_id_for_memory=project_id,
-                new_memory=project_memory,
-                reason=why_generated,
-                user_id=user_id,
+            thread = threading.Thread(
+                target=self._update_project_memory,
+                kwargs=dict(
+                    project_id_for_memory=project_id,
+                    new_memory=project_memory,
+                    reason=why_generated,
+                    user_id=user_id,
+                ),
+                daemon=True,
             )
+            thread.start()
             storing.append("project memory")
-            logger.info("Queued project memory update: %s...", project_memory[:50])
+            logger.info("Started project memory update: %s...", project_memory[:50])
 
         # Return immediate success
         if storing:
@@ -101,33 +103,26 @@ class MemoryExecutor:
         new_memory: str,
         reason: str,
         user_id: Optional[str] = None,
-        **kwargs  # Accept extra kwargs from task_service
-    ) -> Dict[str, Any]:
+    ) -> None:
         """
-        Background task to update user memory.
+        Background thread to update user memory.
 
-        Educational Note: This runs in a background thread via task_service.
+        Educational Note: This runs in a daemon thread (fire-and-forget).
         It calls memory_service which uses AI to merge memories.
-
-        Args:
-            new_memory: New memory content to merge
-            reason: Why this update was triggered
-
-        Returns:
-            Result from memory_service.update_memory()
         """
-        if user_id:
-            return memory_service.update_memory(
+        try:
+            result = memory_service.update_memory(
                 memory_type="user",
                 new_memory=new_memory,
                 reason=reason,
                 user_id=user_id,
             )
-        return memory_service.update_memory(
-            memory_type="user",
-            new_memory=new_memory,
-            reason=reason,
-        )
+            if result.get("success"):
+                logger.info("User memory updated successfully")
+            else:
+                logger.error("User memory update failed: %s", result.get("error"))
+        except Exception as e:
+            logger.exception("Error in user memory update thread: %s", e)
 
     def _update_project_memory(
         self,
@@ -135,36 +130,27 @@ class MemoryExecutor:
         new_memory: str,
         reason: str,
         user_id: Optional[str] = None,
-        **kwargs  # Accept extra kwargs from task_service
-    ) -> Dict[str, Any]:
+    ) -> None:
         """
-        Background task to update project memory.
+        Background thread to update project memory.
 
-        Educational Note: This runs in a background thread via task_service.
+        Educational Note: This runs in a daemon thread (fire-and-forget).
         It calls memory_service which uses AI to merge memories.
-
-        Args:
-            project_id_for_memory: Project UUID for the memory
-            new_memory: New memory content to merge
-            reason: Why this update was triggered
-
-        Returns:
-            Result from memory_service.update_memory()
         """
-        if user_id:
-            return memory_service.update_memory(
+        try:
+            result = memory_service.update_memory(
                 memory_type="project",
                 new_memory=new_memory,
                 reason=reason,
                 project_id=project_id_for_memory,
                 user_id=user_id,
             )
-        return memory_service.update_memory(
-            memory_type="project",
-            new_memory=new_memory,
-            reason=reason,
-            project_id=project_id_for_memory,
-        )
+            if result.get("success"):
+                logger.info("Project memory updated successfully")
+            else:
+                logger.error("Project memory update failed: %s", result.get("error"))
+        except Exception as e:
+            logger.exception("Error in project memory update thread: %s", e)
 
 
 # Singleton instance

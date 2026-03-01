@@ -8,13 +8,13 @@ conversations.
 
 Folder Structure:
 - source_service.py: Main source management (CRUD operations, delegates to modules below)
-- source_index_service.py: Index (metadata) CRUD operations for sources_index.json
+- source_index_service.py: Source metadata CRUD operations (Supabase sources table)
 - source_upload/: Upload handlers for different source types (file, URL, text)
 - source_processing/: Processing orchestration and processors for different file types
 
 Processing Pipeline:
-1. Upload: source_upload/ modules handle validation and storage
-2. Index: source_index_service manages metadata in sources_index.json
+1. Upload: source_upload/ modules handle validation and upload to Supabase Storage
+2. Index: source_index_service manages metadata in Supabase sources table
 3. Process: source_processing/ extracts content, generates embeddings and summaries
 """
 from app.services.source_services.source_service import source_service, SourceService

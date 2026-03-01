@@ -135,7 +135,6 @@ def is_supabase_enabled() -> bool:
         True if Supabase is configured, False otherwise
 
     Educational Note: This allows the application to gracefully handle
-    cases where Supabase is not configured (e.g., during development
-    with JSON files only).
+    cases where Supabase is not yet configured during initial setup.
     """
     return SupabaseClient.is_configured()

@@ -7,7 +7,7 @@ responds in conversations. This blueprint manages:
 1. Project Prompts:
    - Each project can have a custom system prompt
    - If no custom prompt, falls back to default
-   - Stored in project.json as 'custom_prompt' field
+   - Stored in local project config files
 
 2. Default Prompt:
    - Global fallback stored in data/prompts/default_prompt.json

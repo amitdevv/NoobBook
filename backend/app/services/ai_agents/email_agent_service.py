@@ -17,7 +17,6 @@ from app.services.integrations.claude import claude_service
 from app.config import prompt_loader, tool_loader, brand_context_loader
 from app.utils import claude_parsing_utils
 from app.utils.source_content_utils import get_source_content
-from app.utils.path_utils import get_studio_dir
 from app.services.data_services import message_service, project_service
 from app.services.data_services.brand_asset_service import brand_asset_service
 from app.services.data_services.brand_config_service import brand_config_service
@@ -99,11 +98,19 @@ class EmailAgentService:
             ext = Path(original_name).suffix or ".png"
             logo_filename = f"{job_id}_brand_logo{ext}"
 
-            # Save to email templates directory
-            email_dir = get_studio_dir(project_id) / "email_templates"
-            email_dir.mkdir(parents=True, exist_ok=True)
-            logo_path = email_dir / logo_filename
-            logo_path.write_bytes(logo_bytes)
+            # Upload to Supabase Storage
+            # Determine content type from extension
+            ext_to_mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                           ".svg": "image/svg+xml", ".gif": "image/gif", ".webp": "image/webp"}
+            mime_type = ext_to_mime.get(ext.lower(), "application/octet-stream")
+            storage_service.upload_studio_binary(
+                project_id=project_id,
+                job_type="emails",
+                job_id=job_id,
+                filename=logo_filename,
+                file_data=logo_bytes,
+                content_type=mime_type
+            )
 
             return {
                 "filename": logo_filename,

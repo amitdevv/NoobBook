@@ -32,11 +32,10 @@ Routes:
 import io
 import re
 import zipfile
-from pathlib import Path
 from flask import jsonify, request, current_app, send_file, Response
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
-from app.utils.path_utils import get_studio_dir
+from app.services.integrations.supabase import storage_service
 
 
 @studio_bp.route('/projects/<project_id>/studio/website', methods=['POST'])
@@ -157,25 +156,6 @@ def get_website_file(project_id: str, job_id: str, filename: str):
         - Assets: assets/image_1.png, etc.
     """
     try:
-        # Get website directory
-        website_dir = Path(get_studio_dir(project_id)) / "websites" / job_id
-
-        # Build file path (handles subdirectories like assets/)
-        file_path = website_dir / filename
-
-        # Security: Ensure file is within website directory
-        if not file_path.resolve().is_relative_to(website_dir.resolve()):
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file path'
-            }), 400
-
-        if not file_path.exists():
-            return jsonify({
-                'success': False,
-                'error': 'File not found'
-            }), 404
-
         # Determine MIME type
         mime_type = 'text/html'
         if filename.endswith('.css'):
@@ -193,28 +173,42 @@ def get_website_file(project_id: str, job_id: str, filename: str):
         elif filename.endswith('.webp'):
             mime_type = 'image/webp'
 
+        # Binary files (images)
+        is_binary = mime_type.startswith('image/')
+        if is_binary:
+            file_data = storage_service.download_studio_binary(
+                project_id, "websites", job_id, filename
+            )
+            if file_data is None:
+                return jsonify({'success': False, 'error': 'File not found'}), 404
+            return send_file(io.BytesIO(file_data), mimetype=mime_type, as_attachment=False)
+
+        # Text files (HTML, CSS, JS)
+        content = storage_service.download_studio_file(
+            project_id, "websites", job_id, filename
+        )
+        if content is None:
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+
         # For CSS files, inject auth token into url() references so images load.
         # Educational Note: CSS url() references (e.g. background-image) trigger
         # separate browser requests that don't carry the parent page's query params.
         token = request.args.get('token', '')
         if mime_type == 'text/css' and token:
-            css_content = file_path.read_text(encoding='utf-8')
-
             def _add_token_to_css_url(match: re.Match) -> str:
-                prefix = match.group(1)   # url( or url(" or url('
+                prefix = match.group(1)
                 url = match.group(2)
-                suffix = match.group(3)   # ) or ") or ')
+                suffix = match.group(3)
                 sep = '&' if '?' in url else '?'
                 return f'{prefix}{url}{sep}token={token}{suffix}'
 
-            css_content = re.sub(
+            content = re.sub(
                 r"""(url\(["']?)(?!https?://|//|data:)([^"')\s]+)(["']?\))""",
                 _add_token_to_css_url,
-                css_content
+                content
             )
-            return Response(css_content, mimetype='text/css')
 
-        return send_file(file_path, mimetype=mime_type)
+        return Response(content, mimetype=mime_type)
 
     except Exception as e:
         current_app.logger.error(f"Error serving website file: {e}")
@@ -235,17 +229,15 @@ def preview_website(project_id: str, job_id: str):
     files on disk stay clean for download/export.
     """
     try:
-        # Get website directory
-        website_dir = Path(get_studio_dir(project_id)) / "websites" / job_id
-        index_path = website_dir / "index.html"
-
-        if not index_path.exists():
+        # Download index.html from Supabase Storage
+        html_content = storage_service.download_studio_file(
+            project_id, "websites", job_id, "index.html"
+        )
+        if html_content is None:
             return jsonify({
                 'success': False,
                 'error': 'Website not ready yet or index.html not found'
             }), 404
-
-        html_content = index_path.read_text(encoding='utf-8')
 
         # Inject auth token into local resource URLs (CSS, JS, images)
         token = request.args.get('token', '')
@@ -299,25 +291,27 @@ def download_website(project_id: str, job_id: str):
         site_name = job.get('site_name', 'Website')
         zip_filename = f"{site_name.replace(' ', '_')}.zip"
 
-        # Get website directory
-        website_dir = Path(get_studio_dir(project_id)) / "websites" / job_id
-
-        if not website_dir.exists():
-            return jsonify({
-                'success': False,
-                'error': 'Website files not found'
-            }), 404
-
-        # Create ZIP in memory
+        # Create ZIP in memory from Supabase Storage
         zip_buffer = io.BytesIO()
 
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            # Add all files recursively
-            for file_path in website_dir.rglob('*'):
-                if file_path.is_file():
-                    # Get relative path from website_dir
-                    arcname = file_path.relative_to(website_dir)
-                    zip_file.write(file_path, arcname)
+            # Add text files (HTML, CSS, JS) from job metadata
+            for fname in job.get('files', []):
+                content = storage_service.download_studio_file(
+                    project_id, "websites", job_id, fname
+                )
+                if content:
+                    zip_file.writestr(fname, content)
+
+            # Add image assets
+            for image_info in job.get('images', []):
+                img_filename = image_info.get('filename')
+                if img_filename:
+                    img_data = storage_service.download_studio_binary(
+                        project_id, "websites", job_id, f"assets/{img_filename}"
+                    )
+                    if img_data:
+                        zip_file.writestr(f"assets/{img_filename}", img_data)
 
         zip_buffer.seek(0)
 

@@ -14,7 +14,7 @@ Educational Note: Cost tracking is essential for LLM applications because:
 
 Cost Tracking Architecture:
 - Each claude_service.send_message() call records usage
-- Costs stored in project.json under "costs" key
+- Costs stored in Supabase projects.costs column
 - Broken down by model for transparency
 
 This helps users understand:
