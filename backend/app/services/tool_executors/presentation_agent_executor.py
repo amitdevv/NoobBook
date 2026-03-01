@@ -147,7 +147,7 @@ class PresentationAgentExecutor:
 
                 # Upload screenshots to Supabase Storage
                 for screenshot_info in screenshots:
-                    screenshot_path = Path(screenshot_info.get("path", ""))
+                    screenshot_path = Path(screenshot_info.get("screenshot_path", ""))
                     if screenshot_path.exists():
                         screenshot_bytes = screenshot_path.read_bytes()
                         storage_service.upload_studio_binary(

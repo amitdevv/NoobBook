@@ -46,6 +46,40 @@ def _build_path(project_id: str, source_id: str, filename: str) -> str:
     return f"{project_id}/{source_id}/{filename}"
 
 
+def _upsert_file(client, bucket: str, path: str, file_data, file_options: dict) -> str:
+    """
+    Upload a file, replacing it if it already exists.
+
+    Educational Note: We use remove + upload instead of .update() because
+    the Supabase storage3 .update() method can fail with MissingContentMD5
+    due to a boto3/botocore dependency issue. Remove + upload is more reliable.
+
+    Returns:
+        The storage path on success.
+
+    Raises:
+        Exception on failure.
+    """
+    try:
+        client.storage.from_(bucket).upload(
+            path=path,
+            file=file_data,
+            file_options=file_options,
+        )
+    except Exception as e:
+        if "Duplicate" in str(e) or "already exists" in str(e).lower():
+            # File exists — remove first, then re-upload
+            client.storage.from_(bucket).remove([path])
+            client.storage.from_(bucket).upload(
+                path=path,
+                file=file_data,
+                file_options=file_options,
+            )
+        else:
+            raise
+    return path
+
+
 # =============================================================================
 # RAW FILES (Original uploads)
 # =============================================================================
@@ -423,26 +457,12 @@ def upload_studio_file(
     path = _build_studio_path(project_id, job_type, job_id, filename)
 
     try:
-        # Try to upload (will fail if file exists)
-        client.storage.from_(BUCKET_STUDIO).upload(
-            path=path,
-            file=content.encode("utf-8"),
-            file_options={"content-type": content_type}
+        return _upsert_file(
+            client, BUCKET_STUDIO, path,
+            content.encode("utf-8"),
+            {"content-type": content_type},
         )
-        return path
     except Exception as e:
-        # If file exists, try to update it
-        if "Duplicate" in str(e) or "already exists" in str(e).lower():
-            try:
-                client.storage.from_(BUCKET_STUDIO).update(
-                    path=path,
-                    file=content.encode("utf-8"),
-                    file_options={"content-type": content_type}
-                )
-                return path
-            except Exception as update_e:
-                logger.error("Failed to update studio file %s: %s", path, update_e)
-                return None
         logger.error("Failed to upload studio file %s: %s", path, e)
         return None
 
@@ -651,24 +671,12 @@ def upload_studio_binary(
     path = _build_studio_path(project_id, job_type, job_id, filename)
 
     try:
-        client.storage.from_(BUCKET_STUDIO).upload(
-            path=path,
-            file=file_data,
-            file_options={"content-type": content_type}
+        return _upsert_file(
+            client, BUCKET_STUDIO, path,
+            file_data,
+            {"content-type": content_type},
         )
-        return path
     except Exception as e:
-        if "Duplicate" in str(e) or "already exists" in str(e).lower():
-            try:
-                client.storage.from_(BUCKET_STUDIO).update(
-                    path=path,
-                    file=file_data,
-                    file_options={"content-type": content_type}
-                )
-                return path
-            except Exception as update_e:
-                logger.error("Failed to update studio binary %s: %s", path, update_e)
-                return None
         logger.error("Failed to upload studio binary %s: %s", path, e)
         return None
 
@@ -795,24 +803,12 @@ def upload_ai_image(
     path = f"{project_id}/ai-images/{filename}"
 
     try:
-        client.storage.from_(BUCKET_STUDIO).upload(
-            path=path,
-            file=file_data,
-            file_options={"content-type": content_type}
+        return _upsert_file(
+            client, BUCKET_STUDIO, path,
+            file_data,
+            {"content-type": content_type},
         )
-        return path
     except Exception as e:
-        if "Duplicate" in str(e) or "already exists" in str(e).lower():
-            try:
-                client.storage.from_(BUCKET_STUDIO).update(
-                    path=path,
-                    file=file_data,
-                    file_options={"content-type": content_type}
-                )
-                return path
-            except Exception as update_e:
-                logger.error("Failed to update AI image %s: %s", path, update_e)
-                return None
         logger.error("Failed to upload AI image %s: %s", path, e)
         return None
 
@@ -933,25 +929,12 @@ def upload_brand_asset(
     path = _build_brand_path(user_id, asset_id, filename)
 
     try:
-        client.storage.from_(BUCKET_BRAND_ASSETS).upload(
-            path=path,
-            file=file_data,
-            file_options={"content-type": content_type}
+        return _upsert_file(
+            client, BUCKET_BRAND_ASSETS, path,
+            file_data,
+            {"content-type": content_type},
         )
-        return path
     except Exception as e:
-        # If file exists, try to update it
-        if "Duplicate" in str(e) or "already exists" in str(e).lower():
-            try:
-                client.storage.from_(BUCKET_BRAND_ASSETS).update(
-                    path=path,
-                    file=file_data,
-                    file_options={"content-type": content_type}
-                )
-                return path
-            except Exception as update_e:
-                logger.error("Failed to update brand asset %s: %s", path, update_e)
-                return None
         logger.error("Failed to upload brand asset %s: %s", path, e)
         return None
 
