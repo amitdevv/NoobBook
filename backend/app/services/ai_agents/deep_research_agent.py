@@ -62,7 +62,7 @@ class DeepResearchAgent:
         topic: str,
         description: str,
         links: List[str] = None,
-        output_path: str = None
+        output_path: str = ""
     ) -> Dict[str, Any]:
         """
         Run comprehensive research on a topic.
@@ -78,12 +78,12 @@ class DeepResearchAgent:
             topic: The main research topic
             description: Focus areas and questions to answer
             links: Optional list of reference URLs to analyze
-            output_path: Path to write research output (required)
+            output_path: Path to write research output (required, must be non-empty)
 
         Returns:
             Dict with success status and research metadata
         """
-        if output_path is None:
+        if not output_path:
             raise ValueError("output_path is required")
 
         config = self._load_config()

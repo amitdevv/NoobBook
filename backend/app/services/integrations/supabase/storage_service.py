@@ -26,6 +26,10 @@ BUCKET_CHUNKS = "chunks"
 BUCKET_STUDIO = "studio-outputs"
 BUCKET_BRAND_ASSETS = "brand-assets"
 
+# Supabase storage3 defaults to limit=100 which silently drops entries.
+# Use a high limit to ensure we list all files in a folder.
+_LIST_OPTIONS = {"limit": 10000}
+
 
 def _get_client():
     """Get Supabase client, raising error if not configured."""
@@ -296,7 +300,9 @@ def list_source_chunks(project_id: str, source_id: str) -> List[Dict[str, Any]]:
 
     try:
         # List all files in the source's chunk folder
-        files = client.storage.from_(BUCKET_CHUNKS).list(prefix)
+        files = client.storage.from_(BUCKET_CHUNKS).list(
+            prefix, options=_LIST_OPTIONS
+        )
         if not files:
             return []
 
@@ -366,7 +372,9 @@ def delete_source_chunks(project_id: str, source_id: str) -> bool:
 
     try:
         # List all files with prefix
-        files = client.storage.from_(BUCKET_CHUNKS).list(prefix)
+        files = client.storage.from_(BUCKET_CHUNKS).list(
+            prefix, options=_LIST_OPTIONS
+        )
         if files:
             paths = [f"{prefix}{f['name']}" for f in files]
             client.storage.from_(BUCKET_CHUNKS).remove(paths)
@@ -547,7 +555,9 @@ def delete_studio_job_files(project_id: str, job_type: str, job_id: str) -> bool
 
         while folders_to_scan:
             folder = folders_to_scan.pop()
-            entries = client.storage.from_(BUCKET_STUDIO).list(folder)
+            entries = client.storage.from_(BUCKET_STUDIO).list(
+                folder, options=_LIST_OPTIONS
+            )
             if not entries:
                 continue
             for entry in entries:
@@ -593,7 +603,9 @@ def list_studio_job_files(project_id: str, job_type: str, job_id: str) -> List[D
 
         while folders_to_scan:
             folder = folders_to_scan.pop()
-            entries = client.storage.from_(BUCKET_STUDIO).list(folder)
+            entries = client.storage.from_(BUCKET_STUDIO).list(
+                folder, options=_LIST_OPTIONS
+            )
             if not entries:
                 continue
             for entry in entries:
@@ -1031,6 +1043,9 @@ def delete_user_brand_assets(user_id: str) -> bool:
     """
     Delete all brand assets for a user.
 
+    Educational Note: Uses iterative folder scanning because Supabase .list()
+    only returns immediate children. Folders have id=None, files have a UUID id.
+
     Args:
         user_id: The user UUID
 
@@ -1038,26 +1053,30 @@ def delete_user_brand_assets(user_id: str) -> bool:
         True if successful
     """
     client = _get_client()
-    prefix = f"{user_id}/brand"
+    root_prefix = f"{user_id}/brand"
 
     try:
-        # List all files in the project's brand folder
-        files = client.storage.from_(BUCKET_BRAND_ASSETS).list(prefix)
-        if files:
-            # Need to handle nested folders (each asset has its own folder)
-            all_paths = []
-            for item in files:
-                if item.get("id"):  # It's a folder
-                    folder_name = item.get("name", "")
-                    folder_path = f"{prefix}/{folder_name}"
-                    folder_files = client.storage.from_(BUCKET_BRAND_ASSETS).list(folder_path)
-                    for f in folder_files:
-                        all_paths.append(f"{folder_path}/{f['name']}")
-                else:  # It's a file
-                    all_paths.append(f"{prefix}/{item['name']}")
+        # Iteratively scan folders to collect all file paths
+        folders_to_scan = [root_prefix]
+        all_paths = []
 
-            if all_paths:
-                client.storage.from_(BUCKET_BRAND_ASSETS).remove(all_paths)
+        while folders_to_scan:
+            folder = folders_to_scan.pop()
+            entries = client.storage.from_(BUCKET_BRAND_ASSETS).list(
+                folder, options=_LIST_OPTIONS
+            )
+            if not entries:
+                continue
+            for entry in entries:
+                path = f"{folder}/{entry['name']}"
+                if entry.get("id") is None:
+                    # No id means it's a folder — recurse into it
+                    folders_to_scan.append(path)
+                else:
+                    all_paths.append(path)
+
+        if all_paths:
+            client.storage.from_(BUCKET_BRAND_ASSETS).remove(all_paths)
         return True
     except Exception as e:
         logger.error("Failed to delete brand assets for user %s: %s", user_id, e)

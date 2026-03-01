@@ -242,7 +242,7 @@ class WebsiteToolExecutor:
             content_type = self._get_content_type(filename)
 
             # Upload to Supabase Storage
-            storage_service.upload_studio_file(
+            upload_path = storage_service.upload_studio_file(
                 project_id=project_id,
                 job_type="websites",
                 job_id=job_id,
@@ -250,6 +250,8 @@ class WebsiteToolExecutor:
                 content=final_content,
                 content_type=content_type
             )
+            if upload_path is None:
+                return f"Error: Failed to upload file '{filename}' to storage."
 
             line_count = len(final_content.split('\n'))
             char_count = len(final_content)
@@ -303,7 +305,7 @@ class WebsiteToolExecutor:
             lines[start_line-1:end_line] = [line + '\n' for line in new_lines]
 
             # Re-upload modified file
-            storage_service.upload_studio_file(
+            upload_path = storage_service.upload_studio_file(
                 project_id=project_id,
                 job_type="websites",
                 job_id=job_id,
@@ -311,6 +313,8 @@ class WebsiteToolExecutor:
                 content="".join(lines),
                 content_type=self._get_content_type(filename)
             )
+            if upload_path is None:
+                return f"Error: Failed to upload updated file '{filename}' to storage."
 
             return f"Updated lines {start_line}-{end_line} in '{filename}'"
 
@@ -350,7 +354,7 @@ class WebsiteToolExecutor:
             lines[after_line:after_line] = new_lines
 
             # Re-upload modified file
-            storage_service.upload_studio_file(
+            upload_path = storage_service.upload_studio_file(
                 project_id=project_id,
                 job_type="websites",
                 job_id=job_id,
@@ -358,6 +362,8 @@ class WebsiteToolExecutor:
                 content="".join(lines),
                 content_type=self._get_content_type(filename)
             )
+            if upload_path is None:
+                return f"Error: Failed to upload modified file '{filename}' to storage."
 
             return f"Inserted {len(new_lines)} lines after line {after_line} in '{filename}'"
 
