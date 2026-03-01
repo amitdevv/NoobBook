@@ -269,6 +269,11 @@ class MemoryService:
                 )
                 # Fallback: preserve both existing and new memory rather than losing either
                 merged_memory = f"{current_memory}\n{new_memory}".strip() if current_memory else new_memory
+                if len(merged_memory) > 600:  # rough 150-token guard (avg ~4 chars/token)
+                    logger.warning(
+                        "Memory merge fallback: concatenated memory may exceed token limit (%d chars)",
+                        len(merged_memory),
+                    )
                 logger.info("Memory merge: falling back to concatenation of current + new memory")
 
             # Save the merged memory
