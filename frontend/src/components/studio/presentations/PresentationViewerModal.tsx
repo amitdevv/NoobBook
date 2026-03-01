@@ -4,7 +4,7 @@
  * Shows screenshot images with PPTX download option.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   DownloadSimple,
   Presentation,
@@ -36,7 +36,6 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
   onDownloadPptx,
 }) => {
   const [currentSlide, setCurrentSlide] = useState(1);
-  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
 
   // Reset to first slide when opening a new presentation
   useEffect(() => {
@@ -45,20 +44,22 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
     }
   }, [viewingPresentationJob?.id]);
 
-  // Load screenshot URL when slide changes
-  useEffect(() => {
+  // Compute screenshot URL synchronously during render (not in useEffect)
+  // Educational Note: useMemo ensures the URL updates in the SAME render as
+  // the slide counter, keeping them in sync. useEffect runs after paint which
+  // causes a visible desync between the counter and the displayed image.
+  const screenshotUrl = useMemo(() => {
     if (viewingPresentationJob && viewingPresentationJob.screenshots?.length > 0) {
       const screenshot = viewingPresentationJob.screenshots[currentSlide - 1];
       if (screenshot && screenshot.screenshot_file) {
-        // API_BASE_URL already includes /api/v1 path, getAuthUrl adds JWT for browser element auth
-        const url = getAuthUrl(presentationsAPI.getScreenshotUrl(
+        return getAuthUrl(presentationsAPI.getScreenshotUrl(
           projectId,
           viewingPresentationJob.id,
           screenshot.screenshot_file
         ));
-        setScreenshotUrl(url);
       }
     }
+    return null;
   }, [viewingPresentationJob, currentSlide, projectId]);
 
   if (!viewingPresentationJob) return null;
@@ -144,6 +145,7 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
         <div className="flex-1 min-h-0 bg-gray-900 relative flex items-center justify-center">
           {screenshotUrl ? (
             <img
+              key={currentSlide}
               src={screenshotUrl}
               alt={`Slide ${currentSlide}`}
               className="max-w-full max-h-full object-contain"
