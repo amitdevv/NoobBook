@@ -267,9 +267,9 @@ class MemoryService:
                     "Memory merge: tool called but memory is empty. "
                     "Full tool input: %s", tool_input
                 )
-                # Fallback: use the new_memory directly rather than losing it
-                merged_memory = new_memory
-                logger.info("Memory merge: falling back to raw new_memory")
+                # Fallback: preserve both existing and new memory rather than losing either
+                merged_memory = f"{current_memory}\n{new_memory}".strip() if current_memory else new_memory
+                logger.info("Memory merge: falling back to concatenation of current + new memory")
 
             # Save the merged memory
             if memory_type == "user":
