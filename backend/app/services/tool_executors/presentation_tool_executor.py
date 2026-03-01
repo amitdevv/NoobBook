@@ -12,12 +12,10 @@ Tools:
 """
 
 import logging
-import os
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
-from pathlib import Path
 
-from app.utils.path_utils import get_studio_dir
+from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
 
 logger = logging.getLogger(__name__)
@@ -149,13 +147,15 @@ class PresentationToolExecutor:
 
 
         try:
-            slides_dir = Path(get_studio_dir(project_id)) / "presentations" / job_id / "slides"
-            slides_dir.mkdir(parents=True, exist_ok=True)
-
-            file_path = slides_dir / "base-styles.css"
-
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(content)
+            # Upload to Supabase Storage under slides/ subfolder
+            storage_service.upload_studio_file(
+                project_id=project_id,
+                job_type="presentations",
+                job_id=job_id,
+                filename="slides/base-styles.css",
+                content=content,
+                content_type="text/css; charset=utf-8"
+            )
 
             # Update created files list
             updated_files = created_files.copy()
@@ -193,13 +193,15 @@ class PresentationToolExecutor:
 
 
         try:
-            slides_dir = Path(get_studio_dir(project_id)) / "presentations" / job_id / "slides"
-            slides_dir.mkdir(parents=True, exist_ok=True)
-
-            file_path = slides_dir / filename
-
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(content)
+            # Upload to Supabase Storage under slides/ subfolder
+            storage_service.upload_studio_file(
+                project_id=project_id,
+                job_type="presentations",
+                job_id=job_id,
+                filename=f"slides/{filename}",
+                content=content,
+                content_type="text/html; charset=utf-8"
+            )
 
             # Update created files list
             updated_files = created_files.copy()

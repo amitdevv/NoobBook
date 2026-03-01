@@ -19,7 +19,6 @@ from typing import Dict, Any, Tuple
 import pandas as pd
 import numpy as np
 
-from app.utils.path_utils import get_raw_dir
 from app.services.integrations.supabase import storage_service
 
 logger = logging.getLogger(__name__)
@@ -67,29 +66,21 @@ class AnalysisExecutor:
         """
         Load CSV into DataFrame with caching.
 
-        Educational Note: We cache the DataFrame to avoid re-reading
-        the file on every query during an analysis session. Files are
-        checked locally first, then downloaded from Supabase Storage
-        as a fallback (since raw files live in Storage after upload).
+        Educational Note: We cache the DataFrame to avoid re-downloading
+        the file on every query during an analysis session. CSV files are
+        downloaded from Supabase Storage where they live after upload.
         """
         cache_key = f"{project_id}_{source_id}"
 
         if cache_key not in self._df_cache:
-            raw_dir = get_raw_dir(project_id)
-            csv_path = raw_dir / f"{source_id}.csv"
-
-            if csv_path.exists():
-                self._df_cache[cache_key] = pd.read_csv(csv_path)
-            else:
-                # Fallback: download from Supabase Storage (where files live after upload)
-                csv_bytes = storage_service.download_raw_file(
-                    project_id, source_id, f"{source_id}.csv"
+            csv_bytes = storage_service.download_raw_file(
+                project_id, source_id, f"{source_id}.csv"
+            )
+            if csv_bytes is None:
+                raise FileNotFoundError(
+                    f"CSV file not found in storage: {source_id}.csv"
                 )
-                if csv_bytes is None:
-                    raise FileNotFoundError(
-                        f"CSV file not found locally or in storage: {source_id}.csv"
-                    )
-                self._df_cache[cache_key] = pd.read_csv(io.BytesIO(csv_bytes))
+            self._df_cache[cache_key] = pd.read_csv(io.BytesIO(csv_bytes))
 
         return self._df_cache[cache_key].copy()
 

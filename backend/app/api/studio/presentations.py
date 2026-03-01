@@ -28,11 +28,10 @@ Routes:
 """
 import io
 import zipfile
-from pathlib import Path
-from flask import jsonify, request, current_app, send_file
+from flask import jsonify, request, current_app, send_file, Response
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
-from app.utils.path_utils import get_studio_dir
+from app.services.integrations.supabase import storage_service
 
 
 @studio_bp.route('/projects/<project_id>/studio/presentation', methods=['POST'])
@@ -151,31 +150,22 @@ def get_presentation_slide(project_id: str, job_id: str, filename: str):
         - Stylesheets: base-styles.css
     """
     try:
-        # Get slides directory
-        slides_dir = Path(get_studio_dir(project_id)) / "presentations" / job_id / "slides"
-
-        # Build file path
-        file_path = slides_dir / filename
-
-        # Security: Ensure file is within slides directory
-        if not file_path.resolve().is_relative_to(slides_dir.resolve()):
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file path'
-            }), 400
-
-        if not file_path.exists():
-            return jsonify({
-                'success': False,
-                'error': 'File not found'
-            }), 404
-
         # Determine MIME type
         mime_type = 'text/html'
         if filename.endswith('.css'):
             mime_type = 'text/css'
 
-        return send_file(file_path, mimetype=mime_type)
+        # Download from Supabase Storage (files stored under slides/ subfolder)
+        content = storage_service.download_studio_file(
+            project_id, "presentations", job_id, f"slides/{filename}"
+        )
+        if content is None:
+            return jsonify({
+                'success': False,
+                'error': 'File not found'
+            }), 404
+
+        return Response(content, mimetype=mime_type)
 
     except Exception as e:
         current_app.logger.error(f"Error serving slide file: {e}")
@@ -194,26 +184,17 @@ def get_presentation_screenshot(project_id: str, job_id: str, filename: str):
     and used to create the PPTX. They provide a reliable preview.
     """
     try:
-        # Get screenshots directory
-        screenshots_dir = Path(get_studio_dir(project_id)) / "presentations" / job_id / "screenshots"
-
-        # Build file path
-        file_path = screenshots_dir / filename
-
-        # Security: Ensure file is within screenshots directory
-        if not file_path.resolve().is_relative_to(screenshots_dir.resolve()):
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file path'
-            }), 400
-
-        if not file_path.exists():
+        # Download from Supabase Storage (screenshots stored under screenshots/ subfolder)
+        file_data = storage_service.download_studio_binary(
+            project_id, "presentations", job_id, f"screenshots/{filename}"
+        )
+        if file_data is None:
             return jsonify({
                 'success': False,
                 'error': 'Screenshot not found'
             }), 404
 
-        return send_file(file_path, mimetype='image/png')
+        return send_file(io.BytesIO(file_data), mimetype='image/png', as_attachment=False)
 
     except Exception as e:
         current_app.logger.error(f"Error serving screenshot file: {e}")
@@ -299,56 +280,84 @@ def download_presentation(project_id: str, job_id: str):
         download_format = request.args.get('format', 'pptx')
 
         if download_format == 'pptx':
-            # Download PPTX file
-            pptx_file = job.get('pptx_file')
-            if not pptx_file:
+            # Download PPTX file from Supabase Storage
+            pptx_filename = job.get('pptx_file')
+            if not pptx_filename:
                 return jsonify({
                     'success': False,
                     'error': 'PPTX file not ready yet. Export may still be processing.'
                 }), 400
 
-            pptx_path = Path(pptx_file)
-            if not pptx_path.exists():
+            pptx_data = storage_service.download_studio_binary(
+                project_id, "presentations", job_id, pptx_filename
+            )
+            if pptx_data is None:
                 return jsonify({
                     'success': False,
                     'error': 'PPTX file not found'
                 }), 404
 
-            pptx_filename = job.get('pptx_filename', 'Presentation.pptx')
+            download_name = job.get('pptx_filename', 'Presentation.pptx')
 
             return send_file(
-                pptx_path,
+                io.BytesIO(pptx_data),
                 mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation',
                 as_attachment=True,
-                download_name=pptx_filename
+                download_name=download_name
             )
 
         elif download_format == 'zip':
-            # Download as ZIP with all source files
-            presentation_dir = Path(get_studio_dir(project_id)) / "presentations" / job_id
-
-            if not presentation_dir.exists():
-                return jsonify({
-                    'success': False,
-                    'error': 'Presentation files not found'
-                }), 404
-
+            # Download as ZIP with all source files from Supabase Storage
             title = job.get('presentation_title', 'Presentation')
             safe_title = "".join(c for c in title if c.isalnum() or c in " -_").strip()
             if not safe_title:
                 safe_title = "Presentation"
             zip_filename = f"{safe_title}_source.zip"
 
-            # Create ZIP in memory
+            # Create ZIP in memory from Supabase Storage
             zip_buffer = io.BytesIO()
 
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                # Add all files recursively
-                for file_path in presentation_dir.rglob('*'):
-                    if file_path.is_file():
-                        # Get relative path from presentation_dir
-                        arcname = file_path.relative_to(presentation_dir)
-                        zip_file.write(file_path, arcname)
+                # Add slide HTML files and base-styles.css
+                slide_files = job.get('slide_files', [])
+                for slide_file in slide_files:
+                    content = storage_service.download_studio_file(
+                        project_id, "presentations", job_id, f"slides/{slide_file}"
+                    )
+                    if content:
+                        zip_file.writestr(f"slides/{slide_file}", content)
+
+                # Add base-styles.css
+                css_content = storage_service.download_studio_file(
+                    project_id, "presentations", job_id, "slides/base-styles.css"
+                )
+                if css_content:
+                    zip_file.writestr("slides/base-styles.css", css_content)
+
+                # Add screenshots
+                screenshots = job.get('screenshots', [])
+                for screenshot_info in screenshots:
+                    screenshot_name = screenshot_info.get('filename', '')
+                    if not screenshot_name:
+                        # Extract filename from path if stored that way
+                        path = screenshot_info.get('path', '')
+                        if path:
+                            screenshot_name = path.rsplit('/', 1)[-1].rsplit('\\', 1)[-1]
+                    if screenshot_name:
+                        img_data = storage_service.download_studio_binary(
+                            project_id, "presentations", job_id, f"screenshots/{screenshot_name}"
+                        )
+                        if img_data:
+                            zip_file.writestr(f"screenshots/{screenshot_name}", img_data)
+
+                # Add PPTX file
+                pptx_filename = job.get('pptx_file')
+                if pptx_filename:
+                    pptx_data = storage_service.download_studio_binary(
+                        project_id, "presentations", job_id, pptx_filename
+                    )
+                    if pptx_data:
+                        zip_file.writestr(pptx_filename, pptx_data)
 
             zip_buffer.seek(0)
 
@@ -382,8 +391,6 @@ def delete_presentation(project_id: str, job_id: str):
         Success status
     """
     try:
-        import shutil
-
         # Get job to verify it exists
         job = studio_index_service.get_presentation_job(project_id, job_id)
         if not job:
@@ -392,10 +399,8 @@ def delete_presentation(project_id: str, job_id: str):
                 'error': 'Job not found'
             }), 404
 
-        # Delete files
-        presentation_dir = Path(get_studio_dir(project_id)) / "presentations" / job_id
-        if presentation_dir.exists():
-            shutil.rmtree(presentation_dir)
+        # Delete files from Supabase Storage
+        storage_service.delete_studio_job_files(project_id, "presentations", job_id)
 
         # Delete from index
         deleted = studio_index_service.delete_presentation_job(project_id, job_id)

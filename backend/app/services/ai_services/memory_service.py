@@ -280,7 +280,7 @@ class MemoryService:
             else:
                 return {
                     "success": False,
-                    "error": "Failed to save memory to file"
+                    "error": "Failed to save memory to Supabase"
                 }
 
         except Exception as e:

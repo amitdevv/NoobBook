@@ -2,34 +2,27 @@
 Path Utils - Centralized path management for project directories.
 
 Educational Note: This utility provides a single source of truth for all
-project-related paths. Benefits:
-- No path logic duplication across services
-- Auto-creates directories when accessed (ensures they exist)
-- Easy to change directory structure in one place
-- Consistent path handling across the entire application
+project-related local paths. Most user data lives in Supabase (PostgreSQL +
+Storage), but some local directories are still used for:
+- Prompt configurations (data/prompts/)
+- Agent debug logs (data/projects/{id}/agents/)
+- Temp file staging during source processing
+- Background task tracking (data/tasks/)
 
-Directory Structure:
+Local Directory Structure:
     data/
     ├── projects/
-    │   ├── {project_id}.json          # Project metadata
+    │   ├── {project_id}.json          # Project prompt config
     │   └── {project_id}/
-    │       ├── memory.json            # Project-specific memory
-    │       ├── sources/
-    │       │   ├── sources_index.json # Source metadata index
-    │       │   ├── raw/               # Original uploaded files
-    │       │   ├── processed/         # Extracted text files
-    │       │   └── chunks/            # Chunked text for RAG
-    │       │       └── {source_id}/   # Per-source chunks
-    │       ├── chats/
-    │       │   ├── chats_index.json   # Chat metadata index
-    │       │   ├── {chat_id}.json     # Chat messages
-    │       │   └── api_*.json         # Debug logs for API calls
     │       └── agents/
-    │           └── web_agent/         # Web agent execution logs
+    │           └── web_agent/         # Agent execution logs (debug)
     │               └── {execution_id}.json
-    ├── prompts/                       # Prompt configurations
-    ├── tasks/                         # Background task tracking
-    └── user_memory.json               # Global user memory
+    ├── prompts/                       # AI prompt configurations
+    └── tasks/                         # Background task tracking
+
+User data (projects, sources, chats, messages, memory, costs) is stored
+in Supabase. Files (raw uploads, processed text, chunks) are stored in
+Supabase Storage.
 """
 import logging
 from pathlib import Path
@@ -108,10 +101,10 @@ def get_project_dir(project_id: str) -> Path:
 
 def get_project_file(project_id: str) -> Path:
     """
-    Get a project's metadata JSON file path.
+    Get a project's local config file path (used by prompt_loader for custom prompts).
 
-    Educational Note: This is the project's main config file,
-    stored at the same level as the project directory.
+    Educational Note: Project metadata lives in Supabase, but custom prompt
+    config is stored locally in this file.
 
     Args:
         project_id: The project UUID
@@ -213,10 +206,11 @@ def get_source_chunks_dir(project_id: str, source_id: str) -> Path:
 
 def get_sources_index_path(project_id: str) -> Path:
     """
-    Get the sources index JSON file path.
+    Get the sources index JSON file path (legacy - source metadata now in Supabase).
 
-    Educational Note: This file stores metadata for all sources
-    in a project. It's loaded/saved by source_index_service.
+    Note: Source metadata is now stored in the Supabase sources table.
+    This function is kept for backwards compatibility but should not be
+    used for new code.
 
     Args:
         project_id: The project UUID
@@ -233,9 +227,10 @@ def get_sources_index_path(project_id: str) -> Path:
 
 def get_chats_dir(project_id: str) -> Path:
     """
-    Get the chats directory for a project.
+    Get the chats directory for a project (legacy - chat data now in Supabase).
 
-    Educational Note: Contains chat JSON files and API debug logs.
+    Educational Note: Chat data is stored in Supabase (chats and messages tables).
+    This directory may still be used for debug logs.
 
     Args:
         project_id: The project UUID
@@ -250,7 +245,11 @@ def get_chats_dir(project_id: str) -> Path:
 
 def get_chat_file(project_id: str, chat_id: str) -> Path:
     """
-    Get a chat's JSON file path.
+    Get a chat's JSON file path (legacy - chat data now in Supabase).
+
+    Note: Chat messages are stored in the Supabase messages table.
+    This function is kept for backwards compatibility but should not be
+    used for new code.
 
     Args:
         project_id: The project UUID

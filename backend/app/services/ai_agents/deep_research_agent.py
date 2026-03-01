@@ -12,7 +12,7 @@ standard separation of concerns pattern.
 
 import logging
 import uuid
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -20,7 +20,6 @@ from app.config import prompt_loader, tool_loader
 from app.services.tool_executors import deep_research_executor
 from app.services.data_services import message_service
 from app.utils import claude_parsing_utils
-from app.utils.path_utils import get_processed_dir
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +62,7 @@ class DeepResearchAgent:
         topic: str,
         description: str,
         links: List[str] = None,
-        output_path: Optional[str] = None
+        output_path: str = ""
     ) -> Dict[str, Any]:
         """
         Run comprehensive research on a topic.
@@ -79,22 +78,20 @@ class DeepResearchAgent:
             topic: The main research topic
             description: Focus areas and questions to answer
             links: Optional list of reference URLs to analyze
-            output_path: Path to write research output (defaults to processed dir)
+            output_path: Path to write research output (required, must be non-empty)
 
         Returns:
             Dict with success status and research metadata
         """
+        if not output_path:
+            raise ValueError("output_path is required")
+
         config = self._load_config()
         tools_config = self._load_tools()
 
         execution_id = str(uuid.uuid4())
         started_at = datetime.now().isoformat()
         links = links or []
-
-        # Set up output file path
-        if output_path is None:
-            processed_dir = get_processed_dir(project_id)
-            output_path = str(processed_dir / f"{source_id}.txt")
 
         # Build user message from template
         links_context = "\n".join([f"- {link}" for link in links]) if links else "No specific links provided."

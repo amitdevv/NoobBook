@@ -7,8 +7,8 @@ quality assessment. Used by both the simple csv_service (for processing)
 and the csv_analyzer_agent (for detailed analysis).
 
 Key Design: CSV files are NOT chunked or embedded - we analyze them
-on-demand using this executor. The executor reads the file from the
-raw folder using project_id and source_id.
+on-demand using this executor. The executor downloads the file from
+Supabase Storage using project_id and source_id.
 """
 
 import csv
@@ -20,7 +20,6 @@ from collections import Counter
 from datetime import datetime
 import statistics
 
-from app.utils.path_utils import get_raw_dir
 from app.services.integrations.supabase import storage_service
 
 
@@ -78,25 +77,20 @@ class CSVToolExecutor:
         operation = tool_input.get("operation", "summary")
 
         try:
-            # Use explicit path if provided, otherwise fall back to raw folder
+            # Use explicit path if provided (e.g. temp directory during processing),
+            # otherwise download from Supabase Storage
             if csv_file_path:
                 csv_path = Path(csv_file_path)
-            else:
-                raw_dir = get_raw_dir(project_id)
-                csv_path = raw_dir / f"{source_id}.csv"
-
-            if csv_path.exists():
                 with open(csv_path, "r", encoding="utf-8") as f:
                     csv_content = f.read()
             else:
-                # Fallback: download from Supabase Storage (where files live after upload)
                 csv_bytes = storage_service.download_raw_file(
                     project_id, source_id, f"{source_id}.csv"
                 )
                 if csv_bytes is None:
                     return {
                         "success": False,
-                        "error": f"CSV file not found locally or in storage: {source_id}.csv"
+                        "error": f"CSV file not found in storage: {source_id}.csv"
                     }, False
                 csv_content = csv_bytes.decode("utf-8")
 

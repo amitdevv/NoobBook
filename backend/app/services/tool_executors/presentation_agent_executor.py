@@ -7,6 +7,8 @@ HTML slides, it captures screenshots and exports to PPTX.
 """
 
 import logging
+import shutil
+import tempfile
 from typing import Dict, Any
 import uuid
 from pathlib import Path
@@ -49,7 +51,7 @@ class PresentationAgentExecutor:
         from app.services.background_services import task_service
         from app.services.ai_agents import presentation_agent_service
         from app.services.source_services import source_service
-        from app.utils.path_utils import get_studio_dir
+        from app.services.integrations.supabase import storage_service
         from app.utils.screenshot_utils import capture_slides_as_screenshots
         from app.utils.presentation_export_utils import create_pptx_from_screenshots
 
@@ -78,8 +80,9 @@ class PresentationAgentExecutor:
         def run_agent():
             """Background task to run the presentation agent and export to PPTX."""
             logger.info("Starting presentation agent for job %s", job_id[:8])
+            temp_dir = None
             try:
-                # Phase 1: Generate HTML slides
+                # Phase 1: Generate HTML slides (writes to Supabase Storage)
                 result = presentation_agent_service.generate_presentation(
                     project_id=project_id,
                     source_id=source_id,
@@ -104,13 +107,29 @@ class PresentationAgentExecutor:
                     export_status="exporting"
                 )
 
-                # Get paths
-                studio_dir = get_studio_dir(project_id)
-                slides_dir = Path(studio_dir) / "presentations" / job_id / "slides"
-                screenshots_dir = Path(studio_dir) / "presentations" / job_id / "screenshots"
-                screenshots_dir.mkdir(parents=True, exist_ok=True)
+                # Create temp directory and download slides from Supabase for Playwright
+                temp_dir = tempfile.mkdtemp(prefix="noobbook_pres_")
+                slides_dir = Path(temp_dir) / "slides"
+                slides_dir.mkdir()
+                screenshots_dir = Path(temp_dir) / "screenshots"
+                screenshots_dir.mkdir()
 
-                # Capture screenshots
+                # Download slide HTML files and base-styles.css to temp dir
+                for slide_file in slide_files:
+                    content = storage_service.download_studio_file(
+                        project_id, "presentations", job_id, f"slides/{slide_file}"
+                    )
+                    if content:
+                        (slides_dir / slide_file).write_text(content, encoding="utf-8")
+
+                # Download base-styles.css
+                css_content = storage_service.download_studio_file(
+                    project_id, "presentations", job_id, "slides/base-styles.css"
+                )
+                if css_content:
+                    (slides_dir / "base-styles.css").write_text(css_content, encoding="utf-8")
+
+                # Capture screenshots using Playwright against temp dir
                 screenshots = capture_slides_as_screenshots(
                     slides_dir=str(slides_dir),
                     output_dir=str(screenshots_dir),
@@ -126,6 +145,20 @@ class PresentationAgentExecutor:
                     )
                     return
 
+                # Upload screenshots to Supabase Storage
+                for screenshot_info in screenshots:
+                    screenshot_path = Path(screenshot_info.get("path", ""))
+                    if screenshot_path.exists():
+                        screenshot_bytes = screenshot_path.read_bytes()
+                        storage_service.upload_studio_binary(
+                            project_id=project_id,
+                            job_type="presentations",
+                            job_id=job_id,
+                            filename=f"screenshots/{screenshot_path.name}",
+                            file_data=screenshot_bytes,
+                            content_type="image/png"
+                        )
+
                 # Update with screenshots info
                 studio_index_service.update_presentation_job(
                     project_id, job_id,
@@ -133,7 +166,7 @@ class PresentationAgentExecutor:
                     status_message="Creating PPTX..."
                 )
 
-                # Create PPTX
+                # Create PPTX in temp dir
                 job = studio_index_service.get_presentation_job(project_id, job_id)
                 title = job.get("presentation_title", "Presentation") if job else "Presentation"
 
@@ -143,8 +176,7 @@ class PresentationAgentExecutor:
                     safe_title = "Presentation"
                 pptx_filename = f"{safe_title}.pptx"
 
-                pptx_output_dir = Path(studio_dir) / "presentations" / job_id
-                pptx_path = pptx_output_dir / pptx_filename
+                pptx_path = Path(temp_dir) / pptx_filename
 
                 pptx_result = create_pptx_from_screenshots(
                     screenshots=screenshots,
@@ -153,10 +185,21 @@ class PresentationAgentExecutor:
                 )
 
                 if pptx_result:
-                    # Success!
+                    # Upload PPTX to Supabase Storage
+                    pptx_bytes = pptx_path.read_bytes()
+                    storage_service.upload_studio_binary(
+                        project_id=project_id,
+                        job_type="presentations",
+                        job_id=job_id,
+                        filename=pptx_filename,
+                        file_data=pptx_bytes,
+                        content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    )
+
+                    # Store filename (not absolute path) in job metadata
                     studio_index_service.update_presentation_job(
                         project_id, job_id,
-                        pptx_file=str(pptx_path),
+                        pptx_file=pptx_filename,
                         pptx_filename=pptx_filename,
                         export_status="ready",
                         status_message="Presentation ready for download!",
@@ -179,6 +222,10 @@ class PresentationAgentExecutor:
                     status="error",
                     error_message=str(e)
                 )
+            finally:
+                # Clean up temp directory
+                if temp_dir and Path(temp_dir).exists():
+                    shutil.rmtree(temp_dir, ignore_errors=True)
 
         task_service.submit_task(
             task_type="presentation_generation",

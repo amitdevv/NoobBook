@@ -30,12 +30,11 @@ Routes:
 import io
 import re
 import zipfile
-from pathlib import Path
 from flask import g, jsonify, request, current_app, send_file, Response
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.email_agent_executor import email_agent_executor
-from app.utils.path_utils import get_studio_dir
+from app.services.integrations.supabase import storage_service
 
 
 @studio_bp.route('/projects/<project_id>/studio/email-template', methods=['POST'])
@@ -150,23 +149,9 @@ def get_email_template_file(project_id: str, filename: str):
         - HTML file or image file with appropriate headers
     """
     try:
-        email_dir = get_studio_dir(project_id) / "email_templates"
-        filepath = email_dir / filename
-
-        if not filepath.exists():
-            return jsonify({
-                'success': False,
-                'error': f'File not found: {filename}'
-            }), 404
-
-        # Validate the file is within the expected directory (security)
-        try:
-            filepath.resolve().relative_to(email_dir.resolve())
-        except ValueError:
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file path'
-            }), 400
+        # Extract job_id from filename (format: {job_id}.html or {job_id}_image_N.ext or {job_id}_brand_logo.ext)
+        # Job ID is the first UUID-length segment before any suffix
+        job_id = filename.split('_image_')[0].split('_brand_')[0].split('.')[0]
 
         # Determine mimetype
         if filename.endswith('.html'):
@@ -180,11 +165,28 @@ def get_email_template_file(project_id: str, filename: str):
         else:
             mimetype = 'application/octet-stream'
 
-        return send_file(
-            filepath,
-            mimetype=mimetype,
-            as_attachment=False
+        # Text files (HTML)
+        if filename.endswith('.html'):
+            content = storage_service.download_studio_file(
+                project_id, "emails", job_id, filename
+            )
+            if content is None:
+                return jsonify({
+                    'success': False,
+                    'error': f'File not found: {filename}'
+                }), 404
+            return Response(content, mimetype=mimetype, headers={'Content-Type': f'{mimetype}; charset=utf-8'})
+
+        # Binary files (images)
+        file_data = storage_service.download_studio_binary(
+            project_id, "emails", job_id, filename
         )
+        if file_data is None:
+            return jsonify({
+                'success': False,
+                'error': f'File not found: {filename}'
+            }), 404
+        return send_file(io.BytesIO(file_data), mimetype=mimetype, as_attachment=False)
 
     except Exception as e:
         current_app.logger.error(f"Error serving email template file: {e}")
@@ -224,16 +226,15 @@ def preview_email_template(project_id: str, job_id: str):
                 'error': 'Email template not yet generated'
             }), 404
 
-        email_dir = get_studio_dir(project_id) / "email_templates"
-        filepath = email_dir / html_file
-
-        if not filepath.exists():
+        # Download from Supabase Storage
+        html_content = storage_service.download_studio_file(
+            project_id, "emails", job_id, html_file
+        )
+        if html_content is None:
             return jsonify({
                 'success': False,
                 'error': f'HTML file not found: {html_file}'
             }), 404
-
-        html_content = filepath.read_text(encoding='utf-8')
 
         # Inject auth token into image URLs so <img> tags pass auth.
         # The token comes from the ?token= query param the frontend already sends.
@@ -287,24 +288,26 @@ def download_email_template(project_id: str, job_id: str):
                 'error': 'Email template not yet generated'
             }), 404
 
-        email_dir = get_studio_dir(project_id) / "email_templates"
-
-        # Create ZIP in memory
+        # Create ZIP in memory from Supabase Storage
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
             # Add HTML file
-            html_path = email_dir / html_file
-            if html_path.exists():
-                zip_file.write(html_path, html_file)
+            html_content = storage_service.download_studio_file(
+                project_id, "emails", job_id, html_file
+            )
+            if html_content:
+                zip_file.writestr(html_file, html_content)
 
             # Add image files
             images = job.get('images', [])
             for image_info in images:
                 image_filename = image_info.get('filename')
                 if image_filename:
-                    image_path = email_dir / image_filename
-                    if image_path.exists():
-                        zip_file.write(image_path, image_filename)
+                    image_data = storage_service.download_studio_binary(
+                        project_id, "emails", job_id, image_filename
+                    )
+                    if image_data:
+                        zip_file.writestr(image_filename, image_data)
 
         zip_buffer.seek(0)
 

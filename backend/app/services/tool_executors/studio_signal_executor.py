@@ -108,8 +108,8 @@ class StudioSignalExecutor:
 
         # Store signals synchronously (not background task)
         # Educational Note: We do this synchronously to avoid race conditions
-        # with the main chat service which also reads/writes the chat file.
-        # Signal storage is fast (just appending to JSON) so no need for background.
+        # with the main chat service which also reads/writes chat data.
+        # Signal storage is fast (just inserting to Supabase) so no need for background.
         activated = [s["studio_item"] for s in valid_signals]
         logger.info("Storing %s studio signals: %s", len(valid_signals), activated)
 

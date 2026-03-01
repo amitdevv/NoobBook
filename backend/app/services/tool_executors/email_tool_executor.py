@@ -6,13 +6,11 @@ Agent handles orchestration, executor handles tool-specific logic.
 """
 
 import logging
-import os
 import re
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
-from pathlib import Path
 
-from app.utils.path_utils import get_studio_dir
+from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
 from app.services.integrations.google import imagen_service
 
@@ -168,26 +166,18 @@ class EmailToolExecutor:
         )
 
         try:
-            # Prepare output directory
-            studio_dir = get_studio_dir(project_id)
-            email_dir = Path(studio_dir) / "email_templates"
-            email_dir.mkdir(parents=True, exist_ok=True)
-
             # Create filename prefix
             image_index = len(generated_images) + 1
             filename_prefix = f"{job_id}_image_{image_index}"
 
-            # Generate image via Gemini
-            image_result = imagen_service.generate_images(
+            # Generate image and get bytes (not saved to disk)
+            image_result = imagen_service.generate_image_bytes(
                 prompt=image_prompt,
-                output_dir=email_dir,
-                num_images=1,
                 filename_prefix=filename_prefix,
                 aspect_ratio=aspect_ratio
             )
 
-            if not image_result.get("success") or not image_result.get("images"):
-                image_index = len(generated_images) + 1
+            if not image_result.get("success"):
                 placeholder = f"IMAGE_{image_index}"
                 error_msg = (
                     f"Image generation failed for '{section_name}': "
@@ -197,9 +187,19 @@ class EmailToolExecutor:
                 )
                 return error_msg, None
 
-            # Get the generated image info
-            image_data = image_result["images"][0]
-            filename = image_data["filename"]
+            filename = image_result["filename"]
+            image_bytes = image_result["image_bytes"]
+            content_type = image_result["content_type"]
+
+            # Upload to Supabase Storage
+            storage_service.upload_studio_binary(
+                project_id=project_id,
+                job_type="emails",
+                job_id=job_id,
+                filename=filename,
+                file_data=image_bytes,
+                content_type=content_type
+            )
 
             # Build image info
             image_info = {
@@ -302,16 +302,16 @@ class EmailToolExecutor:
                         else:
                             logger.warning("Could not inject brand logo — no <body> or 600px table found")
 
-            # Save HTML file
-            studio_dir = get_studio_dir(project_id)
-            email_dir = os.path.join(studio_dir, "email_templates")
-            os.makedirs(email_dir, exist_ok=True)
-
+            # Upload HTML to Supabase Storage
             html_filename = f"{job_id}.html"
-            html_path = os.path.join(email_dir, html_filename)
-
-            with open(html_path, "w", encoding="utf-8") as f:
-                f.write(final_html)
+            storage_service.upload_studio_file(
+                project_id=project_id,
+                job_type="emails",
+                job_id=job_id,
+                filename=html_filename,
+                content=final_html,
+                content_type="text/html; charset=utf-8"
+            )
 
             # Get job info for template_name
             job = studio_index_service.get_email_job(project_id, job_id)

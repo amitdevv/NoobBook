@@ -3,6 +3,11 @@ Service for managing environment variables and .env file operations.
 
 Educational Note: This service provides a safe way to read, write, and
 update the .env file while maintaining the Flask app's environment.
+
+Stateless Deployment Note: On stateless container deployments (ECS, Fargate,
+Lambda), .env file writes will be lost on container restart. For those
+environments, use environment variable injection (e.g., ECS task definition,
+Secrets Manager) instead of runtime .env writes.
 """
 import logging
 import os

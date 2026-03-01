@@ -6,7 +6,7 @@ Educational Note: Not all sources are file uploads. This module handles:
 1. URL Sources:
    - Regular websites: Fetched via web agent with web_fetch tool
    - YouTube videos: Transcripts fetched via youtube-transcript-api
-   - Stored as .link files containing JSON with URL and metadata
+   - Stored as .link files in Supabase Storage containing JSON with URL and metadata
 
 2. Text Sources:
    - Pasted text content

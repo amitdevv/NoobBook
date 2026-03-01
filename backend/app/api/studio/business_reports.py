@@ -31,12 +31,11 @@ Routes:
 """
 import io
 import zipfile
-from pathlib import Path
 from flask import jsonify, request, current_app, send_file, Response
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.business_report_agent_executor import business_report_agent_executor
-from app.utils.path_utils import get_studio_dir, get_ai_images_dir
+from app.services.integrations.supabase import storage_service
 
 
 @studio_bp.route('/projects/<project_id>/studio/business-report', methods=['POST'])
@@ -177,23 +176,8 @@ def get_business_report_file(project_id: str, filename: str):
         - Markdown file with appropriate headers
     """
     try:
-        reports_dir = get_studio_dir(project_id) / "business_reports"
-        filepath = reports_dir / filename
-
-        if not filepath.exists():
-            return jsonify({
-                'success': False,
-                'error': f'File not found: {filename}'
-            }), 404
-
-        # Validate the file is within the expected directory (security)
-        try:
-            filepath.resolve().relative_to(reports_dir.resolve())
-        except ValueError:
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file path'
-            }), 400
+        # Extract job_id from filename (format: {job_id}.md)
+        job_id = filename.rsplit('.', 1)[0] if '.' in filename else filename
 
         # Determine mimetype
         if filename.endswith('.md'):
@@ -201,10 +185,20 @@ def get_business_report_file(project_id: str, filename: str):
         else:
             mimetype = 'application/octet-stream'
 
-        return send_file(
-            filepath,
+        # Download from Supabase Storage
+        content = storage_service.download_studio_file(
+            project_id, "business_reports", job_id, filename
+        )
+        if content is None:
+            return jsonify({
+                'success': False,
+                'error': f'File not found: {filename}'
+            }), 404
+
+        return Response(
+            content,
             mimetype=mimetype,
-            as_attachment=False
+            headers={'Content-Type': f'{mimetype}; charset=utf-8'}
         )
 
     except Exception as e:
@@ -240,18 +234,15 @@ def preview_business_report(project_id: str, job_id: str):
                 'error': 'Business report not yet generated'
             }), 404
 
-        reports_dir = get_studio_dir(project_id) / "business_reports"
-        filepath = reports_dir / markdown_file
-
-        if not filepath.exists():
+        # Download from Supabase Storage
+        content = storage_service.download_studio_file(
+            project_id, "business_reports", job_id, markdown_file
+        )
+        if content is None:
             return jsonify({
                 'success': False,
                 'error': f'Markdown file not found: {markdown_file}'
             }), 404
-
-        # Read and return markdown content
-        with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read()
 
         return Response(
             content,
@@ -292,25 +283,24 @@ def download_business_report(project_id: str, job_id: str):
                 'error': 'Business report not yet generated'
             }), 404
 
-        reports_dir = get_studio_dir(project_id) / "business_reports"
-        images_dir = get_ai_images_dir(project_id)
-
-        # Create ZIP in memory
+        # Create ZIP in memory from Supabase Storage
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
             # Add markdown file
-            markdown_path = reports_dir / markdown_file
-            if markdown_path.exists():
-                zip_file.write(markdown_path, markdown_file)
+            md_content = storage_service.download_studio_file(
+                project_id, "business_reports", job_id, markdown_file
+            )
+            if md_content:
+                zip_file.writestr(markdown_file, md_content)
 
-            # Add chart files from ai_outputs/images/
+            # Add chart files (stored in ai-images via csv_analyzer_agent)
             charts = job.get('charts', [])
             for chart_info in charts:
                 chart_filename = chart_info.get('filename')
                 if chart_filename:
-                    chart_path = images_dir / chart_filename
-                    if chart_path.exists():
-                        zip_file.write(chart_path, f"charts/{chart_filename}")
+                    chart_data = storage_service.download_ai_image(project_id, chart_filename)
+                    if chart_data:
+                        zip_file.writestr(f"charts/{chart_filename}", chart_data)
 
         zip_buffer.seek(0)
 
@@ -355,14 +345,8 @@ def delete_business_report_job(project_id: str, job_id: str):
                 'error': f'Business report job {job_id} not found'
             }), 404
 
-        # Delete markdown file only (charts are shared)
-        reports_dir = get_studio_dir(project_id) / "business_reports"
-
-        markdown_file = job.get('markdown_file')
-        if markdown_file:
-            markdown_path = reports_dir / markdown_file
-            if markdown_path.exists():
-                markdown_path.unlink()
+        # Delete markdown file from Supabase Storage (charts are shared)
+        storage_service.delete_studio_job_files(project_id, "business_reports", job_id)
 
         # Delete job from index
         studio_index_service.delete_business_report_job(project_id, job_id)
