@@ -5,7 +5,7 @@ Educational Note: All source types (PDF, DOCX, images, audio, links, YouTube)
 are converted to a standardized text format with page markers. This enables:
 1. Consistent chunking for embeddings
 2. Page-based citations in chat responses
-3. Unified storage format in the processed/ folder
+3. Unified storage format uploaded to Supabase Storage
 
 Output Format:
     # Extracted from PDF document: filename.pdf

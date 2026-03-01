@@ -8,7 +8,7 @@ We use two main branches:
 
 | Branch | Purpose |
 |--------|---------|
-| `main` | Stable release (older, JSON-file based storage). Use this to test and play around with NoobBook. |
+| `main` | Stable release. Use this to test and play around with NoobBook. |
 | `develop` | Latest changes (Supabase, Docker, multi-user). **This is where all new work goes.** |
 
 We don't have a separate staging branch yet — `develop` serves as both development and staging for now.

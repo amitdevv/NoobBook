@@ -11,6 +11,7 @@ standard separation of concerns pattern.
 """
 
 import logging
+import tempfile
 import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -20,7 +21,6 @@ from app.config import prompt_loader, tool_loader
 from app.services.tool_executors import deep_research_executor
 from app.services.data_services import message_service
 from app.utils import claude_parsing_utils
-from app.utils.path_utils import get_processed_dir
 
 logger = logging.getLogger(__name__)
 
@@ -91,10 +91,13 @@ class DeepResearchAgent:
         started_at = datetime.now().isoformat()
         links = links or []
 
-        # Set up output file path
+        # Set up output file path (use temp file if no path provided)
         if output_path is None:
-            processed_dir = get_processed_dir(project_id)
-            output_path = str(processed_dir / f"{source_id}.txt")
+            tmp = tempfile.NamedTemporaryFile(
+                suffix=".txt", prefix=f"{source_id}_", delete=False
+            )
+            output_path = tmp.name
+            tmp.close()
 
         # Build user message from template
         links_context = "\n".join([f"- {link}" for link in links]) if links else "No specific links provided."

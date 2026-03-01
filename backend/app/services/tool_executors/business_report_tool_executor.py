@@ -5,12 +5,10 @@ Executes: plan_business_report, analyze_csv_data, search_source_content, write_b
 """
 
 import logging
-import os
 import uuid as uuid_module
 from typing import Dict, Any, List, Tuple
 from datetime import datetime
 
-from app.utils.path_utils import get_studio_dir
 from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
 from app.services.ai_agents.csv_analyzer_agent import csv_analyzer_agent
@@ -299,16 +297,18 @@ class BusinessReportToolExecutor:
                 url = chart_info["url"]
                 final_markdown = final_markdown.replace(f"({filename})", f"({url})")
 
-            # Save markdown file
-            studio_dir = get_studio_dir(project_id)
-            reports_dir = os.path.join(studio_dir, "business_reports")
-            os.makedirs(reports_dir, exist_ok=True)
-
+            # Upload markdown to Supabase Storage
             markdown_filename = f"{job_id}.md"
-            markdown_path = os.path.join(reports_dir, markdown_filename)
-
-            with open(markdown_path, "w", encoding="utf-8") as f:
-                f.write(final_markdown)
+            storage_path = storage_service.upload_studio_file(
+                project_id=project_id,
+                job_type="business_reports",
+                job_id=job_id,
+                filename=markdown_filename,
+                content=final_markdown,
+                content_type="text/markdown; charset=utf-8"
+            )
+            if not storage_path:
+                raise RuntimeError("Failed to upload markdown to Supabase Storage")
 
             # Get job info for title
             job = studio_index_service.get_business_report_job(project_id, job_id)

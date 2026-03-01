@@ -475,13 +475,13 @@ Frontend parses → extracts chunk_id
        ↓
 Hover → GET /api/v1/projects/{id}/citations/{chunk_id}
        ↓
-Backend loads chunk file → returns content + metadata
+Backend loads chunk from Supabase → returns content + metadata
        ↓
 Tooltip shows: "Source Name - Page 5, Section 2" + content
 ```
 
 ### Debug Logging
-Each API call logged to `data/projects/{id}/chats/{chat_id}/api_N.json` with full request/response for debugging.
+Debug logging for API calls is available during development for troubleshooting chat interactions.
 
 ## Claude API Response Parsing
 
@@ -504,16 +504,16 @@ message_service.py (store if needed - pure CRUD)
 
 ## Cost Tracking
 
-Per-project API cost tracking. Pricing: Sonnet ($3/$15 per 1M in/out), Haiku ($1/$5). All services pass `project_id` to `claude_service.send_message()`. Costs stored in `project.json`, displayed in ProjectHeader with tooltip breakdown.
+Per-project API cost tracking. Pricing: Sonnet ($3/$15 per 1M in/out), Haiku ($1/$5). All services pass `project_id` to `claude_service.send_message()`. Costs stored in Supabase `projects.costs` column, displayed in ProjectHeader with tooltip breakdown.
 
 ## Memory System
 
 **Tool-based memory** for persistent context across conversations.
 
-- **User Memory** (`data/user_memory.json`): Global preferences across all projects
-- **Project Memory** (`data/projects/{id}/memory.json`): Project-specific context
+- **User Memory** (Supabase `users.memory` column): Global preferences across all projects
+- **Project Memory** (Supabase `projects.memory` column): Project-specific context
 
-**Flow**: Claude calls `store_memory` → returns immediately (non-blocking) → background task uses Haiku to merge new + existing memory (max 150 tokens) → saved to JSON → included in future system prompts via `context_loader.py`.
+**Flow**: Claude calls `store_memory` → returns immediately (non-blocking) → background task uses Haiku to merge new + existing memory (max 150 tokens) → saved to Supabase → included in future system prompts via `context_loader.py`.
 
 ## Tier Configuration
 

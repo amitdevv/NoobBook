@@ -281,8 +281,8 @@ def list_source_chunks(project_id: str, source_id: str) -> List[Dict[str, Any]]:
     List and download all chunks for a source.
 
     Educational Note: This function retrieves all chunks from Supabase Storage
-    for use in RAG search. Returns chunk data in the same format as the old
-    local file-based system for compatibility.
+    for use in RAG search. Returns chunk data as a list of dicts with
+    chunk_id, text, page_number, and source_id.
 
     Args:
         project_id: The project UUID
@@ -546,6 +546,32 @@ def delete_studio_job_files(project_id: str, job_type: str, job_id: str) -> bool
     except Exception as e:
         logger.error("Failed to delete studio job files for %s: %s", job_id, e)
         return False
+
+
+def list_studio_job_files(project_id: str, job_type: str, job_id: str) -> List[Dict[str, Any]]:
+    """
+    List all files for a studio job.
+
+    Educational Note: Used for ZIP downloads (websites, presentations) where
+    we need to enumerate all files in the job folder.
+
+    Args:
+        project_id: The project UUID
+        job_type: Type of studio output (websites, presentations, etc.)
+        job_id: The job UUID
+
+    Returns:
+        List of file info dicts with 'name' key, or empty list on error
+    """
+    client = _get_client()
+    prefix = f"{project_id}/{job_type}/{job_id}"
+
+    try:
+        files = client.storage.from_(BUCKET_STUDIO).list(prefix)
+        return files or []
+    except Exception as e:
+        logger.error("Failed to list studio job files for %s: %s", prefix, e)
+        return []
 
 
 def upload_studio_binary(

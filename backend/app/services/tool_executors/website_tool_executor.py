@@ -8,11 +8,10 @@ Executes: plan_website, generate_website_image, read_file, create_file,
 import logging
 from typing import Dict, Any, List, Tuple
 from datetime import datetime
-from pathlib import Path
 
 from app.services.integrations.google import imagen_service
+from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
-from app.utils.path_utils import get_studio_dir
 
 logger = logging.getLogger(__name__)
 
@@ -124,26 +123,32 @@ class WebsiteToolExecutor:
         )
 
         try:
-            studio_dir = get_studio_dir(project_id)
-            website_dir = Path(studio_dir) / "websites" / job_id / "assets"
-            website_dir.mkdir(parents=True, exist_ok=True)
-
             image_index = len(generated_images) + 1
             filename_prefix = f"{job_id}_image_{image_index}"
 
-            image_result = imagen_service.generate_images(
+            # Generate image and get bytes (not saved to disk)
+            image_result = imagen_service.generate_image_bytes(
                 prompt=image_prompt,
-                output_dir=website_dir,
-                num_images=1,
                 filename_prefix=filename_prefix,
                 aspect_ratio=aspect_ratio
             )
 
-            if not image_result.get("success") or not image_result.get("images"):
+            if not image_result.get("success"):
                 return f"Error generating image for {purpose}: {image_result.get('error', 'Unknown error')}"
 
-            image_data = image_result["images"][0]
-            filename = image_data["filename"]
+            filename = image_result["filename"]
+            image_bytes = image_result["image_bytes"]
+            content_type = image_result["content_type"]
+
+            # Upload to Supabase Storage under assets/ subfolder
+            storage_service.upload_studio_binary(
+                project_id=project_id,
+                job_type="websites",
+                job_id=job_id,
+                filename=f"assets/{filename}",
+                file_data=image_bytes,
+                content_type=content_type
+            )
 
             image_info = {
                 "purpose": purpose,
@@ -176,22 +181,19 @@ class WebsiteToolExecutor:
         start_line = tool_input.get("start_line")
         end_line = tool_input.get("end_line")
 
-
-        website_dir = Path(get_studio_dir(project_id)) / "websites" / job_id
-        file_path = website_dir / filename
-
-        if not file_path.exists():
+        # Download from Supabase Storage
+        content = storage_service.download_studio_file(
+            project_id, "websites", job_id, filename
+        )
+        if content is None:
             return f"Error: File '{filename}' does not exist yet. Use create_file to create it first."
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-
+            lines = content.splitlines(keepends=True)
             total_lines = len(lines)
 
             # Small file: return all
             if total_lines < 100:
-                content = "".join(lines)
                 return f"File: {filename} ({total_lines} lines)\n\n{content}"
 
             # Large file, no range: return overview
@@ -205,8 +207,8 @@ class WebsiteToolExecutor:
             context_start = max(0, start_line - 1 - 5)
             context_end = min(total_lines, (end_line if end_line else total_lines) + 5)
 
-            content = "".join(lines[context_start:context_end])
-            return f"File: {filename} (lines {context_start+1}-{context_end} of {total_lines})\n\n{content}"
+            range_content = "".join(lines[context_start:context_end])
+            return f"File: {filename} (lines {context_start+1}-{context_end} of {total_lines})\n\n{range_content}"
 
         except Exception as e:
             return f"Error reading file '{filename}': {str(e)}"
@@ -222,20 +224,29 @@ class WebsiteToolExecutor:
         filename = tool_input.get("filename")
         content = tool_input.get("content", "")
 
-
         try:
-            website_dir = Path(get_studio_dir(project_id)) / "websites" / job_id
-            website_dir.mkdir(parents=True, exist_ok=True)
-
-            file_path = website_dir / filename
-
             # Replace IMAGE_N placeholders with actual URLs
             final_content = self._replace_image_placeholders(
                 content, project_id, job_id
             )
 
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(final_content)
+            # Determine content type
+            if filename.endswith('.css'):
+                content_type = "text/css; charset=utf-8"
+            elif filename.endswith('.js'):
+                content_type = "application/javascript; charset=utf-8"
+            else:
+                content_type = "text/html; charset=utf-8"
+
+            # Upload to Supabase Storage
+            storage_service.upload_studio_file(
+                project_id=project_id,
+                job_type="websites",
+                job_id=job_id,
+                filename=filename,
+                content=final_content,
+                content_type=content_type
+            )
 
             line_count = len(final_content.split('\n'))
             char_count = len(final_content)
@@ -266,16 +277,15 @@ class WebsiteToolExecutor:
         end_line = tool_input.get("end_line")
         new_content = tool_input.get("new_content", "")
 
-
-        website_dir = Path(get_studio_dir(project_id)) / "websites" / job_id
-        file_path = website_dir / filename
-
-        if not file_path.exists():
+        # Download from Supabase Storage
+        existing_content = storage_service.download_studio_file(
+            project_id, "websites", job_id, filename
+        )
+        if existing_content is None:
             return f"Error: File '{filename}' does not exist. Use create_file first."
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
+            lines = existing_content.splitlines(keepends=True)
 
             if start_line < 1 or end_line > len(lines):
                 return f"Error: Invalid line range. File has {len(lines)} lines, you requested {start_line}-{end_line}."
@@ -289,8 +299,14 @@ class WebsiteToolExecutor:
             new_lines = final_new_content.split('\n')
             lines[start_line-1:end_line] = [line + '\n' for line in new_lines]
 
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.writelines(lines)
+            # Re-upload modified file
+            storage_service.upload_studio_file(
+                project_id=project_id,
+                job_type="websites",
+                job_id=job_id,
+                filename=filename,
+                content="".join(lines)
+            )
 
             return f"Updated lines {start_line}-{end_line} in '{filename}'"
 
@@ -308,16 +324,15 @@ class WebsiteToolExecutor:
         after_line = tool_input.get("after_line")
         content = tool_input.get("content", "")
 
-
-        website_dir = Path(get_studio_dir(project_id)) / "websites" / job_id
-        file_path = website_dir / filename
-
-        if not file_path.exists():
+        # Download from Supabase Storage
+        existing_content = storage_service.download_studio_file(
+            project_id, "websites", job_id, filename
+        )
+        if existing_content is None:
             return f"Error: File '{filename}' does not exist. Use create_file first."
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
+            lines = existing_content.splitlines(keepends=True)
 
             if after_line < 0 or after_line > len(lines):
                 return f"Error: Invalid line number. File has {len(lines)} lines, you requested to insert after line {after_line}."
@@ -330,8 +345,14 @@ class WebsiteToolExecutor:
             new_lines = [line + '\n' for line in final_content.split('\n')]
             lines[after_line:after_line] = new_lines
 
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.writelines(lines)
+            # Re-upload modified file
+            storage_service.upload_studio_file(
+                project_id=project_id,
+                job_type="websites",
+                job_id=job_id,
+                filename=filename,
+                content="".join(lines)
+            )
 
             return f"Inserted {len(new_lines)} lines after line {after_line} in '{filename}'"
 

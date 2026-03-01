@@ -32,8 +32,8 @@ def load_index(project_id: str) -> Dict[str, Any]:
     """
     Load the sources index for a project.
 
-    Educational Note: Returns structure compatible with old JSON format
-    for backwards compatibility with existing code.
+    Educational Note: Fetches source metadata from Supabase sources table
+    and returns it as a dict keyed by source_id.
 
     Args:
         project_id: The project UUID
