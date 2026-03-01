@@ -523,7 +523,11 @@ def delete_studio_file(
 
 def delete_studio_job_files(project_id: str, job_type: str, job_id: str) -> bool:
     """
-    Delete all files for a studio job.
+    Delete all files for a studio job, including subdirectories.
+
+    Educational Note: Supabase .list() only returns immediate children.
+    For jobs with subdirectories (e.g., websites with assets/, presentations
+    with slides/ and screenshots/), we iterate through folders to find all files.
 
     Args:
         project_id: The project UUID
@@ -534,14 +538,28 @@ def delete_studio_job_files(project_id: str, job_type: str, job_id: str) -> bool
         True if successful
     """
     client = _get_client()
-    prefix = f"{project_id}/{job_type}/{job_id}"
+    root_prefix = f"{project_id}/{job_type}/{job_id}"
 
     try:
-        # List all files in the job folder
-        files = client.storage.from_(BUCKET_STUDIO).list(prefix)
-        if files:
-            paths = [f"{prefix}/{f['name']}" for f in files]
-            client.storage.from_(BUCKET_STUDIO).remove(paths)
+        # Iteratively scan folders to collect all file paths
+        folders_to_scan = [root_prefix]
+        all_paths = []
+
+        while folders_to_scan:
+            folder = folders_to_scan.pop()
+            entries = client.storage.from_(BUCKET_STUDIO).list(folder)
+            if not entries:
+                continue
+            for entry in entries:
+                path = f"{folder}/{entry['name']}"
+                if entry.get("id") is None:
+                    # No id means it's a folder — recurse into it
+                    folders_to_scan.append(path)
+                else:
+                    all_paths.append(path)
+
+        if all_paths:
+            client.storage.from_(BUCKET_STUDIO).remove(all_paths)
         return True
     except Exception as e:
         logger.error("Failed to delete studio job files for %s: %s", job_id, e)
@@ -550,10 +568,11 @@ def delete_studio_job_files(project_id: str, job_type: str, job_id: str) -> bool
 
 def list_studio_job_files(project_id: str, job_type: str, job_id: str) -> List[Dict[str, Any]]:
     """
-    List all files for a studio job.
+    List all files for a studio job, including subdirectories.
 
     Educational Note: Used for ZIP downloads (websites, presentations) where
-    we need to enumerate all files in the job folder.
+    we need to enumerate all files in the job folder. Iterates through
+    subdirectories since Supabase .list() only returns immediate children.
 
     Args:
         project_id: The project UUID
@@ -561,16 +580,36 @@ def list_studio_job_files(project_id: str, job_type: str, job_id: str) -> List[D
         job_id: The job UUID
 
     Returns:
-        List of file info dicts with 'name' key, or empty list on error
+        List of file info dicts with 'name' as relative path from job root,
+        or empty list on error
     """
     client = _get_client()
-    prefix = f"{project_id}/{job_type}/{job_id}"
+    root_prefix = f"{project_id}/{job_type}/{job_id}"
 
     try:
-        files = client.storage.from_(BUCKET_STUDIO).list(prefix)
-        return files or []
+        # Iteratively scan folders to collect all files
+        folders_to_scan = [root_prefix]
+        all_files = []
+
+        while folders_to_scan:
+            folder = folders_to_scan.pop()
+            entries = client.storage.from_(BUCKET_STUDIO).list(folder)
+            if not entries:
+                continue
+            for entry in entries:
+                path = f"{folder}/{entry['name']}"
+                if entry.get("id") is None:
+                    # No id means it's a folder — recurse into it
+                    folders_to_scan.append(path)
+                else:
+                    # Store with relative path from job root for ZIP structure
+                    relative_path = path[len(root_prefix) + 1:]  # Strip prefix + /
+                    file_info = {**entry, "name": relative_path}
+                    all_files.append(file_info)
+
+        return all_files
     except Exception as e:
-        logger.error("Failed to list studio job files for %s: %s", prefix, e)
+        logger.error("Failed to list studio job files for %s: %s", root_prefix, e)
         return []
 
 

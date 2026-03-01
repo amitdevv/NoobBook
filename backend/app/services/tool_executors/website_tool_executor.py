@@ -21,6 +21,15 @@ class WebsiteToolExecutor:
 
     TERMINATION_TOOL = "finalize_website"
 
+    def _get_content_type(self, filename: str) -> str:
+        """Determine MIME content type from filename extension."""
+        if filename.endswith('.css'):
+            return "text/css; charset=utf-8"
+        elif filename.endswith('.js'):
+            return "application/javascript; charset=utf-8"
+        else:
+            return "text/html; charset=utf-8"
+
     def execute_tool(
         self,
         tool_name: str,
@@ -230,13 +239,7 @@ class WebsiteToolExecutor:
                 content, project_id, job_id
             )
 
-            # Determine content type
-            if filename.endswith('.css'):
-                content_type = "text/css; charset=utf-8"
-            elif filename.endswith('.js'):
-                content_type = "application/javascript; charset=utf-8"
-            else:
-                content_type = "text/html; charset=utf-8"
+            content_type = self._get_content_type(filename)
 
             # Upload to Supabase Storage
             storage_service.upload_studio_file(
@@ -305,7 +308,8 @@ class WebsiteToolExecutor:
                 job_type="websites",
                 job_id=job_id,
                 filename=filename,
-                content="".join(lines)
+                content="".join(lines),
+                content_type=self._get_content_type(filename)
             )
 
             return f"Updated lines {start_line}-{end_line} in '{filename}'"
@@ -351,7 +355,8 @@ class WebsiteToolExecutor:
                 job_type="websites",
                 job_id=job_id,
                 filename=filename,
-                content="".join(lines)
+                content="".join(lines),
+                content_type=self._get_content_type(filename)
             )
 
             return f"Inserted {len(new_lines)} lines after line {after_line} in '{filename}'"

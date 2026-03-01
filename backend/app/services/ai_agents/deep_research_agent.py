@@ -11,9 +11,8 @@ standard separation of concerns pattern.
 """
 
 import logging
-import tempfile
 import uuid
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -63,7 +62,7 @@ class DeepResearchAgent:
         topic: str,
         description: str,
         links: List[str] = None,
-        output_path: Optional[str] = None
+        output_path: str = None
     ) -> Dict[str, Any]:
         """
         Run comprehensive research on a topic.
@@ -79,25 +78,20 @@ class DeepResearchAgent:
             topic: The main research topic
             description: Focus areas and questions to answer
             links: Optional list of reference URLs to analyze
-            output_path: Path to write research output (defaults to processed dir)
+            output_path: Path to write research output (required)
 
         Returns:
             Dict with success status and research metadata
         """
+        if output_path is None:
+            raise ValueError("output_path is required")
+
         config = self._load_config()
         tools_config = self._load_tools()
 
         execution_id = str(uuid.uuid4())
         started_at = datetime.now().isoformat()
         links = links or []
-
-        # Set up output file path (use temp file if no path provided)
-        if output_path is None:
-            tmp = tempfile.NamedTemporaryFile(
-                suffix=".txt", prefix=f"{source_id}_", delete=False
-            )
-            output_path = tmp.name
-            tmp.close()
 
         # Build user message from template
         links_context = "\n".join([f"- {link}" for link in links]) if links else "No specific links provided."
