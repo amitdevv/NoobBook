@@ -245,6 +245,9 @@ class AdCreativeService:
                 edit_context += f"- {p['type']}: {p['prompt']}\n"
             edit_context += f"\nEDIT INSTRUCTIONS: {edit_instructions}"
             effective_direction = effective_direction + edit_context
+        elif edit_instructions:
+            # Parent job not found or has no images, but user still provided edit instructions
+            effective_direction = effective_direction + f"\n\nADDITIONAL INSTRUCTIONS: {edit_instructions}"
 
         # Build user message
         user_message = config["user_message"].format(
