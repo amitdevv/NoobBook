@@ -80,6 +80,11 @@ def generate_ad_creative(project_id: str):
                     {"type": img["type"], "prompt": img["prompt"]}
                     for img in parent_job["images"]
                 ]
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found or has no images to edit'
+                }), 404
 
         # Check if Gemini is configured
         if not imagen_service.is_configured():
