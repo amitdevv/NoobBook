@@ -57,9 +57,8 @@ export const useBlogGeneration = (projectId: string) => {
               );
               if (finalJob.status === 'ready' || finalJob.status === 'error') {
                 if (finalJob.status === 'ready' && finalJob.parent_job_id) {
-                  // Edit completed after refresh — remove superseded parent
-                  setSavedBlogJobs((prev) => [finalJob, ...prev.filter((j) => j.id !== finalJob.parent_job_id)]);
-                  blogsAPI.deleteJob(projectId, finalJob.parent_job_id).catch((err) => { console.warn('[Studio] Failed to delete superseded parent blog job', err); });
+                  // Edit completed after refresh — keep parent so user can view previous versions
+                  setSavedBlogJobs((prev) => [finalJob, ...prev]);
                 } else if (finalJob.status === 'error' && finalJob.parent_job_id) {
                   // Edit failed after refresh — delete orphaned error job, parent stays
                   blogsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
@@ -144,9 +143,6 @@ export const useBlogGeneration = (projectId: string) => {
   const handleBlogEdit = async (parentJob: BlogJob, editInstructions: string) => {
     if (isGeneratingBlog) return;
     setPendingEdit({ jobId: parentJob.id, input: editInstructions });
-    setIsGeneratingBlog(true);
-    setCurrentBlogJob(null);
-    setViewingBlogJob(null); // Close modal while generating
 
     try {
       const startResponse = await blogsAPI.startGeneration(
@@ -165,9 +161,13 @@ export const useBlogGeneration = (projectId: string) => {
         setConfigError(startResponse.error || 'Failed to start blog edit.');
         configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         showError(startResponse.error || 'Failed to start blog edit.');
-        setViewingBlogJob(parentJob);
         return;
       }
+
+      // Only close modal and show spinner once we know generation started
+      setIsGeneratingBlog(true);
+      setCurrentBlogJob(null);
+      setViewingBlogJob(null);
 
       showSuccess('Editing blog post...');
 
@@ -182,10 +182,9 @@ export const useBlogGeneration = (projectId: string) => {
       if (finalJob.status === 'ready') {
         setPendingEdit(null);
         showSuccess(`Blog post edited: ${finalJob.title || 'Blog Post'}`);
-        setSavedBlogJobs((prev) => [finalJob, ...prev.filter((j) => j.id !== parentJob.id)]);
+        setSavedBlogJobs((prev) => [finalJob, ...prev]);
         setViewingBlogJob(finalJob); // Reopen modal with new job
-        // Delete superseded parent job from backend (non-fatal)
-        blogsAPI.deleteJob(projectId, parentJob.id).catch((err) => { console.warn('[Studio] Failed to delete superseded parent blog job', err); });
+        // Parent job is kept so user can view previous versions
       } else if (finalJob.status === 'error') {
         showError(finalJob.error_message || 'Blog edit failed.');
         setViewingBlogJob(parentJob); // Restore parent modal so user can retry
@@ -204,7 +203,7 @@ export const useBlogGeneration = (projectId: string) => {
       setCurrentBlogJob(null);
       // Note: pendingEdit is intentionally NOT cleared here — on edit failure,
       // the user's instructions are preserved to pre-fill the input for easy retry.
-      // It IS cleared on success (line 184).
+      // It IS cleared on success (see the `if (finalJob.status === 'ready')` branch above).
     }
   };
 
