@@ -62,6 +62,9 @@ export interface BlogJob {
   status: JobStatus;
   status_message: string;
   error_message: string | null;
+  // Edit lineage
+  parent_job_id: string | null;
+  edit_instructions: string | null;
   // Blog plan fields
   title: string | null;
   meta_description: string | null;

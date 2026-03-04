@@ -55,7 +55,13 @@ export const useBlogGeneration = (projectId: string) => {
                 (job) => setCurrentBlogJob(job)
               );
               if (finalJob.status === 'ready' || finalJob.status === 'error') {
-                setSavedBlogJobs((prev) => [finalJob, ...prev]);
+                if (finalJob.status === 'ready' && finalJob.parent_job_id) {
+                  // Edit completed after refresh — remove superseded parent
+                  setSavedBlogJobs((prev) => [finalJob, ...prev.filter((j) => j.id !== finalJob.parent_job_id)]);
+                  blogsAPI.deleteJob(projectId, finalJob.parent_job_id).catch(() => {});
+                } else {
+                  setSavedBlogJobs((prev) => [finalJob, ...prev]);
+                }
               }
             } catch {
               // Polling failed — job stays visible via next load
@@ -169,6 +175,8 @@ export const useBlogGeneration = (projectId: string) => {
         showSuccess(`Blog post edited: ${finalJob.title || 'Blog Post'}`);
         setSavedBlogJobs((prev) => [finalJob, ...prev.filter((j) => j.id !== parentJob.id)]);
         setViewingBlogJob(finalJob); // Reopen modal with new job
+        // Delete superseded parent job from backend (non-fatal)
+        blogsAPI.deleteJob(projectId, parentJob.id).catch(() => {});
       } else if (finalJob.status === 'error') {
         showError(finalJob.error_message || 'Blog edit failed.');
         setViewingBlogJob(parentJob); // Restore parent modal so user can retry
