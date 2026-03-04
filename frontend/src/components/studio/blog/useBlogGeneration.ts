@@ -208,7 +208,7 @@ export const useBlogGeneration = (projectId: string) => {
     viewingBlogJob,
     setViewingBlogJob,
     configError,
-    pendingEditInput: pendingEdit?.jobId === viewingBlogJob?.id ? pendingEdit.input : '',
+    pendingEditInput: pendingEdit !== null && pendingEdit.jobId === viewingBlogJob?.id ? pendingEdit.input : '',
     loadSavedJobs,
     handleBlogGeneration,
     handleBlogEdit,
