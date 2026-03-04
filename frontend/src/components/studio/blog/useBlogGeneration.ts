@@ -60,6 +60,11 @@ export const useBlogGeneration = (projectId: string) => {
                   // Edit completed after refresh — remove superseded parent
                   setSavedBlogJobs((prev) => [finalJob, ...prev.filter((j) => j.id !== finalJob.parent_job_id)]);
                   blogsAPI.deleteJob(projectId, finalJob.parent_job_id).catch((err) => { console.warn('[Studio] Failed to delete superseded parent blog job', err); });
+                } else if (finalJob.status === 'error' && finalJob.parent_job_id) {
+                  // Edit failed after refresh — delete orphaned error job, parent stays
+                  blogsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+                    console.warn('[Studio] Failed to delete failed edit job', err);
+                  });
                 } else {
                   setSavedBlogJobs((prev) => [finalJob, ...prev]);
                 }
@@ -184,6 +189,10 @@ export const useBlogGeneration = (projectId: string) => {
       } else if (finalJob.status === 'error') {
         showError(finalJob.error_message || 'Blog edit failed.');
         setViewingBlogJob(parentJob); // Restore parent modal so user can retry
+        // Delete the failed edit job so it doesn't pollute the list on refresh
+        blogsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+          console.warn('[Studio] Failed to delete failed edit job', err);
+        });
       }
     } catch (error) {
       console.error('[Studio] Blog edit: failed', error);
@@ -193,6 +202,9 @@ export const useBlogGeneration = (projectId: string) => {
     } finally {
       setIsGeneratingBlog(false);
       setCurrentBlogJob(null);
+      // Note: pendingEdit is intentionally NOT cleared here — on edit failure,
+      // the user's instructions are preserved to pre-fill the input for easy retry.
+      // It IS cleared on success (line 184).
     }
   };
 
