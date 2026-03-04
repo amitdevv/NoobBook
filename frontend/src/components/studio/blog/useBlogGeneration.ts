@@ -172,11 +172,13 @@ export const useBlogGeneration = (projectId: string) => {
         setViewingBlogJob(finalJob); // Reopen modal with new job
       } else if (finalJob.status === 'error') {
         showError(finalJob.error_message || 'Blog edit failed.');
+        setViewingBlogJob(parentJob); // Restore parent modal so user can retry
       }
     } catch (error) {
       console.error('[Studio] Blog edit: failed', error);
       log.error({ err: error }, 'Blog edit failed');
       showError(error instanceof Error ? error.message : 'Blog edit failed.');
+      setViewingBlogJob(parentJob); // Restore parent modal so user can retry
     } finally {
       setIsGeneratingBlog(false);
       setCurrentBlogJob(null);

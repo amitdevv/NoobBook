@@ -42,6 +42,7 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
 
   // Fetch markdown content when modal opens
   useEffect(() => {
+    setEditInput('');
     if (viewingBlogJob) {
       setIsLoading(true);
       blogsAPI.getPreview(projectId, viewingBlogJob.id)

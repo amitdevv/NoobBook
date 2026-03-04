@@ -91,6 +91,11 @@ def generate_blog_post(project_id: str):
                 job_id=parent_job_id,
                 filename=parent_job['markdown_file']
             )
+            if previous_markdown is None:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to load parent blog post content from storage'
+                }), 500
             previous_title = parent_job.get('title')
 
         # Resolve brand logo for image generation
