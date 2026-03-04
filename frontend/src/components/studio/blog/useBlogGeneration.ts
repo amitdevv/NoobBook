@@ -153,6 +153,7 @@ export const useBlogGeneration = (projectId: string) => {
         configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         showError(startResponse.error || 'Failed to start blog edit.');
         setIsGeneratingBlog(false);
+        setViewingBlogJob(parentJob);
         return;
       }
 

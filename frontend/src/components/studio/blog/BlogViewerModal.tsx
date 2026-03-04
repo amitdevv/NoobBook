@@ -27,6 +27,7 @@ interface BlogViewerModalProps {
   onClose: () => void;
   onDownload: (jobId: string) => void;
   onEdit?: (instructions: string) => void;
+  isGenerating?: boolean;
 }
 
 export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
@@ -35,6 +36,7 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
   onClose,
   onDownload,
   onEdit,
+  isGenerating,
 }) => {
   const [markdownContent, setMarkdownContent] = useState<string>('');
   const [editInput, setEditInput] = useState('');
@@ -240,11 +242,12 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
                 onChange={(e) => setEditInput(e.target.value)}
                 placeholder="Describe changes... (e.g., 'make it more casual', 'add more examples')"
                 className="flex-1"
-                onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && handleEdit()}
+                disabled={isGenerating}
+                onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && !isGenerating && handleEdit()}
               />
               <Button
                 onClick={handleEdit}
-                disabled={!editInput.trim()}
+                disabled={!editInput.trim() || isGenerating}
                 size="sm"
               >
                 <PencilSimple size={14} className="mr-1" />

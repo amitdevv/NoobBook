@@ -71,6 +71,7 @@ export const BlogSection: React.FC = () => {
         onClose={() => setViewingBlogJob(null)}
         onDownload={downloadBlog}
         onEdit={(instructions) => viewingBlogJob && handleBlogEdit(viewingBlogJob, instructions)}
+        isGenerating={isGeneratingBlog}
       />
     </>
   );
