@@ -58,7 +58,7 @@ export const useBlogGeneration = (projectId: string) => {
                 if (finalJob.status === 'ready' && finalJob.parent_job_id) {
                   // Edit completed after refresh — remove superseded parent
                   setSavedBlogJobs((prev) => [finalJob, ...prev.filter((j) => j.id !== finalJob.parent_job_id)]);
-                  blogsAPI.deleteJob(projectId, finalJob.parent_job_id).catch(() => {});
+                  blogsAPI.deleteJob(projectId, finalJob.parent_job_id).catch((err) => { console.warn('[Studio] Failed to delete superseded parent blog job', err); });
                 } else {
                   setSavedBlogJobs((prev) => [finalJob, ...prev]);
                 }
@@ -81,7 +81,7 @@ export const useBlogGeneration = (projectId: string) => {
   const handleBlogGeneration = async (signal: BlogSignal) => {
     // source_id is optional — blog can be generated from direction alone
     const sources = signal.sources || [];
-    const sourceId = sources[0]?.source_id || '';
+    const sourceId = sources[0]?.source_id || null;
 
     setIsGeneratingBlog(true);
     setCurrentBlogJob(null);
@@ -136,6 +136,7 @@ export const useBlogGeneration = (projectId: string) => {
   };
 
   const handleBlogEdit = async (parentJob: BlogJob, editInstructions: string) => {
+    if (isGeneratingBlog) return;
     setIsGeneratingBlog(true);
     setCurrentBlogJob(null);
     setViewingBlogJob(null); // Close modal while generating
@@ -176,7 +177,7 @@ export const useBlogGeneration = (projectId: string) => {
         setSavedBlogJobs((prev) => [finalJob, ...prev.filter((j) => j.id !== parentJob.id)]);
         setViewingBlogJob(finalJob); // Reopen modal with new job
         // Delete superseded parent job from backend (non-fatal)
-        blogsAPI.deleteJob(projectId, parentJob.id).catch(() => {});
+        blogsAPI.deleteJob(projectId, parentJob.id).catch((err) => { console.warn('[Studio] Failed to delete superseded parent blog job', err); });
       } else if (finalJob.status === 'error') {
         showError(finalJob.error_message || 'Blog edit failed.');
         setViewingBlogJob(parentJob); // Restore parent modal so user can retry

@@ -46,7 +46,7 @@ class BlogAgentService:
     def generate_blog_post(
         self,
         project_id: str,
-        source_id: str,
+        source_id: Optional[str],
         job_id: str,
         direction: str = "",
         target_keyword: str = "",

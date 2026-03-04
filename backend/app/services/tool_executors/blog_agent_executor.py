@@ -30,7 +30,7 @@ class BlogAgentExecutor:
     def execute(
         self,
         project_id: str,
-        source_id: str,
+        source_id: Optional[str],
         direction: str = "",
         target_keyword: str = "",
         blog_type: str = "how_to_guide",

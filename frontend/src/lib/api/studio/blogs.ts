@@ -54,7 +54,7 @@ export interface BlogImage {
  */
 export interface BlogJob {
   id: string;
-  source_id: string;
+  source_id: string | null;
   source_name: string;
   direction: string;
   target_keyword: string;
@@ -124,7 +124,7 @@ export const blogsAPI = {
    */
   async startGeneration(
     projectId: string,
-    sourceId: string,
+    sourceId: string | null,
     direction?: string,
     targetKeyword?: string,
     blogType?: BlogType,

@@ -18,7 +18,7 @@ JOB_TYPE = "blog"
 def create_blog_job(
     project_id: str,
     job_id: str,
-    source_id: str,
+    source_id: Optional[str],
     source_name: str,
     direction: str,
     target_keyword: str,
