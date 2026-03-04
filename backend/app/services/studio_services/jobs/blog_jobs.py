@@ -22,7 +22,9 @@ def create_blog_job(
     source_name: str,
     direction: str,
     target_keyword: str,
-    blog_type: str
+    blog_type: str,
+    parent_job_id: Optional[str] = None,
+    edit_instructions: Optional[str] = None
 ) -> Dict[str, Any]:
     job_data = {
         "id": job_id,
@@ -34,6 +36,8 @@ def create_blog_job(
         "error": None,
         "target_keyword": target_keyword,
         "blog_type": blog_type,
+        "parent_job_id": parent_job_id,
+        "edit_instructions": edit_instructions,
         "status_message": "Initializing...",
         "error_message": None,
         "title": None,

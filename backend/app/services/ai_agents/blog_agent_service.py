@@ -72,8 +72,11 @@ class BlogAgentService:
             status_message="Starting blog post generation..."
         )
 
-        # Get source content (or use direction as content when no source)
-        source_content = get_source_content(project_id, source_id) if source_id else "No source document provided. Use the direction below as the basis for your blog post."
+        # Get source content — skip in edit mode since previous blog already encodes it
+        if previous_markdown:
+            source_content = "Editing a previous blog post — see the PREVIOUS BLOG POST section below."
+        else:
+            source_content = get_source_content(project_id, source_id) if source_id else "No source document provided. Use the direction below as the basis for your blog post."
         blog_types = config.get("blog_types", {})
         blog_type_display = blog_types.get(blog_type, blog_type.replace("_", " ").title())
 

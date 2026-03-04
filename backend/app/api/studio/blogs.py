@@ -115,7 +115,8 @@ def generate_blog_post(project_id: str):
             user_id=g.user_id,
             edit_instructions=edit_instructions,
             previous_markdown=previous_markdown,
-            previous_title=previous_title
+            previous_title=previous_title,
+            parent_job_id=parent_job_id
         )
 
         if not result.get('success'):

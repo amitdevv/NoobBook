@@ -39,7 +39,8 @@ class BlogAgentExecutor:
         user_id: Optional[str] = None,
         edit_instructions: Optional[str] = None,
         previous_markdown: Optional[str] = None,
-        previous_title: Optional[str] = None
+        previous_title: Optional[str] = None,
+        parent_job_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Execute blog post generation as a background task.
@@ -67,11 +68,16 @@ class BlogAgentExecutor:
         if source_id:
             source = source_service.get_source(project_id, source_id)
             if not source:
-                return {
-                    "success": False,
-                    "error": f"Source {source_id} not found"
-                }
-            source_name = source.get("name", "Unknown Source")
+                if previous_markdown:
+                    # Edit mode — source is supplemental, proceed without it
+                    pass
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Source {source_id} not found"
+                    }
+            else:
+                source_name = source.get("name", "Unknown Source")
 
         # Create job
         job_id = str(uuid.uuid4())
@@ -84,7 +90,9 @@ class BlogAgentExecutor:
             source_name=source_name,
             direction=direction,
             target_keyword=target_keyword,
-            blog_type=blog_type
+            blog_type=blog_type,
+            parent_job_id=parent_job_id,
+            edit_instructions=edit_instructions
         )
 
         # Launch agent as background task
