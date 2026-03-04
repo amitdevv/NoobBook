@@ -130,6 +130,59 @@ export const useBlogGeneration = (projectId: string) => {
     }
   };
 
+  const handleBlogEdit = async (parentJob: BlogJob, editInstructions: string) => {
+    setIsGeneratingBlog(true);
+    setCurrentBlogJob(null);
+    setViewingBlogJob(null); // Close modal while generating
+
+    try {
+      const startResponse = await blogsAPI.startGeneration(
+        projectId,
+        parentJob.source_id,
+        parentJob.direction,
+        parentJob.target_keyword,
+        parentJob.blog_type,
+        parentJob.id,        // parentJobId
+        editInstructions     // editInstructions
+      );
+
+      if (!startResponse.success || !startResponse.job_id) {
+        console.error('[Studio] Blog edit: API start failed', startResponse);
+        if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
+        setConfigError(startResponse.error || 'Failed to start blog edit.');
+        configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
+        showError(startResponse.error || 'Failed to start blog edit.');
+        setIsGeneratingBlog(false);
+        return;
+      }
+
+      showSuccess('Editing blog post...');
+
+      const finalJob = await blogsAPI.pollJobStatus(
+        projectId,
+        startResponse.job_id,
+        (job) => setCurrentBlogJob(job)
+      );
+
+      setCurrentBlogJob(finalJob);
+
+      if (finalJob.status === 'ready') {
+        showSuccess(`Blog post edited: ${finalJob.title || 'Blog Post'}`);
+        setSavedBlogJobs((prev) => [finalJob, ...prev]);
+        setViewingBlogJob(finalJob); // Reopen modal with new job
+      } else if (finalJob.status === 'error') {
+        showError(finalJob.error_message || 'Blog edit failed.');
+      }
+    } catch (error) {
+      console.error('[Studio] Blog edit: failed', error);
+      log.error({ err: error }, 'Blog edit failed');
+      showError(error instanceof Error ? error.message : 'Blog edit failed.');
+    } finally {
+      setIsGeneratingBlog(false);
+      setCurrentBlogJob(null);
+    }
+  };
+
   const downloadBlog = (jobId: string) => {
     const url = blogsAPI.getDownloadUrl(projectId, jobId);
     window.open(getAuthUrl(url), '_blank');
@@ -144,6 +197,7 @@ export const useBlogGeneration = (projectId: string) => {
     configError,
     loadSavedJobs,
     handleBlogGeneration,
+    handleBlogEdit,
     downloadBlog,
   };
 };

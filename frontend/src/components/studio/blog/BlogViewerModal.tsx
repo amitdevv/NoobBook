@@ -14,7 +14,8 @@ import {
 } from '../../ui/dialog';
 import { Button } from '../../ui/button';
 import { ScrollArea } from '../../ui/scroll-area';
-import { Article, DownloadSimple, SpinnerGap, Image as ImageIcon } from '@phosphor-icons/react';
+import { Article, DownloadSimple, SpinnerGap, Image as ImageIcon, PencilSimple } from '@phosphor-icons/react';
+import { Input } from '../../ui/input';
 import { blogsAPI, type BlogJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import ReactMarkdown from 'react-markdown';
@@ -25,6 +26,7 @@ interface BlogViewerModalProps {
   viewingBlogJob: BlogJob | null;
   onClose: () => void;
   onDownload: (jobId: string) => void;
+  onEdit?: (instructions: string) => void;
 }
 
 export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
@@ -32,8 +34,10 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
   viewingBlogJob,
   onClose,
   onDownload,
+  onEdit,
 }) => {
   const [markdownContent, setMarkdownContent] = useState<string>('');
+  const [editInput, setEditInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // Fetch markdown content when modal opens
@@ -61,6 +65,13 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
       ? `${(viewingBlogJob.word_count / 1000).toFixed(1)}k words`
       : `${viewingBlogJob.word_count} words`
     : '';
+
+  const handleEdit = () => {
+    if (editInput.trim() && onEdit) {
+      onEdit(editInput.trim());
+      setEditInput('');
+    }
+  };
 
   const imageCount = viewingBlogJob?.images?.length || 0;
 
@@ -218,6 +229,29 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
             )}
           </div>
         </ScrollArea>
+
+        {/* Edit input */}
+        {onEdit && (
+          <div className="px-6 py-3 border-t flex-shrink-0">
+            <div className="flex gap-2">
+              <Input
+                value={editInput}
+                onChange={(e) => setEditInput(e.target.value)}
+                placeholder="Describe changes... (e.g., 'make it more casual', 'add more examples')"
+                className="flex-1"
+                onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && handleEdit()}
+              />
+              <Button
+                onClick={handleEdit}
+                disabled={!editInput.trim()}
+                size="sm"
+              >
+                <PencilSimple size={14} className="mr-1" />
+                Edit
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

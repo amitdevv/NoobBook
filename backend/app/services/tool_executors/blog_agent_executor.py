@@ -36,7 +36,10 @@ class BlogAgentExecutor:
         blog_type: str = "how_to_guide",
         logo_image_bytes: Optional[bytes] = None,
         logo_mime_type: str = "image/png",
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        edit_instructions: Optional[str] = None,
+        previous_markdown: Optional[str] = None,
+        previous_title: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Execute blog post generation as a background task.
@@ -47,6 +50,9 @@ class BlogAgentExecutor:
             direction: User's direction/guidance (optional)
             target_keyword: SEO keyword/phrase to target (optional)
             blog_type: Category of blog post (default: how_to_guide)
+            edit_instructions: Instructions for refining a previous blog (optional)
+            previous_markdown: Markdown content from a parent job to refine (optional)
+            previous_title: Title from a parent job (optional)
 
         Returns:
             Job info with status and job_id for polling
@@ -95,7 +101,10 @@ class BlogAgentExecutor:
                     blog_type=blog_type,
                     logo_image_bytes=logo_image_bytes,
                     logo_mime_type=logo_mime_type,
-                    user_id=user_id
+                    user_id=user_id,
+                    edit_instructions=edit_instructions,
+                    previous_markdown=previous_markdown,
+                    previous_title=previous_title
                 )
             except Exception as e:
                 logger.exception("Blog agent failed for job %s", job_id[:8])

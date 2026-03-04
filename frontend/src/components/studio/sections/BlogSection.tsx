@@ -23,6 +23,7 @@ export const BlogSection: React.FC = () => {
     configError,
     loadSavedJobs,
     handleBlogGeneration,
+    handleBlogEdit,
     downloadBlog,
   } = useBlogGeneration(projectId);
 
@@ -69,6 +70,7 @@ export const BlogSection: React.FC = () => {
         viewingBlogJob={viewingBlogJob}
         onClose={() => setViewingBlogJob(null)}
         onDownload={downloadBlog}
+        onEdit={(instructions) => viewingBlogJob && handleBlogEdit(viewingBlogJob, instructions)}
       />
     </>
   );

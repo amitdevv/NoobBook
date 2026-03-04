@@ -124,17 +124,23 @@ export const blogsAPI = {
     sourceId: string,
     direction?: string,
     targetKeyword?: string,
-    blogType?: BlogType
+    blogType?: BlogType,
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartBlogResponse> {
     try {
+      const body: Record<string, unknown> = {
+        source_id: sourceId,
+        direction: direction || '',
+        target_keyword: targetKeyword || '',
+        blog_type: blogType || 'how_to_guide',
+      };
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/blog`,
-        {
-          source_id: sourceId,
-          direction: direction || '',
-          target_keyword: targetKeyword || '',
-          blog_type: blogType || 'how_to_guide',
-        }
+        body
       );
       return response.data;
     } catch (error) {

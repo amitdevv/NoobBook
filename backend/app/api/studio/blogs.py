@@ -70,6 +70,29 @@ def generate_blog_post(project_id: str):
         if blog_type not in valid_blog_types:
             blog_type = 'how_to_guide'
 
+        # Edit mode: load parent job's markdown as context for refinement
+        parent_job_id = data.get('parent_job_id')
+        edit_instructions = data.get('edit_instructions')
+        previous_markdown = None
+        previous_title = None
+
+        if parent_job_id:
+            parent_job = studio_index_service.get_blog_job(project_id, parent_job_id)
+            if not parent_job or not parent_job.get('markdown_file'):
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found or has no content to edit'
+                }), 404
+
+            # Download previous markdown from Supabase Storage
+            previous_markdown = storage_service.download_studio_file(
+                project_id=project_id,
+                job_type="blogs",
+                job_id=parent_job_id,
+                filename=parent_job['markdown_file']
+            )
+            previous_title = parent_job.get('title')
+
         # Resolve brand logo for image generation
         logo_image_bytes, logo_mime_type = resolve_logo(data, project_id)
 
@@ -82,7 +105,10 @@ def generate_blog_post(project_id: str):
             blog_type=blog_type,
             logo_image_bytes=logo_image_bytes,
             logo_mime_type=logo_mime_type,
-            user_id=g.user_id
+            user_id=g.user_id,
+            edit_instructions=edit_instructions,
+            previous_markdown=previous_markdown,
+            previous_title=previous_title
         )
 
         if not result.get('success'):
