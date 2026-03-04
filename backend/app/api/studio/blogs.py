@@ -77,6 +77,7 @@ def generate_blog_post(project_id: str):
         edit_instructions = data.get('edit_instructions')
         previous_markdown = None
         previous_title = None
+        parent_source_name = None
 
         if parent_job_id:
             parent_job = studio_index_service.get_blog_job(project_id, parent_job_id)
@@ -99,6 +100,7 @@ def generate_blog_post(project_id: str):
                     'error': 'Failed to load parent blog post content from storage'
                 }), 500
             previous_title = parent_job.get('title')
+            parent_source_name = parent_job.get('source_name')
 
         # Resolve brand logo for image generation
         logo_image_bytes, logo_mime_type = resolve_logo(data, project_id)
@@ -116,7 +118,8 @@ def generate_blog_post(project_id: str):
             edit_instructions=edit_instructions,
             previous_markdown=previous_markdown,
             previous_title=previous_title,
-            parent_job_id=parent_job_id
+            parent_job_id=parent_job_id,
+            parent_source_name=parent_source_name
         )
 
         if not result.get('success'):

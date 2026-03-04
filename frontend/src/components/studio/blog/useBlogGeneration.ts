@@ -167,7 +167,7 @@ export const useBlogGeneration = (projectId: string) => {
 
       if (finalJob.status === 'ready') {
         showSuccess(`Blog post edited: ${finalJob.title || 'Blog Post'}`);
-        setSavedBlogJobs((prev) => [finalJob, ...prev]);
+        setSavedBlogJobs((prev) => [finalJob, ...prev.filter((j) => j.id !== parentJob.id)]);
         setViewingBlogJob(finalJob); // Reopen modal with new job
       } else if (finalJob.status === 'error') {
         showError(finalJob.error_message || 'Blog edit failed.');

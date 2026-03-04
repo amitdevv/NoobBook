@@ -40,7 +40,8 @@ class BlogAgentExecutor:
         edit_instructions: Optional[str] = None,
         previous_markdown: Optional[str] = None,
         previous_title: Optional[str] = None,
-        parent_job_id: Optional[str] = None
+        parent_job_id: Optional[str] = None,
+        parent_source_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Execute blog post generation as a background task.
@@ -69,8 +70,8 @@ class BlogAgentExecutor:
             source = source_service.get_source(project_id, source_id)
             if not source:
                 if previous_markdown:
-                    # Edit mode — source is supplemental, proceed without it
-                    pass
+                    # Edit mode — source may be deleted; inherit name from parent job
+                    source_name = parent_source_name or "No Source"
                 else:
                     return {
                         "success": False,

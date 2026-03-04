@@ -88,13 +88,13 @@ class BlogAgentService:
         )
 
         # Edit mode: append previous blog content + edit instructions to user message
-        if previous_markdown and edit_instructions:
+        if previous_markdown:
             edit_context = (
                 f"\n\n=== PREVIOUS BLOG POST (refine this based on the edit instructions) ===\n"
                 f"Previous Title: {previous_title or 'Untitled'}\n\n"
                 f"{previous_markdown}\n"
                 f"=== END PREVIOUS BLOG POST ===\n\n"
-                f"EDIT INSTRUCTIONS: {edit_instructions}\n\n"
+                f"EDIT INSTRUCTIONS: {edit_instructions or 'No specific edits requested — improve the post as you see fit.'}\n\n"
                 f"Use the previous blog post as your baseline. Apply the edit instructions "
                 f"to refine it. Keep elements the user didn't ask to change."
             )
