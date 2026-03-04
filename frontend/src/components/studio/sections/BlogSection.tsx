@@ -21,6 +21,7 @@ export const BlogSection: React.FC = () => {
     viewingBlogJob,
     setViewingBlogJob,
     configError,
+    pendingEditInput,
     loadSavedJobs,
     handleBlogGeneration,
     handleBlogEdit,
@@ -72,6 +73,7 @@ export const BlogSection: React.FC = () => {
         onDownload={downloadBlog}
         onEdit={(instructions) => viewingBlogJob && handleBlogEdit(viewingBlogJob, instructions)}
         isGenerating={isGeneratingBlog}
+        defaultEditInput={pendingEditInput}
       />
     </>
   );

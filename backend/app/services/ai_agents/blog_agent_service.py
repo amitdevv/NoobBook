@@ -227,7 +227,7 @@ class BlogAgentService:
         messages: List[Dict[str, Any]],
         result: Dict[str, Any],
         started_at: str,
-        source_id: str
+        source_id: Optional[str]
     ) -> None:
         """Save execution log for debugging."""
         message_service.save_agent_execution(

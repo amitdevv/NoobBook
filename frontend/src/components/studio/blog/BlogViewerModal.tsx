@@ -28,6 +28,7 @@ interface BlogViewerModalProps {
   onDownload: (jobId: string) => void;
   onEdit?: (instructions: string) => void;
   isGenerating?: boolean;
+  defaultEditInput?: string;
 }
 
 export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
@@ -37,6 +38,7 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
   onDownload,
   onEdit,
   isGenerating,
+  defaultEditInput = '',
 }) => {
   const [markdownContent, setMarkdownContent] = useState<string>('');
   const [editInput, setEditInput] = useState('');
@@ -44,7 +46,7 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
 
   // Fetch markdown content when modal opens
   useEffect(() => {
-    setEditInput('');
+    setEditInput(defaultEditInput);
     if (viewingBlogJob) {
       setIsLoading(true);
       blogsAPI.getPreview(projectId, viewingBlogJob.id)
@@ -60,7 +62,7 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
     } else {
       setMarkdownContent('');
     }
-  }, [viewingBlogJob, projectId]);
+  }, [viewingBlogJob, projectId, defaultEditInput]);
 
   // Format word count for display
   const wordCountDisplay = viewingBlogJob?.word_count
@@ -72,7 +74,6 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
   const handleEdit = () => {
     if (editInput.trim() && onEdit) {
       onEdit(editInput.trim());
-      setEditInput('');
     }
   };
 

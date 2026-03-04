@@ -28,6 +28,7 @@ export const useBlogGeneration = (projectId: string) => {
   const pollingRef = useRef(false);
   const [viewingBlogJob, setViewingBlogJob] = useState<BlogJob | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [pendingEdit, setPendingEdit] = useState<{ jobId: string; input: string } | null>(null);
   const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadSavedJobs = async () => {
@@ -137,6 +138,7 @@ export const useBlogGeneration = (projectId: string) => {
 
   const handleBlogEdit = async (parentJob: BlogJob, editInstructions: string) => {
     if (isGeneratingBlog) return;
+    setPendingEdit({ jobId: parentJob.id, input: editInstructions });
     setIsGeneratingBlog(true);
     setCurrentBlogJob(null);
     setViewingBlogJob(null); // Close modal while generating
@@ -173,6 +175,7 @@ export const useBlogGeneration = (projectId: string) => {
       setCurrentBlogJob(finalJob);
 
       if (finalJob.status === 'ready') {
+        setPendingEdit(null);
         showSuccess(`Blog post edited: ${finalJob.title || 'Blog Post'}`);
         setSavedBlogJobs((prev) => [finalJob, ...prev.filter((j) => j.id !== parentJob.id)]);
         setViewingBlogJob(finalJob); // Reopen modal with new job
@@ -205,6 +208,7 @@ export const useBlogGeneration = (projectId: string) => {
     viewingBlogJob,
     setViewingBlogJob,
     configError,
+    pendingEditInput: pendingEdit?.jobId === viewingBlogJob?.id ? pendingEdit.input : '',
     loadSavedJobs,
     handleBlogGeneration,
     handleBlogEdit,
