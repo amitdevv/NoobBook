@@ -28,6 +28,7 @@ export const useBlogGeneration = (projectId: string) => {
   const pollingRef = useRef(false);
   const [viewingBlogJob, setViewingBlogJob] = useState<BlogJob | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [pendingEdit, setPendingEdit] = useState<{ jobId: string; input: string } | null>(null);
   const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadSavedJobs = async () => {
@@ -55,7 +56,18 @@ export const useBlogGeneration = (projectId: string) => {
                 (job) => setCurrentBlogJob(job)
               );
               if (finalJob.status === 'ready' || finalJob.status === 'error') {
-                setSavedBlogJobs((prev) => [finalJob, ...prev]);
+                if (finalJob.status === 'ready' && finalJob.parent_job_id) {
+                  // Edit completed after refresh — remove superseded parent
+                  setSavedBlogJobs((prev) => [finalJob, ...prev.filter((j) => j.id !== finalJob.parent_job_id)]);
+                  blogsAPI.deleteJob(projectId, finalJob.parent_job_id).catch((err) => { console.warn('[Studio] Failed to delete superseded parent blog job', err); });
+                } else if (finalJob.status === 'error' && finalJob.parent_job_id) {
+                  // Edit failed after refresh — delete orphaned error job, parent stays
+                  blogsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+                    console.warn('[Studio] Failed to delete failed edit job', err);
+                  });
+                } else {
+                  setSavedBlogJobs((prev) => [finalJob, ...prev]);
+                }
               }
             } catch {
               // Polling failed — job stays visible via next load
@@ -75,7 +87,7 @@ export const useBlogGeneration = (projectId: string) => {
   const handleBlogGeneration = async (signal: BlogSignal) => {
     // source_id is optional — blog can be generated from direction alone
     const sources = signal.sources || [];
-    const sourceId = sources[0]?.source_id || '';
+    const sourceId = sources[0]?.source_id || null;
 
     setIsGeneratingBlog(true);
     setCurrentBlogJob(null);
@@ -99,7 +111,6 @@ export const useBlogGeneration = (projectId: string) => {
         setConfigError(startResponse.error || 'Failed to start blog post generation.');
         configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         showError(startResponse.error || 'Failed to start blog post generation.');
-        setIsGeneratingBlog(false);
         return;
       }
 
@@ -130,6 +141,73 @@ export const useBlogGeneration = (projectId: string) => {
     }
   };
 
+  const handleBlogEdit = async (parentJob: BlogJob, editInstructions: string) => {
+    if (isGeneratingBlog) return;
+    setPendingEdit({ jobId: parentJob.id, input: editInstructions });
+    setIsGeneratingBlog(true);
+    setCurrentBlogJob(null);
+    setViewingBlogJob(null); // Close modal while generating
+
+    try {
+      const startResponse = await blogsAPI.startGeneration(
+        projectId,
+        parentJob.source_id,
+        parentJob.direction,
+        parentJob.target_keyword,
+        parentJob.blog_type,
+        parentJob.id,        // parentJobId
+        editInstructions     // editInstructions
+      );
+
+      if (!startResponse.success || !startResponse.job_id) {
+        console.error('[Studio] Blog edit: API start failed', startResponse);
+        if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
+        setConfigError(startResponse.error || 'Failed to start blog edit.');
+        configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
+        showError(startResponse.error || 'Failed to start blog edit.');
+        setViewingBlogJob(parentJob);
+        return;
+      }
+
+      showSuccess('Editing blog post...');
+
+      const finalJob = await blogsAPI.pollJobStatus(
+        projectId,
+        startResponse.job_id,
+        (job) => setCurrentBlogJob(job)
+      );
+
+      setCurrentBlogJob(finalJob);
+
+      if (finalJob.status === 'ready') {
+        setPendingEdit(null);
+        showSuccess(`Blog post edited: ${finalJob.title || 'Blog Post'}`);
+        setSavedBlogJobs((prev) => [finalJob, ...prev.filter((j) => j.id !== parentJob.id)]);
+        setViewingBlogJob(finalJob); // Reopen modal with new job
+        // Delete superseded parent job from backend (non-fatal)
+        blogsAPI.deleteJob(projectId, parentJob.id).catch((err) => { console.warn('[Studio] Failed to delete superseded parent blog job', err); });
+      } else if (finalJob.status === 'error') {
+        showError(finalJob.error_message || 'Blog edit failed.');
+        setViewingBlogJob(parentJob); // Restore parent modal so user can retry
+        // Delete the failed edit job so it doesn't pollute the list on refresh
+        blogsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+          console.warn('[Studio] Failed to delete failed edit job', err);
+        });
+      }
+    } catch (error) {
+      console.error('[Studio] Blog edit: failed', error);
+      log.error({ err: error }, 'Blog edit failed');
+      showError(error instanceof Error ? error.message : 'Blog edit failed.');
+      setViewingBlogJob(parentJob); // Restore parent modal so user can retry
+    } finally {
+      setIsGeneratingBlog(false);
+      setCurrentBlogJob(null);
+      // Note: pendingEdit is intentionally NOT cleared here — on edit failure,
+      // the user's instructions are preserved to pre-fill the input for easy retry.
+      // It IS cleared on success (line 184).
+    }
+  };
+
   const downloadBlog = (jobId: string) => {
     const url = blogsAPI.getDownloadUrl(projectId, jobId);
     window.open(getAuthUrl(url), '_blank');
@@ -142,8 +220,10 @@ export const useBlogGeneration = (projectId: string) => {
     viewingBlogJob,
     setViewingBlogJob,
     configError,
+    pendingEditInput: pendingEdit !== null && pendingEdit.jobId === viewingBlogJob?.id ? pendingEdit.input : '',
     loadSavedJobs,
     handleBlogGeneration,
+    handleBlogEdit,
     downloadBlog,
   };
 };

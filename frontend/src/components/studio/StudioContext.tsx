@@ -188,7 +188,7 @@ export const useStudioContext = (): StudioContextValue => {
  * Hook to filter jobs by valid source IDs
  * Uses the memoized Set for O(1) lookups instead of O(n^2) nested .some() calls
  */
-export const useFilteredJobs = <T extends { source_id: string }>(jobs: T[]): T[] => {
+export const useFilteredJobs = <T extends { source_id: string | null }>(jobs: T[]): T[] => {
   const { validSourceIds } = useStudioContext();
 
   return useMemo(() => {

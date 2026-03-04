@@ -30,13 +30,18 @@ class BlogAgentExecutor:
     def execute(
         self,
         project_id: str,
-        source_id: str,
+        source_id: Optional[str],
         direction: str = "",
         target_keyword: str = "",
         blog_type: str = "how_to_guide",
         logo_image_bytes: Optional[bytes] = None,
         logo_mime_type: str = "image/png",
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        edit_instructions: Optional[str] = None,
+        previous_markdown: Optional[str] = None,
+        previous_title: Optional[str] = None,
+        parent_job_id: Optional[str] = None,
+        parent_source_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Execute blog post generation as a background task.
@@ -47,6 +52,9 @@ class BlogAgentExecutor:
             direction: User's direction/guidance (optional)
             target_keyword: SEO keyword/phrase to target (optional)
             blog_type: Category of blog post (default: how_to_guide)
+            edit_instructions: Instructions for refining a previous blog (optional)
+            previous_markdown: Markdown content from a parent job to refine (optional)
+            previous_title: Title from a parent job (optional)
 
         Returns:
             Job info with status and job_id for polling
@@ -61,11 +69,16 @@ class BlogAgentExecutor:
         if source_id:
             source = source_service.get_source(project_id, source_id)
             if not source:
-                return {
-                    "success": False,
-                    "error": f"Source {source_id} not found"
-                }
-            source_name = source.get("name", "Unknown Source")
+                if previous_markdown:
+                    # Edit mode — source may be deleted; inherit name from parent job
+                    source_name = parent_source_name or "No Source"
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Source {source_id} not found"
+                    }
+            else:
+                source_name = source.get("name", "Unknown Source")
 
         # Create job
         job_id = str(uuid.uuid4())
@@ -78,7 +91,9 @@ class BlogAgentExecutor:
             source_name=source_name,
             direction=direction,
             target_keyword=target_keyword,
-            blog_type=blog_type
+            blog_type=blog_type,
+            parent_job_id=parent_job_id,
+            edit_instructions=edit_instructions
         )
 
         # Launch agent as background task
@@ -95,7 +110,10 @@ class BlogAgentExecutor:
                     blog_type=blog_type,
                     logo_image_bytes=logo_image_bytes,
                     logo_mime_type=logo_mime_type,
-                    user_id=user_id
+                    user_id=user_id,
+                    edit_instructions=edit_instructions,
+                    previous_markdown=previous_markdown,
+                    previous_title=previous_title
                 )
             except Exception as e:
                 logger.exception("Blog agent failed for job %s", job_id[:8])

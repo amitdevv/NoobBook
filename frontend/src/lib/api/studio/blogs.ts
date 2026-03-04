@@ -54,7 +54,7 @@ export interface BlogImage {
  */
 export interface BlogJob {
   id: string;
-  source_id: string;
+  source_id: string | null;
   source_name: string;
   direction: string;
   target_keyword: string;
@@ -62,6 +62,9 @@ export interface BlogJob {
   status: JobStatus;
   status_message: string;
   error_message: string | null;
+  // Edit lineage
+  parent_job_id: string | null;
+  edit_instructions: string | null;
   // Blog plan fields
   title: string | null;
   meta_description: string | null;
@@ -121,20 +124,26 @@ export const blogsAPI = {
    */
   async startGeneration(
     projectId: string,
-    sourceId: string,
+    sourceId: string | null,
     direction?: string,
     targetKeyword?: string,
-    blogType?: BlogType
+    blogType?: BlogType,
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartBlogResponse> {
     try {
+      const body: Record<string, unknown> = {
+        source_id: sourceId,
+        direction: direction || '',
+        target_keyword: targetKeyword || '',
+        blog_type: blogType || 'how_to_guide',
+      };
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/blog`,
-        {
-          source_id: sourceId,
-          direction: direction || '',
-          target_keyword: targetKeyword || '',
-          blog_type: blogType || 'how_to_guide',
-        }
+        body
       );
       return response.data;
     } catch (error) {

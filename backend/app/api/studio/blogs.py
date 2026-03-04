@@ -41,13 +41,15 @@ from app.api.studio.logo_utils import resolve_logo
 @studio_bp.route('/projects/<project_id>/studio/blog', methods=['POST'])
 def generate_blog_post(project_id: str):
     """
-    Start blog post generation via blog agent.
+    Start blog post generation or edit via blog agent.
 
     Request Body:
-        - source_id: UUID of the source to generate blog from (required)
+        - source_id: UUID of the source to generate blog from (optional)
         - direction: User's direction/guidance (optional)
         - target_keyword: SEO keyword/phrase to target (optional)
         - blog_type: Category of blog post (optional, default: how_to_guide)
+        - parent_job_id: UUID of the parent blog job to edit (optional, for edits)
+        - edit_instructions: Instructions for editing the parent blog (optional, for edits)
 
     Response:
         - 202 Accepted with job_id for polling
@@ -56,7 +58,7 @@ def generate_blog_post(project_id: str):
         data = request.get_json()
 
         # source_id is optional — blog can be generated from direction alone
-        source_id = data.get('source_id', '')
+        source_id = data.get('source_id') or None
         direction = data.get('direction', '')
         target_keyword = data.get('target_keyword', '')
         blog_type = data.get('blog_type', 'how_to_guide')
@@ -70,6 +72,36 @@ def generate_blog_post(project_id: str):
         if blog_type not in valid_blog_types:
             blog_type = 'how_to_guide'
 
+        # Edit mode: load parent job's markdown as context for refinement
+        parent_job_id = data.get('parent_job_id')
+        edit_instructions = data.get('edit_instructions')
+        previous_markdown = None
+        previous_title = None
+        parent_source_name = None
+
+        if parent_job_id:
+            parent_job = studio_index_service.get_blog_job(project_id, parent_job_id)
+            if not parent_job or not parent_job.get('markdown_file'):
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found or has no content to edit'
+                }), 404
+
+            # Download previous markdown from Supabase Storage
+            previous_markdown = storage_service.download_studio_file(
+                project_id=project_id,
+                job_type="blogs",
+                job_id=parent_job_id,
+                filename=parent_job['markdown_file']
+            )
+            if previous_markdown is None:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to load parent blog post content from storage'
+                }), 500
+            previous_title = parent_job.get('title')
+            parent_source_name = parent_job.get('source_name')
+
         # Resolve brand logo for image generation
         logo_image_bytes, logo_mime_type = resolve_logo(data, project_id)
 
@@ -82,7 +114,12 @@ def generate_blog_post(project_id: str):
             blog_type=blog_type,
             logo_image_bytes=logo_image_bytes,
             logo_mime_type=logo_mime_type,
-            user_id=g.user_id
+            user_id=g.user_id,
+            edit_instructions=edit_instructions,
+            previous_markdown=previous_markdown,
+            previous_title=previous_title,
+            parent_job_id=parent_job_id,
+            parent_source_name=parent_source_name
         )
 
         if not result.get('success'):
@@ -148,9 +185,22 @@ def list_blog_jobs(project_id: str):
         source_id = request.args.get('source_id')
         jobs = studio_index_service.list_blog_jobs(project_id, source_id)
 
+        # Filter out orphaned failed-edit jobs (error + parent_job_id).
+        # These are leftover from edit failures and should never be shown.
+        # Also delete them so they don't accumulate.
+        clean_jobs = []
+        for job in jobs:
+            if job.get("status") == "error" and job.get("parent_job_id"):
+                try:
+                    studio_index_service.delete_blog_job(project_id, job["id"])
+                except Exception:
+                    pass
+            else:
+                clean_jobs.append(job)
+
         return jsonify({
             'success': True,
-            'jobs': jobs
+            'jobs': clean_jobs
         })
 
     except Exception as e:
