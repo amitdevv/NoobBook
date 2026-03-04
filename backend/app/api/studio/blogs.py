@@ -41,13 +41,15 @@ from app.api.studio.logo_utils import resolve_logo
 @studio_bp.route('/projects/<project_id>/studio/blog', methods=['POST'])
 def generate_blog_post(project_id: str):
     """
-    Start blog post generation via blog agent.
+    Start blog post generation or edit via blog agent.
 
     Request Body:
-        - source_id: UUID of the source to generate blog from (required)
+        - source_id: UUID of the source to generate blog from (optional)
         - direction: User's direction/guidance (optional)
         - target_keyword: SEO keyword/phrase to target (optional)
         - blog_type: Category of blog post (optional, default: how_to_guide)
+        - parent_job_id: UUID of the parent blog job to edit (optional, for edits)
+        - edit_instructions: Instructions for editing the parent blog (optional, for edits)
 
     Response:
         - 202 Accepted with job_id for polling
