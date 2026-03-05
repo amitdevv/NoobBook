@@ -105,6 +105,8 @@ export const useMarketingStrategyGeneration = (projectId: string) => {
     } catch (error) {
       log.error({ err: error }, 'marketing strategy edit failed');
       showError(error instanceof Error ? error.message : 'Marketing strategy edit failed.');
+      // Restore parent job in viewer so user can retry
+      setViewingMarketingStrategyJob(parentJob);
     } finally {
       setIsGeneratingMarketingStrategy(false);
       setCurrentMarketingStrategyJob(null);

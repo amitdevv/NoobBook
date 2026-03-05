@@ -84,13 +84,16 @@ class PRDAgentService:
         else:
             user_message = f"Create a comprehensive Product Requirements Document (PRD).\n\nDirection from user: {effective_direction}\n\nPlease create a detailed, complete PRD following the workflow:\n1. First, plan the document structure using the plan_prd tool\n2. Then write each section one at a time using the write_prd_section tool\n3. Set is_last_section=true when you write the final section"
 
-        # Edit mode: include previous document for refinement
+        # Edit mode: include previous document for refinement (capped to control token costs)
         if previous_document and edit_instructions:
+            prev_markdown = previous_document.get('markdown_content', '')
+            if len(prev_markdown) > 15000:
+                prev_markdown = prev_markdown[:15000] + "\n\n[... document truncated for context limit ...]"
             edit_context = "\n\n## EDIT MODE — REFINE PREVIOUS DOCUMENT\n"
             edit_context += f"Previous document title: {previous_document.get('document_title', 'N/A')}\n"
             edit_context += f"Previous sections: {previous_document.get('sections_written', 0)}\n"
             edit_context += "\n### PREVIOUS DOCUMENT CONTENT:\n"
-            edit_context += previous_document.get('markdown_content', '')
+            edit_context += prev_markdown
             edit_context += f"\n\n### EDIT INSTRUCTIONS:\n{edit_instructions}\n"
             edit_context += "Rewrite the document applying the edit instructions. Preserve sections and content the user didn't ask to change. Focus modifications on what the edit instructions specify."
             user_message = user_message + edit_context
