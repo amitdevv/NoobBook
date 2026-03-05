@@ -80,6 +80,16 @@ def generate_blog_post(project_id: str):
         parent_source_name = None
 
         if parent_job_id:
+            # Clean up any previously failed edit jobs for this parent
+            try:
+                all_jobs = studio_index_service.list_blog_jobs(project_id)
+                for job in all_jobs:
+                    if (job.get("status") == "error"
+                            and job.get("parent_job_id") == parent_job_id):
+                        studio_index_service.delete_blog_job(project_id, job["id"])
+            except Exception:
+                pass  # Non-critical cleanup — don't block the new edit
+
             parent_job = studio_index_service.get_blog_job(project_id, parent_job_id)
             if not parent_job or not parent_job.get('markdown_file'):
                 return jsonify({
@@ -187,16 +197,11 @@ def list_blog_jobs(project_id: str):
 
         # Filter out orphaned failed-edit jobs (error + parent_job_id).
         # These are leftover from edit failures and should never be shown.
-        # Also delete them so they don't accumulate.
-        clean_jobs = []
-        for job in jobs:
-            if job.get("status") == "error" and job.get("parent_job_id"):
-                try:
-                    studio_index_service.delete_blog_job(project_id, job["id"])
-                except Exception:
-                    pass
-            else:
-                clean_jobs.append(job)
+        # Deletion happens in the create flow to keep GET idempotent.
+        clean_jobs = [
+            job for job in jobs
+            if not (job.get("status") == "error" and job.get("parent_job_id"))
+        ]
 
         return jsonify({
             'success': True,

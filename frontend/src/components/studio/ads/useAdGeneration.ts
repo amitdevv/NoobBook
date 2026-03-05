@@ -121,7 +121,7 @@ export const useAdGeneration = (projectId: string) => {
         showError(finalJob.error || 'Ad generation failed.');
       }
     } catch (error) {
-      log.error({ err: error }, 'LAd generationE failed');
+      log.error({ err: error }, 'ad generation failed');
       showError(error instanceof Error ? error.message : 'Ad generation failed.');
     } finally {
       setIsGeneratingAd(false);
@@ -179,10 +179,12 @@ export const useAdGeneration = (projectId: string) => {
         setViewingAdJob(finalJob);
       } else if (finalJob.status === 'error') {
         showError(finalJob.error || 'Ad edit failed.');
+        setViewingAdJob(parentJob);
       }
     } catch (error) {
       log.error({ err: error }, 'ad edit failed');
       showError(error instanceof Error ? error.message : 'Ad edit failed.');
+      setViewingAdJob(parentJob);
     } finally {
       setIsGeneratingAd(false);
       setCurrentAdJob(null);

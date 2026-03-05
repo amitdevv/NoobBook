@@ -108,7 +108,7 @@ export const useComponentGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Component generation failed.');
       }
     } catch (error) {
-      log.error({ err: error }, 'LComponent generationE failed');
+      log.error({ err: error }, 'component generation failed');
       showError(error instanceof Error ? error.message : 'Component generation failed.');
     } finally {
       setIsGeneratingComponents(false);
