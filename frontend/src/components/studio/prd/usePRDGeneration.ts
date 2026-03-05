@@ -114,11 +114,7 @@ export const usePRDGeneration = (projectId: string) => {
   };
 
   const handlePRDGeneration = async (signal: StudioSignal) => {
-    const sourceId = signal.sources[0]?.source_id;
-    if (!sourceId) {
-      showError('No source specified for PRD generation.');
-      return;
-    }
+    const sourceId = signal.sources[0]?.source_id || null;
 
     setIsGeneratingPRD(true);
     setCurrentPRDJob(null);

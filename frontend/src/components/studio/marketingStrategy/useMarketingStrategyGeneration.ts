@@ -114,11 +114,7 @@ export const useMarketingStrategyGeneration = (projectId: string) => {
   };
 
   const handleMarketingStrategyGeneration = async (signal: StudioSignal) => {
-    const sourceId = signal.sources[0]?.source_id;
-    if (!sourceId) {
-      showError('No source specified for marketing strategy generation.');
-      return;
-    }
+    const sourceId = signal.sources[0]?.source_id || null;
 
     setIsGeneratingMarketingStrategy(true);
     setCurrentMarketingStrategyJob(null);
