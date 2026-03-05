@@ -16,7 +16,7 @@ const log = createLogger('studio-marketing-strategies-api');
  */
 export interface MarketingStrategyJob {
   id: string;
-  source_id: string;
+  source_id: string | null;
   source_name: string;
   direction: string;
   status: JobStatus;
@@ -115,9 +115,9 @@ export const marketingStrategiesAPI = {
   ): Promise<StartMarketingStrategyResponse> {
     try {
       const body: Record<string, string> = {
-        source_id: sourceId,
         direction: direction || 'Create a comprehensive marketing strategy covering all relevant aspects.',
       };
+      if (sourceId) body.source_id = sourceId;
       if (parentJobId) body.parent_job_id = parentJobId;
       if (editInstructions) body.edit_instructions = editInstructions;
 
