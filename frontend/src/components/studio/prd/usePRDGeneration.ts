@@ -101,11 +101,11 @@ export const usePRDGeneration = (projectId: string) => {
         setViewingPRDJob(finalJob);
       } else if (finalJob.status === 'error') {
         showError(finalJob.error_message || 'PRD edit failed.');
+        setViewingPRDJob(parentJob);
       }
     } catch (error) {
       log.error({ err: error }, 'PRD edit failed');
       showError(error instanceof Error ? error.message : 'PRD edit failed.');
-      // Restore parent job in viewer so user can retry
       setViewingPRDJob(parentJob);
     } finally {
       setIsGeneratingPRD(false);
