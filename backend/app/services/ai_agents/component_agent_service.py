@@ -128,15 +128,27 @@ class ComponentAgentService:
             status_message="Starting component generation..."
         )
 
-        # Get source content using shared utility
-        source_content = get_source_content(project_id, source_id, max_chars=15000)
+        # Get source content (optional — can generate from direction alone)
+        source_content = ""
+        if source_id:
+            source_content = get_source_content(project_id, source_id, max_chars=15000)
 
         # Build user message from config
         effective_direction = direction if direction else config.get("default_direction", "")
-        user_message = config.get("user_message", "").format(
-            source_content=source_content,
-            direction=effective_direction
-        )
+        if source_content:
+            user_message = config.get("user_message", "").format(
+                source_content=source_content,
+                direction=effective_direction
+            )
+        else:
+            user_message = (
+                f"Create 2-4 professional UI component variations based on this direction:\n\n"
+                f"Direction: {effective_direction}\n\n"
+                f"Please create complete, production-ready components following the workflow:\n"
+                f"1. Plan 2-4 distinct component variations (different styles, not just colors)\n"
+                f"2. Write complete HTML/CSS/JS code for each variation (self-contained HTML documents)\n"
+                f"3. Make each variation unique and professional"
+            )
 
         # Edit mode: append previous component info and edit instructions
         if previous_components and edit_instructions:

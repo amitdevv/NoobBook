@@ -109,8 +109,8 @@ class FlowDiagramService:
     def generate_flow_diagram(
         self,
         project_id: str,
-        source_id: str,
-        job_id: str,
+        source_id: str = None,
+        job_id: str = "",
         direction: str = "Create a diagram showing the key processes and relationships."
     ) -> Dict[str, Any]:
         """
@@ -136,32 +136,34 @@ class FlowDiagramService:
         )
 
         try:
-            # Get source metadata
-            source = source_index_service.get_source_from_index(project_id, source_id)
-            if not source:
-                raise ValueError(f"Source {source_id} not found")
+            # Get source content (if source provided)
+            source_name = "Direction Only"
+            content = ""
+            if source_id:
+                source = source_index_service.get_source_from_index(project_id, source_id)
+                if not source:
+                    raise ValueError(f"Source {source_id} not found")
+                source_name = source.get("name", "Unknown")
 
-            source_name = source.get("name", "Unknown")
-
-            # Get source content
-            studio_index_service.update_flow_diagram_job(
-                project_id, job_id,
-                progress="Analyzing content..."
-            )
-
-            content = self._get_source_content(project_id, source_id)
-            if not content:
-                raise ValueError("No content found for source")
+                studio_index_service.update_flow_diagram_job(
+                    project_id, job_id,
+                    progress="Analyzing content..."
+                )
+                content = self._get_source_content(project_id, source_id)
 
             # Load config and tool
             config = self._load_config()
             tool = self._load_tool()
 
             # Build the user message
-            user_message = config["user_message_template"].format(
-                direction=direction,
-                content=content[:15000]  # Limit content to ~15k chars
-            )
+            if content:
+                user_message = config["user_message_template"].format(
+                    direction=direction,
+                    content=content[:15000]  # Limit content to ~15k chars
+                )
+            else:
+                # No source — generate from direction alone
+                user_message = f"Generate a Mermaid diagram based on this direction:\n\n{direction}\n\nCreate a clear, well-structured Mermaid diagram. Choose the most appropriate diagram type."
 
             # Call Claude with the flow diagram tool
             studio_index_service.update_flow_diagram_job(

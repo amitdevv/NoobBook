@@ -65,10 +65,6 @@ export const useFlowDiagramGeneration = (projectId: string) => {
 
   const handleFlowDiagramGeneration = async (signal: StudioSignal) => {
     const sourceId = signal.sources[0]?.source_id;
-    if (!sourceId) {
-      showError('No source specified for flow diagram generation.');
-      return;
-    }
 
     setIsGeneratingFlowDiagram(true);
     setCurrentFlowDiagramJob(null);

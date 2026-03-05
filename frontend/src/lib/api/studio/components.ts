@@ -97,16 +97,16 @@ export const componentsAPI = {
    */
   async startGeneration(
     projectId: string,
-    sourceId: string,
+    sourceId?: string,
     direction?: string,
     parentJobId?: string,
     editInstructions?: string
   ): Promise<StartComponentResponse> {
     try {
       const body: Record<string, string> = {
-        source_id: sourceId,
         direction: direction || '',
       };
+      if (sourceId) body.source_id = sourceId;
       if (parentJobId) body.parent_job_id = parentJobId;
       if (editInstructions) body.edit_instructions = editInstructions;
 

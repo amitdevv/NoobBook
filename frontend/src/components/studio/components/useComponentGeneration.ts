@@ -72,10 +72,6 @@ export const useComponentGeneration = (projectId: string) => {
    */
   const handleComponentGeneration = async (signal: StudioSignal) => {
     const sourceId = signal.sources[0]?.source_id;
-    if (!sourceId) {
-      showError('No source specified for component generation.');
-      return;
-    }
 
     setIsGeneratingComponents(true);
     setCurrentComponentJob(null);

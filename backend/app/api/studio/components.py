@@ -48,14 +48,8 @@ def generate_components(project_id: str):
     try:
         data = request.get_json()
 
-        # Validate input
+        # Source is optional — can generate from direction alone
         source_id = data.get('source_id')
-        if not source_id:
-            return jsonify({
-                'success': False,
-                'error': 'source_id is required'
-            }), 400
-
         direction = data.get('direction', '')
 
         # Edit mode: load parent job's component data as context for refinement

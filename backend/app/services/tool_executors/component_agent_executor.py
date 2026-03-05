@@ -52,15 +52,16 @@ class ComponentAgentExecutor:
         from app.services.ai_agents.component_agent_service import component_agent_service
         from app.services.source_services import source_service
 
-        # Get source info
-        source = source_service.get_source(project_id, source_id)
-        if not source:
-            return {
-                "success": False,
-                "error": f"Source {source_id} not found"
-            }
-
-        source_name = source.get("name", "Unknown Source")
+        # Get source info (optional — can generate from direction alone)
+        source_name = "Direction Only"
+        if source_id:
+            source = source_service.get_source(project_id, source_id)
+            if not source:
+                return {
+                    "success": False,
+                    "error": f"Source {source_id} not found"
+                }
+            source_name = source.get("name", "Unknown Source")
 
         # Create job
         job_id = str(uuid.uuid4())
