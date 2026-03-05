@@ -259,9 +259,9 @@ class StudioSignalExecutor:
                 # Skip CSV sources unless explicitly requested (business_report needs them)
                 if is_csv and not include_csv:
                     continue
-                # For non-CSV sources, require embedding
-                if not is_csv and not embedding_info.get("is_embedded", False):
-                    continue
+                # Any ready source has processed content available via get_source_content().
+                # No need to require embedding — small sources (< 2500 tokens) skip embedding
+                # but still have fully processed text that studio generators can use.
                 if src.get("id"):
                     fallback_ids.append(src["id"])
             return fallback_ids
