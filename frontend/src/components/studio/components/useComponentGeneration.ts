@@ -72,10 +72,6 @@ export const useComponentGeneration = (projectId: string) => {
    */
   const handleComponentGeneration = async (signal: StudioSignal) => {
     const sourceId = signal.sources[0]?.source_id;
-    if (!sourceId) {
-      showError('No source specified for component generation.');
-      return;
-    }
 
     setIsGeneratingComponents(true);
     setCurrentComponentJob(null);
@@ -112,8 +108,66 @@ export const useComponentGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Component generation failed.');
       }
     } catch (error) {
-      log.error({ err: error }, 'LComponent generationE failed');
+      log.error({ err: error }, 'component generation failed');
       showError(error instanceof Error ? error.message : 'Component generation failed.');
+    } finally {
+      setIsGeneratingComponents(false);
+      setCurrentComponentJob(null);
+    }
+  };
+
+  /**
+   * Handle component edit — creates a new job with previous context
+   */
+  const handleComponentEdit = async (parentJob: ComponentJob, editInstructions: string) => {
+    setIsGeneratingComponents(true);
+
+    try {
+      const startResponse = await componentsAPI.startGeneration(
+        projectId,
+        parentJob.source_id,
+        parentJob.direction,
+        parentJob.id,
+        editInstructions
+      );
+
+      if (!startResponse.success || !startResponse.job_id) {
+        showError(startResponse.error || 'Failed to start component edit.');
+        setIsGeneratingComponents(false);
+        return;
+      }
+
+      // Only close modal once the edit job has started successfully
+      setCurrentComponentJob(null);
+      setViewingComponentJob(null);
+
+      showSuccess('Editing components...');
+
+      const finalJob = await componentsAPI.pollJobStatus(
+        projectId,
+        startResponse.job_id,
+        (job) => setCurrentComponentJob(job)
+      );
+
+      setCurrentComponentJob(finalJob);
+
+      if (finalJob.status === 'ready') {
+        const count = finalJob.components?.length || 0;
+        showSuccess(`Generated ${count} refined component${count !== 1 ? 's' : ''}!`);
+        setSavedComponentJobs((prev) => [finalJob, ...prev]);
+        setViewingComponentJob(finalJob);
+      } else if (finalJob.status === 'error') {
+        showError(finalJob.error_message || 'Component edit failed.');
+        setViewingComponentJob(parentJob);
+        // Delete the failed edit job so it doesn't pollute the list on refresh
+        componentsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+          console.warn('[Studio] Failed to delete failed edit job', err);
+        });
+      }
+    } catch (error) {
+      log.error({ err: error }, 'component edit failed');
+      showError(error instanceof Error ? error.message : 'Component edit failed.');
+      setViewingComponentJob(parentJob);
     } finally {
       setIsGeneratingComponents(false);
       setCurrentComponentJob(null);
@@ -128,5 +182,6 @@ export const useComponentGeneration = (projectId: string) => {
     setViewingComponentJob,
     loadSavedJobs,
     handleComponentGeneration,
+    handleComponentEdit,
   };
 };

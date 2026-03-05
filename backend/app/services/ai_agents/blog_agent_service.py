@@ -46,14 +46,17 @@ class BlogAgentService:
     def generate_blog_post(
         self,
         project_id: str,
-        source_id: str,
+        source_id: Optional[str],
         job_id: str,
         direction: str = "",
         target_keyword: str = "",
         blog_type: str = "how_to_guide",
         logo_image_bytes: Optional[bytes] = None,
         logo_mime_type: str = "image/png",
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        edit_instructions: Optional[str] = None,
+        previous_markdown: Optional[str] = None,
+        previous_title: Optional[str] = None
     ) -> Dict[str, Any]:
         """Run the agent to generate a blog post."""
         config = self._load_config()
@@ -69,8 +72,11 @@ class BlogAgentService:
             status_message="Starting blog post generation..."
         )
 
-        # Get source content (or use direction as content when no source)
-        source_content = get_source_content(project_id, source_id) if source_id else "No source document provided. Use the direction below as the basis for your blog post."
+        # Get source content — skip in edit mode since previous blog already encodes it
+        if previous_markdown:
+            source_content = "Editing a previous blog post — see the PREVIOUS BLOG POST section below."
+        else:
+            source_content = get_source_content(project_id, source_id) if source_id else "No source document provided. Use the direction below as the basis for your blog post."
         blog_types = config.get("blog_types", {})
         blog_type_display = blog_types.get(blog_type, blog_type.replace("_", " ").title())
 
@@ -80,6 +86,22 @@ class BlogAgentService:
             blog_type_display=blog_type_display,
             direction=direction or "No specific direction provided - use your best judgment based on the content."
         )
+
+        # Edit mode: append previous blog content + edit instructions to user message
+        if previous_markdown:
+            edit_context = (
+                f"\n\n=== PREVIOUS BLOG POST (refine this based on the edit instructions) ===\n"
+                f"Previous Title: {previous_title or 'Untitled'}\n\n"
+                f"{previous_markdown}\n"
+                f"=== END PREVIOUS BLOG POST ===\n\n"
+                f"EDIT INSTRUCTIONS: {edit_instructions or 'No specific edits requested — improve the post as you see fit.'}\n\n"
+                f"Use the previous blog post as your baseline. Apply the edit instructions "
+                f"to refine it. Keep elements the user didn't ask to change."
+            )
+            user_message += edit_context
+        elif edit_instructions:
+            # No parent content but user provided edit instructions — treat as additional guidance
+            user_message += f"\n\nADDITIONAL INSTRUCTIONS: {edit_instructions}"
 
         messages = [{"role": "user", "content": user_message}]
 
@@ -205,7 +227,7 @@ class BlogAgentService:
         messages: List[Dict[str, Any]],
         result: Dict[str, Any],
         started_at: str,
-        source_id: str
+        source_id: Optional[str]
     ) -> None:
         """Save execution log for debugging."""
         message_service.save_agent_execution(

@@ -50,8 +50,8 @@ class WireframeAgentService:
     def generate_wireframe(
         self,
         project_id: str,
-        source_id: str,
-        job_id: str,
+        source_id: str = None,
+        job_id: str = "",
         direction: str = "Create a wireframe for the main page layout.",
     ) -> Dict[str, Any]:
         """
@@ -84,26 +84,28 @@ class WireframeAgentService:
         logger.info("Starting wireframe agent job %s", job_id[:8])
 
         try:
-            # Get source metadata
-            source = source_index_service.get_source_from_index(project_id, source_id)
-            if not source:
-                raise ValueError(f"Source {source_id} not found")
+            # Get source content (if source provided)
+            source_content = ""
+            source_name = "Direction Only"
+            if source_id:
+                source = source_index_service.get_source_from_index(project_id, source_id)
+                if not source:
+                    raise ValueError(f"Source {source_id} not found")
+                source_name = source.get("name", "Unknown Source")
 
-            source_name = source.get("name", "Unknown")
+                studio_index_service.update_wireframe_job(
+                    project_id, job_id, progress="Analyzing content..."
+                )
+                source_content = get_source_content(project_id, source_id, max_chars=15000)
 
-            # Get source content
-            studio_index_service.update_wireframe_job(
-                project_id, job_id, progress="Analyzing content..."
-            )
-
-            source_content = get_source_content(project_id, source_id, max_chars=15000)
-            if not source_content or source_content.startswith("Error"):
-                raise ValueError("No content found for source")
-
-            # Build user message from config
-            user_message = config.get("user_message", "").format(
-                source_content=source_content, direction=direction
-            )
+            # Build user message
+            if source_content and not source_content.startswith("Error"):
+                user_message = config.get("user_message", "").format(
+                    source_content=source_content, direction=direction
+                )
+            else:
+                # No source — generate from direction alone
+                user_message = f"Create a wireframe based on this direction:\n\nDIRECTION:\n{direction}\n\nGenerate a complete wireframe layout using the agentic workflow."
 
             messages = [{"role": "user", "content": user_message}]
 

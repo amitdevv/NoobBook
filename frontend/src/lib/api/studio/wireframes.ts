@@ -98,16 +98,18 @@ export const wireframesAPI = {
    */
   async startGeneration(
     projectId: string,
-    sourceId: string,
+    sourceId?: string,
     direction?: string
   ): Promise<StartWireframeResponse> {
     try {
+      const body: Record<string, string> = {
+        direction: direction || 'Create a wireframe for the main page layout.',
+      };
+      if (sourceId) body.source_id = sourceId;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/wireframe`,
-        {
-          source_id: sourceId,
-          direction: direction || 'Create a wireframe for the main page layout.',
-        }
+        body
       );
       return response.data;
     } catch (error) {

@@ -24,6 +24,7 @@ Routes:
 - GET  /projects/<id>/studio/component-jobs/<id>             - Job status
 - GET  /projects/<id>/studio/component-jobs                  - List jobs
 - GET  /projects/<id>/studio/components/<id>/preview/<file>  - Preview HTML
+- DELETE /projects/<id>/studio/component-jobs/<id>           - Delete job
 """
 import io
 from flask import g, jsonify, request, current_app, send_file, Response
@@ -48,22 +49,46 @@ def generate_components(project_id: str):
     try:
         data = request.get_json()
 
-        # Validate input
+        # Source is optional — can generate from direction alone
         source_id = data.get('source_id')
-        if not source_id:
+        direction = data.get('direction', '')
+
+        # Edit mode: load parent job's component data as context for refinement
+        parent_job_id = data.get('parent_job_id')
+        edit_instructions = data.get('edit_instructions')
+        previous_components = None
+
+        if parent_job_id and not edit_instructions:
             return jsonify({
                 'success': False,
-                'error': 'source_id is required'
+                'error': 'edit_instructions is required when parent_job_id is provided'
             }), 400
 
-        direction = data.get('direction', '')
+        if parent_job_id:
+            parent_job = studio_index_service.get_component_job(project_id, parent_job_id)
+            if parent_job and parent_job.get('components'):
+                previous_components = {
+                    "component_category": parent_job.get("component_category"),
+                    "component_description": parent_job.get("component_description"),
+                    "variations": [
+                        {"variation_name": c["variation_name"], "description": c["description"]}
+                        for c in parent_job["components"]
+                    ]
+                }
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found or has no components to edit'
+                }), 404
 
         # Execute via component_agent_executor (creates job and launches agent)
         result = component_agent_executor.execute(
             project_id=project_id,
             source_id=source_id,
             direction=direction,
-            user_id=g.user_id
+            user_id=g.user_id,
+            previous_components=previous_components,
+            edit_instructions=edit_instructions
         )
 
         if not result.get('success'):
@@ -168,6 +193,46 @@ def preview_component(project_id: str, job_id: str, filename: str):
         return jsonify({
             'success': False,
             'error': f'Failed to serve component: {str(e)}'
+        }), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/component-jobs/<job_id>', methods=['DELETE'])
+def delete_component_job(project_id: str, job_id: str):
+    """
+    Delete a component generation job and its files from Supabase Storage.
+
+    Response:
+        - Success status
+    """
+    try:
+        job = studio_index_service.get_component_job(project_id, job_id)
+
+        if not job:
+            return jsonify({
+                'success': False,
+                'error': f'Component job {job_id} not found'
+            }), 404
+
+        # Delete all files for this job from Supabase Storage
+        storage_service.delete_studio_job_files(
+            project_id=project_id,
+            job_type="components",
+            job_id=job_id
+        )
+
+        # Delete job from index
+        studio_index_service.delete_component_job(project_id, job_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Component job {job_id} deleted'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting component job: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete component job: {str(e)}'
         }), 500
 
 

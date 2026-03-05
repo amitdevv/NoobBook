@@ -51,23 +51,18 @@ def generate_flow_diagram(project_id: str):
         data = request.get_json() or {}
 
         source_id = data.get('source_id')
-        if not source_id:
-            return jsonify({
-                'success': False,
-                'error': 'source_id is required'
-            }), 400
-
         direction = data.get('direction', 'Create a diagram showing the key processes and relationships.')
 
-        # Get source info for the job record
-        source = source_index_service.get_source_from_index(project_id, source_id)
-        if not source:
-            return jsonify({
-                'success': False,
-                'error': f'Source not found: {source_id}'
-            }), 404
-
-        source_name = source.get('name', 'Unknown')
+        # Source is optional — can generate from direction alone
+        source_name = 'Direction Only'
+        if source_id:
+            source = source_index_service.get_source_from_index(project_id, source_id)
+            if not source:
+                return jsonify({
+                    'success': False,
+                    'error': f'Source not found: {source_id}'
+                }), 404
+            source_name = source.get('name', 'Unknown')
 
         # Create job record
         job_id = str(uuid.uuid4())

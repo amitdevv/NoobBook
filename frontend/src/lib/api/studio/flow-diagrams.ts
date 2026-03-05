@@ -85,16 +85,18 @@ export const flowDiagramsAPI = {
    */
   async startGeneration(
     projectId: string,
-    sourceId: string,
+    sourceId?: string,
     direction?: string
   ): Promise<StartFlowDiagramResponse> {
     try {
+      const body: Record<string, string> = {
+        direction: direction || 'Create a diagram showing the key processes and relationships.',
+      };
+      if (sourceId) body.source_id = sourceId;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/flow-diagram`,
-        {
-          source_id: sourceId,
-          direction: direction || 'Create a diagram showing the key processes and relationships.',
-        }
+        body
       );
       return response.data;
     } catch (error) {

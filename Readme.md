@@ -497,19 +497,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full details and `CLAUDE.md` for code
 
 ---
 
-## License 
+## License
 
-**License YOLO.v1.01**
-- New License type
+This project is licensed under the [MIT License](LICENSE).
 
-**Free to use:**
-- Fork it, self-host it, use it for yourself or your company
-
-**Want to commercialize it?**
-- Become an authorized seller: [noob@noobbooklm.com](mailto:noob@noobbooklm.com)
-- Or provide a minimum sponsorship of $10,000 USD
-
-If you commercialize without authorization... well, we're too busy building to chase you. But karma has a way of catching up.
+Copyright (c) 2026 Neel Seth / TeacherOp
 
 ---
 

@@ -6,7 +6,7 @@ and launches the component agent as a background task to generate 2-4 component 
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import uuid
 from datetime import datetime
 
@@ -29,9 +29,11 @@ class ComponentAgentExecutor:
     def execute(
         self,
         project_id: str,
-        source_id: str,
+        source_id: Optional[str],
         direction: str = "",
-        user_id: str = None
+        user_id: str = None,
+        previous_components: Optional[Dict] = None,
+        edit_instructions: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Execute component generation as a background task.
@@ -50,15 +52,16 @@ class ComponentAgentExecutor:
         from app.services.ai_agents.component_agent_service import component_agent_service
         from app.services.source_services import source_service
 
-        # Get source info
-        source = source_service.get_source(project_id, source_id)
-        if not source:
-            return {
-                "success": False,
-                "error": f"Source {source_id} not found"
-            }
-
-        source_name = source.get("name", "Unknown Source")
+        # Get source info (optional — can generate from direction alone)
+        source_name = "Direction Only"
+        if source_id:
+            source = source_service.get_source(project_id, source_id)
+            if not source:
+                return {
+                    "success": False,
+                    "error": f"Source {source_id} not found"
+                }
+            source_name = source.get("name", "Unknown Source")
 
         # Create job
         job_id = str(uuid.uuid4())
@@ -82,7 +85,9 @@ class ComponentAgentExecutor:
                     source_id=source_id,
                     job_id=job_id,
                     direction=direction,
-                    user_id=user_id
+                    user_id=user_id,
+                    previous_components=previous_components,
+                    edit_instructions=edit_instructions
                 )
             except Exception as e:
                 logger.exception("Component agent failed for job %s", job_id[:8])

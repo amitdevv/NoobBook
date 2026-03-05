@@ -97,16 +97,22 @@ export const componentsAPI = {
    */
   async startGeneration(
     projectId: string,
-    sourceId: string,
-    direction?: string
+    sourceId?: string,
+    direction?: string,
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartComponentResponse> {
     try {
+      const body: Record<string, string> = {
+        direction: direction || '',
+      };
+      if (sourceId) body.source_id = sourceId;
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/components`,
-        {
-          source_id: sourceId,
-          direction: direction || '',
-        }
+        body
       );
       return response.data;
     } catch (error) {
@@ -161,6 +167,24 @@ export const componentsAPI = {
    */
   getPreviewUrl(projectId: string, jobId: string, filename: string): string {
     return `${API_BASE_URL}/projects/${projectId}/studio/components/${jobId}/preview/${filename}`;
+  },
+
+  /**
+   * Delete a component job
+   */
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/component-jobs/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        return error.response.data;
+      }
+      log.error({ err: error }, 'failed to delete component job');
+      throw error;
+    }
   },
 
   /**

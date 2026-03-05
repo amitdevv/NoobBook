@@ -107,10 +107,12 @@ class ComponentAgentService:
     def generate_components(
         self,
         project_id: str,
-        source_id: str,
+        source_id: Optional[str],
         job_id: str,
         direction: str = "",
-        user_id: str = None
+        user_id: str = None,
+        previous_components: Optional[Dict[str, Any]] = None,
+        edit_instructions: Optional[str] = None
     ) -> Dict[str, Any]:
         """Run the agent to generate component variations."""
         config = self._load_config()
@@ -126,15 +128,41 @@ class ComponentAgentService:
             status_message="Starting component generation..."
         )
 
-        # Get source content using shared utility
-        source_content = get_source_content(project_id, source_id, max_chars=15000)
+        # Get source content (optional — can generate from direction alone)
+        source_content = ""
+        if source_id:
+            source_content = get_source_content(project_id, source_id, max_chars=15000)
 
         # Build user message from config
         effective_direction = direction if direction else config.get("default_direction", "")
-        user_message = config.get("user_message", "").format(
-            source_content=source_content,
-            direction=effective_direction
-        )
+        if source_content:
+            user_message = config.get("user_message", "").format(
+                source_content=source_content,
+                direction=effective_direction
+            )
+        else:
+            user_message = (
+                f"Create 2-4 professional UI component variations based on this direction:\n\n"
+                f"Direction: {effective_direction}\n\n"
+                f"Please create complete, production-ready components following the workflow:\n"
+                f"1. Plan 2-4 distinct component variations (different styles, not just colors)\n"
+                f"2. Write complete HTML/CSS/JS code for each variation (self-contained HTML documents)\n"
+                f"3. Make each variation unique and professional"
+            )
+
+        # Edit mode: append previous component info and edit instructions
+        if previous_components and edit_instructions:
+            edit_context = "\n\n## EDIT MODE — REFINE PREVIOUS COMPONENTS\n"
+            edit_context += f"Category: {previous_components.get('component_category', 'N/A')}\n"
+            edit_context += f"Description: {previous_components.get('component_description', 'N/A')}\n"
+            edit_context += "Previous variations:\n"
+            for v in previous_components.get("variations", []):
+                edit_context += f"- {v['variation_name']}: {v['description']}\n"
+            edit_context += f"\nEDIT INSTRUCTIONS: {edit_instructions}\n"
+            edit_context += "Refine the above components based on the edit instructions. Keep the same category and number of variations unless the edit instructs otherwise."
+            user_message = user_message + edit_context
+        elif edit_instructions:
+            user_message = user_message + f"\n\nADDITIONAL INSTRUCTIONS: {edit_instructions}"
 
         # Load brand context if configured for ads_creative feature
         brand_context = brand_context_loader.load_brand_context(

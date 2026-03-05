@@ -105,16 +105,14 @@ export const StudioProvider: React.FC<StudioProviderProps> = ({
 
     const handler = generationHandlers.get(optionId);
     if (handler) {
-      console.error('[Studio] Calling handler for:', optionId, 'signal:', signal);
+      log.debug('calling handler for: %s signal: %o', optionId, signal);
       try {
         await handler(signal);
       } catch (error) {
-        console.error('[Studio] Handler threw error for:', optionId, error);
-        log.error({ err: error }, 'generation handler threw error');
+        log.error({ err: error }, 'generation handler threw error for: %s', optionId);
       }
     } else {
-      console.error('[Studio] No handler registered for:', optionId, 'registered:', [...generationHandlers.keys()]);
-      log.warn(`no generation handler registered for: ${optionId}`);
+      log.warn('no handler registered for: %s, registered: %o', optionId, [...generationHandlers.keys()]);
     }
   }, [generationHandlers]);
 
@@ -122,11 +120,11 @@ export const StudioProvider: React.FC<StudioProviderProps> = ({
   // If multiple signals exist for an item, show picker. Otherwise generate directly.
   const handleGenerate = useCallback((optionId: StudioItemId, itemSignals: StudioSignal[]) => {
     if (itemSignals.length === 0) {
-      console.error('[Studio] handleGenerate called with 0 signals for:', optionId);
+      log.warn('handleGenerate called with 0 signals for: %s', optionId);
       return;
     }
 
-    console.error('[Studio] handleGenerate dispatching:', optionId, 'signals:', itemSignals.length);
+    log.debug('handleGenerate dispatching: %s signals: %d', optionId, itemSignals.length);
     if (itemSignals.length === 1) {
       // Single signal - generate directly
       triggerGeneration(optionId, itemSignals[0]);
@@ -188,7 +186,7 @@ export const useStudioContext = (): StudioContextValue => {
  * Hook to filter jobs by valid source IDs
  * Uses the memoized Set for O(1) lookups instead of O(n^2) nested .some() calls
  */
-export const useFilteredJobs = <T extends { source_id: string }>(jobs: T[]): T[] => {
+export const useFilteredJobs = <T extends { source_id: string | null }>(jobs: T[]): T[] => {
   const { validSourceIds } = useStudioContext();
 
   return useMemo(() => {
