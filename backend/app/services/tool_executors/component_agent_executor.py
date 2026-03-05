@@ -29,7 +29,7 @@ class ComponentAgentExecutor:
     def execute(
         self,
         project_id: str,
-        source_id: str,
+        source_id: Optional[str],
         direction: str = "",
         user_id: str = None,
         previous_components: Optional[Dict] = None,

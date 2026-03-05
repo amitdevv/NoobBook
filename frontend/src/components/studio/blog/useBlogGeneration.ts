@@ -142,6 +142,7 @@ export const useBlogGeneration = (projectId: string) => {
 
   const handleBlogEdit = async (parentJob: BlogJob, editInstructions: string) => {
     if (isGeneratingBlog) return;
+    setIsGeneratingBlog(true);
     setPendingEdit({ jobId: parentJob.id, input: editInstructions });
 
     try {
@@ -164,8 +165,7 @@ export const useBlogGeneration = (projectId: string) => {
         return;
       }
 
-      // Only close modal and show spinner once we know generation started
-      setIsGeneratingBlog(true);
+      // Only close modal once we know generation started
       setCurrentBlogJob(null);
       setViewingBlogJob(null);
 

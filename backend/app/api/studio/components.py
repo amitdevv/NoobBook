@@ -24,6 +24,7 @@ Routes:
 - GET  /projects/<id>/studio/component-jobs/<id>             - Job status
 - GET  /projects/<id>/studio/component-jobs                  - List jobs
 - GET  /projects/<id>/studio/components/<id>/preview/<file>  - Preview HTML
+- DELETE /projects/<id>/studio/component-jobs/<id>           - Delete job
 """
 import io
 from flask import g, jsonify, request, current_app, send_file, Response
@@ -192,6 +193,46 @@ def preview_component(project_id: str, job_id: str, filename: str):
         return jsonify({
             'success': False,
             'error': f'Failed to serve component: {str(e)}'
+        }), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/component-jobs/<job_id>', methods=['DELETE'])
+def delete_component_job(project_id: str, job_id: str):
+    """
+    Delete a component generation job and its files from Supabase Storage.
+
+    Response:
+        - Success status
+    """
+    try:
+        job = studio_index_service.get_component_job(project_id, job_id)
+
+        if not job:
+            return jsonify({
+                'success': False,
+                'error': f'Component job {job_id} not found'
+            }), 404
+
+        # Delete all files for this job from Supabase Storage
+        storage_service.delete_studio_job_files(
+            project_id=project_id,
+            job_type="components",
+            job_id=job_id
+        )
+
+        # Delete job from index
+        studio_index_service.delete_component_job(project_id, job_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Component job {job_id} deleted'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting component job: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete component job: {str(e)}'
         }), 500
 
 

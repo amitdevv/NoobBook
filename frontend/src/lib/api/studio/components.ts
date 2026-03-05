@@ -170,6 +170,24 @@ export const componentsAPI = {
   },
 
   /**
+   * Delete a component job
+   */
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/component-jobs/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        return error.response.data;
+      }
+      log.error({ err: error }, 'failed to delete component job');
+      throw error;
+    }
+  },
+
+  /**
    * Poll component job status until complete or error
    */
   async pollJobStatus(

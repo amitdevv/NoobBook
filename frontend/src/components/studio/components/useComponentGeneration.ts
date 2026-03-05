@@ -159,6 +159,10 @@ export const useComponentGeneration = (projectId: string) => {
       } else if (finalJob.status === 'error') {
         showError(finalJob.error_message || 'Component edit failed.');
         setViewingComponentJob(parentJob);
+        // Delete the failed edit job so it doesn't pollute the list on refresh
+        componentsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+          console.warn('[Studio] Failed to delete failed edit job', err);
+        });
       }
     } catch (error) {
       log.error({ err: error }, 'component edit failed');
