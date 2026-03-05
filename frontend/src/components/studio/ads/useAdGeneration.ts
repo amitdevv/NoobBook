@@ -135,7 +135,6 @@ export const useAdGeneration = (projectId: string) => {
   const handleAdEdit = async (parentJob: AdJob, editInstructions: string) => {
     setIsGeneratingAd(true);
     setCurrentAdJob(null);
-    setViewingAdJob(null);
 
     try {
       const geminiStatus = await checkGeminiStatus();
@@ -163,6 +162,8 @@ export const useAdGeneration = (projectId: string) => {
         return;
       }
 
+      // Only close modal once generation has started successfully
+      setViewingAdJob(null);
       showSuccess('Editing ad creatives...');
 
       const finalJob = await adsAPI.pollJobStatus(
