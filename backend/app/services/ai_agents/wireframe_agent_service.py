@@ -86,10 +86,12 @@ class WireframeAgentService:
         try:
             # Get source content (if source provided)
             source_content = ""
+            source_name = "Direction Only"
             if source_id:
                 source = source_index_service.get_source_from_index(project_id, source_id)
                 if not source:
                     raise ValueError(f"Source {source_id} not found")
+                source_name = source.get("name", "Unknown Source")
 
                 studio_index_service.update_wireframe_job(
                     project_id, job_id, progress="Analyzing content..."
