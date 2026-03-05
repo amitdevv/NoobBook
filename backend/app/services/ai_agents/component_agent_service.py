@@ -107,7 +107,7 @@ class ComponentAgentService:
     def generate_components(
         self,
         project_id: str,
-        source_id: str,
+        source_id: Optional[str],
         job_id: str,
         direction: str = "",
         user_id: str = None,

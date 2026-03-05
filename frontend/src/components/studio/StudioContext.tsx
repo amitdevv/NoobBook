@@ -113,7 +113,6 @@ export const StudioProvider: React.FC<StudioProviderProps> = ({
       }
     } else {
       log.warn('no handler registered for: %s, registered: %o', optionId, [...generationHandlers.keys()]);
-      log.warn(`no generation handler registered for: ${optionId}`);
     }
   }, [generationHandlers]);
 

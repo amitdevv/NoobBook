@@ -158,10 +158,12 @@ export const useComponentGeneration = (projectId: string) => {
         setViewingComponentJob(finalJob);
       } else if (finalJob.status === 'error') {
         showError(finalJob.error_message || 'Component edit failed.');
+        setViewingComponentJob(parentJob);
       }
     } catch (error) {
       log.error({ err: error }, 'component edit failed');
       showError(error instanceof Error ? error.message : 'Component edit failed.');
+      setViewingComponentJob(parentJob);
     } finally {
       setIsGeneratingComponents(false);
       setCurrentComponentJob(null);
