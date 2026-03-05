@@ -46,7 +46,7 @@ class MarketingStrategyAgentService:
     def generate_marketing_strategy(
         self,
         project_id: str,
-        source_id: str,
+        source_id: Optional[str],
         job_id: str,
         direction: str = "",
         previous_document: Optional[Dict] = None,
@@ -203,7 +203,7 @@ class MarketingStrategyAgentService:
         messages: List[Dict[str, Any]],
         result: Dict[str, Any],
         started_at: str,
-        source_id: str
+        source_id: Optional[str]
     ) -> None:
         """Save execution log for debugging."""
         message_service.save_agent_execution(

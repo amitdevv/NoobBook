@@ -108,7 +108,7 @@ export const marketingStrategiesAPI = {
    */
   async startGeneration(
     projectId: string,
-    sourceId: string,
+    sourceId: string | null,
     direction?: string,
     parentJobId?: string,
     editInstructions?: string

@@ -108,7 +108,7 @@ export const prdsAPI = {
    */
   async startGeneration(
     projectId: string,
-    sourceId: string,
+    sourceId: string | null,
     direction?: string,
     parentJobId?: string,
     editInstructions?: string
