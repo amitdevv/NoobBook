@@ -16,7 +16,7 @@ const log = createLogger('studio-prds-api');
  */
 export interface PRDJob {
   id: string;
-  source_id: string;
+  source_id: string | null;
   source_name: string;
   direction: string;
   status: JobStatus;
@@ -108,16 +108,16 @@ export const prdsAPI = {
    */
   async startGeneration(
     projectId: string,
-    sourceId: string,
+    sourceId: string | null,
     direction?: string,
     parentJobId?: string,
     editInstructions?: string
   ): Promise<StartPRDResponse> {
     try {
       const body: Record<string, string> = {
-        source_id: sourceId,
         direction: direction || 'Create a comprehensive PRD covering all relevant product requirements.',
       };
+      if (sourceId) body.source_id = sourceId;
       if (parentJobId) body.parent_job_id = parentJobId;
       if (editInstructions) body.edit_instructions = editInstructions;
 

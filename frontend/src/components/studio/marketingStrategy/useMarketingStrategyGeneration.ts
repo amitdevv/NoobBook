@@ -101,10 +101,12 @@ export const useMarketingStrategyGeneration = (projectId: string) => {
         setViewingMarketingStrategyJob(finalJob);
       } else if (finalJob.status === 'error') {
         showError(finalJob.error_message || 'Marketing strategy edit failed.');
+        setViewingMarketingStrategyJob(parentJob);
       }
     } catch (error) {
       log.error({ err: error }, 'marketing strategy edit failed');
       showError(error instanceof Error ? error.message : 'Marketing strategy edit failed.');
+      setViewingMarketingStrategyJob(parentJob);
     } finally {
       setIsGeneratingMarketingStrategy(false);
       setCurrentMarketingStrategyJob(null);

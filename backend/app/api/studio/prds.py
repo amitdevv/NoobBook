@@ -84,13 +84,17 @@ def generate_prd(project_id: str):
             markdown_content = storage_service.download_studio_file(
                 project_id, "prds", parent_job_id, parent_job['markdown_file']
             )
-            if markdown_content:
-                previous_document = {
-                    "document_title": parent_job.get("document_title"),
-                    "product_name": parent_job.get("product_name"),
-                    "sections_written": parent_job.get("sections_written", 0),
-                    "markdown_content": markdown_content
-                }
+            if not markdown_content:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to load parent document content for editing'
+                }), 500
+            previous_document = {
+                "document_title": parent_job.get("document_title"),
+                "product_name": parent_job.get("product_name"),
+                "sections_written": parent_job.get("sections_written", 0),
+                "markdown_content": markdown_content
+            }
 
         # Create job
         job_id = str(uuid.uuid4())
