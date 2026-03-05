@@ -99,7 +99,11 @@ class WireframeAgentService:
                 source_content = get_source_content(project_id, source_id, max_chars=15000)
 
             # Build user message
-            if source_content and not source_content.startswith("Error"):
+            # Guard against error messages AND unprocessed sources
+            has_valid_content = (source_content
+                                and not source_content.startswith("Error")
+                                and "not yet processed" not in source_content)
+            if has_valid_content:
                 user_message = config.get("user_message", "").format(
                     source_content=source_content, direction=direction
                 )
