@@ -97,7 +97,7 @@ export const BusinessReportViewerModal: React.FC<BusinessReportViewerModalProps>
     <Dialog open={viewingBusinessReportJob !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-4xl h-[85vh] p-0 flex flex-col">
         <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pr-6">
             <div className="flex items-center gap-2">
               <ChartBar size={20} className="text-teal-600" />
               <DialogTitle>
@@ -261,7 +261,7 @@ export const BusinessReportViewerModal: React.FC<BusinessReportViewerModalProps>
 
         {/* Edit input */}
         {onEdit && (
-          <div className="px-6 py-3 border-t flex-shrink-0">
+          <div className="px-6 py-3 border-t-2 border-orange-200 bg-orange-50/30 flex-shrink-0">
             <div className="flex gap-2">
               <Input
                 value={editInput}
