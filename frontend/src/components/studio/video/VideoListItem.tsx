@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { VideoCamera, DownloadSimple } from '@phosphor-icons/react';
+import { VideoCamera, DownloadSimple, PencilSimple } from '@phosphor-icons/react';
 import type { VideoJob } from '@/lib/api/studio';
 
 interface VideoListItemProps {
@@ -26,8 +26,14 @@ export const VideoListItem: React.FC<VideoListItemProps> = ({
     >
       <VideoCamera size={16} weight="duotone" className="text-orange-600 mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-gray-900 truncate">
+        <p className="text-xs font-medium text-gray-900 truncate flex items-center gap-1.5">
           {job.source_name || 'Video'}
+          {job.parent_job_id && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-orange-600 bg-orange-500/10 px-1 py-0.5 rounded flex-shrink-0">
+              <PencilSimple size={9} />
+              Edited
+            </span>
+          )}
         </p>
         <p className="text-[11px] text-gray-500 truncate">
           {job.videos.length} video{job.videos.length > 1 ? 's' : ''} • {job.aspect_ratio} • {job.duration_seconds}s

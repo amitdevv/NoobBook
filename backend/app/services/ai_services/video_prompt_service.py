@@ -6,7 +6,7 @@ detailed, vivid video prompts from source content. The generated prompts are
 then used with Google Veo 2.0 for video generation.
 """
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from app.services.integrations.claude import claude_service
 from app.services.integrations.supabase import storage_service
@@ -28,7 +28,9 @@ class VideoPromptService:
         self,
         project_id: str,
         source_id: str,
-        direction: str = ""
+        direction: str = "",
+        edit_instructions: Optional[str] = None,
+        previous_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate an optimized video prompt from source content.
@@ -37,6 +39,8 @@ class VideoPromptService:
             project_id: Project ID
             source_id: Source to generate prompt from
             direction: User's direction/guidance
+            edit_instructions: Instructions for editing the previous prompt
+            previous_prompt: The prompt from the parent video to refine
 
         Returns:
             Dict with success status and generated prompt
@@ -49,8 +53,26 @@ class VideoPromptService:
         # Get source content (sample for large sources)
         source_content = self._get_source_content(project_id, source_id)
 
-        # Build user message
-        user_message = f"""Create a detailed video prompt based on this content:
+        # Build user message - edit mode vs new generation
+        if edit_instructions and previous_prompt:
+            # Edit mode: refine the previous prompt based on user instructions
+            user_message = f"""You previously generated this video prompt:
+
+=== PREVIOUS PROMPT ===
+{previous_prompt}
+=== END PREVIOUS PROMPT ===
+
+The user wants to edit it with these instructions: {edit_instructions}
+
+Here is the original source content for reference:
+
+=== SOURCE CONTENT ===
+{source_content}
+=== END SOURCE ===
+
+Generate a refined video prompt (2-4 sentences) that applies the edit instructions to the previous prompt. Keep what works and change what the user asked for. Include specific visual details, camera movements, lighting, and mood. Remember: the video will be 5-8 seconds, so keep it focused on a single scene or smooth transition."""
+        else:
+            user_message = f"""Create a detailed video prompt based on this content:
 
 === SOURCE CONTENT ===
 {source_content}

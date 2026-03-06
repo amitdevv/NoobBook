@@ -77,7 +77,7 @@ export const PRDViewerModal: React.FC<PRDViewerModalProps> = ({
     <Dialog open={viewingPRDJob !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-4xl h-[85vh] p-0 flex flex-col">
         <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pr-6">
             <div className="flex items-center gap-2">
               <FileText size={20} className="text-amber-600" />
               <DialogTitle>
@@ -187,7 +187,7 @@ export const PRDViewerModal: React.FC<PRDViewerModalProps> = ({
         </ScrollArea>
 
         {onEdit && (
-          <div className="flex gap-2 px-6 py-3 border-t flex-shrink-0">
+          <div className="flex gap-2 px-6 py-3 border-t-2 border-orange-200 bg-orange-50/30 flex-shrink-0">
             <Input
               value={editInput}
               onChange={(e) => setEditInput(e.target.value)}

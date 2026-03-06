@@ -8,7 +8,7 @@ Educational Note: This is a simple service (not an agent) that:
 """
 import logging
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from app.services.integrations.google.video_service import google_video_service
 
@@ -34,7 +34,9 @@ class VideoService:
         direction: str = "",
         aspect_ratio: str = "16:9",
         duration_seconds: int = 8,
-        number_of_videos: int = 1
+        number_of_videos: int = 1,
+        edit_instructions: Optional[str] = None,
+        previous_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate video(s) from source content.
@@ -47,6 +49,8 @@ class VideoService:
             aspect_ratio: "16:9" or "16:10"
             duration_seconds: 5-8 seconds
             number_of_videos: 1-4 videos
+            edit_instructions: Instructions for editing (refining the prompt)
+            previous_prompt: The generated prompt from the parent video
 
         Returns:
             Result dict with success status and video info
@@ -62,7 +66,9 @@ class VideoService:
         prompt_result = video_prompt_service.generate_video_prompt(
             project_id=project_id,
             source_id=source_id,
-            direction=direction
+            direction=direction,
+            edit_instructions=edit_instructions,
+            previous_prompt=previous_prompt
         )
 
         if not prompt_result["success"]:

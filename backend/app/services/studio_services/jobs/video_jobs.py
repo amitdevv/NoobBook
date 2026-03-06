@@ -22,7 +22,9 @@ def create_video_job(
     direction: str,
     aspect_ratio: str = "16:9",
     duration_seconds: int = 8,
-    number_of_videos: int = 1
+    number_of_videos: int = 1,
+    parent_job_id: Optional[str] = None,
+    edit_instructions: Optional[str] = None
 ) -> Dict[str, Any]:
     job_data = {
         "id": job_id,
@@ -39,6 +41,8 @@ def create_video_job(
         "generated_prompt": None,
         "status_message": "Initializing...",
         "error_message": None,
+        "parent_job_id": parent_job_id,
+        "edit_instructions": edit_instructions,
     }
     return create_job(project_id, JOB_TYPE, job_data)
 

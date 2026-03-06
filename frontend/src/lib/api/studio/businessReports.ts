@@ -76,6 +76,9 @@ export interface BusinessReportJob {
   // Data analysis tracking
   analyses: ReportAnalysis[];
   charts: ReportChart[];
+  // Edit lineage
+  parent_job_id: string | null;
+  edit_instructions: string | null;
   // Generated content
   markdown_file: string | null;
   markdown_url: string | null;
@@ -133,19 +136,25 @@ export const businessReportsAPI = {
     reportType?: BusinessReportType,
     csvSourceIds?: string[],
     contextSourceIds?: string[],
-    focusAreas?: string[]
+    focusAreas?: string[],
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartBusinessReportResponse> {
     try {
+      const body: Record<string, unknown> = {
+        source_id: sourceId,
+        direction: direction || '',
+        report_type: reportType || 'executive_summary',
+        csv_source_ids: csvSourceIds || [],
+        context_source_ids: contextSourceIds || [],
+        focus_areas: focusAreas || [],
+      };
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/business-report`,
-        {
-          source_id: sourceId,
-          direction: direction || '',
-          report_type: reportType || 'executive_summary',
-          csv_source_ids: csvSourceIds || [],
-          context_source_ids: contextSourceIds || [],
-          focus_areas: focusAreas || [],
-        }
+        body
       );
       return response.data;
     } catch (error) {

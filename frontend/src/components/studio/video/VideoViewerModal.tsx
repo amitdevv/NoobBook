@@ -4,8 +4,8 @@
  * Supports multiple videos per job (if user requested more than one).
  */
 
-import React, { useState } from 'react';
-import { DownloadSimple, PlayCircle, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import React, { useState, useEffect } from 'react';
+import { DownloadSimple, PlayCircle, CaretLeft, CaretRight, PencilSimple, CaretDown, CaretUp } from '@phosphor-icons/react';
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../ui/dialog';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
 import type { VideoJob } from '@/lib/api/studio';
 import { videosAPI } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
@@ -22,6 +24,9 @@ interface VideoViewerModalProps {
   viewingVideoJob: VideoJob | null;
   onClose: () => void;
   onDownload: (filename: string) => void;
+  onEdit?: (instructions: string) => void;
+  isGenerating?: boolean;
+  defaultEditInput?: string;
 }
 
 export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
@@ -29,8 +34,24 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
   viewingVideoJob,
   onClose,
   onDownload,
+  onEdit,
+  isGenerating,
+  defaultEditInput = '',
 }) => {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [editInput, setEditInput] = useState('');
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [showDirection, setShowDirection] = useState(false);
+
+  useEffect(() => {
+    setCurrentVideoIndex(0);
+    setShowPrompt(false);
+    setShowDirection(false);
+  }, [viewingVideoJob?.id]);
+
+  useEffect(() => {
+    setEditInput(defaultEditInput);
+  }, [defaultEditInput]);
 
   if (!viewingVideoJob || !viewingVideoJob.videos.length) return null;
 
@@ -69,9 +90,17 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
                 </DialogTitle>
               </div>
             </div>
-            <DialogDescription>
-              {viewingVideoJob.videos.length} video{viewingVideoJob.videos.length > 1 ? 's' : ''} •
-              {' '}{viewingVideoJob.aspect_ratio} • {viewingVideoJob.duration_seconds}s
+            <DialogDescription className="flex items-center gap-2">
+              {viewingVideoJob.parent_job_id && (
+                <span className="inline-flex items-center gap-0.5 text-[11px] text-orange-600 bg-orange-500/10 px-1.5 py-0.5 rounded">
+                  <PencilSimple size={10} />
+                  Edited version
+                </span>
+              )}
+              <span>
+                {viewingVideoJob.videos.length} video{viewingVideoJob.videos.length > 1 ? 's' : ''} •
+                {' '}{viewingVideoJob.aspect_ratio} • {viewingVideoJob.duration_seconds}s
+              </span>
             </DialogDescription>
           </DialogHeader>
 
@@ -123,19 +152,65 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
           </video>
         </div>
 
-        {/* Footer Info */}
-        <div className="px-6 py-3 border-t bg-gray-50/50 flex-shrink-0">
-          {viewingVideoJob.generated_prompt && (
-            <p className="text-xs text-muted-foreground mb-2">
-              <span className="font-medium">Generated Prompt:</span> {viewingVideoJob.generated_prompt}
-            </p>
-          )}
-          {viewingVideoJob.direction && (
-            <p className="text-xs text-muted-foreground">
-              <span className="font-medium">User Direction:</span> {viewingVideoJob.direction}
-            </p>
-          )}
-        </div>
+        {/* Footer Info - Collapsible prompt & direction */}
+        {(viewingVideoJob.generated_prompt || viewingVideoJob.direction) && (
+          <div className="px-6 py-2 border-t bg-gray-50/50 flex-shrink-0">
+            <div className="flex items-center gap-2 mb-1">
+              {viewingVideoJob.generated_prompt && (
+                <button
+                  onClick={() => setShowPrompt(prev => !prev)}
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
+                >
+                  {showPrompt ? <CaretUp size={12} /> : <CaretDown size={12} />}
+                  Generated Prompt
+                </button>
+              )}
+              {viewingVideoJob.direction && (
+                <button
+                  onClick={() => setShowDirection(prev => !prev)}
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
+                >
+                  {showDirection ? <CaretUp size={12} /> : <CaretDown size={12} />}
+                  User Direction
+                </button>
+              )}
+            </div>
+            {showPrompt && viewingVideoJob.generated_prompt && (
+              <p className="text-xs text-muted-foreground mb-1">
+                {viewingVideoJob.generated_prompt}
+              </p>
+            )}
+            {showDirection && viewingVideoJob.direction && (
+              <p className="text-xs text-muted-foreground">
+                {viewingVideoJob.direction}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Edit input */}
+        {onEdit && (
+          <div className="px-6 py-3 border-t-2 border-orange-200 bg-orange-50/30 flex-shrink-0">
+            <div className="flex gap-2">
+              <Input
+                value={editInput}
+                onChange={(e) => setEditInput(e.target.value)}
+                placeholder="Describe changes... (e.g., 'make it slower', 'change to night scene')"
+                className="flex-1"
+                disabled={isGenerating}
+                onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && !isGenerating && onEdit(editInput.trim())}
+              />
+              <Button
+                onClick={() => editInput.trim() && onEdit(editInput.trim())}
+                disabled={!editInput.trim() || isGenerating}
+                size="sm"
+              >
+                <PencilSimple size={14} className="mr-1" />
+                Edit
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

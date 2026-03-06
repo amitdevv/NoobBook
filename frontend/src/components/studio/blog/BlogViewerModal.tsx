@@ -44,9 +44,8 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
   const [editInput, setEditInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch markdown content when modal opens
+  // Fetch markdown content when job changes
   useEffect(() => {
-    setEditInput(defaultEditInput);
     if (viewingBlogJob) {
       setIsLoading(true);
       blogsAPI.getPreview(projectId, viewingBlogJob.id)
@@ -62,7 +61,12 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
     } else {
       setMarkdownContent('');
     }
-  }, [viewingBlogJob, projectId, defaultEditInput]);
+  }, [viewingBlogJob, projectId]);
+
+  // Sync edit input separately to avoid re-fetching markdown
+  useEffect(() => {
+    setEditInput(defaultEditInput);
+  }, [defaultEditInput]);
 
   // Format word count for display
   const wordCountDisplay = viewingBlogJob?.word_count
@@ -83,7 +87,7 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
     <Dialog open={viewingBlogJob !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-4xl h-[85vh] p-0 flex flex-col">
         <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pr-6">
             <div className="flex items-center gap-2">
               <Article size={20} className="text-indigo-600" />
               <DialogTitle>
@@ -103,6 +107,12 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
             )}
           </div>
           <DialogDescription className="flex items-center gap-3">
+            {viewingBlogJob?.parent_job_id && (
+              <span className="inline-flex items-center gap-0.5 text-[11px] text-indigo-600 bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                <PencilSimple size={10} />
+                Edited version
+              </span>
+            )}
             {wordCountDisplay && <span>{wordCountDisplay}</span>}
             {imageCount > 0 && (
               <span className="flex items-center gap-1">
@@ -236,7 +246,7 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
 
         {/* Edit input */}
         {onEdit && (
-          <div className="px-6 py-3 border-t flex-shrink-0">
+          <div className="px-6 py-3 border-t-2 border-orange-200 bg-orange-50/30 flex-shrink-0">
             <div className="flex gap-2">
               <Input
                 value={editInput}

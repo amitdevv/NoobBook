@@ -29,6 +29,7 @@ export const useBusinessReportGeneration = (projectId: string) => {
   const [isGeneratingBusinessReport, setIsGeneratingBusinessReport] = useState(false);
   const pollingRef = useRef(false);
   const [viewingBusinessReportJob, setViewingBusinessReportJob] = useState<BusinessReportJob | null>(null);
+  const [pendingEdit, setPendingEdit] = useState<{ jobId: string; input: string } | null>(null);
 
   const loadSavedJobs = async () => {
     try {
@@ -55,7 +56,17 @@ export const useBusinessReportGeneration = (projectId: string) => {
                 (job) => setCurrentBusinessReportJob(job)
               );
               if (finalJob.status === 'ready' || finalJob.status === 'error') {
-                setSavedBusinessReportJobs((prev) => [finalJob, ...prev]);
+                if (finalJob.status === 'ready' && finalJob.parent_job_id) {
+                  // Edit completed after refresh — keep parent so user can view previous versions
+                  setSavedBusinessReportJobs((prev) => [finalJob, ...prev]);
+                } else if (finalJob.status === 'error' && finalJob.parent_job_id) {
+                  // Edit failed after refresh — delete orphaned error job, parent stays
+                  businessReportsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+                    console.warn('[Studio] Failed to delete failed edit job', err);
+                  });
+                } else {
+                  setSavedBusinessReportJobs((prev) => [finalJob, ...prev]);
+                }
               }
             } catch {
               // Polling failed — job stays visible via next load
@@ -123,11 +134,75 @@ export const useBusinessReportGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Business report generation failed.');
       }
     } catch (error) {
-      log.error({ err: error }, 'LBusiness report generationE failed');
+      log.error({ err: error }, 'Business report generation failed');
       showError(error instanceof Error ? error.message : 'Business report generation failed.');
     } finally {
       setIsGeneratingBusinessReport(false);
       setCurrentBusinessReportJob(null);
+    }
+  };
+
+  /**
+   * Handle business report edit - regenerate report with edit instructions
+   * Educational Note: For business reports, editing means passing the previous
+   * markdown as context so the agent can refine it based on edit instructions.
+   */
+  const handleBusinessReportEdit = async (parentJob: BusinessReportJob, editInstructions: string) => {
+    if (isGeneratingBusinessReport) return;
+    setIsGeneratingBusinessReport(true);
+    setPendingEdit({ jobId: parentJob.id, input: editInstructions });
+
+    try {
+      const startResponse = await businessReportsAPI.startGeneration(
+        projectId,
+        parentJob.source_id,
+        parentJob.direction,
+        parentJob.report_type,
+        parentJob.csv_source_ids,
+        parentJob.context_source_ids,
+        parentJob.focus_areas,
+        parentJob.id,        // parentJobId
+        editInstructions     // editInstructions
+      );
+
+      if (!startResponse.success || !startResponse.job_id) {
+        showError(startResponse.error || 'Failed to start business report edit.');
+        return;
+      }
+
+      // Close modal once generation started
+      setCurrentBusinessReportJob(null);
+      setViewingBusinessReportJob(null);
+
+      showSuccess('Editing business report...');
+
+      const finalJob = await businessReportsAPI.pollJobStatus(
+        projectId,
+        startResponse.job_id,
+        (job) => setCurrentBusinessReportJob(job)
+      );
+
+      if (finalJob.status === 'ready') {
+        setPendingEdit(null);
+        showSuccess(`Business report edited: ${finalJob.title || 'Business Report'}`);
+        setSavedBusinessReportJobs((prev) => [finalJob, ...prev]);
+        setViewingBusinessReportJob(finalJob); // Reopen modal with new job
+      } else if (finalJob.status === 'error') {
+        showError(finalJob.error_message || 'Business report edit failed.');
+        setViewingBusinessReportJob(parentJob); // Restore parent modal for retry
+        // Delete the failed edit job
+        businessReportsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+          console.warn('[Studio] Failed to delete failed edit job', err);
+        });
+      }
+    } catch (error) {
+      log.error({ err: error }, 'Business report edit failed');
+      showError(error instanceof Error ? error.message : 'Business report edit failed.');
+      setViewingBusinessReportJob(parentJob); // Restore parent modal for retry
+    } finally {
+      setIsGeneratingBusinessReport(false);
+      setCurrentBusinessReportJob(null);
+      // pendingEdit intentionally NOT cleared — preserved for retry on failure
     }
   };
 
@@ -142,8 +217,10 @@ export const useBusinessReportGeneration = (projectId: string) => {
     isGeneratingBusinessReport,
     viewingBusinessReportJob,
     setViewingBusinessReportJob,
+    pendingEditInput: pendingEdit !== null && pendingEdit.jobId === viewingBusinessReportJob?.id ? pendingEdit.input : '',
     loadSavedJobs,
     handleBusinessReportGeneration,
+    handleBusinessReportEdit,
     downloadBusinessReport,
   };
 };
