@@ -59,13 +59,8 @@ def generate_business_report(project_id: str):
     try:
         data = request.get_json()
 
-        # Validate input
+        # Extract input (validation after parent_job_id inheritance)
         source_id = data.get('source_id')
-        if not source_id:
-            return jsonify({
-                'success': False,
-                'error': 'source_id is required'
-            }), 400
 
         direction = data.get('direction', '')
         report_type = data.get('report_type', 'executive_summary')
@@ -116,6 +111,13 @@ def generate_business_report(project_id: str):
             # Always inherit report_type from parent during edits (unless explicitly overridden)
             if not data.get('report_type'):
                 report_type = parent_job.get('report_type', report_type)
+
+        # Validate source_id (after parent_job_id inheritance)
+        if not source_id:
+            return jsonify({
+                'success': False,
+                'error': 'source_id is required'
+            }), 400
 
         # Validate report_type
         valid_report_types = [
