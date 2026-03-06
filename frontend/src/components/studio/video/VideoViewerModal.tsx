@@ -42,6 +42,10 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
   const [editInput, setEditInput] = useState('');
 
   useEffect(() => {
+    setCurrentVideoIndex(0);
+  }, [viewingVideoJob?.id]);
+
+  useEffect(() => {
     setEditInput(defaultEditInput);
   }, [defaultEditInput]);
 
