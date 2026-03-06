@@ -10,7 +10,7 @@ multiple CSV sources and incorporate context from non-CSV sources.
 """
 
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import uuid
 from datetime import datetime
 
@@ -37,7 +37,11 @@ class BusinessReportAgentExecutor:
         report_type: str = "executive_summary",
         csv_source_ids: List[str] = None,
         context_source_ids: List[str] = None,
-        focus_areas: List[str] = None
+        focus_areas: List[str] = None,
+        edit_instructions: Optional[str] = None,
+        previous_markdown: Optional[str] = None,
+        previous_title: Optional[str] = None,
+        parent_job_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Execute business report generation as a background task.
@@ -50,6 +54,10 @@ class BusinessReportAgentExecutor:
             csv_source_ids: List of CSV source IDs to analyze (optional)
             context_source_ids: List of non-CSV source IDs for context (optional)
             focus_areas: List of focus areas/topics (optional)
+            edit_instructions: Instructions for editing the parent report (optional)
+            previous_markdown: The markdown content from the parent report (optional)
+            previous_title: The title from the parent report (optional)
+            parent_job_id: UUID of the parent report job (optional)
 
         Returns:
             Job info with status and job_id for polling
@@ -86,7 +94,9 @@ class BusinessReportAgentExecutor:
             report_type=report_type,
             csv_source_ids=csv_source_ids,
             context_source_ids=context_source_ids,
-            focus_areas=focus_areas
+            focus_areas=focus_areas,
+            parent_job_id=parent_job_id,
+            edit_instructions=edit_instructions
         )
 
         # Launch agent as background task
@@ -102,7 +112,10 @@ class BusinessReportAgentExecutor:
                     report_type=report_type,
                     csv_source_ids=csv_source_ids,
                     context_source_ids=context_source_ids,
-                    focus_areas=focus_areas
+                    focus_areas=focus_areas,
+                    edit_instructions=edit_instructions,
+                    previous_markdown=previous_markdown,
+                    previous_title=previous_title
                 )
             except Exception as e:
                 logger.exception("Business report agent failed for job %s", job_id[:8])

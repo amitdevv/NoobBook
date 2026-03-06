@@ -10,7 +10,7 @@ Orchestrates the business report generation workflow:
 
 import logging
 import uuid
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -52,7 +52,10 @@ class BusinessReportAgentService:
         report_type: str = "executive_summary",
         csv_source_ids: List[str] = None,
         context_source_ids: List[str] = None,
-        focus_areas: List[str] = None
+        focus_areas: List[str] = None,
+        edit_instructions: Optional[str] = None,
+        previous_markdown: Optional[str] = None,
+        previous_title: Optional[str] = None
     ) -> Dict[str, Any]:
         """Run the agent to generate a business report."""
         config = self._load_config()
@@ -81,6 +84,11 @@ class BusinessReportAgentService:
         user_message = self._build_user_message(
             config, source_info, report_type_display, direction, focus_areas
         )
+
+        # Edit mode: append previous report and edit instructions to user message
+        if edit_instructions and previous_markdown:
+            edit_context = f"\n\n## EDIT MODE\n\nYou are editing a previously generated report. Apply the user's edit instructions to refine the report.\n\n### Previous Report Title: {previous_title or 'Untitled'}\n\n### Previous Report Content:\n{previous_markdown}\n\n### Edit Instructions:\n{edit_instructions}\n\nStart from the previous content as your baseline. Apply the edit instructions to refine the report. Keep elements the user didn't ask to change. Focus changes on what the edit instructions specify. You may still call analyze_csv_data if the edit requires new data analysis or charts."
+            user_message += edit_context
 
         messages = [{"role": "user", "content": user_message}]
 

@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { ChartBar, DownloadSimple } from '@phosphor-icons/react';
+import { ChartBar, DownloadSimple, PencilSimple } from '@phosphor-icons/react';
 import type { BusinessReportJob } from '@/lib/api/studio';
 
 interface BusinessReportListItemProps {
@@ -33,8 +33,14 @@ export const BusinessReportListItem: React.FC<BusinessReportListItemProps> = ({ 
         <ChartBar size={16} className="text-teal-600" />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
-        <p className="text-xs font-medium truncate">
+        <p className="text-xs font-medium truncate flex items-center gap-1.5">
           {job.title || job.source_name}
+          {job.parent_job_id && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-teal-600 bg-teal-500/10 px-1 py-0.5 rounded flex-shrink-0">
+              <PencilSimple size={9} />
+              Edited
+            </span>
+          )}
         </p>
       </div>
       {chartCount > 0 && (

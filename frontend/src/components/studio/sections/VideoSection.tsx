@@ -19,8 +19,10 @@ export const VideoSection: React.FC = () => {
     isGeneratingVideo,
     viewingVideoJob,
     setViewingVideoJob,
+    pendingEditInput,
     loadSavedJobs,
     handleVideoGeneration,
+    handleVideoEdit,
     downloadVideo,
   } = useVideoGeneration(projectId);
 
@@ -71,6 +73,9 @@ export const VideoSection: React.FC = () => {
             downloadVideo(viewingVideoJob.id, filename);
           }
         }}
+        onEdit={(instructions) => viewingVideoJob && handleVideoEdit(viewingVideoJob, instructions)}
+        isGenerating={isGeneratingVideo}
+        defaultEditInput={pendingEditInput}
       />
     </>
   );

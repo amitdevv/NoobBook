@@ -7,7 +7,7 @@ and launches video generation as a background task.
 import logging
 import uuid
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,10 @@ class VideoExecutor:
         direction: str = "",
         aspect_ratio: str = "16:9",
         duration_seconds: int = 8,
-        number_of_videos: int = 1
+        number_of_videos: int = 1,
+        edit_instructions: Optional[str] = None,
+        previous_prompt: Optional[str] = None,
+        parent_job_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Execute video generation as a background task.
@@ -43,6 +46,9 @@ class VideoExecutor:
             aspect_ratio: "16:9" or "16:10" (default: "16:9")
             duration_seconds: 5-8 seconds (default: 8)
             number_of_videos: 1-4 videos (default: 1)
+            edit_instructions: Instructions for editing the parent video (optional)
+            previous_prompt: The generated prompt from the parent video (optional)
+            parent_job_id: UUID of the parent video job (optional)
 
         Returns:
             Job info with status and job_id for polling
@@ -74,7 +80,9 @@ class VideoExecutor:
             direction=direction,
             aspect_ratio=aspect_ratio,
             duration_seconds=duration_seconds,
-            number_of_videos=number_of_videos
+            number_of_videos=number_of_videos,
+            parent_job_id=parent_job_id,
+            edit_instructions=edit_instructions
         )
 
         # Launch video generation as background task
@@ -89,7 +97,9 @@ class VideoExecutor:
                     direction=direction,
                     aspect_ratio=aspect_ratio,
                     duration_seconds=duration_seconds,
-                    number_of_videos=number_of_videos
+                    number_of_videos=number_of_videos,
+                    edit_instructions=edit_instructions,
+                    previous_prompt=previous_prompt
                 )
             except Exception as e:
                 logger.exception("Video generation failed for job %s", job_id[:8])

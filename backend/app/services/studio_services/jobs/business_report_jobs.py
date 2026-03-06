@@ -26,7 +26,9 @@ def create_business_report_job(
     report_type: str,
     csv_source_ids: List[str],
     context_source_ids: List[str],
-    focus_areas: List[str]
+    focus_areas: List[str],
+    parent_job_id: Optional[str] = None,
+    edit_instructions: Optional[str] = None
 ) -> Dict[str, Any]:
     job_data = {
         "id": job_id,
@@ -54,6 +56,8 @@ def create_business_report_job(
         "iterations": None,
         "input_tokens": None,
         "output_tokens": None,
+        "parent_job_id": parent_job_id,
+        "edit_instructions": edit_instructions,
     }
     return create_job(project_id, JOB_TYPE, job_data)
 

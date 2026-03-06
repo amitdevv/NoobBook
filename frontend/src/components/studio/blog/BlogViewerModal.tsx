@@ -44,9 +44,8 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
   const [editInput, setEditInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch markdown content when modal opens
+  // Fetch markdown content when job changes
   useEffect(() => {
-    setEditInput(defaultEditInput);
     if (viewingBlogJob) {
       setIsLoading(true);
       blogsAPI.getPreview(projectId, viewingBlogJob.id)
@@ -62,7 +61,12 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
     } else {
       setMarkdownContent('');
     }
-  }, [viewingBlogJob, projectId, defaultEditInput]);
+  }, [viewingBlogJob, projectId]);
+
+  // Sync edit input separately to avoid re-fetching markdown
+  useEffect(() => {
+    setEditInput(defaultEditInput);
+  }, [defaultEditInput]);
 
   // Format word count for display
   const wordCountDisplay = viewingBlogJob?.word_count
@@ -103,6 +107,12 @@ export const BlogViewerModal: React.FC<BlogViewerModalProps> = ({
             )}
           </div>
           <DialogDescription className="flex items-center gap-3">
+            {viewingBlogJob?.parent_job_id && (
+              <span className="inline-flex items-center gap-0.5 text-[11px] text-indigo-600 bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                <PencilSimple size={10} />
+                Edited version
+              </span>
+            )}
             {wordCountDisplay && <span>{wordCountDisplay}</span>}
             {imageCount > 0 && (
               <span className="flex items-center gap-1">

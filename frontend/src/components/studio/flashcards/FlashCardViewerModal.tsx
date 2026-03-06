@@ -4,7 +4,7 @@
  * Features: card navigation, flip animation, progress bar, reset functionality.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -26,6 +26,11 @@ export const FlashCardViewerModal: React.FC<FlashCardViewerModalProps> = ({
 }) => {
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isCardFlipped, setIsCardFlipped] = useState(false);
+
+  useEffect(() => {
+    setCurrentCardIndex(0);
+    setIsCardFlipped(false);
+  }, [viewingFlashCardJob?.id]);
 
   /**
    * Toggle current card flip
