@@ -86,7 +86,7 @@ export const AdViewerModal: React.FC<AdViewerModalProps> = ({
         </div>
 
         {onEdit && (
-          <div className="flex gap-2 pt-4 border-t">
+          <div className="flex gap-2 pt-4 border-t-2 border-orange-200 bg-orange-50/30 px-1 pb-1 rounded-b-lg">
             <Input
               value={editInput}
               onChange={(e) => setEditInput(e.target.value)}
