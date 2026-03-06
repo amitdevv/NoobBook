@@ -50,6 +50,8 @@ def generate_business_report(project_id: str):
         - csv_source_ids: List of CSV source IDs to analyze (optional)
         - context_source_ids: List of non-CSV source IDs for context (optional)
         - focus_areas: List of focus areas/topics (optional)
+        - parent_job_id: UUID of the parent report job to edit (optional, for edits)
+        - edit_instructions: Instructions for editing the parent report (optional, for edits)
 
     Response:
         - 202 Accepted with job_id for polling
@@ -71,6 +73,50 @@ def generate_business_report(project_id: str):
         context_source_ids = data.get('context_source_ids', [])
         focus_areas = data.get('focus_areas', [])
 
+        # Edit mode: load parent job's markdown as context for refinement
+        parent_job_id = data.get('parent_job_id')
+        edit_instructions = data.get('edit_instructions')
+        previous_markdown = None
+        previous_title = None
+
+        if parent_job_id:
+            # Clean up any previously failed edit jobs for this parent
+            try:
+                all_jobs = studio_index_service.list_business_report_jobs(project_id)
+                for job in all_jobs:
+                    if (job.get("status") == "error"
+                            and job.get("parent_job_id") == parent_job_id):
+                        studio_index_service.delete_business_report_job(project_id, job["id"])
+            except Exception:
+                pass  # Non-critical cleanup
+
+            parent_job = studio_index_service.get_business_report_job(project_id, parent_job_id)
+            if not parent_job or not parent_job.get('markdown_file'):
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found or has no content to edit'
+                }), 404
+
+            # Download previous markdown from Supabase Storage
+            previous_markdown = storage_service.download_studio_file(
+                project_id=project_id,
+                job_type="business_reports",
+                job_id=parent_job_id,
+                filename=parent_job['markdown_file']
+            )
+            if previous_markdown is None:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to load parent report content from storage'
+                }), 500
+            previous_title = parent_job.get('title')
+            # Inherit fields from parent if not provided
+            if not source_id:
+                source_id = parent_job.get('source_id')
+            # Always inherit report_type from parent during edits (unless explicitly overridden)
+            if not data.get('report_type'):
+                report_type = parent_job.get('report_type', report_type)
+
         # Validate report_type
         valid_report_types = [
             'executive_summary', 'financial_report', 'performance_analysis',
@@ -88,7 +134,11 @@ def generate_business_report(project_id: str):
             report_type=report_type,
             csv_source_ids=csv_source_ids,
             context_source_ids=context_source_ids,
-            focus_areas=focus_areas
+            focus_areas=focus_areas,
+            edit_instructions=edit_instructions,
+            previous_markdown=previous_markdown,
+            previous_title=previous_title,
+            parent_job_id=parent_job_id
         )
 
         if not result.get('success'):
@@ -154,9 +204,15 @@ def list_business_report_jobs(project_id: str):
         source_id = request.args.get('source_id')
         jobs = studio_index_service.list_business_report_jobs(project_id, source_id)
 
+        # Filter out orphaned failed-edit jobs (error + parent_job_id)
+        clean_jobs = [
+            job for job in jobs
+            if not (job.get("status") == "error" and job.get("parent_job_id"))
+        ]
+
         return jsonify({
             'success': True,
-            'jobs': jobs
+            'jobs': clean_jobs
         })
 
     except Exception as e:

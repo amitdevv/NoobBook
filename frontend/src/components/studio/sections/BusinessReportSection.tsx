@@ -19,8 +19,10 @@ export const BusinessReportSection: React.FC = () => {
     isGeneratingBusinessReport,
     viewingBusinessReportJob,
     setViewingBusinessReportJob,
+    pendingEditInput,
     loadSavedJobs,
     handleBusinessReportGeneration,
+    handleBusinessReportEdit,
     downloadBusinessReport,
   } = useBusinessReportGeneration(projectId);
 
@@ -65,6 +67,9 @@ export const BusinessReportSection: React.FC = () => {
         viewingBusinessReportJob={viewingBusinessReportJob}
         onClose={() => setViewingBusinessReportJob(null)}
         onDownload={downloadBusinessReport}
+        onEdit={(instructions) => viewingBusinessReportJob && handleBusinessReportEdit(viewingBusinessReportJob, instructions)}
+        isGenerating={isGeneratingBusinessReport}
+        defaultEditInput={pendingEditInput}
       />
     </>
   );

@@ -23,6 +23,7 @@ export const useVideoGeneration = (projectId: string) => {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const pollingRef = useRef(false);
   const [viewingVideoJob, setViewingVideoJob] = useState<VideoJob | null>(null);
+  const [pendingEdit, setPendingEdit] = useState<{ jobId: string; input: string } | null>(null);
 
   /**
    * Load saved video jobs from backend
@@ -52,7 +53,17 @@ export const useVideoGeneration = (projectId: string) => {
                 (job) => setCurrentVideoJob(job)
               );
               if (finalJob.status === 'ready' || finalJob.status === 'error') {
-                setSavedVideoJobs((prev) => [finalJob, ...prev]);
+                if (finalJob.status === 'ready' && finalJob.parent_job_id) {
+                  // Edit completed after refresh — keep parent so user can view previous versions
+                  setSavedVideoJobs((prev) => [finalJob, ...prev]);
+                } else if (finalJob.status === 'error' && finalJob.parent_job_id) {
+                  // Edit failed after refresh — delete orphaned error job, parent stays
+                  videosAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+                    console.warn('[Studio] Failed to delete failed edit job', err);
+                  });
+                } else {
+                  setSavedVideoJobs((prev) => [finalJob, ...prev]);
+                }
               }
             } catch {
               // Polling failed — job stays visible via next load
@@ -121,11 +132,75 @@ export const useVideoGeneration = (projectId: string) => {
         showError(finalJob.error_message || 'Video generation failed');
       }
     } catch (error) {
-      log.error({ err: error }, 'LVideo generationE failed');
+      log.error({ err: error }, 'Video generation failed');
       showError('Video generation failed');
     } finally {
       setIsGeneratingVideo(false);
       setCurrentVideoJob(null);
+    }
+  };
+
+  /**
+   * Handle video edit - regenerate video with refined prompt
+   * Educational Note: For videos, "editing" means refining the generated prompt
+   * and regenerating the video with Google Veo. The previous prompt is passed
+   * as context so Claude can modify it based on edit instructions.
+   */
+  const handleVideoEdit = async (parentJob: VideoJob, editInstructions: string) => {
+    if (isGeneratingVideo) return;
+    setIsGeneratingVideo(true);
+    setPendingEdit({ jobId: parentJob.id, input: editInstructions });
+
+    try {
+      const startResponse = await videosAPI.startGeneration(
+        projectId,
+        parentJob.source_id,
+        parentJob.direction,
+        parentJob.aspect_ratio,
+        parentJob.duration_seconds,
+        parentJob.number_of_videos,
+        parentJob.id,        // parentJobId
+        editInstructions     // editInstructions
+      );
+
+      if (!startResponse.success || !startResponse.job_id) {
+        showError(startResponse.error || 'Failed to start video edit.');
+        return;
+      }
+
+      // Close modal once generation started
+      setCurrentVideoJob(null);
+      setViewingVideoJob(null);
+
+      showSuccess('Editing video...');
+
+      const finalJob = await videosAPI.pollJobStatus(
+        projectId,
+        startResponse.job_id,
+        (job) => setCurrentVideoJob(job)
+      );
+
+      if (finalJob.status === 'ready') {
+        setPendingEdit(null);
+        showSuccess(`Video edited successfully!`);
+        setSavedVideoJobs((prev) => [finalJob, ...prev]);
+        setViewingVideoJob(finalJob);
+      } else if (finalJob.status === 'error') {
+        showError(finalJob.error_message || 'Video edit failed.');
+        setViewingVideoJob(parentJob); // Restore parent modal for retry
+        // Delete the failed edit job
+        videosAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+          console.warn('[Studio] Failed to delete failed edit job', err);
+        });
+      }
+    } catch (error) {
+      log.error({ err: error }, 'Video edit failed');
+      showError(error instanceof Error ? error.message : 'Video edit failed.');
+      setViewingVideoJob(parentJob); // Restore parent modal for retry
+    } finally {
+      setIsGeneratingVideo(false);
+      setCurrentVideoJob(null);
+      // pendingEdit intentionally NOT cleared — preserved for retry on failure
     }
   };
 
@@ -156,8 +231,10 @@ export const useVideoGeneration = (projectId: string) => {
     isGeneratingVideo,
     viewingVideoJob,
     setViewingVideoJob,
+    pendingEditInput: pendingEdit !== null && pendingEdit.jobId === viewingVideoJob?.id ? pendingEdit.input : '',
     loadSavedJobs,
     handleVideoGeneration,
+    handleVideoEdit,
     openVideo,
     downloadVideo,
   };

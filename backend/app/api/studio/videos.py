@@ -44,6 +44,8 @@ def generate_video(project_id: str):
         - aspect_ratio: "16:9" or "16:10" (default: "16:9")
         - duration_seconds: 5-8 seconds (default: 8)
         - number_of_videos: 1-4 (default: 1)
+        - parent_job_id: UUID of the parent video job to edit (optional, for edits)
+        - edit_instructions: Instructions for editing the parent video (optional, for edits)
 
     Response:
         - success: Boolean
@@ -60,6 +62,38 @@ def generate_video(project_id: str):
         aspect_ratio = data.get("aspect_ratio", "16:9")
         duration_seconds = data.get("duration_seconds", 8)
         number_of_videos = data.get("number_of_videos", 1)
+
+        # Edit mode: load parent job's generated prompt as context for refinement
+        parent_job_id = data.get("parent_job_id")
+        edit_instructions = data.get("edit_instructions")
+        previous_prompt = None
+
+        if parent_job_id:
+            # Clean up any previously failed edit jobs for this parent
+            try:
+                all_jobs = studio_index_service.list_video_jobs(project_id)
+                for job in all_jobs:
+                    if (job.get("status") == "error"
+                            and job.get("parent_job_id") == parent_job_id):
+                        studio_index_service.delete_video_job(project_id, job["id"])
+            except Exception:
+                pass  # Non-critical cleanup
+
+            parent_job = studio_index_service.get_video_job(project_id, parent_job_id)
+            if not parent_job:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found'
+                }), 404
+            previous_prompt = parent_job.get("generated_prompt")
+            if not previous_prompt:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job has no generated prompt to edit'
+                }), 400
+            # Inherit source_id from parent if not provided
+            if not source_id:
+                source_id = parent_job.get("source_id")
 
         if not source_id:
             return jsonify({
@@ -93,7 +127,10 @@ def generate_video(project_id: str):
             direction=direction,
             aspect_ratio=aspect_ratio,
             duration_seconds=duration_seconds,
-            number_of_videos=number_of_videos
+            number_of_videos=number_of_videos,
+            edit_instructions=edit_instructions,
+            previous_prompt=previous_prompt,
+            parent_job_id=parent_job_id
         )
 
         if not result.get("success"):
@@ -156,9 +193,15 @@ def list_video_jobs(project_id: str):
         source_id = request.args.get('source_id')
         jobs = studio_index_service.list_video_jobs(project_id, source_id)
 
+        # Filter out orphaned failed-edit jobs (error + parent_job_id)
+        clean_jobs = [
+            job for job in jobs
+            if not (job.get("status") == "error" and job.get("parent_job_id"))
+        ]
+
         return jsonify({
             'success': True,
-            'jobs': jobs
+            'jobs': clean_jobs
         })
 
     except Exception as e:
@@ -227,4 +270,40 @@ def download_video(project_id: str, job_id: str, filename: str):
         return jsonify({
             'success': False,
             'error': f'Failed to download video: {str(e)}'
+        }), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/videos/<job_id>', methods=['DELETE'])
+def delete_video_job(project_id: str, job_id: str):
+    """
+    Delete a video job and its files from Supabase Storage.
+
+    Response:
+        - Success status
+    """
+    try:
+        job = studio_index_service.get_video_job(project_id, job_id)
+
+        if not job:
+            return jsonify({
+                'success': False,
+                'error': f'Video job {job_id} not found'
+            }), 404
+
+        # Delete all files for this job from Supabase Storage
+        storage_service.delete_studio_job_files(project_id, "videos", job_id)
+
+        # Delete job from index
+        studio_index_service.delete_video_job(project_id, job_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Video job {job_id} deleted'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting video job: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete video job: {str(e)}'
         }), 500

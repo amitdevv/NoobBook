@@ -14,7 +14,8 @@ import {
 } from '../../ui/dialog';
 import { Button } from '../../ui/button';
 import { ScrollArea } from '../../ui/scroll-area';
-import { ChartBar, DownloadSimple, SpinnerGap, ChartLine } from '@phosphor-icons/react';
+import { ChartBar, DownloadSimple, SpinnerGap, ChartLine, PencilSimple } from '@phosphor-icons/react';
+import { Input } from '../../ui/input';
 import { businessReportsAPI, type BusinessReportJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import ReactMarkdown from 'react-markdown';
@@ -25,6 +26,9 @@ interface BusinessReportViewerModalProps {
   viewingBusinessReportJob: BusinessReportJob | null;
   onClose: () => void;
   onDownload: (jobId: string) => void;
+  onEdit?: (instructions: string) => void;
+  isGenerating?: boolean;
+  defaultEditInput?: string;
 }
 
 export const BusinessReportViewerModal: React.FC<BusinessReportViewerModalProps> = ({
@@ -32,11 +36,15 @@ export const BusinessReportViewerModal: React.FC<BusinessReportViewerModalProps>
   viewingBusinessReportJob,
   onClose,
   onDownload,
+  onEdit,
+  isGenerating,
+  defaultEditInput = '',
 }) => {
   const [markdownContent, setMarkdownContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const [editInput, setEditInput] = useState('');
 
-  // Fetch markdown content when modal opens
+  // Fetch markdown content when job changes
   useEffect(() => {
     if (viewingBusinessReportJob) {
       setIsLoading(true);
@@ -54,6 +62,11 @@ export const BusinessReportViewerModal: React.FC<BusinessReportViewerModalProps>
       setMarkdownContent('');
     }
   }, [viewingBusinessReportJob, projectId]);
+
+  // Sync edit input separately to avoid re-fetching markdown
+  useEffect(() => {
+    setEditInput(defaultEditInput);
+  }, [defaultEditInput]);
 
   // Format word count for display
   const wordCountDisplay = viewingBusinessReportJob?.word_count
@@ -104,6 +117,12 @@ export const BusinessReportViewerModal: React.FC<BusinessReportViewerModalProps>
             )}
           </div>
           <DialogDescription className="flex items-center gap-3 flex-wrap">
+            {viewingBusinessReportJob?.parent_job_id && (
+              <span className="inline-flex items-center gap-0.5 text-[11px] text-teal-600 bg-teal-500/10 px-1.5 py-0.5 rounded">
+                <PencilSimple size={10} />
+                Edited version
+              </span>
+            )}
             {viewingBusinessReportJob?.report_type && (
               <span className="text-teal-600 font-medium">
                 {getReportTypeDisplay(viewingBusinessReportJob.report_type)}
@@ -239,6 +258,30 @@ export const BusinessReportViewerModal: React.FC<BusinessReportViewerModalProps>
             )}
           </div>
         </ScrollArea>
+
+        {/* Edit input */}
+        {onEdit && (
+          <div className="px-6 py-3 border-t flex-shrink-0">
+            <div className="flex gap-2">
+              <Input
+                value={editInput}
+                onChange={(e) => setEditInput(e.target.value)}
+                placeholder="Describe changes... (e.g., 'add more charts', 'focus on Q4 results')"
+                className="flex-1"
+                disabled={isGenerating}
+                onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && !isGenerating && onEdit(editInput.trim())}
+              />
+              <Button
+                onClick={() => editInput.trim() && onEdit(editInput.trim())}
+                disabled={!editInput.trim() || isGenerating}
+                size="sm"
+              >
+                <PencilSimple size={14} className="mr-1" />
+                Edit
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

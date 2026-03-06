@@ -39,6 +39,10 @@ export interface VideoJob {
   duration_seconds: number;
   number_of_videos: number;
 
+  // Edit lineage
+  parent_job_id: string | null;
+  edit_instructions: string | null;
+
   // Generated content
   videos: VideoFile[];
   generated_prompt: string | null;
@@ -93,18 +97,24 @@ export const videosAPI = {
     direction?: string,
     aspectRatio: '16:9' | '16:10' = '16:9',
     durationSeconds: number = 8,
-    numberOfVideos: number = 1
+    numberOfVideos: number = 1,
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartVideoResponse> {
     try {
+      const body: Record<string, unknown> = {
+        source_id: sourceId,
+        direction: direction || '',
+        aspect_ratio: aspectRatio,
+        duration_seconds: durationSeconds,
+        number_of_videos: numberOfVideos,
+      };
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/videos`,
-        {
-          source_id: sourceId,
-          direction: direction || '',
-          aspect_ratio: aspectRatio,
-          duration_seconds: durationSeconds,
-          number_of_videos: numberOfVideos,
-        }
+        body
       );
       return response.data;
     } catch (error) {
@@ -150,6 +160,24 @@ export const videosAPI = {
         return error.response.data;
       }
       log.error({ err: error }, 'failed to list video jobs');
+      throw error;
+    }
+  },
+
+  /**
+   * Delete a video job
+   */
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/videos/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        return error.response.data;
+      }
+      log.error({ err: error }, 'failed to delete video job');
       throw error;
     }
   },
