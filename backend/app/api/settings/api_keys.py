@@ -277,6 +277,18 @@ def update_api_keys():
                 if not saved_value:
                     current_app.logger.error(f"Failed to verify {key_id} in environment!")
 
+        # Reload integration service configs so they pick up new keys without restart
+        for key_data in api_keys:
+            key_id = key_data.get('id')
+            value = key_data.get('value', '')
+            if value and not value.startswith('***'):
+                if key_id == 'NOTION_API_KEY':
+                    from app.services.integrations.knowledge_bases.notion.notion_service import notion_service
+                    notion_service.reload_config()
+                elif key_id in ('JIRA_API_KEY', 'JIRA_CLOUD_ID', 'JIRA_EMAIL'):
+                    from app.services.integrations.knowledge_bases.jira.jira_service import jira_service
+                    jira_service.reload_config()
+
         current_app.logger.info(f"Updated {updated_count} API keys")
 
         return jsonify({

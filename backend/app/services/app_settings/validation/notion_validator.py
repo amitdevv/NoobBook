@@ -24,7 +24,7 @@ def validate_notion_key(api_key: str) -> Tuple[bool, str]:
     Returns:
         Tuple of (is_valid, message)
     """
-    if not api_key or api_key == '':
+    if not api_key:
         return False, "API key is empty"
 
     try:

@@ -34,7 +34,7 @@ def validate_jira_key(
     Returns:
         Tuple of (is_valid, message)
     """
-    if not api_token or api_token == '':
+    if not api_token:
         return False, "API token is empty"
 
     if not email:
