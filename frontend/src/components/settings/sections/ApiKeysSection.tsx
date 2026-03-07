@@ -251,7 +251,7 @@ export const ApiKeysSection: React.FC = () => {
     </div>
   );
 
-  const renderCategorySection = (title: string, category: 'ai' | 'storage' | 'utility') => {
+  const renderCategorySection = (title: string, category: 'ai' | 'storage' | 'utility' | 'integrations') => {
     const categoryKeys = apiKeys.filter(k => k.category === category);
     if (categoryKeys.length === 0) return null;
 
