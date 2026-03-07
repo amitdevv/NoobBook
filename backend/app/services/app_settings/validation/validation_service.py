@@ -15,6 +15,8 @@ from app.services.app_settings.validation.nano_banana_validator import validate_
 from app.services.app_settings.validation.veo_validator import validate_veo_key
 from app.services.app_settings.validation.tavily_validator import validate_tavily_key
 from app.services.app_settings.validation.pinecone_validator import validate_pinecone_key
+from app.services.app_settings.validation.notion_validator import validate_notion_key
+from app.services.app_settings.validation.jira_validator import validate_jira_key
 
 
 class ValidationService:
@@ -57,3 +59,11 @@ class ValidationService:
     def validate_pinecone_key(self, api_key: str) -> Tuple[bool, str, Optional[Dict[str, str]]]:
         """Validate a Pinecone API key and auto-create index if needed."""
         return validate_pinecone_key(api_key)
+
+    def validate_notion_key(self, api_key: str) -> Tuple[bool, str]:
+        """Validate a Notion API key."""
+        return validate_notion_key(api_key)
+
+    def validate_jira_key(self, api_token: str, email: Optional[str] = None, cloud_id: Optional[str] = None) -> Tuple[bool, str]:
+        """Validate Jira credentials (API token + email + cloud ID)."""
+        return validate_jira_key(api_token, email, cloud_id)

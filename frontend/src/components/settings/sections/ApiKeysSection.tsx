@@ -293,6 +293,8 @@ export const ApiKeysSection: React.FC = () => {
         {renderCategorySection('Storage & Database', 'storage')}
         <Separator />
         {renderCategorySection('Utility Services', 'utility')}
+        <Separator />
+        {renderCategorySection('Integrations', 'integrations')}
       </div>
 
       <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>

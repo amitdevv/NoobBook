@@ -72,6 +72,10 @@ class JiraService:
         if self._configured:
             logger.info("Jira service configured: %s", config_label)
 
+    def reload_config(self) -> None:
+        """Reset cached config so next call re-reads from environment."""
+        self._configured = None
+
     def is_configured(self) -> bool:
         """Check if Jira credentials are configured."""
         self._load_config()
