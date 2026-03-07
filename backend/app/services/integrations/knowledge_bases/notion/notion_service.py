@@ -44,6 +44,10 @@ class NotionService:
         if self._configured:
             logger.info("Notion service configured")
 
+    def reload_config(self) -> None:
+        """Reset cached config so next call re-reads from environment."""
+        self._configured = None
+
     def is_configured(self) -> bool:
         """Check if Notion credentials are configured."""
         self._load_config()

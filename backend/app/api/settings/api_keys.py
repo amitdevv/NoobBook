@@ -31,6 +31,8 @@ Supported API Keys:
 - TAVILY_API_KEY: Web search
 - GOOGLE_CLIENT_ID/SECRET: Google Drive OAuth
 - GEMINI/VEO/NANO_BANANA: Google AI services
+- NOTION_API_KEY: Notion integration (chat tools)
+- JIRA_CLOUD_ID/EMAIL/API_KEY: Jira integration (chat tools)
 
 Routes:
 - GET    /settings/api-keys           - List all keys (masked)
@@ -128,6 +130,30 @@ API_KEYS_CONFIG = [
         'name': 'Webshare Proxy',
         'description': 'Proxy rotation for YouTube transcript fetching',
         'category': 'utility'
+    },
+    {
+        'id': 'NOTION_API_KEY',
+        'name': 'Notion Integration',
+        'description': 'Notion API key — enables Claude to search and read Notion pages in chat',
+        'category': 'integrations'
+    },
+    {
+        'id': 'JIRA_CLOUD_ID',
+        'name': 'Jira Cloud ID',
+        'description': 'Atlassian Cloud ID (from admin.atlassian.com → your-site → Settings)',
+        'category': 'integrations'
+    },
+    {
+        'id': 'JIRA_EMAIL',
+        'name': 'Jira Email',
+        'description': 'Atlassian account email for API authentication',
+        'category': 'integrations'
+    },
+    {
+        'id': 'JIRA_API_KEY',
+        'name': 'Jira API Token',
+        'description': 'Atlassian API token (from id.atlassian.com/manage-profile/security/api-tokens)',
+        'category': 'integrations'
     },
 ]
 
@@ -426,6 +452,31 @@ def _validate_key(key_id: str, value: str) -> tuple[bool, str]:
         # Auto-managed fields - just accept them
         is_valid = bool(value)
         message = 'Configuration accepted (auto-managed)'
+        return is_valid, message
+
+    elif key_id == 'NOTION_API_KEY':
+        is_valid, message = validation_service.validate_notion_key(value)
+        if is_valid:
+            # Reload Notion service config so chat tools activate without restart
+            from app.services.integrations.knowledge_bases.notion.notion_service import notion_service
+            notion_service.reload_config()
+        return is_valid, message
+
+    elif key_id == 'JIRA_API_KEY':
+        # Jira validation needs email + cloud_id from env (must be saved first)
+        jira_email = env_service.get_key('JIRA_EMAIL')
+        jira_cloud_id = env_service.get_key('JIRA_CLOUD_ID')
+        is_valid, message = validation_service.validate_jira_key(value, jira_email, jira_cloud_id)
+        if is_valid:
+            # Reload Jira service config so chat tools activate without restart
+            from app.services.integrations.knowledge_bases.jira.jira_service import jira_service
+            jira_service.reload_config()
+        return is_valid, message
+
+    elif key_id in ['JIRA_CLOUD_ID', 'JIRA_EMAIL']:
+        # Supporting fields for Jira — just accept them
+        is_valid = bool(value)
+        message = 'Value saved' if is_valid else 'Value is empty'
         return is_valid, message
 
     else:
