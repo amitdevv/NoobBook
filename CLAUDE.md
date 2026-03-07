@@ -297,6 +297,25 @@ Base URL: `http://localhost:5001/api/v1`
 
 **Settings**: `GET/POST /settings/api-keys`, `DELETE /settings/api-keys/{id}`, `POST /settings/api-keys/validate`
 
+## API Key Management
+
+All API keys are stored in `backend/.env` (not database) and managed via the Settings → API Keys UI. Keys are defined in `API_KEYS_CONFIG` in `backend/app/api/settings/api_keys.py`.
+
+**Categories:** `ai` (Claude, OpenAI, ElevenLabs, Gemini, VEO), `storage` (Pinecone), `utility` (Tavily, Google OAuth, Webshare), `integrations` (Notion, Jira)
+
+**Adding a new API key:**
+1. Add entry to `API_KEYS_CONFIG` with `id`, `name`, `description`, `category`
+2. Create validator in `backend/app/services/app_settings/validation/` (make minimal API call to verify)
+3. Register validator in `ValidationService` class
+4. Add routing case in `_validate_key()` function
+5. Frontend auto-renders from config — only update `ApiKeysSection.tsx` if adding a new category to the type union
+
+**Key patterns:**
+- Keys are masked before sending to frontend (`EnvService.mask_key()`)
+- Masked values (starting with `***`) are skipped on save
+- Validation tests real API connections before saving
+- Services with cached config (like Notion/Jira) need `reload_config()` called in `update_api_keys()` after `env_service.reload_env()` so changes take effect without restart
+
 **Google Drive**:
 - `GET /google/status` - Check if configured and connected
 - `GET /google/auth` - Get OAuth authorization URL
