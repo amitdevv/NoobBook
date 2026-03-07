@@ -478,7 +478,7 @@ def _validate_key(key_id: str, value: str) -> tuple[bool, str]:
     elif key_id in ['JIRA_CLOUD_ID', 'JIRA_EMAIL']:
         # Supporting fields for Jira — just accept them
         is_valid = bool(value)
-        message = 'Value saved' if is_valid else 'Value is empty'
+        message = 'Value accepted' if is_valid else 'Value is empty'
         return is_valid, message
 
     else:
