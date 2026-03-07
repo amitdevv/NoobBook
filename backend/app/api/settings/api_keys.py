@@ -467,23 +467,13 @@ def _validate_key(key_id: str, value: str) -> tuple[bool, str]:
         return is_valid, message
 
     elif key_id == 'NOTION_API_KEY':
-        is_valid, message = validation_service.validate_notion_key(value)
-        if is_valid:
-            # Reload Notion service config so chat tools activate without restart
-            from app.services.integrations.knowledge_bases.notion.notion_service import notion_service
-            notion_service.reload_config()
-        return is_valid, message
+        return validation_service.validate_notion_key(value)
 
     elif key_id == 'JIRA_API_KEY':
         # Jira validation needs email + cloud_id from env (must be saved first)
         jira_email = env_service.get_key('JIRA_EMAIL')
         jira_cloud_id = env_service.get_key('JIRA_CLOUD_ID')
-        is_valid, message = validation_service.validate_jira_key(value, jira_email, jira_cloud_id)
-        if is_valid:
-            # Reload Jira service config so chat tools activate without restart
-            from app.services.integrations.knowledge_bases.jira.jira_service import jira_service
-            jira_service.reload_config()
-        return is_valid, message
+        return validation_service.validate_jira_key(value, jira_email, jira_cloud_id)
 
     elif key_id in ['JIRA_CLOUD_ID', 'JIRA_EMAIL']:
         # Supporting fields for Jira — just accept them
