@@ -20,9 +20,11 @@ export const InfographicSection: React.FC = () => {
     isGeneratingInfographic,
     viewingInfographicJob,
     setViewingInfographicJob,
+    pendingEditInput,
     configError,
     loadSavedJobs,
     handleInfographicGeneration,
+    handleInfographicEdit,
   } = useInfographicGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedInfographicJobs);
@@ -62,6 +64,9 @@ export const InfographicSection: React.FC = () => {
       <InfographicViewerModal
         viewingInfographicJob={viewingInfographicJob}
         onClose={() => setViewingInfographicJob(null)}
+        onEdit={(instructions) => viewingInfographicJob && handleInfographicEdit(viewingInfographicJob, instructions)}
+        isGenerating={isGeneratingInfographic}
+        defaultEditInput={pendingEditInput}
       />
     </>
   );

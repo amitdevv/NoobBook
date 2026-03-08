@@ -62,7 +62,9 @@ class SocialPostsService:
         platforms: List[str] | None = None,
         logo_image_bytes: Optional[bytes] = None,
         logo_mime_type: str = "image/png",
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        edit_instructions: Optional[str] = None,
+        previous_posts: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
         Generate social media posts for selected platforms.
@@ -104,7 +106,9 @@ class SocialPostsService:
             job_id=job_id,
             platforms=platforms,
             has_logo=logo_image_bytes is not None,
-            user_id=user_id
+            user_id=user_id,
+            edit_instructions=edit_instructions,
+            previous_posts=previous_posts
         )
 
         if not content_result.get("success"):
@@ -251,7 +255,9 @@ class SocialPostsService:
         job_id: str,
         platforms: List[str] | None = None,
         has_logo: bool = False,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        edit_instructions: Optional[str] = None,
+        previous_posts: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
         Generate social media content using Claude.
@@ -260,6 +266,10 @@ class SocialPostsService:
         tailored to each platform's style, tone, and image dimensions.
         When a brand logo is available, Claude is instructed to write image prompts
         that describe incorporating the logo into the design.
+
+        When editing, the previous posts data is provided as context
+        so Claude can refine copy, hashtags, and image prompts based on
+        the user's edit instructions.
         """
         if platforms is None:
             platforms = ["linkedin", "instagram", "twitter"]
@@ -288,6 +298,32 @@ class SocialPostsService:
                 "the composition) and how design elements should complement it."
             )
 
+        # Edit context — provides previous posts + edit instructions for refinement
+        edit_context = ""
+        if previous_posts and edit_instructions:
+            # Serialize previous posts for Claude to reference
+            previous_posts_summary = json.dumps(
+                [{
+                    "platform": p.get("platform"),
+                    "copy": p.get("copy"),
+                    "hashtags": p.get("hashtags"),
+                    "image_prompt": p.get("image_prompt")
+                } for p in previous_posts],
+                indent=2
+            )
+            edit_context = (
+                "\n\n=== EDIT MODE ===\n"
+                "You are REFINING previously generated social posts. "
+                "The user wants changes to the existing content.\n\n"
+                f"PREVIOUS POSTS:\n{previous_posts_summary}\n\n"
+                f"USER'S EDIT INSTRUCTIONS:\n{edit_instructions}\n\n"
+                "Apply the user's requested changes while keeping the rest "
+                "intact. You can modify copy, hashtags, AND/OR image prompts "
+                "as needed. Return the FULL updated JSON response (not just "
+                "the changes).\n"
+                "=== END EDIT MODE ==="
+            )
+
         # Build user message
         user_message = config["user_message"].format(
             topic=topic,
@@ -295,6 +331,10 @@ class SocialPostsService:
             platforms=platforms_str,
             logo_context=logo_context
         )
+
+        # Append edit context after the formatted message
+        if edit_context:
+            user_message += edit_context
 
         messages = [{"role": "user", "content": user_message}]
 

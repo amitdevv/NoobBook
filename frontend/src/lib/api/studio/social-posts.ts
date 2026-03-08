@@ -47,6 +47,10 @@ export interface SocialPostJob {
   topic_summary: string | null;
   post_count: number;
   generation_time_seconds: number | null;
+  // Edit lineage
+  parent_job_id: string | null;
+  edit_instructions: string | null;
+  // Metadata
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -95,7 +99,9 @@ export const socialPostsAPI = {
     direction?: string,
     platforms?: string[],
     logoSource?: 'auto' | 'brand_icon' | 'source' | 'none',
-    logoSourceId?: string
+    logoSourceId?: string,
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartSocialPostsResponse> {
     try {
       const body: Record<string, unknown> = {
@@ -105,6 +111,8 @@ export const socialPostsAPI = {
         logo_source: logoSource || 'auto',
       };
       if (logoSourceId) body.logo_source_id = logoSourceId;
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
 
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/social-posts`,
@@ -157,10 +165,28 @@ export const socialPostsAPI = {
   },
 
   /**
+   * Delete a social post job
+   */
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/social-post-jobs/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        return error.response.data;
+      }
+      log.error({ err: error }, 'failed to delete social post job');
+      throw error;
+    }
+  },
+
+  /**
    * Get the full URL for a social post image
    */
-  getImageUrl(projectId: string, filename: string): string {
-    return `${API_BASE_URL}/projects/${projectId}/studio/social/${filename}`;
+  getImageUrl(projectId: string, jobId: string, filename: string): string {
+    return `${API_BASE_URL}/projects/${projectId}/studio/social/${jobId}/${filename}`;
   },
 
   /**
