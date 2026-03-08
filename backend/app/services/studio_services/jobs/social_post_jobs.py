@@ -19,7 +19,9 @@ def create_social_post_job(
     job_id: str,
     topic: str,
     direction: str,
-    platforms: Optional[List[str]] = None
+    platforms: Optional[List[str]] = None,
+    parent_job_id: Optional[str] = None,
+    edit_instructions: Optional[str] = None
 ) -> Dict[str, Any]:
     job_data = {
         "id": job_id,
@@ -33,6 +35,8 @@ def create_social_post_job(
         "topic_summary": None,
         "post_count": 0,
         "generation_time_seconds": None,
+        "parent_job_id": parent_job_id,
+        "edit_instructions": edit_instructions,
     }
     return create_job(project_id, JOB_TYPE, job_data)
 

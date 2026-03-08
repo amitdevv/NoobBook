@@ -21,6 +21,7 @@ export const useInfographicGeneration = (projectId: string) => {
   const [isGeneratingInfographic, setIsGeneratingInfographic] = useState(false);
   const pollingRef = useRef(false);
   const [viewingInfographicJob, setViewingInfographicJob] = useState<InfographicJob | null>(null);
+  const [pendingEdit, setPendingEdit] = useState<{ jobId: string; input: string } | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -51,7 +52,14 @@ export const useInfographicGeneration = (projectId: string) => {
                 inProgressJob.id,
                 (job) => setCurrentInfographicJob(job)
               );
-              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+              if (finalJob.status === 'ready') {
+                setSavedInfographicJobs((prev) => [finalJob, ...prev]);
+              } else if (finalJob.status === 'error' && finalJob.parent_job_id) {
+                // Edit failed after refresh — delete orphaned error job
+                infographicsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+                  log.warn({ err }, 'Failed to delete failed edit job');
+                });
+              } else if (finalJob.status === 'error') {
                 setSavedInfographicJobs((prev) => [finalJob, ...prev]);
               }
             } catch {
@@ -129,14 +137,72 @@ export const useInfographicGeneration = (projectId: string) => {
     }
   };
 
+  /**
+   * Handle iterative editing of an existing infographic
+   * Educational Note: Follows the same pattern as video editing —
+   * previous image prompt is passed to Claude for refinement.
+   */
+  const handleInfographicEdit = async (parentJob: InfographicJob, editInstructions: string) => {
+    if (isGeneratingInfographic) return;
+    setIsGeneratingInfographic(true);
+    setPendingEdit({ jobId: parentJob.id, input: editInstructions });
+
+    try {
+      const startResponse = await infographicsAPI.startGeneration(
+        projectId,
+        parentJob.source_id,
+        parentJob.direction,
+        parentJob.id,
+        editInstructions
+      );
+
+      if (!startResponse.success || !startResponse.job_id) {
+        showError(startResponse.error || 'Failed to start infographic edit.');
+        return;
+      }
+
+      // Close modal once generation started
+      setCurrentInfographicJob(null);
+      setViewingInfographicJob(null);
+
+      const finalJob = await infographicsAPI.pollJobStatus(
+        projectId,
+        startResponse.job_id,
+        (job) => setCurrentInfographicJob(job)
+      );
+
+      if (finalJob.status === 'ready') {
+        setPendingEdit(null);
+        setSavedInfographicJobs((prev) => [finalJob, ...prev]);
+        setViewingInfographicJob(finalJob);
+      } else if (finalJob.status === 'error') {
+        showError(finalJob.error || 'Infographic edit failed.');
+        setViewingInfographicJob(parentJob);
+        // Delete the failed edit job
+        infographicsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+          log.warn({ err }, 'Failed to delete failed edit job');
+        });
+      }
+    } catch (error) {
+      log.error({ err: error }, 'Infographic edit failed');
+      showError(error instanceof Error ? error.message : 'Infographic edit failed.');
+    } finally {
+      setIsGeneratingInfographic(false);
+      setCurrentInfographicJob(null);
+      // pendingEdit intentionally NOT cleared — preserved for retry on failure
+    }
+  };
+
   return {
     savedInfographicJobs,
     currentInfographicJob,
     isGeneratingInfographic,
     viewingInfographicJob,
     setViewingInfographicJob,
+    pendingEditInput: pendingEdit !== null && pendingEdit.jobId === viewingInfographicJob?.id ? pendingEdit.input : '',
     configError,
     loadSavedJobs,
     handleInfographicGeneration,
+    handleInfographicEdit,
   };
 };

@@ -21,9 +21,11 @@ export const SocialSection: React.FC = () => {
     isGeneratingSocialPosts,
     viewingSocialPostJob,
     setViewingSocialPostJob,
+    pendingEditInput,
     configError,
     loadSavedJobs,
     handleSocialPostGeneration,
+    handleSocialPostEdit,
   } = useSocialPostGeneration(projectId);
 
   const hasSocialSignal = signals.some((s) => s.studio_item === 'social');
@@ -63,6 +65,9 @@ export const SocialSection: React.FC = () => {
       <SocialPostViewerModal
         viewingSocialPostJob={viewingSocialPostJob}
         onClose={() => setViewingSocialPostJob(null)}
+        onEdit={(instructions) => viewingSocialPostJob && handleSocialPostEdit(viewingSocialPostJob, instructions)}
+        isGenerating={isGeneratingSocialPosts}
+        defaultEditInput={pendingEditInput}
       />
     </>
   );

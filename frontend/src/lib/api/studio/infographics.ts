@@ -45,6 +45,10 @@ export interface InfographicJob {
   image_url: string | null;
   image_prompt: string | null;
   generation_time_seconds: number | null;
+  // Edit lineage
+  parent_job_id: string | null;
+  edit_instructions: string | null;
+  // Metadata
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -90,15 +94,21 @@ export const infographicsAPI = {
   async startGeneration(
     projectId: string,
     sourceId: string = '',
-    direction?: string
+    direction?: string,
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartInfographicResponse> {
     try {
+      const body: Record<string, unknown> = {
+        source_id: sourceId,
+        direction: direction || 'Create an informative infographic summarizing the key concepts.',
+      };
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/infographic`,
-        {
-          source_id: sourceId,
-          direction: direction || 'Create an informative infographic summarizing the key concepts.',
-        }
+        body
       );
       return response.data;
     } catch (error) {
@@ -144,6 +154,24 @@ export const infographicsAPI = {
         return error.response.data;
       }
       log.error({ err: error }, 'failed to list infographic jobs');
+      throw error;
+    }
+  },
+
+  /**
+   * Delete an infographic job
+   */
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/infographic-jobs/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        return error.response.data;
+      }
+      log.error({ err: error }, 'failed to delete infographic job');
       throw error;
     }
   },

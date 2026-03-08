@@ -21,6 +21,7 @@ export const useSocialPostGeneration = (projectId: string) => {
   const [isGeneratingSocialPosts, setIsGeneratingSocialPosts] = useState(false);
   const pollingRef = useRef(false);
   const [viewingSocialPostJob, setViewingSocialPostJob] = useState<SocialPostJob | null>(null);
+  const [pendingEdit, setPendingEdit] = useState<{ jobId: string; input: string } | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -51,7 +52,14 @@ export const useSocialPostGeneration = (projectId: string) => {
                 inProgressJob.id,
                 (job) => setCurrentSocialPostJob(job)
               );
-              if (finalJob.status === 'ready' || finalJob.status === 'error') {
+              if (finalJob.status === 'ready') {
+                setSavedSocialPostJobs((prev) => [finalJob, ...prev]);
+              } else if (finalJob.status === 'error' && finalJob.parent_job_id) {
+                // Edit failed after refresh — delete orphaned error job
+                socialPostsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+                  log.warn({ err }, 'Failed to delete failed edit job');
+                });
+              } else if (finalJob.status === 'error') {
                 setSavedSocialPostJobs((prev) => [finalJob, ...prev]);
               }
             } catch {
@@ -133,14 +141,75 @@ export const useSocialPostGeneration = (projectId: string) => {
     }
   };
 
+  /**
+   * Handle iterative editing of existing social posts
+   * Educational Note: Follows the same pattern as video editing —
+   * previous posts array is passed to Claude for refinement.
+   */
+  const handleSocialPostEdit = async (parentJob: SocialPostJob, editInstructions: string) => {
+    if (isGeneratingSocialPosts) return;
+    setIsGeneratingSocialPosts(true);
+    setPendingEdit({ jobId: parentJob.id, input: editInstructions });
+
+    try {
+      const startResponse = await socialPostsAPI.startGeneration(
+        projectId,
+        parentJob.topic,
+        parentJob.direction,
+        parentJob.platforms,
+        'auto',
+        undefined,
+        parentJob.id,
+        editInstructions
+      );
+
+      if (!startResponse.success || !startResponse.job_id) {
+        showError(startResponse.error || 'Failed to start social post edit.');
+        return;
+      }
+
+      // Close modal once generation started
+      setCurrentSocialPostJob(null);
+      setViewingSocialPostJob(null);
+
+      const finalJob = await socialPostsAPI.pollJobStatus(
+        projectId,
+        startResponse.job_id,
+        (job) => setCurrentSocialPostJob(job)
+      );
+
+      if (finalJob.status === 'ready') {
+        setPendingEdit(null);
+        setSavedSocialPostJobs((prev) => [finalJob, ...prev]);
+        setViewingSocialPostJob(finalJob);
+      } else if (finalJob.status === 'error') {
+        showError(finalJob.error || 'Social post edit failed.');
+        setViewingSocialPostJob(parentJob);
+        // Delete the failed edit job
+        socialPostsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+          log.warn({ err }, 'Failed to delete failed edit job');
+        });
+      }
+    } catch (error) {
+      log.error({ err: error }, 'Social post edit failed');
+      showError(error instanceof Error ? error.message : 'Social post edit failed.');
+    } finally {
+      setIsGeneratingSocialPosts(false);
+      setCurrentSocialPostJob(null);
+      // pendingEdit intentionally NOT cleared — preserved for retry on failure
+    }
+  };
+
   return {
     savedSocialPostJobs,
     currentSocialPostJob,
     isGeneratingSocialPosts,
     viewingSocialPostJob,
     setViewingSocialPostJob,
+    pendingEditInput: pendingEdit !== null && pendingEdit.jobId === viewingSocialPostJob?.id ? pendingEdit.input : '',
     configError,
     loadSavedJobs,
     handleSocialPostGeneration,
+    handleSocialPostEdit,
   };
 };
