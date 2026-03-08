@@ -141,8 +141,9 @@ bin/dev                       # Starts backend (:5001) + frontend (:5173)
 
 # Windows
 cd backend && python -m venv venv && venv\Scripts\activate && pip install -r requirements.txt
-cd ../frontend && npm install
-python start.py               # Starts both servers
+cd ..\frontend && npm install
+cd ..
+python start.py               # Starts both servers (run from repo root)
 python stop.py                # Stops both servers
 ```
 

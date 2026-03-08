@@ -231,6 +231,8 @@ Get these before running setup:
 | `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | [Google Cloud Console](https://console.cloud.google.com/) | No — Google Drive import |
 | `JIRA_CLOUD_ID` (or `JIRA_DOMAIN`) + `JIRA_EMAIL` + `JIRA_API_KEY` | [Jira Settings → Security → API tokens](https://id.atlassian.com/manage-profile/security/api-tokens) | No — Jira integration |
 | `NOTION_API_KEY` | [Notion Integrations](https://www.notion.so/my-integrations) | No — Notion integration |
+| `NANO_BANANA_API_KEY` | [Google AI Studio](https://aistudio.google.com/) | No — Gemini image generation |
+| `VEO_API_KEY` | [Google AI Studio](https://aistudio.google.com/) | No — Video generation |
 
 ---
 
@@ -446,10 +448,11 @@ python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
 
-cd ../frontend
+cd ..\frontend
 npm install
 
-python start.py               # Starts both servers
+cd ..
+python start.py               # Starts both servers (run from repo root)
 python stop.py                 # Stops both servers
 ```
 
