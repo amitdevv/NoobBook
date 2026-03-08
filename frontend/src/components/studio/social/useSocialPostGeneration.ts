@@ -133,7 +133,7 @@ export const useSocialPostGeneration = (projectId: string) => {
         showError(finalJob.error || 'Social post generation failed.');
       }
     } catch (error) {
-      log.error({ err: error }, 'LSocial post generationE failed');
+      log.error({ err: error }, 'Social post generation failed');
       showError(error instanceof Error ? error.message : 'Social post generation failed.');
     } finally {
       setIsGeneratingSocialPosts(false);

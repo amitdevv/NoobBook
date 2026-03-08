@@ -129,7 +129,7 @@ export const useInfographicGeneration = (projectId: string) => {
         showError(finalJob.error || 'Infographic generation failed.');
       }
     } catch (error) {
-      log.error({ err: error }, 'LInfographic generationE failed');
+      log.error({ err: error }, 'Infographic generation failed');
       showError(error instanceof Error ? error.message : 'Infographic generation failed.');
     } finally {
       setIsGeneratingInfographic(false);

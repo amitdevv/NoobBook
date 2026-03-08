@@ -185,8 +185,8 @@ export const socialPostsAPI = {
   /**
    * Get the full URL for a social post image
    */
-  getImageUrl(projectId: string, filename: string): string {
-    return `${API_BASE_URL}/projects/${projectId}/studio/social/${filename}`;
+  getImageUrl(projectId: string, jobId: string, filename: string): string {
+    return `${API_BASE_URL}/projects/${projectId}/studio/social/${jobId}/${filename}`;
   },
 
   /**
