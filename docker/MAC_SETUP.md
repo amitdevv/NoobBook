@@ -108,7 +108,7 @@ docker ps
 - **Supabase Studio**: http://localhost:8000
 - **MinIO Console**: http://localhost:9001
 
-> Backend API is accessed via nginx at `http://localhost/api/v1` (port 5001 is internal only).
+> **Note:** All API traffic is routed through nginx at `http://localhost/api/v1`. Direct backend access on port 5001 is still available by default; set `BACKEND_PORT` in `docker/.env` to change or restrict it.
 
 ## Manual Setup (If setup.sh fails)
 
