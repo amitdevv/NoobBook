@@ -104,10 +104,11 @@ docker ps
 ```
 
 ### 5. Access the Application
-- **Frontend**: http://localhost:80
-- **Backend API**: http://localhost:5001/api/v1
-- **Supabase API**: http://localhost:8000
-- **MinIO Console**: http://localhost:9001 (supabase/supabase123)
+- **Frontend**: http://localhost
+- **Supabase Studio**: http://localhost:8000
+- **MinIO Console**: http://localhost:9001
+
+> Backend API is accessed via nginx at `http://localhost/api/v1` (port 5001 is internal only).
 
 ## Manual Setup (If setup.sh fails)
 
@@ -148,6 +149,7 @@ docker ps --filter "name=supabase-db" --format "{{.Status}}"
 ### Step 5: Create MinIO Bucket
 ```bash
 # This is required for file storage on macOS
+# If you changed MinIO credentials in docker/supabase/.env, use those values instead
 docker exec supabase-minio mc alias set local http://localhost:9000 supabase supabase123
 docker exec supabase-minio mc mb local/storage --ignore-existing
 ```
@@ -176,16 +178,15 @@ storage:
     STORAGE_S3_BUCKET: storage
     STORAGE_S3_ENDPOINT: http://minio:9000
     STORAGE_S3_FORCE_PATH_STYLE: "true"
-    AWS_ACCESS_KEY_ID: supabase
-    AWS_SECRET_ACCESS_KEY: supabase123
+    AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-supabase}
+    AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-supabase123}
 ```
 
 ### Port Conflicts
 If you have other services running, you may need to stop them:
 ```bash
 # Check what's using common ports
-lsof -i :80    # Frontend
-lsof -i :5001  # Backend
+lsof -i :80    # Frontend (nginx)
 lsof -i :8000  # Supabase Kong
 lsof -i :5432  # PostgreSQL
 
@@ -264,9 +265,8 @@ docker network rm noobbook-network
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| Frontend | http://localhost:80 | NoobBook web application |
-| Backend API | http://localhost:5001/api/v1 | REST API |
-| Supabase Kong | http://localhost:8000 | API Gateway |
+| Frontend | http://localhost | NoobBook web application (nginx) |
+| Backend API | http://localhost/api/v1 | REST API (proxied via nginx) |
 | Supabase Studio | http://localhost:8000 | Database dashboard (via Kong) |
 | MinIO Console | http://localhost:9001 | Storage browser |
 | PostgreSQL | localhost:5432 | Database (direct) |

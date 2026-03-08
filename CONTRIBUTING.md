@@ -76,7 +76,7 @@ bash docker/reset.sh -v       # Stop + delete ALL data (destructive)
 | Service | URL |
 |---------|-----|
 | NoobBook | `http://localhost` |
-| Backend API | `http://localhost:5001/api/v1` |
+| Backend API | `http://localhost/api/v1` (proxied via nginx) |
 | Supabase Studio | `http://localhost:8000` |
 
 **Supabase Studio login:** The setup script auto-generates the dashboard password. To find it:

@@ -210,7 +210,7 @@ Before you begin, make sure you have:
 
 | Port | Used by |
 |------|---------|
-| `80` | NoobBook frontend |
+| `80` | NoobBook frontend (nginx) |
 | `5001` | NoobBook backend API |
 | `8000` | Supabase API gateway |
 | `5432` | PostgreSQL |
@@ -303,8 +303,7 @@ When you see this, you're good:
 ============================================
 
   App:              http://localhost
-  Backend API:      http://localhost:5001/api/v1
-  Supabase API:     http://localhost:8000
+  Supabase Studio:  http://localhost:8000
 ```
 
 ### Step 4: Log In
@@ -374,9 +373,10 @@ bash docker/setup.sh
 | Service | URL |
 |---------|-----|
 | NoobBook App | `http://localhost` |
-| Backend API | `http://localhost:5001/api/v1` |
-| Supabase API | `http://localhost:8000` |
-| MinIO Console | `http://localhost:9001` (supabase/supabase123) |
+| Supabase Studio | `http://localhost:8000` |
+| MinIO Console | `http://localhost:9001` |
+
+> **Note:** Backend API is not exposed directly — all requests go through nginx on port 80 (`/api/*`).
 
 ---
 
