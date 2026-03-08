@@ -378,7 +378,7 @@ bash docker/setup.sh
 | Supabase Studio | `http://localhost:8000` |
 | MinIO Console | `http://localhost:9001` |
 
-> **Note:** Backend API is not exposed directly — all requests go through nginx on port 80 (`/api/*`).
+> **Note:** All API traffic is routed through nginx (`/api/*` → port 80). Direct backend access on port 5001 is still available by default; set `BACKEND_PORT` in `docker/.env` to change or restrict it.
 
 ---
 

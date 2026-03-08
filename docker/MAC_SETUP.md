@@ -150,7 +150,9 @@ docker ps --filter "name=supabase-db" --format "{{.Status}}"
 ```bash
 # This is required for file storage on macOS
 # If you changed MinIO credentials in docker/supabase/.env, use those values instead
-docker exec supabase-minio mc alias set local http://localhost:9000 supabase supabase123
+MINIO_USER=$(grep -m1 '^MINIO_ROOT_USER=' docker/supabase/.env 2>/dev/null | cut -d= -f2-)
+MINIO_PASS=$(grep -m1 '^MINIO_ROOT_PASSWORD=' docker/supabase/.env 2>/dev/null | cut -d= -f2-)
+docker exec supabase-minio mc alias set local http://localhost:9000 "${MINIO_USER:-supabase}" "${MINIO_PASS:-supabase123}"
 docker exec supabase-minio mc mb local/storage --ignore-existing
 ```
 
