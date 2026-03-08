@@ -76,7 +76,7 @@ bash docker/reset.sh -v       # Stop + delete ALL data (destructive)
 | Service | URL |
 |---------|-----|
 | NoobBook | `http://localhost` |
-| Backend API | `http://localhost:5001/api/v1` |
+| Backend API | `http://localhost/api/v1` (proxied via nginx) |
 | Supabase Studio | `http://localhost:8000` |
 
 **Supabase Studio login:** The setup script auto-generates the dashboard password. To find it:
@@ -141,8 +141,9 @@ bin/dev                       # Starts backend (:5001) + frontend (:5173)
 
 # Windows
 cd backend && python -m venv venv && venv\Scripts\activate && pip install -r requirements.txt
-cd ../frontend && npm install
-python start.py               # Starts both servers
+cd ..\frontend && npm install
+cd ..
+python start.py               # Starts both servers (run from repo root)
 python stop.py                # Stops both servers
 ```
 

@@ -9,14 +9,14 @@ services:
     container_name: noobbook-backend
     restart: unless-stopped
     ports:
-      - "5001:5001"
+      - "${BACKEND_PORT:-5001}:5001"
     env_file:
       - ./docker/.env
     environment:
       - FLASK_ENV=production
       - PORT=5001
       - SUPABASE_URL=http://supabase-kong:8000
-      - ALLOWED_ORIGINS=http://localhost
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost}
     volumes:
       - backend-data:/app/data
       - ./docker/.env:/app/.env

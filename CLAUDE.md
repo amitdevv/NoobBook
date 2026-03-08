@@ -274,7 +274,7 @@ app/services/tools/               # Tool definitions (JSON schemas)
 ```
 
 ### API Endpoints
-Base URL: `http://localhost:5001/api/v1`
+Base URL: `http://localhost:5001/api/v1` (local dev) or `http://localhost/api/v1` (Docker)
 
 **Projects**: GET/POST `/projects`, GET/PUT/DELETE `/projects/{id}`, GET `/projects/{id}/costs`, GET `/projects/{id}/memory`
 
@@ -332,7 +332,7 @@ All API keys are stored in `backend/.env` (not database) and managed via the Set
 
 Import files from Google Drive. OAuth 2.0 flow with `drive.readonly` scope. Tokens stored per-user in Supabase `users.google_tokens` column, auto-refresh on expiry. Google Workspace exports: Docs→DOCX, Sheets→CSV, Slides→PPTX.
 
-**Setup**: Create OAuth credentials in Google Cloud Console, add redirect URI `http://localhost:5001/api/v1/google/callback`.
+**Setup**: Create OAuth credentials in Google Cloud Console, add redirect URI `http://localhost/api/v1/google/callback` (Docker) or `http://localhost:5001/api/v1/google/callback` (local dev).
 
 **Multi-user Support**: Each user has their own Google Drive connection. The OAuth state parameter carries user_id for proper token association.
 
