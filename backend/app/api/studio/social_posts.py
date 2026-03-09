@@ -50,6 +50,8 @@ def generate_social_posts(project_id: str):
         - direction: Optional guidance for the style/focus
         - platforms: Optional list of platforms to generate for (default: all 3)
                      Valid values: 'linkedin', 'instagram', 'twitter'
+        - parent_job_id: Optional parent job ID for iterative editing
+        - edit_instructions: Optional edit instructions (requires parent_job_id)
 
     Response:
         - success: Boolean
@@ -59,7 +61,40 @@ def generate_social_posts(project_id: str):
     try:
         data = request.get_json() or {}
 
+        # Edit mode: load parent job's posts as context for refinement
+        parent_job_id = data.get("parent_job_id")
+        edit_instructions = data.get("edit_instructions")
+        previous_posts = None
+        parent_job = None
+
+        if parent_job_id:
+            # Clean up any previously failed edit jobs for this parent
+            try:
+                all_jobs = studio_index_service.list_social_post_jobs(project_id)
+                for job in all_jobs:
+                    if (job.get("status") == "error"
+                            and job.get("parent_job_id") == parent_job_id):
+                        studio_index_service.delete_social_post_job(project_id, job["id"])
+            except Exception:
+                pass  # Non-critical cleanup
+
+            parent_job = studio_index_service.get_social_post_job(project_id, parent_job_id)
+            if not parent_job:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found'
+                }), 404
+            previous_posts = parent_job.get("posts")
+            if not previous_posts:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job has no posts to edit'
+                }), 400
+
         topic = data.get('topic')
+        # Inherit topic from parent if not provided (edit mode)
+        if not topic and parent_job_id and parent_job:
+            topic = parent_job.get("topic", "Topic")
         if not topic:
             return jsonify({
                 'success': False,
@@ -68,9 +103,10 @@ def generate_social_posts(project_id: str):
 
         direction = data.get('direction', 'Create engaging social media posts for this topic.')
 
-        # Validate platforms parameter
+        # Validate platforms parameter — inherit from parent in edit mode
         valid_platforms = {'linkedin', 'instagram', 'twitter'}
-        platforms = data.get('platforms', list(valid_platforms))
+        default_platforms = parent_job.get("platforms", list(valid_platforms)) if (parent_job_id and parent_job) else list(valid_platforms)
+        platforms = data.get('platforms', default_platforms)
         platforms = [p.lower() for p in platforms if p.lower() in valid_platforms]
         if not platforms:
             return jsonify({
@@ -95,7 +131,9 @@ def generate_social_posts(project_id: str):
             job_id=job_id,
             topic=topic,
             direction=direction,
-            platforms=platforms
+            platforms=platforms,
+            parent_job_id=parent_job_id,
+            edit_instructions=edit_instructions
         )
 
         # Submit background task
@@ -110,7 +148,9 @@ def generate_social_posts(project_id: str):
             platforms=platforms,
             logo_image_bytes=logo_image_bytes,
             logo_mime_type=logo_mime_type,
-            user_id=g.user_id
+            user_id=g.user_id,
+            edit_instructions=edit_instructions,
+            previous_posts=previous_posts
         )
 
         return jsonify({
@@ -171,10 +211,16 @@ def list_social_post_jobs(project_id: str):
     try:
         jobs = studio_index_service.list_social_post_jobs(project_id)
 
+        # Filter out orphaned failed-edit jobs (error + parent_job_id)
+        clean_jobs = [
+            job for job in jobs
+            if not (job.get("status") == "error" and job.get("parent_job_id"))
+        ]
+
         return jsonify({
             'success': True,
-            'jobs': jobs,
-            'count': len(jobs)
+            'jobs': clean_jobs,
+            'count': len(clean_jobs)
         }), 200
 
     except Exception as e:
@@ -182,6 +228,42 @@ def list_social_post_jobs(project_id: str):
         return jsonify({
             'success': False,
             'error': f'Failed to list jobs: {str(e)}'
+        }), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/social-post-jobs/<job_id>', methods=['DELETE'])
+def delete_social_post_job(project_id: str, job_id: str):
+    """
+    Delete a social post job and its files from Supabase Storage.
+
+    Response:
+        - Success status
+    """
+    try:
+        job = studio_index_service.get_social_post_job(project_id, job_id)
+
+        if not job:
+            return jsonify({
+                'success': False,
+                'error': f'Social post job {job_id} not found'
+            }), 404
+
+        # Delete all files for this job from Supabase Storage
+        storage_service.delete_studio_job_files(project_id, "social_posts", job_id)
+
+        # Delete job from index
+        studio_index_service.delete_social_post_job(project_id, job_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Social post job {job_id} deleted'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting social post job: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete social post job: {str(e)}'
         }), 500
 
 

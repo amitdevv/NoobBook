@@ -286,7 +286,11 @@ fi
 # macOS Docker doesn't support xattr, so we use MinIO for S3-compatible storage
 info "Creating MinIO storage bucket..."
 sleep 5  # Wait for MinIO to be fully ready
-if docker exec supabase-minio mc alias set local http://localhost:9000 supabase supabase123 >/dev/null 2>&1; then
+MINIO_USER=$(grep -m1 '^MINIO_ROOT_USER=' "$SUPABASE_ENV" 2>/dev/null | cut -d= -f2-)
+MINIO_USER="${MINIO_USER:-supabase}"
+MINIO_PASS=$(grep -m1 '^MINIO_ROOT_PASSWORD=' "$SUPABASE_ENV" 2>/dev/null | cut -d= -f2-)
+MINIO_PASS="${MINIO_PASS:-supabase123}"
+if docker exec supabase-minio mc alias set local http://localhost:9000 "$MINIO_USER" "$MINIO_PASS" >/dev/null 2>&1; then
     docker exec supabase-minio mc mb local/storage --ignore-existing >/dev/null 2>&1
     success "MinIO storage bucket ready"
 else
@@ -330,9 +334,8 @@ echo -e "${GREEN}  NoobBook is running!${NC}"
 echo -e "${GREEN}============================================${NC}"
 echo ""
 echo -e "  App:              ${CYAN}http://localhost${NC}"
-echo -e "  Backend API:      ${CYAN}http://localhost:5001/api/v1${NC}"
-echo -e "  Supabase API:     ${CYAN}http://localhost:8000${NC}"
-echo -e "  MinIO Console:    ${CYAN}http://localhost:9001${NC}  (supabase/supabase123)"
+echo -e "  Supabase Studio:  ${CYAN}http://localhost:8000${NC}"
+echo -e "  MinIO Console:    ${CYAN}http://localhost:9001${NC}"
 echo ""
 echo -e "  Stop:   ${YELLOW}bash docker/stop.sh${NC}"
 echo -e "  Reset:  ${YELLOW}bash docker/reset.sh${NC}"

@@ -135,6 +135,7 @@ CREATE TABLE IF NOT EXISTS chats (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   title TEXT NOT NULL DEFAULT 'New Chat',
+  selected_source_ids UUID[] DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -190,7 +191,8 @@ CREATE TABLE IF NOT EXISTS background_tasks (
   error_message TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  completed_at TIMESTAMPTZ
+  completed_at TIMESTAMPTZ,
+  started_at TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_target ON background_tasks(target_id, target_type);

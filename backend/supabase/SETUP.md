@@ -67,7 +67,7 @@ bash docker/reset.sh -v         # Stop + delete ALL data (destructive)
 | Service | URL | Purpose |
 |---------|-----|---------|
 | NoobBook | `http://localhost` | Main application |
-| Backend API | `http://localhost:5001/api/v1` | Flask API (also proxied via nginx) |
+| Backend API | `http://localhost/api/v1` | Flask API (proxied via nginx) |
 | Supabase Studio | `http://localhost:8000` | Database admin UI |
 
 ### Supabase Studio Login
@@ -225,13 +225,13 @@ The backend should print `✓ Supabase client initialized (service key): http://
 
 ## Google Drive (Optional)
 
-OAuth callback URLs are currently hardcoded to `localhost:5001` (backend) and `localhost:5173` (frontend). Register in Google Cloud Console:
+OAuth callback goes through nginx. Register in Google Cloud Console:
 
 ```
-Redirect URI: http://localhost:5001/api/v1/google/callback
+Redirect URI: http://localhost/api/v1/google/callback
 ```
 
-For remote servers, update the URLs in the code to match your server address.
+For remote/bare-metal servers, replace `localhost` with your domain or IP.
 
 ## Deploying with Coolify
 

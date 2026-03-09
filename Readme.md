@@ -210,7 +210,7 @@ Before you begin, make sure you have:
 
 | Port | Used by |
 |------|---------|
-| `80` | NoobBook frontend |
+| `80` | NoobBook frontend (nginx) |
 | `5001` | NoobBook backend API |
 | `8000` | Supabase API gateway |
 | `5432` | PostgreSQL |
@@ -231,6 +231,8 @@ Get these before running setup:
 | `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | [Google Cloud Console](https://console.cloud.google.com/) | No — Google Drive import |
 | `JIRA_CLOUD_ID` (or `JIRA_DOMAIN`) + `JIRA_EMAIL` + `JIRA_API_KEY` | [Jira Settings → Security → API tokens](https://id.atlassian.com/manage-profile/security/api-tokens) | No — Jira integration |
 | `NOTION_API_KEY` | [Notion Integrations](https://www.notion.so/my-integrations) | No — Notion integration |
+| `NANO_BANANA_API_KEY` | [Google AI Studio](https://aistudio.google.com/) | No — Gemini image generation |
+| `VEO_API_KEY` | [Google AI Studio](https://aistudio.google.com/) | No — Video generation |
 
 ---
 
@@ -303,8 +305,7 @@ When you see this, you're good:
 ============================================
 
   App:              http://localhost
-  Backend API:      http://localhost:5001/api/v1
-  Supabase API:     http://localhost:8000
+  Supabase Studio:  http://localhost:8000
 ```
 
 ### Step 4: Log In
@@ -374,9 +375,10 @@ bash docker/setup.sh
 | Service | URL |
 |---------|-----|
 | NoobBook App | `http://localhost` |
-| Backend API | `http://localhost:5001/api/v1` |
-| Supabase API | `http://localhost:8000` |
-| MinIO Console | `http://localhost:9001` (supabase/supabase123) |
+| Supabase Studio | `http://localhost:8000` |
+| MinIO Console | `http://localhost:9001` |
+
+> **Note:** All API traffic is routed through nginx (`/api/*` → port 80). Direct backend access on port 5001 is still available by default; set `BACKEND_PORT` in `docker/.env` to change or restrict it.
 
 ---
 
@@ -446,10 +448,11 @@ python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
 
-cd ../frontend
+cd ..\frontend
 npm install
 
-python start.py               # Starts both servers
+cd ..
+python start.py               # Starts both servers (run from repo root)
 python stop.py                 # Stops both servers
 ```
 

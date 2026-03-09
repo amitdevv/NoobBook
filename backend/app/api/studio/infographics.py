@@ -49,6 +49,8 @@ def generate_infographic(project_id: str):
     Request Body:
         - source_id: UUID of the source (optional - empty string for no source)
         - direction: Optional guidance for what to focus on
+        - parent_job_id: Optional parent job ID for iterative editing
+        - edit_instructions: Optional edit instructions (requires parent_job_id)
 
     Response:
         - success: Boolean
@@ -60,6 +62,38 @@ def generate_infographic(project_id: str):
 
         source_id = data.get('source_id', '')
         direction = data.get('direction', 'Create an informative infographic summarizing the key concepts.')
+
+        # Edit mode: load parent job's image prompt as context for refinement
+        parent_job_id = data.get("parent_job_id")
+        edit_instructions = data.get("edit_instructions")
+        previous_image_prompt = None
+
+        if parent_job_id:
+            # Clean up any previously failed edit jobs for this parent
+            try:
+                all_jobs = studio_index_service.list_infographic_jobs(project_id)
+                for job in all_jobs:
+                    if (job.get("status") == "error"
+                            and job.get("parent_job_id") == parent_job_id):
+                        studio_index_service.delete_infographic_job(project_id, job["id"])
+            except Exception:
+                pass  # Non-critical cleanup
+
+            parent_job = studio_index_service.get_infographic_job(project_id, parent_job_id)
+            if not parent_job:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found'
+                }), 404
+            previous_image_prompt = parent_job.get("image_prompt")
+            if not previous_image_prompt:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job has no image prompt to edit'
+                }), 400
+            # Inherit source_id from parent if not provided
+            if not source_id:
+                source_id = parent_job.get("source_id", "")
 
         # Check if Gemini is configured
         if not imagen_service.is_configured():
@@ -86,7 +120,9 @@ def generate_infographic(project_id: str):
             job_id=job_id,
             source_id=source_id,
             source_name=source_name,
-            direction=direction
+            direction=direction,
+            parent_job_id=parent_job_id,
+            edit_instructions=edit_instructions
         )
 
         # Resolve brand logo for image generation
@@ -103,7 +139,9 @@ def generate_infographic(project_id: str):
             direction=direction,
             logo_image_bytes=logo_image_bytes,
             logo_mime_type=logo_mime_type,
-            user_id=g.user_id
+            user_id=g.user_id,
+            edit_instructions=edit_instructions,
+            previous_image_prompt=previous_image_prompt
         )
 
         return jsonify({
@@ -168,10 +206,16 @@ def list_infographic_jobs(project_id: str):
         source_id = request.args.get('source_id')
         jobs = studio_index_service.list_infographic_jobs(project_id, source_id)
 
+        # Filter out orphaned failed-edit jobs (error + parent_job_id)
+        clean_jobs = [
+            job for job in jobs
+            if not (job.get("status") == "error" and job.get("parent_job_id"))
+        ]
+
         return jsonify({
             'success': True,
-            'jobs': jobs,
-            'count': len(jobs)
+            'jobs': clean_jobs,
+            'count': len(clean_jobs)
         }), 200
 
     except Exception as e:
@@ -179,6 +223,42 @@ def list_infographic_jobs(project_id: str):
         return jsonify({
             'success': False,
             'error': f'Failed to list jobs: {str(e)}'
+        }), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/infographic-jobs/<job_id>', methods=['DELETE'])
+def delete_infographic_job(project_id: str, job_id: str):
+    """
+    Delete an infographic job and its files from Supabase Storage.
+
+    Response:
+        - Success status
+    """
+    try:
+        job = studio_index_service.get_infographic_job(project_id, job_id)
+
+        if not job:
+            return jsonify({
+                'success': False,
+                'error': f'Infographic job {job_id} not found'
+            }), 404
+
+        # Delete all files for this job from Supabase Storage
+        storage_service.delete_studio_job_files(project_id, "infographics", job_id)
+
+        # Delete job from index
+        studio_index_service.delete_infographic_job(project_id, job_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Infographic job {job_id} deleted'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting infographic job: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete infographic job: {str(e)}'
         }), 500
 
 

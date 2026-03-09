@@ -274,7 +274,7 @@ app/services/tools/               # Tool definitions (JSON schemas)
 ```
 
 ### API Endpoints
-Base URL: `http://localhost:5001/api/v1`
+Base URL: `http://localhost:5001/api/v1` (local dev) or `http://localhost/api/v1` (Docker)
 
 **Projects**: GET/POST `/projects`, GET/PUT/DELETE `/projects/{id}`, GET `/projects/{id}/costs`, GET `/projects/{id}/memory`
 
@@ -297,6 +297,25 @@ Base URL: `http://localhost:5001/api/v1`
 
 **Settings**: `GET/POST /settings/api-keys`, `DELETE /settings/api-keys/{id}`, `POST /settings/api-keys/validate`
 
+## API Key Management
+
+All API keys are stored in `backend/.env` (not database) and managed via the Settings → API Keys UI. Keys are defined in `API_KEYS_CONFIG` in `backend/app/api/settings/api_keys.py`.
+
+**Categories:** `ai` (Claude, OpenAI, ElevenLabs, Gemini, VEO), `storage` (Pinecone), `utility` (Tavily, Google OAuth, Webshare), `integrations` (Notion, Jira)
+
+**Adding a new API key:**
+1. Add entry to `API_KEYS_CONFIG` with `id`, `name`, `description`, `category`
+2. Create validator in `backend/app/services/app_settings/validation/` (make minimal API call to verify)
+3. Register validator in `ValidationService` class
+4. Add routing case in `_validate_key()` function
+5. Frontend auto-renders from config — only update `ApiKeysSection.tsx` if adding a new category to the type union
+
+**Key patterns:**
+- Keys are masked before sending to frontend (`EnvService.mask_key()`)
+- Masked values (starting with `***`) are skipped on save
+- Validation tests real API connections before saving
+- Services with cached config (like Notion/Jira) need `reload_config()` called in `update_api_keys()` after `env_service.reload_env()` so changes take effect without restart
+
 **Google Drive**:
 - `GET /google/status` - Check if configured and connected
 - `GET /google/auth` - Get OAuth authorization URL
@@ -313,7 +332,7 @@ Base URL: `http://localhost:5001/api/v1`
 
 Import files from Google Drive. OAuth 2.0 flow with `drive.readonly` scope. Tokens stored per-user in Supabase `users.google_tokens` column, auto-refresh on expiry. Google Workspace exports: Docs→DOCX, Sheets→CSV, Slides→PPTX.
 
-**Setup**: Create OAuth credentials in Google Cloud Console, add redirect URI `http://localhost:5001/api/v1/google/callback`.
+**Setup**: Create OAuth credentials in Google Cloud Console, add redirect URI `http://localhost/api/v1/google/callback` (Docker) or `http://localhost:5001/api/v1/google/callback` (local dev).
 
 **Multi-user Support**: Each user has their own Google Drive connection. The OAuth state parameter carries user_id for proper token association.
 

@@ -104,7 +104,9 @@ class InfographicService:
         direction: str = "",
         logo_image_bytes: Optional[bytes] = None,
         logo_mime_type: str = "image/png",
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        edit_instructions: Optional[str] = None,
+        previous_image_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate an infographic image for a source.
@@ -160,7 +162,9 @@ class InfographicService:
                 source_content=content,
                 direction=direction,
                 has_logo=effective_logo is not None,
-                user_id=user_id
+                user_id=user_id,
+                edit_instructions=edit_instructions,
+                previous_image_prompt=previous_image_prompt
             )
 
             if not prompt_result.get("success"):
@@ -270,7 +274,9 @@ class InfographicService:
         source_content: str,
         direction: str,
         has_logo: bool = False,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        edit_instructions: Optional[str] = None,
+        previous_image_prompt: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate infographic image prompt using Claude.
@@ -278,6 +284,9 @@ class InfographicService:
         Educational Note: Claude analyzes the source content and creates
         a detailed image prompt describing the visual layout, sections,
         icons, and color scheme for the infographic.
+
+        When editing, the previous image prompt is provided as context
+        so Claude can refine it based on the user's edit instructions.
         """
         config = self._load_config()
 
@@ -301,12 +310,31 @@ class InfographicService:
                 "and how design elements should complement it."
             )
 
+        # Edit context — provides previous prompt + edit instructions for refinement
+        edit_context = ""
+        if previous_image_prompt and edit_instructions:
+            edit_context = (
+                "\n\n=== EDIT MODE ===\n"
+                "You are REFINING a previously generated infographic. "
+                "The user wants changes to the existing design.\n\n"
+                f"PREVIOUS IMAGE PROMPT:\n{previous_image_prompt}\n\n"
+                f"USER'S EDIT INSTRUCTIONS:\n{edit_instructions}\n\n"
+                "Apply the user's requested changes while keeping the rest of the "
+                "infographic design intact. Return the FULL updated JSON response "
+                "(not just the changes).\n"
+                "=== END EDIT MODE ==="
+            )
+
         # Build user message
         user_message = config["user_message"].format(
             source_section=source_section,
             direction=direction or "Create an informative infographic summarizing the key concepts.",
             logo_context=logo_context
         )
+
+        # Append edit context after the formatted message
+        if edit_context:
+            user_message += edit_context
 
         messages = [{"role": "user", "content": user_message}]
 
