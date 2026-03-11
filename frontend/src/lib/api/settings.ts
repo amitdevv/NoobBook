@@ -197,6 +197,182 @@ class DatabasesAPI {
 export const databasesAPI = new DatabasesAPI();
 
 // ============================================================================
+// MCP Connections Types and API
+// ============================================================================
+
+export type McpAuthType = 'none' | 'bearer' | 'api_key' | 'header';
+export type McpTransport = 'sse' | 'stdio';
+
+export interface McpStdioConfig {
+  command: string;
+  args: string[];
+  env_masked?: Record<string, string>;
+}
+
+export interface McpToolSummary {
+  name: string;
+  description: string;
+}
+
+export interface McpConnection {
+  id: string;
+  name: string;
+  description: string;
+  server_url: string;
+  transport: McpTransport;
+  auth_type: McpAuthType;
+  auth_config_masked: Record<string, string> | null;
+  stdio_config: McpStdioConfig | null;
+  tools_enabled: boolean;
+  cached_tools: McpToolSummary[] | null;
+  tools_cached_at: string | null;
+  is_active: boolean;
+  visible_to_all: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface McpResource {
+  uri: string;
+  name: string;
+  description: string;
+  mime_type: string | null;
+}
+
+export interface McpTool {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
+class McpAPI {
+  async listConnections(): Promise<McpConnection[]> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/settings/mcp`);
+      return response.data.connections || [];
+    } catch (error) {
+      log.error({ err: error }, 'failed to fetch MCP connections');
+      throw error;
+    }
+  }
+
+  async createConnection(payload: {
+    name: string;
+    transport?: McpTransport;
+    server_url?: string;
+    auth_type?: McpAuthType;
+    auth_config?: Record<string, string>;
+    stdio_config?: { command: string; args: string[]; env?: Record<string, string> };
+    description?: string;
+    tools_enabled?: boolean;
+  }): Promise<McpConnection> {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/settings/mcp`, payload);
+      return response.data.connection;
+    } catch (error) {
+      log.error({ err: error }, 'failed to create MCP connection');
+      throw error;
+    }
+  }
+
+  async deleteConnection(connectionId: string): Promise<void> {
+    try {
+      await axios.delete(`${API_BASE_URL}/settings/mcp/${connectionId}`);
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete MCP connection');
+      throw error;
+    }
+  }
+
+  async updateVisibility(connectionId: string, visibleToAll: boolean): Promise<McpConnection> {
+    try {
+      const response = await axios.patch(
+        `${API_BASE_URL}/settings/mcp/${connectionId}/visibility`,
+        { visible_to_all: visibleToAll }
+      );
+      return response.data.connection;
+    } catch (error) {
+      log.error({ err: error }, 'failed to update MCP visibility');
+      throw error;
+    }
+  }
+
+  async updateToolsEnabled(connectionId: string, enabled: boolean): Promise<McpConnection> {
+    try {
+      const response = await axios.patch(
+        `${API_BASE_URL}/settings/mcp/${connectionId}/tools-enabled`,
+        { tools_enabled: enabled }
+      );
+      return response.data.connection;
+    } catch (error) {
+      log.error({ err: error }, 'failed to update MCP tools-enabled');
+      throw error;
+    }
+  }
+
+  async validateConnection(payload: {
+    transport?: McpTransport;
+    server_url?: string;
+    auth_type?: McpAuthType;
+    auth_config?: Record<string, string>;
+    stdio_config?: { command: string; args: string[]; env?: Record<string, string> };
+  }): Promise<ValidationResult> {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/settings/mcp/validate`, {
+        transport: payload.transport || 'sse',
+        server_url: payload.server_url || '',
+        auth_type: payload.auth_type || 'none',
+        auth_config: payload.auth_config || {},
+        stdio_config: payload.stdio_config || {},
+      });
+      return {
+        valid: response.data.valid,
+        message: response.data.message,
+      };
+    } catch (error) {
+      log.error({ err: error }, 'failed to validate MCP connection');
+      const axiosErr = error as { response?: { data?: { error?: string; message?: string } } };
+      return {
+        valid: false,
+        message: axiosErr.response?.data?.error || axiosErr.response?.data?.message || 'Validation failed',
+      };
+    }
+  }
+
+  async listResources(connectionId: string): Promise<McpResource[]> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/settings/mcp/${connectionId}/resources`);
+      return response.data.resources || [];
+    } catch (error) {
+      log.error({ err: error }, 'failed to list MCP resources');
+      throw error;
+    }
+  }
+
+  async listTools(connectionId: string): Promise<McpTool[]> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/settings/mcp/${connectionId}/tools`);
+      return response.data.tools || [];
+    } catch (error) {
+      log.error({ err: error }, 'failed to list MCP tools');
+      throw error;
+    }
+  }
+
+  async refreshTools(connectionId: string): Promise<McpTool[]> {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/settings/mcp/${connectionId}/refresh-tools`);
+      return response.data.tools || [];
+    } catch (error) {
+      log.error({ err: error }, 'failed to refresh MCP tools');
+      throw error;
+    }
+  }
+}
+
+export const mcpAPI = new McpAPI();
+
+// ============================================================================
 // Users (RBAC) Types and API
 // ============================================================================
 

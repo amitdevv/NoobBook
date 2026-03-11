@@ -108,7 +108,7 @@ export interface ProcessedContent {
  */
 export const VIEWABLE_EXTENSIONS = [
   '.pdf', '.txt', '.docx', '.pptx', '.md', '.json', '.html', '.xml',  // Documents
-  '.link', '.research',                                                 // Web content
+  '.link', '.research', '.mcp',                                          // Web content / MCP
 ];
 
 export const NON_VIEWABLE_EXTENSIONS = [
@@ -343,6 +343,30 @@ class SourcesAPI {
       return response.data.source;
     } catch (error) {
       log.error({ err: error }, 'failed to add research source');
+      throw error;
+    }
+  }
+
+  /**
+   * Add an MCP source from an account-level MCP connection
+   * Educational Note: Snapshots selected resources from an MCP server,
+   * embeds them, and makes them searchable in chat via RAG.
+   */
+  async addMcpSource(
+    projectId: string,
+    connectionId: string,
+    resourceUris: string[],
+    name?: string,
+    description?: string
+  ): Promise<Source> {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/projects/${projectId}/sources/mcp`,
+        { connection_id: connectionId, resource_uris: resourceUris, name, description }
+      );
+      return response.data.source;
+    } catch (error) {
+      log.error({ err: error }, 'failed to add MCP source');
       throw error;
     }
   }

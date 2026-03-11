@@ -32,6 +32,7 @@ import {
   PencilSimple,
   Stop,
   ArrowClockwise,
+  Plug,
 } from '@phosphor-icons/react';
 import {
   DropdownMenu,
@@ -81,6 +82,7 @@ const getSourceIcon = (source: Source): { icon: typeof File; weight?: 'bold' } =
     case '.txt': return { icon: FileText, weight: 'bold' };
     case '.csv': return { icon: FileCsv, weight: 'bold' };
     case '.database': return { icon: Table, weight: 'bold' };
+    case '.mcp': return { icon: Plug, weight: 'bold' };
     case '.md': return { icon: MarkdownLogo, weight: 'bold' };
     case '.html': return { icon: FileHtml, weight: 'bold' };
     case '.json': case '.xml': return { icon: FileText, weight: 'bold' };
@@ -100,6 +102,7 @@ const getSourceIcon = (source: Source): { icon: typeof File; weight?: 'bold' } =
     case 'IMAGE': return { icon: Image, weight: 'bold' };
     case 'DATA': return { icon: Table, weight: 'bold' };
     case 'DATABASE': return { icon: Table, weight: 'bold' };
+    case 'MCP': return { icon: Plug, weight: 'bold' };
     case 'DOCUMENT': return { icon: FileText, weight: 'bold' };
     default: return { icon: File, weight: 'bold' };
   }

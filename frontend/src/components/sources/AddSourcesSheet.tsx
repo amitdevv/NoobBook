@@ -13,6 +13,7 @@ import { PasteTab } from './PasteTab';
 import { GoogleDriveTab } from './GoogleDriveTab';
 import { ResearchTab } from './ResearchTab';
 import { DatabaseTab } from './DatabaseTab';
+import { McpTab } from './McpTab';
 import { MAX_SOURCES } from '../../lib/api/sources';
 
 interface AddSourcesSheetProps {
@@ -25,6 +26,7 @@ interface AddSourcesSheetProps {
   onAddText: (content: string, name: string) => Promise<void>;
   onAddResearch: (topic: string, description: string, links: string[]) => Promise<void>;
   onAddDatabase: (connectionId: string, name?: string, description?: string) => Promise<void>;
+  onAddMcp: (connectionId: string, resourceUris: string[], name?: string, description?: string) => Promise<void>;
   onImportComplete: () => void;
   uploading: boolean;
 }
@@ -39,6 +41,7 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
   onAddText,
   onAddResearch,
   onAddDatabase,
+  onAddMcp,
   onImportComplete,
   uploading,
 }) => {
@@ -95,6 +98,12 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
               >
                 Database
               </TabsTrigger>
+              <TabsTrigger
+                value="mcp"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
+              >
+                MCP
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="upload" className="mt-6">
@@ -136,6 +145,17 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
                 isAtLimit={isAtLimit}
                 onAddDatabase={async (connectionId, name, description) => {
                   await onAddDatabase(connectionId, name, description);
+                  onImportComplete();
+                  onOpenChange(false);
+                }}
+              />
+            </TabsContent>
+
+            <TabsContent value="mcp" className="mt-6">
+              <McpTab
+                isAtLimit={isAtLimit}
+                onAddMcp={async (connectionId, resourceUris, name, description) => {
+                  await onAddMcp(connectionId, resourceUris, name, description);
                   onImportComplete();
                   onOpenChange(false);
                 }}

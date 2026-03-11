@@ -9,9 +9,12 @@ Educational Note: This module creates formatted context blocks for the system pr
 The context is rebuilt on every message to reflect the current state
 (active/inactive sources, new uploads, updated memories).
 """
+import logging
 from typing import Dict, Any, List, Optional
 
 from app.services.source_services import source_service
+
+logger = logging.getLogger(__name__)
 
 
 class ContextLoader:
@@ -133,6 +136,8 @@ class ContextLoader:
                 lines.append("  - Chat tool: analyze_csv_agent (for calculations/plots)")
             if file_ext == ".database":
                 lines.append("  - Chat tool: analyze_database_agent (for live SQL queries)")
+            if file_ext == ".mcp":
+                lines.append("  - Chat tool: search_sources (RAG search over MCP resources)")
             if summary_text:
                 lines.append(f"  - Summary: {summary_text}")
             lines.append("")
@@ -172,6 +177,7 @@ class ContextLoader:
             ".csv": "CSV Spreadsheet",
             ".research": "Research Document",
             ".database": "Database (Postgres/MySQL)",
+            ".mcp": "MCP Server Resources",
         }
 
         if file_ext in ext_map:
@@ -237,6 +243,45 @@ class ContextLoader:
 
         return "\n".join(lines)
 
+    def build_mcp_tools_context(self, user_id: Optional[str] = None) -> str:
+        """
+        Build context about available MCP tools for the system prompt.
+
+        Educational Note: Tells Claude about external MCP tools it can use
+        during chat. Includes a safety reminder for destructive actions.
+        """
+        if not user_id:
+            return ""
+
+        try:
+            from app.services.integrations.mcp.mcp_tool_service import mcp_tool_service
+
+            tools, _ = mcp_tool_service.get_available_tools(user_id=user_id)
+            if not tools:
+                return ""
+
+            lines = [
+                "",
+                "## MCP Tools (External Integrations)",
+                "",
+                "You have access to external tools from connected MCP servers.",
+                "These tools can perform real actions (create tickets, search data, etc.).",
+                "Always confirm with the user before performing destructive or irreversible actions.",
+                "",
+            ]
+
+            for tool in tools:
+                name = tool.get("name", "")
+                desc = tool.get("description", "")
+                lines.append(f"- **{name}**: {desc}")
+
+            lines.append("")
+            return "\n".join(lines)
+
+        except Exception as e:
+            logger.error("Failed to build MCP tools context: %s", e)
+            return ""
+
     def build_full_context(
         self,
         project_id: str,
@@ -244,10 +289,11 @@ class ContextLoader:
         selected_source_ids: Optional[List[str]] = None,
     ) -> str:
         """
-        Build complete context including sources and memory.
+        Build complete context including sources, memory, and MCP tools.
 
         Educational Note: Combines all context types for the system prompt.
-        Order: Memory context first (general context), then source context (specific tools).
+        Order: Memory context first (general context), then source context
+        (available tools), then MCP tools context (external integrations).
 
         Args:
             project_id: The project UUID
@@ -267,6 +313,11 @@ class ContextLoader:
         source_context = self.build_source_context(project_id, selected_source_ids=selected_source_ids)
         if source_context:
             parts.append(source_context)
+
+        # Add MCP tools context (external integrations)
+        mcp_context = self.build_mcp_tools_context(user_id=user_id)
+        if mcp_context:
+            parts.append(mcp_context)
 
         return "\n".join(parts)
 
