@@ -56,6 +56,7 @@ import {
   YoutubeLogo,
   CaretRight,
   Plus,
+  Plug,
 } from '@phosphor-icons/react';
 import { createLogger } from '@/lib/logger';
 
@@ -96,6 +97,7 @@ const getSourceIcon = (source: Source): typeof File => {
     case '.txt': return FileText;
     case '.csv': return FileCsv;
     case '.database': return Table;
+    case '.mcp': return Plug;
     case '.md': return MarkdownLogo;
     case '.html': return FileHtml;
     case '.json': case '.xml': return FileText;
@@ -115,6 +117,7 @@ const getSourceIcon = (source: Source): typeof File => {
     case 'IMAGE': return Image;
     case 'DATA': return Table;
     case 'DATABASE': return Table;
+    case 'MCP': return Plug;
     case 'DOCUMENT': return FileText;
     default: return File;
   }
@@ -428,6 +431,32 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   };
 
   /**
+   * Handle adding an MCP source
+   */
+  const handleAddMcp = async (connectionId: string, resourceUris: string[], name?: string, description?: string) => {
+    if (sources.length >= MAX_SOURCES) {
+      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
+      return;
+    }
+
+    try {
+      await sourcesAPI.addMcpSource(projectId, connectionId, resourceUris, name, description);
+      success('MCP source added successfully');
+      await loadSources();
+      setSheetOpen(false);
+    } catch (err: unknown) {
+      log.error({ err }, 'failed to add MCP source');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add MCP source';
+      if (typeof err === 'object' && err !== null && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { error?: string } } };
+        error(axiosErr.response?.data?.error || errorMessage);
+      } else {
+        error(errorMessage);
+      }
+    }
+  };
+
+  /**
    * Handle source deletion
    */
   const handleDeleteSource = async (sourceId: string, sourceName: string) => {
@@ -695,6 +724,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         onAddText={handleAddText}
         onAddResearch={handleAddResearch}
         onAddDatabase={handleAddDatabase}
+        onAddMcp={handleAddMcp}
         onImportComplete={loadSources}
         uploading={uploading}
       />

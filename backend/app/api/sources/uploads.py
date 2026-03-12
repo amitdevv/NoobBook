@@ -32,6 +32,7 @@ Routes:
 - POST /projects/<id>/sources/text     - Add pasted text source
 - POST /projects/<id>/sources/research - Add AI research source
 - POST /projects/<id>/sources/database - Add database source (Postgres/MySQL)
+- POST /projects/<id>/sources/mcp      - Add MCP source (external data via MCP servers)
 """
 from flask import jsonify, request, current_app
 from app.api.sources import sources_bp
@@ -320,4 +321,55 @@ def add_database_source(project_id: str):
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         current_app.logger.error(f"Error adding database source: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@sources_bp.route('/projects/<project_id>/sources/mcp', methods=['POST'])
+def add_mcp_source(project_id: str):
+    """
+    Add an MCP source (external data via MCP server) to a project.
+
+    Educational Note: MCP sources are connected at the account level
+    (settings/mcp) and then attached to projects. Users select which
+    resources to snapshot, and the content is embedded for RAG search.
+
+    Request Body:
+        {
+            "connection_id": "uuid",              # required
+            "resource_uris": ["uri1", "uri2"],    # required
+            "name": "GitHub Docs",                # optional display name
+            "description": "Repository docs..."   # optional
+        }
+    """
+    try:
+        identity = get_request_identity()
+        data = request.get_json() or {}
+
+        connection_id = data.get('connection_id')
+        if not connection_id:
+            return jsonify({'success': False, 'error': 'connection_id is required'}), 400
+
+        resource_uris = data.get('resource_uris', [])
+        if not resource_uris:
+            return jsonify({'success': False, 'error': 'resource_uris is required (non-empty list)'}), 400
+
+        source = source_service.add_mcp_source(
+            project_id=project_id,
+            connection_id=connection_id,
+            resource_uris=resource_uris,
+            name=data.get('name'),
+            description=data.get('description', ''),
+            user_id=identity.user_id,
+        )
+
+        return jsonify({
+            'success': True,
+            'source': source,
+            'message': 'MCP source added successfully'
+        }), 201
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error adding MCP source: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

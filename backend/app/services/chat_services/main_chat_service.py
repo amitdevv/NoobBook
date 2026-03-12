@@ -28,6 +28,7 @@ from app.services.tool_executors import csv_analyzer_agent_executor
 from app.services.tool_executors import database_analyzer_agent_executor
 from app.services.tool_executors import studio_signal_executor
 from app.services.integrations.knowledge_bases import knowledge_base_service
+from app.services.integrations.mcp.mcp_tool_service import mcp_tool_service
 from app.services.ai_services.chat_naming_service import chat_naming_service
 from app.services.background_services import task_service
 from flask import has_request_context
@@ -93,7 +94,8 @@ class MainChatService:
         has_active_sources: bool,
         has_csv_sources: bool = False,
         has_database_sources: bool = False,
-    ) -> List[Dict[str, Any]]:
+        user_id: Optional[str] = None,
+    ) -> Tuple[List[Dict[str, Any]], Dict]:
         """
         Get tools list for Claude API call.
 
@@ -102,14 +104,16 @@ class MainChatService:
         CSV analyzer tool is available when there are CSV sources.
         Database analyzer tool is available when there are DATABASE sources.
         Knowledge base tools (Jira, Notion, GitHub) are added if configured.
+        MCP tools are added if the user has tool-enabled MCP connections.
 
         Args:
             has_active_sources: Whether project has active non-CSV sources
             has_csv_sources: Whether project has active CSV sources
             has_database_sources: Whether project has active DATABASE sources
+            user_id: The requesting user's ID (for MCP tool access)
 
         Returns:
-            List of tool definitions
+            Tuple of (tool definitions list, MCP tool registry dict)
         """
         # Always include memory and studio_signal tools
         tools = [
@@ -129,7 +133,18 @@ class MainChatService:
         # Add all configured knowledge base tools (Jira, Notion, GitHub, etc.)
         tools.extend(knowledge_base_service.get_available_tools())
 
-        return tools
+        # Add MCP tools if user has tool-enabled connections
+        mcp_registry: Dict = {}
+        if user_id:
+            try:
+                mcp_tools, mcp_registry = mcp_tool_service.get_available_tools(user_id=user_id)
+                if mcp_tools:
+                    tools.extend(mcp_tools)
+                    logger.info("Added %d MCP tools for user %s", len(mcp_tools), user_id)
+            except Exception as e:
+                logger.error("Failed to load MCP tools for user %s: %s", user_id, e)
+
+        return tools, mcp_registry
 
     def _build_system_prompt(
         self,
@@ -167,6 +182,7 @@ class MainChatService:
         tool_name: str,
         tool_input: Dict[str, Any],
         user_id: Optional[str] = None,
+        mcp_registry: Optional[Dict] = None,
     ) -> str:
         """
         Execute a tool and return result string.
@@ -256,6 +272,14 @@ class MainChatService:
                 tool_input=tool_input
             )
 
+        elif mcp_registry and mcp_tool_service.can_handle(tool_name):
+            # Route to MCP tool service (Freshdesk, GitHub MCP, etc.)
+            return mcp_tool_service.execute(
+                tool_name=tool_name,
+                tool_input=tool_input,
+                registry=mcp_registry,
+            )
+
         else:
             return f"Unknown tool: {tool_name}"
 
@@ -314,10 +338,11 @@ class MainChatService:
         csv_sources = [s for s in active_sources if _file_ext(s) == ".csv"]
         database_sources = [s for s in active_sources if _file_ext(s) == ".database"]
         non_csv_sources = [s for s in active_sources if _file_ext(s) not in (".csv", ".database")]
-        tools = self._get_tools(
+        tools, mcp_registry = self._get_tools(
             has_active_sources=bool(non_csv_sources),
             has_csv_sources=bool(csv_sources),
             has_database_sources=bool(database_sources),
+            user_id=user_id,
         )
 
         try:
@@ -386,6 +411,7 @@ class MainChatService:
                         tool_name,
                         tool_input,
                         user_id=user_id,
+                        mcp_registry=mcp_registry,
                     )
 
                     # Add tool result as user message

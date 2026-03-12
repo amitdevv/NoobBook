@@ -69,6 +69,7 @@ class SourceProcessingService:
         ".flac": "audio",
         ".link": "link",  # Handles both website URLs and YouTube
         ".database": "database",  # Database sources (Postgres/MySQL)
+        ".mcp": "mcp",  # MCP server resources
         ".research": "research",  # Deep research source
     }
 
@@ -175,6 +176,10 @@ class SourceProcessingService:
             elif processor_type == "database":
                 from app.services.source_services.source_processing.database_processor import process_database
                 return process_database(project_id, source_id, source, raw_file_path, source_service)
+
+            elif processor_type == "mcp":
+                from app.services.source_services.source_processing.mcp_processor import process_mcp
+                return process_mcp(project_id, source_id, source, raw_file_path, source_service)
 
             elif processor_type == "research":
                 from app.services.source_services.source_processing.research_processor import process_research

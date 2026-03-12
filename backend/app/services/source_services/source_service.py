@@ -24,6 +24,7 @@ from app.services.source_services.source_upload import (
     upload_text,
     upload_research,
     add_database_source,
+    add_mcp_source,
 )
 # Local path utils used for temp file staging during source processing
 from app.utils.path_utils import (
@@ -383,6 +384,33 @@ class SourceService:
                 user_id=user_id,
             )
         return add_database_source(project_id, connection_id, name, description)
+
+    def add_mcp_source(
+        self,
+        project_id: str,
+        connection_id: str,
+        resource_uris: List[str],
+        name: Optional[str] = None,
+        description: str = "",
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Add an MCP source to a project.
+
+        Educational Note: This creates an MCP source that stores a small
+        `.mcp` metadata file in Supabase Storage and triggers processing
+        to snapshot selected resources, embed them, and make them searchable.
+        """
+        if user_id:
+            return add_mcp_source(
+                project_id,
+                connection_id,
+                resource_uris,
+                name,
+                description,
+                user_id=user_id,
+            )
+        return add_mcp_source(project_id, connection_id, resource_uris, name, description)
 
     # =========================================================================
     # Processing Delegation (thin wrappers)

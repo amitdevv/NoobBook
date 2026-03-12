@@ -34,8 +34,8 @@ import {
   ArrowSquareOut,
   Warning,
 } from '@phosphor-icons/react';
-import { googleDriveAPI, databasesAPI } from '@/lib/api/settings';
-import type { GoogleStatus, DatabaseConnection, DatabaseType } from '@/lib/api/settings';
+import { googleDriveAPI, databasesAPI, mcpAPI } from '@/lib/api/settings';
+import type { GoogleStatus, DatabaseConnection, DatabaseType, McpConnection, McpAuthType, McpTransport } from '@/lib/api/settings';
 import { useToast } from '@/components/ui/toast';
 import { createLogger } from '@/lib/logger';
 
@@ -73,8 +73,40 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
     description: '',
   });
 
+  // MCP State
+  const [mcpConnections, setMcpConnections] = useState<McpConnection[]>([]);
+  const [mcpLoading, setMcpLoading] = useState(false);
+  const [mcpCreating, setMcpCreating] = useState(false);
+  const [mcpValidating, setMcpValidating] = useState(false);
+  const [showMcpToken, setShowMcpToken] = useState(false);
+  const [mcpValidation, setMcpValidation] = useState<{ valid?: boolean; message?: string }>({});
+  const [mcpForm, setMcpForm] = useState<{
+    name: string;
+    transport: McpTransport;
+    server_url: string;
+    auth_type: McpAuthType;
+    auth_token: string;
+    stdio_command: string;
+    stdio_args: string;
+    stdio_env: string;
+    description: string;
+    tools_enabled: boolean;
+  }>({
+    name: '',
+    transport: 'stdio',
+    server_url: '',
+    auth_type: 'none',
+    auth_token: '',
+    stdio_command: '',
+    stdio_args: '',
+    stdio_env: '',
+    description: '',
+    tools_enabled: true,
+  });
+
   // Confirmation dialog state
   const [deleteDbId, setDeleteDbId] = useState<string | null>(null);
+  const [deleteMcpId, setDeleteMcpId] = useState<string | null>(null);
   const [disconnectGoogleOpen, setDisconnectGoogleOpen] = useState(false);
 
   const { success, error, info } = useToast();
@@ -82,6 +114,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
   useEffect(() => {
     loadGoogleStatus();
     loadDatabases();
+    loadMcpConnections();
   }, []);
 
   const loadGoogleStatus = async () => {
@@ -200,6 +233,155 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
       log.error({ err }, 'failed to delete database');
       const axiosErr = err as { response?: { data?: { error?: string } } };
       error(axiosErr.response?.data?.error || 'Failed to delete database connection');
+    }
+  };
+
+  // MCP Handlers
+  const loadMcpConnections = async () => {
+    setMcpLoading(true);
+    try {
+      const conns = await mcpAPI.listConnections();
+      setMcpConnections(conns);
+    } catch (err) {
+      log.error({ err }, 'failed to load MCP connections');
+      error('Failed to load MCP connections');
+    } finally {
+      setMcpLoading(false);
+    }
+  };
+
+  const buildMcpAuthConfig = (): Record<string, string> => {
+    const token = mcpForm.auth_token.trim();
+    if (!token) return {};
+    switch (mcpForm.auth_type) {
+      case 'bearer': return { token };
+      case 'api_key': return { key: token };
+      case 'header': return { header_name: 'Authorization', header_value: token };
+      default: return {};
+    }
+  };
+
+  /**
+   * Parse stdio env vars from a multiline string (KEY=VALUE format).
+   * Educational Note: Users enter env vars like FRESHDESK_API_KEY=abc123,
+   * one per line. We parse them into a key-value object for the API.
+   */
+  const parseStdioEnv = (): Record<string, string> => {
+    const env: Record<string, string> = {};
+    for (const line of mcpForm.stdio_env.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.includes('=')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      const key = trimmed.substring(0, eqIdx).trim();
+      const value = trimmed.substring(eqIdx + 1).trim();
+      if (key) env[key] = value;
+    }
+    return env;
+  };
+
+  const buildStdioConfig = () => ({
+    command: mcpForm.stdio_command.trim(),
+    args: mcpForm.stdio_args.trim() ? mcpForm.stdio_args.trim().split(/\s+/) : [],
+    env: parseStdioEnv(),
+  });
+
+  const handleValidateMcp = async () => {
+    setMcpValidating(true);
+    try {
+      const result = await mcpAPI.validateConnection({
+        transport: mcpForm.transport,
+        server_url: mcpForm.transport === 'sse' ? mcpForm.server_url.trim() : undefined,
+        auth_type: mcpForm.transport === 'sse' ? mcpForm.auth_type : 'none',
+        auth_config: mcpForm.transport === 'sse' ? buildMcpAuthConfig() : undefined,
+        stdio_config: mcpForm.transport === 'stdio' ? buildStdioConfig() : undefined,
+      });
+      setMcpValidation(result);
+      if (result.valid) {
+        success(result.message || 'Connection successful');
+      } else {
+        error(result.message || 'Validation failed');
+      }
+    } catch (err) {
+      log.error({ err }, 'MCP validation request failed');
+      error('Failed to reach backend for validation');
+    } finally {
+      setMcpValidating(false);
+    }
+  };
+
+  const handleCreateMcp = async () => {
+    setMcpCreating(true);
+    try {
+      await mcpAPI.createConnection({
+        name: mcpForm.name.trim(),
+        transport: mcpForm.transport,
+        server_url: mcpForm.transport === 'sse' ? mcpForm.server_url.trim() : undefined,
+        auth_type: mcpForm.transport === 'sse' ? mcpForm.auth_type : 'none',
+        auth_config: mcpForm.transport === 'sse' ? buildMcpAuthConfig() : undefined,
+        stdio_config: mcpForm.transport === 'stdio' ? buildStdioConfig() : undefined,
+        description: mcpForm.description.trim() || undefined,
+        tools_enabled: mcpForm.tools_enabled,
+      });
+      success('MCP connection saved');
+      setMcpForm({
+        name: '', transport: 'stdio', server_url: '', auth_type: 'none',
+        auth_token: '', stdio_command: '', stdio_args: '', stdio_env: '',
+        description: '', tools_enabled: true,
+      });
+      setMcpValidation({});
+      await loadMcpConnections();
+    } catch (err) {
+      log.error({ err }, 'failed to create MCP connection');
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      error(axiosErr.response?.data?.error || 'Failed to save MCP connection');
+    } finally {
+      setMcpCreating(false);
+    }
+  };
+
+  const handleToggleMcpToolsEnabled = async (connectionId: string, enabled: boolean) => {
+    setMcpConnections((prev) =>
+      prev.map((c) => (c.id === connectionId ? { ...c, tools_enabled: enabled } : c))
+    );
+    try {
+      await mcpAPI.updateToolsEnabled(connectionId, enabled);
+      success(enabled ? 'Tools enabled in chat' : 'Tools disabled');
+    } catch (err) {
+      setMcpConnections((prev) =>
+        prev.map((c) => (c.id === connectionId ? { ...c, tools_enabled: !enabled } : c))
+      );
+      log.error({ err }, 'failed to toggle MCP tools');
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      error(axiosErr.response?.data?.error || 'Failed to update tools setting');
+    }
+  };
+
+  const handleDeleteMcp = async (connectionId: string) => {
+    try {
+      await mcpAPI.deleteConnection(connectionId);
+      success('MCP connection deleted');
+      await loadMcpConnections();
+    } catch (err) {
+      log.error({ err }, 'failed to delete MCP connection');
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      error(axiosErr.response?.data?.error || 'Failed to delete MCP connection');
+    }
+  };
+
+  const handleToggleMcpVisibility = async (connectionId: string, visibleToAll: boolean) => {
+    setMcpConnections((prev) =>
+      prev.map((c) => (c.id === connectionId ? { ...c, visible_to_all: visibleToAll } : c))
+    );
+    try {
+      await mcpAPI.updateVisibility(connectionId, visibleToAll);
+      success(visibleToAll ? 'Visible to all users' : 'Admin only');
+    } catch (err) {
+      setMcpConnections((prev) =>
+        prev.map((c) => (c.id === connectionId ? { ...c, visible_to_all: !visibleToAll } : c))
+      );
+      log.error({ err }, 'failed to update MCP visibility');
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      error(axiosErr.response?.data?.error || 'Failed to update visibility');
     }
   };
 
@@ -474,6 +656,333 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
           )}
         </div>
       </div>
+
+      <Separator />
+
+      {/* MCP Connections Section */}
+      <div>
+        <h3 className="text-sm font-semibold mb-3">MCP Connections</h3>
+        <div className="space-y-4">
+          {mcpLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <CircleNotch size={20} className="animate-spin" />
+            </div>
+          ) : (
+            <>
+              {mcpConnections.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No MCP connections yet. Add one below to connect external tools and data.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {mcpConnections.map((conn) => (
+                    <div
+                      key={conn.id}
+                      className="flex items-start justify-between gap-4 rounded-lg border p-3 bg-muted/20"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{conn.name}</p>
+                          <span className="text-[11px] px-1.5 py-0.5 rounded bg-stone-200 text-stone-600">
+                            {conn.transport}
+                          </span>
+                          {conn.cached_tools && conn.cached_tools.length > 0 && (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
+                              {conn.cached_tools.length} tools
+                            </span>
+                          )}
+                        </div>
+                        {conn.description && (
+                          <p className="text-xs text-muted-foreground">{conn.description}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground font-mono break-all">
+                          {conn.transport === 'stdio'
+                            ? `${conn.stdio_config?.command || ''} ${(conn.stdio_config?.args || []).join(' ')}`.trim()
+                            : conn.server_url}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <label className="flex items-center gap-2 cursor-pointer" title="Enable tools in chat">
+                          <Switch
+                            checked={conn.tools_enabled}
+                            onCheckedChange={(checked) => handleToggleMcpToolsEnabled(conn.id, checked)}
+                          />
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {conn.tools_enabled ? 'Chat tools' : 'Tools off'}
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <Switch
+                            checked={conn.visible_to_all}
+                            onCheckedChange={(checked) => handleToggleMcpVisibility(conn.id, checked)}
+                          />
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {conn.visible_to_all ? 'All users' : 'Admin only'}
+                          </span>
+                        </label>
+                        <Button
+                          variant="soft"
+                          size="sm"
+                          onClick={() => setDeleteMcpId(conn.id)}
+                        >
+                          <Trash size={16} className="mr-1" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="rounded-lg border p-4 space-y-3">
+                <p className="text-sm font-medium">Add MCP connection</p>
+
+                <div className="grid gap-2">
+                  <Label>Name</Label>
+                  <Input
+                    value={mcpForm.name}
+                    onChange={(e) => setMcpForm((s) => ({ ...s, name: e.target.value }))}
+                    placeholder="Freshdesk"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Transport</Label>
+                  <Select
+                    value={mcpForm.transport}
+                    onValueChange={(v) => {
+                      setMcpForm((s) => ({ ...s, transport: v as McpTransport }));
+                      setMcpValidation({});
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="stdio">Stdio (subprocess)</SelectItem>
+                      <SelectItem value="sse">SSE (HTTP)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* SSE-specific fields */}
+                {mcpForm.transport === 'sse' && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label>Server URL</Label>
+                      <Input
+                        value={mcpForm.server_url}
+                        onChange={(e) => {
+                          setMcpForm((s) => ({ ...s, server_url: e.target.value }));
+                          setMcpValidation({});
+                        }}
+                        placeholder="https://mcp-server.example.com/sse"
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Auth Type</Label>
+                      <Select
+                        value={mcpForm.auth_type}
+                        onValueChange={(v) => {
+                          setMcpForm((s) => ({ ...s, auth_type: v as McpAuthType, auth_token: '' }));
+                          setMcpValidation({});
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="bearer">Bearer Token</SelectItem>
+                          <SelectItem value="api_key">API Key</SelectItem>
+                          <SelectItem value="header">Custom Header</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {mcpForm.auth_type !== 'none' && (
+                      <div className="grid gap-2">
+                        <div className="flex items-center justify-between">
+                          <Label>
+                            {mcpForm.auth_type === 'bearer' ? 'Token' : mcpForm.auth_type === 'api_key' ? 'API Key' : 'Header Value'}
+                          </Label>
+                          <Button variant="ghost" size="sm" onClick={() => setShowMcpToken((s) => !s)} type="button">
+                            {showMcpToken ? <EyeSlash size={16} /> : <Eye size={16} />}
+                          </Button>
+                        </div>
+                        <Input
+                          type={showMcpToken ? 'text' : 'password'}
+                          value={mcpForm.auth_token}
+                          onChange={(e) => {
+                            setMcpForm((s) => ({ ...s, auth_token: e.target.value }));
+                            setMcpValidation({});
+                          }}
+                          placeholder={mcpForm.auth_type === 'bearer' ? 'Bearer token' : mcpForm.auth_type === 'api_key' ? 'API key' : 'Header value'}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Stdio-specific fields */}
+                {mcpForm.transport === 'stdio' && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label>Command</Label>
+                      <Input
+                        value={mcpForm.stdio_command}
+                        onChange={(e) => {
+                          setMcpForm((s) => ({ ...s, stdio_command: e.target.value }));
+                          setMcpValidation({});
+                        }}
+                        placeholder="uvx"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Allowed: uvx, npx, node, python3, python, docker
+                      </p>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Arguments</Label>
+                      <Input
+                        value={mcpForm.stdio_args}
+                        onChange={(e) => setMcpForm((s) => ({ ...s, stdio_args: e.target.value }))}
+                        placeholder="freshdesk-mcp"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Space-separated arguments passed to the command
+                      </p>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Environment Variables</Label>
+                        <Button variant="ghost" size="sm" onClick={() => setShowMcpToken((s) => !s)} type="button">
+                          {showMcpToken ? <EyeSlash size={16} /> : <Eye size={16} />}
+                        </Button>
+                      </div>
+                      <textarea
+                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        rows={3}
+                        value={showMcpToken ? mcpForm.stdio_env : mcpForm.stdio_env.split('\n').map(l => {
+                          const eq = l.indexOf('=');
+                          return eq > 0 ? l.substring(0, eq + 1) + '***' : l;
+                        }).join('\n')}
+                        readOnly={!showMcpToken}
+                        onChange={(e) => {
+                          if (!showMcpToken) return;
+                          setMcpForm((s) => ({ ...s, stdio_env: e.target.value }));
+                          setMcpValidation({});
+                        }}
+                        placeholder={'FRESHDESK_API_KEY=your-key\nFRESHDESK_DOMAIN=company.freshdesk.com'}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        One per line, KEY=VALUE format. Secrets are stored server-side.
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {mcpValidation.message && (
+                  <p className={`text-xs ${mcpValidation.valid ? 'text-green-600' : 'text-red-600'}`}>
+                    {mcpValidation.message}
+                  </p>
+                )}
+
+                <div className="grid gap-2">
+                  <Label>Description (optional)</Label>
+                  <Input
+                    value={mcpForm.description}
+                    onChange={(e) => setMcpForm((s) => ({ ...s, description: e.target.value }))}
+                    placeholder="Freshdesk support ticket management"
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Switch
+                    checked={mcpForm.tools_enabled}
+                    onCheckedChange={(checked) => setMcpForm((s) => ({ ...s, tools_enabled: checked }))}
+                  />
+                  <span className="text-sm">Enable tools in chat</span>
+                  <span className="text-xs text-muted-foreground">(Claude can call this server's tools during conversations)</span>
+                </label>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="soft"
+                    onClick={handleValidateMcp}
+                    disabled={mcpValidating || (mcpForm.transport === 'sse' ? !mcpForm.server_url.trim() : !mcpForm.stdio_command.trim())}
+                  >
+                    {mcpValidating ? (
+                      <>
+                        <CircleNotch size={16} className="mr-2 animate-spin" />
+                        Testing...
+                      </>
+                    ) : (
+                      'Test connection'
+                    )}
+                  </Button>
+                  <Button
+                    onClick={handleCreateMcp}
+                    disabled={
+                      mcpCreating ||
+                      !mcpForm.name.trim() ||
+                      (mcpForm.transport === 'sse' ? !mcpForm.server_url.trim() : !mcpForm.stdio_command.trim())
+                    }
+                  >
+                    {mcpCreating ? (
+                      <>
+                        <CircleNotch size={16} className="mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save'
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Connect to MCP servers to use their tools in chat and import resources as sources.
+                Stdio transport runs the server as a subprocess (e.g., uvx freshdesk-mcp).
+                SSE transport connects via HTTP.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Delete MCP Confirmation */}
+      <AlertDialog open={!!deleteMcpId} onOpenChange={(open) => !open && setDeleteMcpId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Warning size={20} className="text-destructive" />
+              Delete MCP Connection
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{mcpConnections.find(c => c.id === deleteMcpId)?.name}</strong>? Projects using this connection will lose access.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="soft" onClick={() => setDeleteMcpId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteMcpId) {
+                  handleDeleteMcp(deleteMcpId);
+                  setDeleteMcpId(null);
+                }
+              }}
+            >
+              Delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Database Confirmation */}
       <AlertDialog open={!!deleteDbId} onOpenChange={(open) => !open && setDeleteDbId(null)}>
