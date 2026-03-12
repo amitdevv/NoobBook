@@ -60,7 +60,13 @@ command -v python3 >/dev/null 2>&1 || error "Python3 is not installed. Install v
 
 success "Docker and Docker Compose found ($COMPOSE)"
 
-# Check for port conflicts before starting anything
+# Stop any existing NoobBook/Supabase containers so ports are freed before checks.
+# This makes setup.sh safe to re-run without manually stopping first.
+info "Stopping any existing containers..."
+$COMPOSE -f "$ROOT_DIR/docker-compose.yml" down 2>/dev/null || true
+$COMPOSE -f "$SCRIPT_DIR/supabase/docker-compose.yml" down 2>/dev/null || true
+
+# Check for port conflicts (now that our own containers are stopped)
 check_port() {
     local port="$1" service="$2"
     if lsof -iTCP:"$port" -sTCP:LISTEN -P -n >/dev/null 2>&1; then
@@ -286,9 +292,9 @@ fi
 # macOS Docker doesn't support xattr, so we use MinIO for S3-compatible storage
 info "Creating MinIO storage bucket..."
 sleep 5  # Wait for MinIO to be fully ready
-MINIO_USER=$(grep -m1 '^MINIO_ROOT_USER=' "$SUPABASE_ENV" 2>/dev/null | cut -d= -f2-)
+MINIO_USER=$(grep -m1 '^MINIO_ROOT_USER=' "$SUPABASE_ENV" 2>/dev/null | cut -d= -f2- || true)
 MINIO_USER="${MINIO_USER:-supabase}"
-MINIO_PASS=$(grep -m1 '^MINIO_ROOT_PASSWORD=' "$SUPABASE_ENV" 2>/dev/null | cut -d= -f2-)
+MINIO_PASS=$(grep -m1 '^MINIO_ROOT_PASSWORD=' "$SUPABASE_ENV" 2>/dev/null | cut -d= -f2- || true)
 MINIO_PASS="${MINIO_PASS:-supabase123}"
 if docker exec supabase-minio mc alias set local http://localhost:9000 "$MINIO_USER" "$MINIO_PASS" >/dev/null 2>&1; then
     docker exec supabase-minio mc mb local/storage --ignore-existing >/dev/null 2>&1
