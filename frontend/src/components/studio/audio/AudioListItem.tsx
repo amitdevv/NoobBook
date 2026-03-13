@@ -28,6 +28,10 @@ interface AudioListItemProps {
   isEditing?: boolean;
   isGenerating?: boolean;
   defaultEditInput?: string;
+  /** Whether the edit input is currently visible (controlled by parent) */
+  isEditOpen?: boolean;
+  /** Toggle edit input visibility (controlled by parent) */
+  onToggleEdit?: () => void;
 }
 
 export const AudioListItem: React.FC<AudioListItemProps> = ({
@@ -47,19 +51,18 @@ export const AudioListItem: React.FC<AudioListItemProps> = ({
   isEditing = false,
   isGenerating = false,
   defaultEditInput = '',
+  isEditOpen = false,
+  onToggleEdit,
 }) => {
   // isActive: this job is loaded (playing or paused) -- show timeline
   const isActive = playingJobId === job.id;
   // isPlaying: actually producing audio right now -- animate bars, show pause icon
   const isPlaying = isActive && !isPaused;
 
-  const [showEditInput, setShowEditInput] = useState(isEditing);
-  const [editInput, setEditInput] = useState(defaultEditInput);
+  // Edit input visibility is controlled by parent (isEditOpen) OR by active editing state
+  const showEditInput = isEditOpen || isEditing;
 
-  // Sync with external editing state
-  useEffect(() => {
-    setShowEditInput(isEditing);
-  }, [isEditing]);
+  const [editInput, setEditInput] = useState(defaultEditInput);
 
   // Sync edit input when defaultEditInput changes (e.g. after failed edit preserves input)
   useEffect(() => {
@@ -69,7 +72,7 @@ export const AudioListItem: React.FC<AudioListItemProps> = ({
   const handleEdit = () => {
     if (editInput.trim() && onEdit) {
       onEdit(job, editInput.trim());
-      setShowEditInput(false);
+      onToggleEdit?.(); // Close the edit input after submitting
     }
   };
 
@@ -118,7 +121,7 @@ export const AudioListItem: React.FC<AudioListItemProps> = ({
               size="sm"
               variant="ghost"
               className="h-7 w-7 p-0"
-              onClick={() => setShowEditInput(!showEditInput)}
+              onClick={() => onToggleEdit?.()}
               disabled={isGenerating}
             >
               <PencilSimple size={16} />
