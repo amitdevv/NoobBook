@@ -19,7 +19,9 @@ def create_email_job(
     job_id: str,
     source_id: str,
     source_name: str,
-    direction: str
+    direction: str,
+    parent_job_id: Optional[str] = None,
+    edit_instructions: Optional[str] = None
 ) -> Dict[str, Any]:
     job_data = {
         "id": job_id,
@@ -29,6 +31,8 @@ def create_email_job(
         "status": "pending",
         "progress": "Initializing...",
         "error": None,
+        "parent_job_id": parent_job_id,
+        "edit_instructions": edit_instructions,
         "status_message": "Initializing...",
         "error_message": None,
         "template_name": None,

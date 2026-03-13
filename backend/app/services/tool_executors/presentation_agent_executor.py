@@ -9,7 +9,7 @@ HTML slides, it captures screenshots and exports to PPTX.
 import logging
 import shutil
 import tempfile
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import uuid
 from pathlib import Path
 
@@ -34,7 +34,12 @@ class PresentationAgentExecutor:
         self,
         project_id: str,
         source_id: str,
-        direction: str = ""
+        direction: str = "",
+        edit_instructions: Optional[str] = None,
+        previous_markdown: Optional[str] = None,
+        previous_title: Optional[str] = None,
+        parent_job_id: Optional[str] = None,
+        parent_source_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Execute presentation generation as a background task.
@@ -43,6 +48,11 @@ class PresentationAgentExecutor:
             project_id: The project ID
             source_id: Source to generate presentation from
             direction: User's direction/guidance (optional)
+            edit_instructions: Instructions for refining a previous presentation (optional)
+            previous_markdown: Slide HTML content from a parent job to refine (optional)
+            previous_title: Title from a parent job (optional)
+            parent_job_id: UUID of the parent job being edited (optional)
+            parent_source_name: Source name from parent job (optional)
 
         Returns:
             Job info with status and job_id for polling
@@ -56,14 +66,20 @@ class PresentationAgentExecutor:
         from app.utils.presentation_export_utils import create_pptx_from_screenshots
 
         # Get source info
-        source = source_service.get_source(project_id, source_id)
-        if not source:
-            return {
-                "success": False,
-                "error": f"Source {source_id} not found"
-            }
-
-        source_name = source.get("name", "Unknown Source")
+        source_name = "No Source"
+        if source_id:
+            source = source_service.get_source(project_id, source_id)
+            if not source:
+                if previous_markdown:
+                    # Edit mode — source may be deleted; inherit name from parent job
+                    source_name = parent_source_name or "No Source"
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Source {source_id} not found"
+                    }
+            else:
+                source_name = source.get("name", "Unknown Source")
 
         # Create job
         job_id = str(uuid.uuid4())
@@ -73,7 +89,9 @@ class PresentationAgentExecutor:
             job_id=job_id,
             source_id=source_id,
             source_name=source_name,
-            direction=direction
+            direction=direction,
+            parent_job_id=parent_job_id,
+            edit_instructions=edit_instructions
         )
 
         # Launch agent as background task
@@ -87,7 +105,10 @@ class PresentationAgentExecutor:
                     project_id=project_id,
                     source_id=source_id,
                     job_id=job_id,
-                    direction=direction
+                    direction=direction,
+                    edit_instructions=edit_instructions,
+                    previous_markdown=previous_markdown,
+                    previous_title=previous_title
                 )
 
                 if not result.get("success"):

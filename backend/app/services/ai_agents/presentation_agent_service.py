@@ -14,7 +14,7 @@ After generation:
 
 import logging
 import uuid
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -53,7 +53,10 @@ class PresentationAgentService:
         project_id: str,
         source_id: str,
         job_id: str,
-        direction: str = ""
+        direction: str = "",
+        edit_instructions: Optional[str] = None,
+        previous_markdown: Optional[str] = None,
+        previous_title: Optional[str] = None
     ) -> Dict[str, Any]:
         """Run the agent to generate a presentation."""
         config = self._load_config()
@@ -70,8 +73,11 @@ class PresentationAgentService:
             started_at=started_at
         )
 
-        # Get source content using shared utility (larger limit for presentations)
-        source_content = get_source_content(project_id, source_id, max_chars=20000)
+        # Get source content — skip in edit mode since previous presentation already encodes it
+        if previous_markdown:
+            source_content = "Editing a previous presentation — see the PREVIOUS PRESENTATION section below."
+        else:
+            source_content = get_source_content(project_id, source_id, max_chars=20000)
 
         # Build user message from config
         effective_direction = direction if direction else config.get("default_direction", "")
@@ -79,6 +85,21 @@ class PresentationAgentService:
             source_content=source_content,
             direction=effective_direction
         )
+
+        # Edit mode: append previous presentation content + edit instructions to user message
+        if previous_markdown:
+            edit_context = (
+                f"\n\n=== PREVIOUS PRESENTATION (refine this based on the edit instructions) ===\n"
+                f"Previous Title: {previous_title or 'Untitled'}\n\n"
+                f"{previous_markdown}\n"
+                f"=== END PREVIOUS PRESENTATION ===\n\n"
+                f"EDIT INSTRUCTIONS: {edit_instructions or 'No specific edits requested — improve as you see fit.'}\n\n"
+                f"Use the previous presentation as your baseline. Apply the edit instructions "
+                f"to refine it. Keep elements the user didn't ask to change."
+            )
+            user_message += edit_context
+        elif edit_instructions:
+            user_message += f"\n\nADDITIONAL INSTRUCTIONS: {edit_instructions}"
 
         messages = [{"role": "user", "content": user_message}]
 

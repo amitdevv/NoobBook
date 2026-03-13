@@ -20,12 +20,13 @@ Output Structure:
 - ZIP download available for full package
 
 Routes:
-- POST /projects/<id>/studio/email-template              - Start generation
-- GET  /projects/<id>/studio/email-jobs/<id>             - Job status
-- GET  /projects/<id>/studio/email-jobs                  - List jobs
-- GET  /projects/<id>/studio/email-templates/<file>      - Serve file
-- GET  /projects/<id>/studio/email-templates/<id>/preview  - Preview HTML
-- GET  /projects/<id>/studio/email-templates/<id>/download - Download ZIP
+- POST   /projects/<id>/studio/email-template              - Start generation
+- GET    /projects/<id>/studio/email-jobs/<id>             - Job status
+- GET    /projects/<id>/studio/email-jobs                  - List jobs
+- GET    /projects/<id>/studio/email-templates/<file>      - Serve file
+- GET    /projects/<id>/studio/email-templates/<id>/preview  - Preview HTML
+- GET    /projects/<id>/studio/email-templates/<id>/download - Download ZIP
+- DELETE /projects/<id>/studio/email-jobs/<id>             - Delete job
 """
 import io
 import re
@@ -40,11 +41,13 @@ from app.services.integrations.supabase import storage_service
 @studio_bp.route('/projects/<project_id>/studio/email-template', methods=['POST'])
 def generate_email_template(project_id: str):
     """
-    Start email template generation via email agent.
+    Start email template generation or edit via email agent.
 
     Request Body:
-        - source_id: UUID of the source to generate template from (required)
+        - source_id: UUID of the source to generate template from (optional)
         - direction: User's direction/guidance (optional)
+        - parent_job_id: UUID of the parent email job to edit (optional, for edits)
+        - edit_instructions: Instructions for editing the parent email (optional, for edits)
 
     Response:
         - 202 Accepted with job_id for polling
@@ -56,12 +59,57 @@ def generate_email_template(project_id: str):
         source_id = data.get('source_id', '')
         direction = data.get('direction', '')
 
+        # Edit mode: load parent job's HTML as context for refinement
+        parent_job_id = data.get('parent_job_id')
+        edit_instructions = data.get('edit_instructions')
+        previous_markdown = None
+        previous_title = None
+        parent_source_name = None
+
+        if parent_job_id:
+            # Clean up any previously failed edit jobs for this parent
+            try:
+                all_jobs = studio_index_service.list_email_jobs(project_id)
+                for job in all_jobs:
+                    if (job.get("status") == "error"
+                            and job.get("parent_job_id") == parent_job_id):
+                        studio_index_service.delete_email_job(project_id, job["id"])
+            except Exception:
+                pass  # Non-critical cleanup — don't block the new edit
+
+            parent_job = studio_index_service.get_email_job(project_id, parent_job_id)
+            if not parent_job or not parent_job.get('html_file'):
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found or has no content to edit'
+                }), 404
+
+            # Download previous HTML from Supabase Storage
+            previous_markdown = storage_service.download_studio_file(
+                project_id=project_id,
+                job_type="emails",
+                job_id=parent_job_id,
+                filename=parent_job['html_file']
+            )
+            if previous_markdown is None:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to load parent email template content from storage'
+                }), 500
+            previous_title = parent_job.get('template_name')
+            parent_source_name = parent_job.get('source_name')
+
         # Execute via email_agent_executor (creates job and launches agent)
         result = email_agent_executor.execute(
             project_id=project_id,
             source_id=source_id,
             direction=direction,
-            user_id=g.user_id
+            user_id=g.user_id,
+            edit_instructions=edit_instructions,
+            previous_markdown=previous_markdown,
+            previous_title=previous_title,
+            parent_job_id=parent_job_id,
+            parent_source_name=parent_source_name
         )
 
         if not result.get('success'):
@@ -127,9 +175,17 @@ def list_email_jobs(project_id: str):
         source_id = request.args.get('source_id')
         jobs = studio_index_service.list_email_jobs(project_id, source_id)
 
+        # Filter out orphaned failed-edit jobs (error + parent_job_id).
+        # These are leftover from edit failures and should never be shown.
+        # Deletion happens in the create flow to keep GET idempotent.
+        clean_jobs = [
+            job for job in jobs
+            if not (job.get("status") == "error" and job.get("parent_job_id"))
+        ]
+
         return jsonify({
             'success': True,
-            'jobs': jobs
+            'jobs': clean_jobs
         })
 
     except Exception as e:
@@ -328,4 +384,44 @@ def download_email_template(project_id: str, job_id: str):
         return jsonify({
             'success': False,
             'error': f'Failed to download template: {str(e)}'
+        }), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/email-jobs/<job_id>', methods=['DELETE'])
+def delete_email_job(project_id: str, job_id: str):
+    """
+    Delete an email template job and its files from Supabase Storage.
+
+    Response:
+        - Success status
+    """
+    try:
+        job = studio_index_service.get_email_job(project_id, job_id)
+
+        if not job:
+            return jsonify({
+                'success': False,
+                'error': f'Email job {job_id} not found'
+            }), 404
+
+        # Delete all files for this job from Supabase Storage
+        storage_service.delete_studio_job_files(
+            project_id=project_id,
+            job_type="emails",
+            job_id=job_id
+        )
+
+        # Delete job from index
+        studio_index_service.delete_email_job(project_id, job_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Email job {job_id} deleted'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting email job: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete email job: {str(e)}'
         }), 500

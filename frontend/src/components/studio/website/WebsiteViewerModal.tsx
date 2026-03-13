@@ -4,8 +4,8 @@
  * Simpler than component viewer since websites are single-page previews.
  */
 
-import React from 'react';
-import { DownloadSimple, Globe } from '@phosphor-icons/react';
+import React, { useState, useEffect } from 'react';
+import { DownloadSimple, Globe, PencilSimple } from '@phosphor-icons/react';
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../ui/dialog';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
 import { websitesAPI, type WebsiteJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 
@@ -20,13 +22,32 @@ interface WebsiteViewerModalProps {
   projectId: string;
   viewingWebsiteJob: WebsiteJob | null;
   onClose: () => void;
+  onEdit?: (instructions: string) => void;
+  isGenerating?: boolean;
+  defaultEditInput?: string;
 }
 
 export const WebsiteViewerModal: React.FC<WebsiteViewerModalProps> = ({
   projectId,
   viewingWebsiteJob,
   onClose,
+  onEdit,
+  isGenerating,
+  defaultEditInput = '',
 }) => {
+  const [editInput, setEditInput] = useState('');
+
+  // Sync edit input separately to avoid re-rendering iframe
+  useEffect(() => {
+    setEditInput(defaultEditInput);
+  }, [defaultEditInput]);
+
+  const handleEdit = () => {
+    if (editInput.trim() && onEdit) {
+      onEdit(editInput.trim());
+    }
+  };
+
   if (!viewingWebsiteJob) return null;
 
   const previewUrl = getAuthUrl(websitesAPI.getPreviewUrl(projectId, viewingWebsiteJob.id));
@@ -59,8 +80,16 @@ export const WebsiteViewerModal: React.FC<WebsiteViewerModalProps> = ({
                 </DialogTitle>
               </div>
             </div>
-            <DialogDescription>
-              {viewingWebsiteJob.pages_created?.length || 0} pages • {viewingWebsiteJob.features_implemented?.length || 0} features
+            <DialogDescription className="flex items-center gap-3">
+              {viewingWebsiteJob.parent_job_id && (
+                <span className="inline-flex items-center gap-0.5 text-[11px] text-purple-600 bg-purple-500/10 px-1.5 py-0.5 rounded">
+                  <PencilSimple size={10} />
+                  Edited version
+                </span>
+              )}
+              <span>
+                {viewingWebsiteJob.pages_created?.length || 0} pages • {viewingWebsiteJob.features_implemented?.length || 0} features
+              </span>
             </DialogDescription>
           </DialogHeader>
 
@@ -92,6 +121,29 @@ export const WebsiteViewerModal: React.FC<WebsiteViewerModalProps> = ({
           />
         </div>
 
+        {/* Edit input */}
+        {onEdit && (
+          <div className="px-6 py-3 border-t-2 border-orange-200 bg-orange-50/30 flex-shrink-0">
+            <div className="flex gap-2">
+              <Input
+                value={editInput}
+                onChange={(e) => setEditInput(e.target.value)}
+                placeholder="Describe changes... (e.g., 'add a contact form', 'change color scheme')"
+                className="flex-1"
+                disabled={isGenerating}
+                onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && !isGenerating && handleEdit()}
+              />
+              <Button
+                onClick={handleEdit}
+                disabled={!editInput.trim() || isGenerating}
+                size="sm"
+              >
+                <PencilSimple size={14} className="mr-1" />
+                Edit
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

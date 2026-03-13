@@ -53,6 +53,9 @@ export interface WebsiteJob {
   status: JobStatus;
   status_message: string;
   error_message: string | null;
+  // Edit lineage
+  parent_job_id: string | null;
+  edit_instructions: string | null;
 
   // Plan
   site_type: 'portfolio' | 'business' | 'blog' | 'landing' | 'corporate' | 'personal' | 'ecommerce' | null;
@@ -123,21 +126,27 @@ export interface ListWebsiteJobsResponse {
  */
 export const websitesAPI = {
   /**
-   * Start website generation (background task)
+   * Start website generation or edit (background task)
    * Educational Note: Non-blocking - returns immediately with job_id
    */
   async startGeneration(
     projectId: string,
     sourceId: string,
-    direction?: string
+    direction?: string,
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartWebsiteResponse> {
     try {
+      const body: Record<string, unknown> = {
+        source_id: sourceId,
+        direction: direction || '',
+      };
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/website`,
-        {
-          source_id: sourceId,
-          direction: direction || '',
-        }
+        body
       );
       return response.data;
     } catch (error) {
@@ -199,6 +208,24 @@ export const websitesAPI = {
    */
   getDownloadUrl(projectId: string, jobId: string): string {
     return `${API_BASE_URL}/projects/${projectId}/studio/websites/${jobId}/download`;
+  },
+
+  /**
+   * Delete a website job
+   */
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/website-jobs/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        return error.response.data;
+      }
+      log.error({ err: error }, 'failed to delete website job');
+      throw error;
+    }
   },
 
   /**

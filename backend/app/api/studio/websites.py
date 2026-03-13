@@ -41,12 +41,14 @@ from app.services.integrations.supabase import storage_service
 @studio_bp.route('/projects/<project_id>/studio/website', methods=['POST'])
 def generate_website(project_id: str):
     """
-    Start website generation (background task).
+    Start website generation or edit (background task).
 
     Request body:
         {
             "source_id": "source-uuid",
-            "direction": "optional user direction/preferences"
+            "direction": "optional user direction/preferences",
+            "parent_job_id": "optional parent job UUID for edits",
+            "edit_instructions": "optional edit instructions"
         }
 
     Returns:
@@ -57,20 +59,68 @@ def generate_website(project_id: str):
     try:
         data = request.get_json()
         source_id = data.get('source_id')
+        direction = data.get('direction', '')
 
-        if not source_id:
+        # Edit mode: load parent job's files as context for refinement
+        parent_job_id = data.get('parent_job_id')
+        edit_instructions = data.get('edit_instructions')
+        previous_markdown = None
+        previous_title = None
+        parent_source_name = None
+
+        if parent_job_id:
+            # Clean up any previously failed edit jobs for this parent
+            try:
+                all_jobs = studio_index_service.list_website_jobs(project_id)
+                for job in all_jobs:
+                    if (job.get("status") == "error"
+                            and job.get("parent_job_id") == parent_job_id):
+                        studio_index_service.delete_website_job(project_id, job["id"])
+            except Exception:
+                pass  # Non-critical cleanup — don't block the new edit
+
+            parent_job = studio_index_service.get_website_job(project_id, parent_job_id)
+            if not parent_job or not parent_job.get('files'):
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found or has no content to edit'
+                }), 404
+
+            # Collect all file content from Supabase Storage
+            file_contents = []
+            for fname in parent_job.get('files', []):
+                content = storage_service.download_studio_file(
+                    project_id=project_id,
+                    job_type="websites",
+                    job_id=parent_job_id,
+                    filename=fname
+                )
+                if content:
+                    file_contents.append(f"--- {fname} ---\n{content}")
+            previous_markdown = "\n\n".join(file_contents) if file_contents else None
+            if previous_markdown is None:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to load parent website content from storage'
+                }), 500
+            previous_title = parent_job.get('site_name')
+            parent_source_name = parent_job.get('source_name')
+        elif not source_id:
             return jsonify({
                 'success': False,
                 'error': 'source_id is required'
             }), 400
 
-        direction = data.get('direction', '')
-
         # Execute website generation (background task)
         result = website_agent_executor.execute(
             project_id=project_id,
-            source_id=source_id,
-            direction=direction
+            source_id=source_id or '',
+            direction=direction,
+            edit_instructions=edit_instructions,
+            previous_markdown=previous_markdown,
+            previous_title=previous_title,
+            parent_job_id=parent_job_id,
+            parent_source_name=parent_source_name
         )
 
         if not result.get('success'):
@@ -131,9 +181,15 @@ def list_website_jobs(project_id: str):
         source_id = request.args.get('source_id')
         jobs = studio_index_service.list_website_jobs(project_id, source_id)
 
+        # Filter out orphaned failed-edit jobs (error + parent_job_id).
+        clean_jobs = [
+            job for job in jobs
+            if not (job.get("status") == "error" and job.get("parent_job_id"))
+        ]
+
         return jsonify({
             'success': True,
-            'jobs': jobs
+            'jobs': clean_jobs
         })
 
     except Exception as e:
@@ -327,4 +383,44 @@ def download_website(project_id: str, job_id: str):
         return jsonify({
             'success': False,
             'error': f'Failed to download website: {str(e)}'
+        }), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/website-jobs/<job_id>', methods=['DELETE'])
+def delete_website_job(project_id: str, job_id: str):
+    """
+    Delete a website job and its files from Supabase Storage.
+
+    Response:
+        - Success status
+    """
+    try:
+        job = studio_index_service.get_website_job(project_id, job_id)
+
+        if not job:
+            return jsonify({
+                'success': False,
+                'error': f'Website job {job_id} not found'
+            }), 404
+
+        # Delete all files for this job from Supabase Storage
+        storage_service.delete_studio_job_files(
+            project_id=project_id,
+            job_type="websites",
+            job_id=job_id
+        )
+
+        # Delete job from index
+        studio_index_service.delete_website_job(project_id, job_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Website job {job_id} deleted'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting website job: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete website job: {str(e)}'
         }), 500

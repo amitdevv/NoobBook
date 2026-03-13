@@ -22,6 +22,9 @@ export const usePresentationGeneration = (projectId: string) => {
   const [isGeneratingPresentation, setIsGeneratingPresentation] = useState(false);
   const pollingRef = useRef(false);
   const [viewingPresentationJob, setViewingPresentationJob] = useState<PresentationJob | null>(null);
+  const [pendingEdit, setPendingEdit] = useState<{ jobId: string; input: string } | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Load saved presentation jobs from backend
@@ -54,7 +57,17 @@ export const usePresentationGeneration = (projectId: string) => {
                 (job) => setCurrentPresentationJob(job)
               );
               if ((finalJob.status === 'ready' && finalJob.export_status === 'ready') || finalJob.status === 'error') {
-                setSavedPresentationJobs((prev) => [finalJob, ...prev]);
+                if (finalJob.status === 'ready' && finalJob.parent_job_id) {
+                  // Edit completed after refresh — keep parent so user can view previous versions
+                  setSavedPresentationJobs((prev) => [finalJob, ...prev]);
+                } else if (finalJob.status === 'error' && finalJob.parent_job_id) {
+                  // Edit failed after refresh — delete orphaned error job
+                  presentationsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+                    console.warn('[Studio] Failed to delete failed edit job', err);
+                  });
+                } else {
+                  setSavedPresentationJobs((prev) => [finalJob, ...prev]);
+                }
               }
             } catch {
               // Polling failed — job stays visible via next load
@@ -144,14 +157,77 @@ export const usePresentationGeneration = (projectId: string) => {
     link.click();
   };
 
+  const handlePresentationEdit = async (parentJob: PresentationJob, editInstructions: string) => {
+    if (isGeneratingPresentation) return;
+    setIsGeneratingPresentation(true);
+    setPendingEdit({ jobId: parentJob.id, input: editInstructions });
+
+    try {
+      const startResponse = await presentationsAPI.startGeneration(
+        projectId,
+        parentJob.source_id,
+        parentJob.direction,
+        parentJob.id,        // parentJobId
+        editInstructions     // editInstructions
+      );
+
+      if (!startResponse.success || !startResponse.job_id) {
+        console.error('[Studio] Presentation edit: API start failed', startResponse);
+        if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
+        setConfigError(startResponse.error || 'Failed to start presentation edit.');
+        configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
+        showError(startResponse.error || 'Failed to start presentation edit.');
+        return;
+      }
+
+      // Only close modal once we know generation started
+      setCurrentPresentationJob(null);
+      setViewingPresentationJob(null);
+
+      showSuccess('Editing presentation...');
+
+      const finalJob = await presentationsAPI.pollJobStatus(
+        projectId,
+        startResponse.job_id,
+        (job) => setCurrentPresentationJob(job)
+      );
+
+      setCurrentPresentationJob(finalJob);
+
+      if (finalJob.status === 'ready' && finalJob.export_status === 'ready') {
+        setPendingEdit(null);
+        showSuccess(`Presentation edited: ${finalJob.presentation_title || 'Presentation'}`);
+        setSavedPresentationJobs((prev) => [finalJob, ...prev]);
+        setViewingPresentationJob(finalJob); // Reopen modal with new job
+      } else if (finalJob.status === 'error') {
+        showError(finalJob.error_message || 'Presentation edit failed.');
+        setViewingPresentationJob(parentJob); // Restore parent modal so user can retry
+        presentationsAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+          console.warn('[Studio] Failed to delete failed edit job', err);
+        });
+      }
+    } catch (error) {
+      console.error('[Studio] Presentation edit: failed', error);
+      log.error({ err: error }, 'Presentation edit failed');
+      showError(error instanceof Error ? error.message : 'Presentation edit failed.');
+      setViewingPresentationJob(parentJob); // Restore parent modal so user can retry
+    } finally {
+      setIsGeneratingPresentation(false);
+      setCurrentPresentationJob(null);
+    }
+  };
+
   return {
     savedPresentationJobs,
     currentPresentationJob,
     isGeneratingPresentation,
     viewingPresentationJob,
     setViewingPresentationJob,
+    configError,
+    pendingEditInput: pendingEdit !== null && pendingEdit.jobId === viewingPresentationJob?.id ? pendingEdit.input : '',
     loadSavedJobs,
     handlePresentationGeneration,
+    handlePresentationEdit,
     downloadPresentation,
     downloadPresentationSource,
   };

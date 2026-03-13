@@ -21,8 +21,10 @@ export const EmailSection: React.FC = () => {
     viewingEmailJob,
     setViewingEmailJob,
     configError,
+    pendingEditInput,
     loadSavedJobs,
     handleEmailGeneration,
+    handleEmailEdit,
   } = useEmailGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedEmailJobs);
@@ -63,6 +65,9 @@ export const EmailSection: React.FC = () => {
         projectId={projectId}
         viewingEmailJob={viewingEmailJob}
         onClose={() => setViewingEmailJob(null)}
+        onEdit={(instructions) => viewingEmailJob && handleEmailEdit(viewingEmailJob, instructions)}
+        isGenerating={isGeneratingEmail}
+        defaultEditInput={pendingEditInput}
       />
     </>
   );

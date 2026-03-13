@@ -10,6 +10,7 @@ import {
   Presentation,
   CaretLeft,
   CaretRight,
+  PencilSimple,
 } from '@phosphor-icons/react';
 import {
   Dialog,
@@ -18,6 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../ui/dialog';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
 import { presentationsAPI, type PresentationJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 
@@ -27,6 +30,9 @@ interface PresentationViewerModalProps {
   onClose: () => void;
   onDownloadPptx?: (jobId: string) => void;
   onDownloadSource?: (jobId: string) => void;
+  onEdit?: (instructions: string) => void;
+  isGenerating?: boolean;
+  defaultEditInput?: string;
 }
 
 export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = ({
@@ -34,8 +40,17 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
   viewingPresentationJob,
   onClose,
   onDownloadPptx,
+  onEdit,
+  isGenerating,
+  defaultEditInput = '',
 }) => {
   const [currentSlide, setCurrentSlide] = useState(1);
+  const [editInput, setEditInput] = useState('');
+
+  // Sync edit input separately to avoid re-rendering slides
+  useEffect(() => {
+    setEditInput(defaultEditInput);
+  }, [defaultEditInput]);
 
   // Reset to first slide when opening a new presentation
   useEffect(() => {
@@ -61,6 +76,12 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
     }
     return null;
   }, [viewingPresentationJob, currentSlide, projectId]);
+
+  const handleEdit = () => {
+    if (editInput.trim() && onEdit) {
+      onEdit(editInput.trim());
+    }
+  };
 
   if (!viewingPresentationJob) return null;
 
@@ -121,12 +142,20 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
                 </DialogTitle>
               </div>
             </div>
-            <DialogDescription>
-              {totalSlides} slides
-              {viewingPresentationJob.presentation_type &&
-                ` | ${viewingPresentationJob.presentation_type}`}
-              {viewingPresentationJob.target_audience &&
-                ` | For: ${viewingPresentationJob.target_audience}`}
+            <DialogDescription className="flex items-center gap-3">
+              {viewingPresentationJob.parent_job_id && (
+                <span className="inline-flex items-center gap-0.5 text-[11px] text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                  <PencilSimple size={10} />
+                  Edited version
+                </span>
+              )}
+              <span>
+                {totalSlides} slides
+                {viewingPresentationJob.presentation_type &&
+                  ` | ${viewingPresentationJob.presentation_type}`}
+                {viewingPresentationJob.target_audience &&
+                  ` | For: ${viewingPresentationJob.target_audience}`}
+              </span>
             </DialogDescription>
           </DialogHeader>
 
@@ -193,6 +222,30 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
             Slide {currentSlide} of {totalSlides}
           </div>
         </div>
+
+        {/* Edit input */}
+        {onEdit && (
+          <div className="px-6 py-3 border-t-2 border-orange-200 bg-orange-50/30 flex-shrink-0">
+            <div className="flex gap-2">
+              <Input
+                value={editInput}
+                onChange={(e) => setEditInput(e.target.value)}
+                placeholder="Describe changes... (e.g., 'add more data charts', 'simplify slide 3')"
+                className="flex-1"
+                disabled={isGenerating}
+                onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && !isGenerating && handleEdit()}
+              />
+              <Button
+                onClick={handleEdit}
+                disabled={!editInput.trim() || isGenerating}
+                size="sm"
+              >
+                <PencilSimple size={14} className="mr-1" />
+                Edit
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
