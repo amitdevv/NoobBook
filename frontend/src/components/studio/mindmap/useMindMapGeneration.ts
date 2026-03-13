@@ -144,6 +144,7 @@ export const useMindMapGeneration = (projectId: string) => {
       if (!startResponse.success || !startResponse.job_id) {
         console.error('[Studio] Mind map edit: API start failed', startResponse);
         showError(startResponse.error || 'Failed to start mind map edit.');
+        setViewingMindMapJob(parentJob);
         return;
       }
 

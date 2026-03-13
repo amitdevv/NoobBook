@@ -144,6 +144,7 @@ export const useQuizGeneration = (projectId: string) => {
       if (!startResponse.success || !startResponse.job_id) {
         console.error('[Studio] Quiz edit: API start failed', startResponse);
         showError(startResponse.error || 'Failed to start quiz edit.');
+        setViewingQuizJob(parentJob);
         return;
       }
 

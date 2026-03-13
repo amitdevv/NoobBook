@@ -150,6 +150,7 @@ export const useFlashCardGeneration = (projectId: string) => {
       if (!startResponse.success || !startResponse.job_id) {
         console.error('[Studio] Flash card edit: API start failed', startResponse);
         showError(startResponse.error || 'Failed to start flash card edit.');
+        setViewingFlashCardJob(parentJob);
         return;
       }
 

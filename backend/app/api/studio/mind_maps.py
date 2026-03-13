@@ -91,8 +91,12 @@ def generate_mind_map(project_id: str):
 
             # Serialize previous nodes as JSON string for LLM context
             nodes = parent_job.get('nodes', [])
-            if nodes:
-                previous_content = json.dumps(nodes, indent=2)
+            if not nodes:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job has no nodes to edit'
+                }), 400
+            previous_content = json.dumps(nodes, indent=2)
 
         # Get source info for the job record
         source = source_index_service.get_source_from_index(project_id, source_id)

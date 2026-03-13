@@ -169,7 +169,7 @@ class FlashCardsService:
             if is_edit:
                 edit_context = (
                     f"\n\n=== PREVIOUS FLASH CARDS (refine based on edit instructions) ===\n"
-                    f"{previous_content}\n"
+                    f"{previous_content[:10000]}\n"
                     f"=== END PREVIOUS FLASH CARDS ===\n\n"
                     f"EDIT INSTRUCTIONS: {edit_instructions}\n\n"
                     f"Use the previous flash cards as baseline. Apply the edits. "

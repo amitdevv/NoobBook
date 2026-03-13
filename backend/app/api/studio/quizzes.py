@@ -90,8 +90,12 @@ def generate_quiz(project_id: str):
 
             # Serialize previous questions as JSON string for LLM context
             questions = parent_job.get('questions', [])
-            if questions:
-                previous_content = json.dumps(questions, indent=2)
+            if not questions:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job has no questions to edit'
+                }), 400
+            previous_content = json.dumps(questions, indent=2)
 
         # Get source info for the job record
         source = source_index_service.get_source_from_index(project_id, source_id)

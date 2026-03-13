@@ -90,8 +90,12 @@ def generate_flash_cards(project_id: str):
 
             # Serialize previous cards as JSON string for LLM context
             cards = parent_job.get('cards', [])
-            if cards:
-                previous_content = json.dumps(cards, indent=2)
+            if not cards:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job has no cards to edit'
+                }), 400
+            previous_content = json.dumps(cards, indent=2)
 
         # Get source info for the job record
         source = source_index_service.get_source_from_index(project_id, source_id)
