@@ -36,6 +36,9 @@ export interface MindMapJob {
   topic_summary: string | null;
   node_count: number;
   generation_time_seconds: number | null;
+  // Edit lineage
+  parent_job_id: string | null;
+  edit_instructions: string | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -81,15 +84,21 @@ export const mindMapsAPI = {
   async startGeneration(
     projectId: string,
     sourceId: string,
-    direction?: string
+    direction?: string,
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartMindMapResponse> {
     try {
+      const body: Record<string, unknown> = {
+        source_id: sourceId,
+        direction: direction || 'Create a mind map covering the key concepts and their relationships.',
+      };
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/mind-map`,
-        {
-          source_id: sourceId,
-          direction: direction || 'Create a mind map covering the key concepts and their relationships.',
-        }
+        body
       );
       return response.data;
     } catch (error) {
@@ -135,6 +144,24 @@ export const mindMapsAPI = {
         return error.response.data;
       }
       log.error({ err: error }, 'failed to list mind map jobs');
+      throw error;
+    }
+  },
+
+  /**
+   * Delete a mind map job
+   */
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/mind-map-jobs/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        return error.response.data;
+      }
+      log.error({ err: error }, 'failed to delete mind map job');
       throw error;
     }
   },

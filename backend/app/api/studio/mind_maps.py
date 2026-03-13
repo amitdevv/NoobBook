@@ -24,6 +24,7 @@ Routes:
 - GET  /projects/<id>/studio/mind-map-jobs/<id> - Job status
 - GET  /projects/<id>/studio/mind-map-jobs      - List jobs
 """
+import json
 import uuid
 from flask import jsonify, request, current_app
 from app.api.studio import studio_bp
@@ -36,14 +37,17 @@ from app.services.background_services.task_service import task_service
 @studio_bp.route('/projects/<project_id>/studio/mind-map', methods=['POST'])
 def generate_mind_map(project_id: str):
     """
-    Start mind map generation as a background task.
+    Start mind map generation or edit as a background task.
 
     Educational Note: Mind maps are generated from source content using
     Claude to create hierarchical node structures for visual concept mapping.
+    Edits refine existing mind maps based on user instructions.
 
     Request Body:
         - source_id: UUID of the source to generate mind map from (required)
         - direction: Optional guidance for what to focus on
+        - parent_job_id: UUID of the parent job to edit (optional, for edits)
+        - edit_instructions: Instructions for editing the parent mind map (optional, for edits)
 
     Response:
         - success: Boolean
@@ -62,6 +66,34 @@ def generate_mind_map(project_id: str):
 
         direction = data.get('direction', 'Create a mind map covering the key concepts and their relationships.')
 
+        # Edit mode: load parent job's nodes as context for refinement
+        parent_job_id = data.get('parent_job_id')
+        edit_instructions = data.get('edit_instructions')
+        previous_content = None
+
+        if parent_job_id:
+            # Clean up any previously failed edit jobs for this parent
+            try:
+                all_jobs = studio_index_service.list_mind_map_jobs(project_id)
+                for job in all_jobs:
+                    if (job.get("status") == "error"
+                            and job.get("parent_job_id") == parent_job_id):
+                        studio_index_service.delete_mind_map_job(project_id, job["id"])
+            except Exception:
+                pass  # Non-critical cleanup — don't block the new edit
+
+            parent_job = studio_index_service.get_mind_map_job(project_id, parent_job_id)
+            if not parent_job:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found'
+                }), 404
+
+            # Serialize previous nodes as JSON string for LLM context
+            nodes = parent_job.get('nodes', [])
+            if nodes:
+                previous_content = json.dumps(nodes, indent=2)
+
         # Get source info for the job record
         source = source_index_service.get_source_from_index(project_id, source_id)
         if not source:
@@ -72,17 +104,19 @@ def generate_mind_map(project_id: str):
 
         source_name = source.get('name', 'Unknown')
 
-        # Create job record
+        # Create job record with edit lineage
         job_id = str(uuid.uuid4())
         studio_index_service.create_mind_map_job(
             project_id=project_id,
             job_id=job_id,
             source_id=source_id,
             source_name=source_name,
-            direction=direction
+            direction=direction,
+            parent_job_id=parent_job_id,
+            edit_instructions=edit_instructions
         )
 
-        # Submit background task
+        # Submit background task with edit context
         task_service.submit_task(
             task_type="mind_map",
             target_id=job_id,
@@ -90,7 +124,9 @@ def generate_mind_map(project_id: str):
             project_id=project_id,
             source_id=source_id,
             job_id=job_id,
-            direction=direction
+            direction=direction,
+            previous_content=previous_content,
+            edit_instructions=edit_instructions
         )
 
         return jsonify({
@@ -155,10 +191,17 @@ def list_mind_map_jobs(project_id: str):
         source_id = request.args.get('source_id')
         jobs = studio_index_service.list_mind_map_jobs(project_id, source_id)
 
+        # Filter out orphaned failed-edit jobs (error + parent_job_id).
+        # These are leftover from edit failures and should never be shown.
+        clean_jobs = [
+            job for job in jobs
+            if not (job.get("status") == "error" and job.get("parent_job_id"))
+        ]
+
         return jsonify({
             'success': True,
-            'jobs': jobs,
-            'count': len(jobs)
+            'jobs': clean_jobs,
+            'count': len(clean_jobs)
         }), 200
 
     except Exception as e:
@@ -166,4 +209,37 @@ def list_mind_map_jobs(project_id: str):
         return jsonify({
             'success': False,
             'error': f'Failed to list jobs: {str(e)}'
+        }), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/mind-map-jobs/<job_id>', methods=['DELETE'])
+def delete_mind_map_job(project_id: str, job_id: str):
+    """
+    Delete a mind map job.
+
+    Response:
+        - success: Boolean
+        - message: Status message
+    """
+    try:
+        job = studio_index_service.get_mind_map_job(project_id, job_id)
+
+        if not job:
+            return jsonify({
+                'success': False,
+                'error': f'Mind map job {job_id} not found'
+            }), 404
+
+        studio_index_service.delete_mind_map_job(project_id, job_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Mind map job {job_id} deleted'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting mind map job: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete mind map job: {str(e)}'
         }), 500

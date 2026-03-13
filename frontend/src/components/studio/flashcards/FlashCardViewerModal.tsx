@@ -1,7 +1,7 @@
 /**
  * FlashCardViewerModal Component
  * Educational Note: Modal with carousel and 3D flip animation.
- * Features: card navigation, flip animation, progress bar, reset functionality.
+ * Features: card navigation, flip animation, progress bar, reset, and iterative editing.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -12,25 +12,39 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../ui/dialog';
-import { Cards, CaretLeft, CaretRight, ArrowsClockwise } from '@phosphor-icons/react';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Cards, CaretLeft, CaretRight, ArrowsClockwise, PencilSimple } from '@phosphor-icons/react';
 import type { FlashCardJob } from '@/lib/api/studio';
 
 interface FlashCardViewerModalProps {
   viewingFlashCardJob: FlashCardJob | null;
   onClose: () => void;
+  onEdit?: (instructions: string) => void;
+  isGenerating?: boolean;
+  defaultEditInput?: string;
 }
 
 export const FlashCardViewerModal: React.FC<FlashCardViewerModalProps> = ({
   viewingFlashCardJob,
   onClose,
+  onEdit,
+  isGenerating,
+  defaultEditInput = '',
 }) => {
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isCardFlipped, setIsCardFlipped] = useState(false);
+  const [editInput, setEditInput] = useState('');
 
   useEffect(() => {
     setCurrentCardIndex(0);
     setIsCardFlipped(false);
   }, [viewingFlashCardJob?.id]);
+
+  // Sync edit input separately to avoid re-fetching state
+  useEffect(() => {
+    setEditInput(defaultEditInput);
+  }, [defaultEditInput]);
 
   /**
    * Toggle current card flip
@@ -76,30 +90,40 @@ export const FlashCardViewerModal: React.FC<FlashCardViewerModalProps> = ({
     onClose();
   };
 
+  const handleEdit = () => {
+    if (editInput.trim() && onEdit) {
+      onEdit(editInput.trim());
+    }
+  };
+
   return (
     <Dialog open={viewingFlashCardJob !== null} onOpenChange={(open) => {
       if (!open) handleClose();
     }}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-2xl p-0 flex flex-col">
+        <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Cards size={20} className="text-purple-600" />
             {viewingFlashCardJob?.source_name}
           </DialogTitle>
-          {viewingFlashCardJob?.topic_summary && (
-            <DialogDescription>
-              {viewingFlashCardJob.topic_summary}
-            </DialogDescription>
-          )}
+          <DialogDescription>
+            {viewingFlashCardJob?.parent_job_id && (
+              <span className="inline-flex items-center gap-0.5 text-[11px] text-purple-600 bg-purple-500/10 px-1.5 py-0.5 rounded mr-2">
+                <PencilSimple size={10} />
+                Edited version
+              </span>
+            )}
+            {viewingFlashCardJob?.topic_summary || ''}
+          </DialogDescription>
         </DialogHeader>
 
         {/* Flip instruction */}
-        <p className="text-xs text-center text-muted-foreground">
+        <p className="text-xs text-center text-muted-foreground pt-2">
           Click card to flip
         </p>
 
         {/* Card Carousel */}
-        <div className="flex items-center justify-center gap-4 py-4">
+        <div className="flex items-center justify-center gap-4 py-4 px-6">
           {/* Previous Button */}
           <button
             onClick={prevCard}
@@ -188,7 +212,7 @@ export const FlashCardViewerModal: React.FC<FlashCardViewerModalProps> = ({
         </div>
 
         {/* Progress Indicator */}
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-3 px-6 pb-4">
           {/* Reset Button */}
           <button
             onClick={resetCards}
@@ -215,6 +239,30 @@ export const FlashCardViewerModal: React.FC<FlashCardViewerModalProps> = ({
             {currentCardIndex + 1} / {viewingFlashCardJob?.card_count || 0} cards
           </span>
         </div>
+
+        {/* Edit input */}
+        {onEdit && (
+          <div className="px-6 py-3 border-t-2 border-orange-200 bg-orange-50/30 flex-shrink-0">
+            <div className="flex gap-2">
+              <Input
+                value={editInput}
+                onChange={(e) => setEditInput(e.target.value)}
+                placeholder="Describe changes... (e.g., 'add more concept cards', 'make answers shorter')"
+                className="flex-1"
+                disabled={isGenerating}
+                onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && !isGenerating && handleEdit()}
+              />
+              <Button
+                onClick={handleEdit}
+                disabled={!editInput.trim() || isGenerating}
+                size="sm"
+              >
+                <PencilSimple size={14} className="mr-1" />
+                Edit
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

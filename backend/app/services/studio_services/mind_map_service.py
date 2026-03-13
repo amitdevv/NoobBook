@@ -13,7 +13,7 @@ The tool-based approach ensures structured output with proper parent-child
 relationships (id, label, parent_id, node_type, description).
 """
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -105,27 +105,32 @@ class MindMapService:
         project_id: str,
         source_id: str,
         job_id: str,
-        direction: str = "Create a mind map covering the key concepts and their relationships."
+        direction: str = "Create a mind map covering the key concepts and their relationships.",
+        previous_content: Optional[str] = None,
+        edit_instructions: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Generate a mind map for a source.
+        Generate a mind map for a source, or edit an existing mind map.
 
         Args:
             project_id: The project UUID
             source_id: The source UUID
             job_id: The job ID for status tracking
             direction: User's direction for what to focus on
+            previous_content: JSON string of previous nodes (for edits)
+            edit_instructions: User instructions for editing (for edits)
 
         Returns:
             Dict with success status, nodes array, and metadata
         """
         started_at = datetime.now()
+        is_edit = bool(previous_content and edit_instructions)
 
         # Update job to processing
         studio_index_service.update_mind_map_job(
             project_id, job_id,
             status="processing",
-            progress="Reading source content...",
+            progress="Editing mind map..." if is_edit else "Reading source content...",
             started_at=datetime.now().isoformat()
         )
 
@@ -137,15 +142,19 @@ class MindMapService:
 
             source_name = source.get("name", "Unknown")
 
-            # Get source content
-            studio_index_service.update_mind_map_job(
-                project_id, job_id,
-                progress="Analyzing content..."
-            )
+            # For edits, skip source fetching — previous content is the baseline
+            if is_edit:
+                content = "[Source content available via previous mind map nodes below]"
+            else:
+                # Get source content
+                studio_index_service.update_mind_map_job(
+                    project_id, job_id,
+                    progress="Analyzing content..."
+                )
 
-            content = self._get_source_content(project_id, source_id)
-            if not content:
-                raise ValueError("No content found for source")
+                content = self._get_source_content(project_id, source_id)
+                if not content:
+                    raise ValueError("No content found for source")
 
             # Load config and tool
             config = self._load_config()
@@ -156,6 +165,18 @@ class MindMapService:
                 direction=direction,
                 content=content[:15000]  # Limit content to ~15k chars
             )
+
+            # Append edit context so Claude refines rather than regenerates
+            if is_edit:
+                edit_context = (
+                    f"\n\n=== PREVIOUS MIND MAP (refine based on edit instructions) ===\n"
+                    f"{previous_content}\n"
+                    f"=== END PREVIOUS MIND MAP ===\n\n"
+                    f"EDIT INSTRUCTIONS: {edit_instructions}\n\n"
+                    f"Use the previous mind map nodes as baseline. Apply the edits. "
+                    f"Keep unchanged nodes intact."
+                )
+                user_message += edit_context
 
             # Call Claude with the mind map tool
             studio_index_service.update_mind_map_job(
