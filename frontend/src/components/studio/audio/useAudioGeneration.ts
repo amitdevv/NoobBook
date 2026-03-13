@@ -153,6 +153,7 @@ export const useAudioGeneration = (projectId: string) => {
 
       if (!startResponse.success || !startResponse.job_id) {
         showError(startResponse.error || 'Failed to start audio edit.');
+        setEditingJobId(parentJob.id); // restore so user can retry with instructions
         return;
       }
 
