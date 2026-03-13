@@ -136,9 +136,6 @@ export const useFlowDiagramGeneration = (projectId: string) => {
       );
 
       if (!startResponse.success || !startResponse.job_id) {
-        if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
-        setConfigError(startResponse.error || 'Failed to start flow diagram edit.');
-        configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         showError(startResponse.error || 'Failed to start flow diagram edit.');
         return;
       }
@@ -161,7 +158,8 @@ export const useFlowDiagramGeneration = (projectId: string) => {
         setPendingEdit(null);
         showSuccess(`Flow diagram edited: ${finalJob.title || 'Flow Diagram'}`);
         setSavedFlowDiagramJobs((prev) => [finalJob, ...prev]);
-        setViewingFlowDiagramJob(finalJob); // Reopen modal with new job
+        // Only reopen if user hasn't navigated to another diagram
+        setViewingFlowDiagramJob((current) => current === null ? finalJob : current);
       } else if (finalJob.status === 'error') {
         showError(finalJob.error || 'Flow diagram edit failed.');
         setViewingFlowDiagramJob(parentJob); // Restore parent modal so user can retry

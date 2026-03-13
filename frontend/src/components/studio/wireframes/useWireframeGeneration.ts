@@ -136,9 +136,6 @@ export const useWireframeGeneration = (projectId: string) => {
       );
 
       if (!startResponse.success || !startResponse.job_id) {
-        if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
-        setConfigError(startResponse.error || 'Failed to start wireframe edit.');
-        configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
         showError(startResponse.error || 'Failed to start wireframe edit.');
         return;
       }
@@ -161,7 +158,8 @@ export const useWireframeGeneration = (projectId: string) => {
         setPendingEdit(null);
         showSuccess(`Wireframe edited: ${finalJob.title || 'Wireframe'}`);
         setSavedWireframeJobs((prev) => [finalJob, ...prev]);
-        setViewingWireframeJob(finalJob); // Reopen modal with new job
+        // Only reopen if user hasn't navigated to another wireframe
+        setViewingWireframeJob((current) => current === null ? finalJob : current);
       } else if (finalJob.status === 'error') {
         showError(finalJob.error || 'Wireframe edit failed.');
         setViewingWireframeJob(parentJob); // Restore parent modal so user can retry
