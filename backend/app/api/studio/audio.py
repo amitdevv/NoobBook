@@ -64,11 +64,6 @@ def generate_audio_overview(project_id: str):
         data = request.get_json() or {}
 
         source_id = data.get('source_id')
-        if not source_id:
-            return jsonify({
-                'success': False,
-                'error': 'source_id is required'
-            }), 400
 
         direction = data.get('direction', 'Create an engaging audio overview of this content.')
 
@@ -124,6 +119,13 @@ def generate_audio_overview(project_id: str):
             # Inherit source_id from parent if not explicitly provided
             if not source_id:
                 source_id = parent_job.get('source_id')
+
+        # Now enforce source_id after potential inheritance
+        if not source_id:
+            return jsonify({
+                'success': False,
+                'error': 'source_id is required'
+            }), 400
 
         # Get source info for the job record
         source = source_index_service.get_source_from_index(project_id, source_id)

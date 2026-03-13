@@ -31,7 +31,7 @@ export const WireframeViewerModal: React.FC<WireframeViewerModalProps> = ({
   isGenerating,
   defaultEditInput = '',
 }) => {
-  const [editInput, setEditInput] = useState('');
+  const [editInput, setEditInput] = useState(defaultEditInput);
 
   // Sync edit input when defaultEditInput changes (e.g. after failed edit preserves input)
   useEffect(() => {
