@@ -54,6 +54,9 @@ export interface EmailJob {
   status: JobStatus;
   status_message: string;
   error_message: string | null;
+  // Edit lineage
+  parent_job_id: string | null;
+  edit_instructions: string | null;
   // Template plan
   template_name: string | null;
   template_type: 'newsletter' | 'promotional' | 'transactional' | 'announcement' | null;
@@ -110,20 +113,26 @@ export interface ListEmailJobsResponse {
  */
 export const emailsAPI = {
   /**
-   * Start email template generation via email agent
+   * Start email template generation or edit via email agent
    */
   async startGeneration(
     projectId: string,
     sourceId: string,
-    direction?: string
+    direction?: string,
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartEmailResponse> {
     try {
+      const body: Record<string, unknown> = {
+        source_id: sourceId,
+        direction: direction || '',
+      };
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/email-template`,
-        {
-          source_id: sourceId,
-          direction: direction || '',
-        }
+        body
       );
       return response.data;
     } catch (error) {
@@ -192,6 +201,24 @@ export const emailsAPI = {
    */
   getDownloadUrl(projectId: string, jobId: string): string {
     return `${API_BASE_URL}/projects/${projectId}/studio/email-templates/${jobId}/download`;
+  },
+
+  /**
+   * Delete an email template job
+   */
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/email-jobs/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        return error.response.data;
+      }
+      log.error({ err: error }, 'failed to delete email job');
+      throw error;
+    }
   },
 
   /**

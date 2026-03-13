@@ -10,7 +10,7 @@ Orchestrates the website generation workflow:
 
 import logging
 import uuid
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -49,7 +49,10 @@ class WebsiteAgentService:
         project_id: str,
         source_id: str,
         job_id: str,
-        direction: str = ""
+        direction: str = "",
+        edit_instructions: Optional[str] = None,
+        previous_markdown: Optional[str] = None,
+        previous_title: Optional[str] = None
     ) -> Dict[str, Any]:
         """Run the agent to generate a website."""
         config = self._load_config()
@@ -65,13 +68,31 @@ class WebsiteAgentService:
             status_message="Starting website generation..."
         )
 
-        # Get source content and build user message from config
-        source_content = get_source_content(project_id, source_id)
+        # Get source content — skip in edit mode since previous website already encodes it
+        if previous_markdown:
+            source_content = "Editing a previous website — see the PREVIOUS WEBSITE section below."
+        else:
+            source_content = get_source_content(project_id, source_id)
 
         user_message = config.get("user_message", "").format(
             source_content=source_content,
             direction=direction or "No specific direction provided - use your best judgment based on the content."
         )
+
+        # Edit mode: append previous website content + edit instructions to user message
+        if previous_markdown:
+            edit_context = (
+                f"\n\n=== PREVIOUS WEBSITE (refine this based on the edit instructions) ===\n"
+                f"Previous Site Name: {previous_title or 'Untitled'}\n\n"
+                f"{previous_markdown}\n"
+                f"=== END PREVIOUS WEBSITE ===\n\n"
+                f"EDIT INSTRUCTIONS: {edit_instructions or 'No specific edits requested — improve as you see fit.'}\n\n"
+                f"Use the previous website as your baseline. Apply the edit instructions "
+                f"to refine it. Keep elements the user didn't ask to change."
+            )
+            user_message += edit_context
+        elif edit_instructions:
+            user_message += f"\n\nADDITIONAL INSTRUCTIONS: {edit_instructions}"
 
         messages = [{"role": "user", "content": user_message}]
 

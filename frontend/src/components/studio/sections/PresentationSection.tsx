@@ -9,6 +9,7 @@ import { usePresentationGeneration } from '../presentations/usePresentationGener
 import { PresentationListItem } from '../presentations/PresentationListItem';
 import { PresentationProgressIndicator } from '../presentations/PresentationProgressIndicator';
 import { PresentationViewerModal } from '../presentations/PresentationViewerModal';
+import { ConfigErrorBanner } from '../shared/ConfigErrorBanner';
 
 export const PresentationSection: React.FC = () => {
   const { projectId, registerGenerationHandler } = useStudioContext();
@@ -19,8 +20,11 @@ export const PresentationSection: React.FC = () => {
     isGeneratingPresentation,
     viewingPresentationJob,
     setViewingPresentationJob,
+    configError,
+    pendingEditInput,
     loadSavedJobs,
     handlePresentationGeneration,
+    handlePresentationEdit,
     downloadPresentation,
   } = usePresentationGeneration(projectId);
 
@@ -38,12 +42,14 @@ export const PresentationSection: React.FC = () => {
     registerGenerationHandler('presentation', handleGenerate);
   }, [registerGenerationHandler, handleGenerate]);
 
-  if (filteredJobs.length === 0 && !isGeneratingPresentation) {
+  if (filteredJobs.length === 0 && !isGeneratingPresentation && !configError) {
     return null;
   }
 
   return (
     <>
+      <ConfigErrorBanner message={configError} />
+
       {isGeneratingPresentation && (
         <PresentationProgressIndicator currentPresentationJob={currentPresentationJob} />
       )}
@@ -65,6 +71,9 @@ export const PresentationSection: React.FC = () => {
         viewingPresentationJob={viewingPresentationJob}
         onClose={() => setViewingPresentationJob(null)}
         onDownloadPptx={downloadPresentation}
+        onEdit={(instructions) => viewingPresentationJob && handlePresentationEdit(viewingPresentationJob, instructions)}
+        isGenerating={isGeneratingPresentation}
+        defaultEditInput={pendingEditInput}
       />
     </>
   );

@@ -28,7 +28,7 @@ Routes:
 """
 import io
 import zipfile
-from flask import jsonify, request, current_app, send_file, Response
+from flask import g, jsonify, request, current_app, send_file, Response
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.services.integrations.supabase import storage_service
@@ -37,12 +37,14 @@ from app.services.integrations.supabase import storage_service
 @studio_bp.route('/projects/<project_id>/studio/presentation', methods=['POST'])
 def generate_presentation(project_id: str):
     """
-    Start presentation generation (background task).
+    Start presentation generation or edit (background task).
 
     Request body:
         {
             "source_id": "source-uuid",
-            "direction": "optional user direction/preferences"
+            "direction": "optional user direction/preferences",
+            "parent_job_id": "optional parent job UUID for edits",
+            "edit_instructions": "optional edit instructions"
         }
 
     Returns:
@@ -53,20 +55,68 @@ def generate_presentation(project_id: str):
     try:
         data = request.get_json()
         source_id = data.get('source_id')
+        direction = data.get('direction', '')
 
-        if not source_id:
+        # Edit mode: load parent job's slide HTML as context for refinement
+        parent_job_id = data.get('parent_job_id')
+        edit_instructions = data.get('edit_instructions')
+        previous_markdown = None
+        previous_title = None
+        parent_source_name = None
+
+        if parent_job_id:
+            # Clean up any previously failed edit jobs for this parent
+            try:
+                all_jobs = studio_index_service.list_presentation_jobs(project_id)
+                for job in all_jobs:
+                    if (job.get("status") == "error"
+                            and job.get("parent_job_id") == parent_job_id):
+                        studio_index_service.delete_presentation_job(project_id, job["id"])
+            except Exception:
+                pass  # Non-critical cleanup — don't block the new edit
+
+            parent_job = studio_index_service.get_presentation_job(project_id, parent_job_id)
+            if not parent_job or not parent_job.get('slide_files'):
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found or has no content to edit'
+                }), 404
+
+            # Collect all slide HTML content from Supabase Storage
+            slide_contents = []
+            for slide_file in parent_job.get('slide_files', []):
+                content = storage_service.download_studio_file(
+                    project_id=project_id,
+                    job_type="presentations",
+                    job_id=parent_job_id,
+                    filename=f"slides/{slide_file}"
+                )
+                if content:
+                    slide_contents.append(f"--- {slide_file} ---\n{content}")
+            previous_markdown = "\n\n".join(slide_contents) if slide_contents else None
+            if previous_markdown is None:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to load parent presentation content from storage'
+                }), 500
+            previous_title = parent_job.get('presentation_title')
+            parent_source_name = parent_job.get('source_name')
+        elif not source_id:
             return jsonify({
                 'success': False,
                 'error': 'source_id is required'
             }), 400
 
-        direction = data.get('direction', '')
-
         # Execute presentation generation (background task)
         result = presentation_agent_executor.execute(
             project_id=project_id,
-            source_id=source_id,
-            direction=direction
+            source_id=source_id or '',
+            direction=direction,
+            edit_instructions=edit_instructions,
+            previous_markdown=previous_markdown,
+            previous_title=previous_title,
+            parent_job_id=parent_job_id,
+            parent_source_name=parent_source_name
         )
 
         if not result.get('success'):
@@ -127,9 +177,15 @@ def list_presentation_jobs(project_id: str):
         source_id = request.args.get('source_id')
         jobs = studio_index_service.list_presentation_jobs(project_id, source_id)
 
+        # Filter out orphaned failed-edit jobs (error + parent_job_id).
+        clean_jobs = [
+            job for job in jobs
+            if not (job.get("status") == "error" and job.get("parent_job_id"))
+        ]
+
         return jsonify({
             'success': True,
-            'jobs': jobs
+            'jobs': clean_jobs
         })
 
     except Exception as e:

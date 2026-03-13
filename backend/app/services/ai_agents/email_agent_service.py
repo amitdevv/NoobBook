@@ -128,7 +128,10 @@ class EmailAgentService:
         source_id: str,
         job_id: str,
         direction: str = "",
-        user_id: str = None
+        user_id: str = None,
+        edit_instructions: Optional[str] = None,
+        previous_markdown: Optional[str] = None,
+        previous_title: Optional[str] = None
     ) -> Dict[str, Any]:
         """Run the agent to generate an email template."""
         config = self._load_config()
@@ -144,8 +147,13 @@ class EmailAgentService:
             status_message="Starting email template generation..."
         )
 
-        # Get source content (or use direction as content when no source)
-        source_content = get_source_content(project_id, source_id, max_chars=10000) if source_id else "No source document provided. Use the direction below as the basis for your email template."
+        # Get source content — skip in edit mode since previous email already encodes it
+        if previous_markdown:
+            source_content = "Editing a previous email template — see the PREVIOUS EMAIL TEMPLATE section below."
+        elif source_id:
+            source_content = get_source_content(project_id, source_id, max_chars=10000)
+        else:
+            source_content = "No source document provided. Use the direction below as the basis for your email template."
 
         # Build user message from config
         effective_direction = direction if direction else config.get("default_direction", "")
@@ -214,6 +222,22 @@ class EmailAgentService:
                 )
             brand_instruction += "Do NOT substitute these with any other colors, fonts, or skip the logo.\n"
             user_message = user_message + brand_instruction
+
+        # Edit mode: append previous email content + edit instructions to user message
+        if previous_markdown:
+            edit_context = (
+                f"\n\n=== PREVIOUS EMAIL TEMPLATE (refine this based on the edit instructions) ===\n"
+                f"Previous Title: {previous_title or 'Untitled'}\n\n"
+                f"{previous_markdown}\n"
+                f"=== END PREVIOUS EMAIL TEMPLATE ===\n\n"
+                f"EDIT INSTRUCTIONS: {edit_instructions or 'No specific edits requested — improve as you see fit.'}\n\n"
+                f"Use the previous email template as your baseline. Apply the edit instructions "
+                f"to refine it. Keep elements the user didn't ask to change."
+            )
+            user_message += edit_context
+        elif edit_instructions:
+            # No parent content but user provided edit instructions — treat as additional guidance
+            user_message += f"\n\nADDITIONAL INSTRUCTIONS: {edit_instructions}"
 
         messages = [{"role": "user", "content": user_message}]
 

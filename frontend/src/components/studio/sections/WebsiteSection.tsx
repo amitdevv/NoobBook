@@ -9,6 +9,7 @@ import { useWebsiteGeneration } from '../website/useWebsiteGeneration';
 import { WebsiteListItem } from '../website/WebsiteListItem';
 import { WebsiteProgressIndicator } from '../website/WebsiteProgressIndicator';
 import { WebsiteViewerModal } from '../website/WebsiteViewerModal';
+import { ConfigErrorBanner } from '../shared/ConfigErrorBanner';
 
 export const WebsiteSection: React.FC = () => {
   const { projectId, registerGenerationHandler } = useStudioContext();
@@ -19,8 +20,11 @@ export const WebsiteSection: React.FC = () => {
     isGeneratingWebsite,
     viewingWebsiteJob,
     setViewingWebsiteJob,
+    configError,
+    pendingEditInput,
     loadSavedJobs,
     handleWebsiteGeneration,
+    handleWebsiteEdit,
     downloadWebsite,
   } = useWebsiteGeneration(projectId);
 
@@ -38,12 +42,14 @@ export const WebsiteSection: React.FC = () => {
     registerGenerationHandler('website', handleGenerate);
   }, [registerGenerationHandler, handleGenerate]);
 
-  if (filteredJobs.length === 0 && !isGeneratingWebsite) {
+  if (filteredJobs.length === 0 && !isGeneratingWebsite && !configError) {
     return null;
   }
 
   return (
     <>
+      <ConfigErrorBanner message={configError} />
+
       {isGeneratingWebsite && (
         <WebsiteProgressIndicator currentWebsiteJob={currentWebsiteJob} />
       )}
@@ -64,6 +70,9 @@ export const WebsiteSection: React.FC = () => {
         projectId={projectId}
         viewingWebsiteJob={viewingWebsiteJob}
         onClose={() => setViewingWebsiteJob(null)}
+        onEdit={(instructions) => viewingWebsiteJob && handleWebsiteEdit(viewingWebsiteJob, instructions)}
+        isGenerating={isGeneratingWebsite}
+        defaultEditInput={pendingEditInput}
       />
     </>
   );

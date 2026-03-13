@@ -53,6 +53,9 @@ export interface PresentationJob {
   status: JobStatus;
   status_message: string;
   error_message: string | null;
+  // Edit lineage
+  parent_job_id: string | null;
+  edit_instructions: string | null;
 
   // Plan
   presentation_title: string | null;
@@ -144,21 +147,27 @@ export interface PresentationPreviewResponse {
  */
 export const presentationsAPI = {
   /**
-   * Start presentation generation (background task)
+   * Start presentation generation or edit (background task)
    * Educational Note: Non-blocking - returns immediately with job_id
    */
   async startGeneration(
     projectId: string,
     sourceId: string,
-    direction?: string
+    direction?: string,
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartPresentationResponse> {
     try {
+      const body: Record<string, unknown> = {
+        source_id: sourceId,
+        direction: direction || '',
+      };
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/presentation`,
-        {
-          source_id: sourceId,
-          direction: direction || '',
-        }
+        body
       );
       return response.data;
     } catch (error) {
@@ -248,6 +257,24 @@ export const presentationsAPI = {
    */
   getDownloadUrl(projectId: string, jobId: string, format: 'pptx' | 'zip' = 'pptx'): string {
     return `${API_BASE_URL}/projects/${projectId}/studio/presentations/${jobId}/download?format=${format}`;
+  },
+
+  /**
+   * Delete a presentation job
+   */
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/presentations/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        return error.response.data;
+      }
+      log.error({ err: error }, 'failed to delete presentation job');
+      throw error;
+    }
   },
 
   /**

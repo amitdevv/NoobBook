@@ -8,7 +8,7 @@ email_agent_service itself.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import uuid
 from datetime import datetime
 
@@ -32,7 +32,12 @@ class EmailAgentExecutor:
         project_id: str,
         source_id: str,
         direction: str = "",
-        user_id: str = None
+        user_id: str = None,
+        edit_instructions: Optional[str] = None,
+        previous_markdown: Optional[str] = None,
+        previous_title: Optional[str] = None,
+        parent_job_id: Optional[str] = None,
+        parent_source_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Execute email template generation as a background task.
@@ -42,6 +47,11 @@ class EmailAgentExecutor:
             source_id: Source to generate template from
             direction: User's direction/guidance (optional)
             user_id: The authenticated user's UUID (for brand config lookup)
+            edit_instructions: Instructions for refining a previous email (optional)
+            previous_markdown: HTML content from a parent job to refine (optional)
+            previous_title: Title from a parent job (optional)
+            parent_job_id: UUID of the parent job being edited (optional)
+            parent_source_name: Source name from parent job (optional)
 
         Returns:
             Job info with status and job_id for polling
@@ -56,11 +66,16 @@ class EmailAgentExecutor:
         if source_id:
             source = source_service.get_source(project_id, source_id)
             if not source:
-                return {
-                    "success": False,
-                    "error": f"Source {source_id} not found"
-                }
-            source_name = source.get("name", "Unknown Source")
+                if previous_markdown:
+                    # Edit mode — source may be deleted; inherit name from parent job
+                    source_name = parent_source_name or "No Source"
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Source {source_id} not found"
+                    }
+            else:
+                source_name = source.get("name", "Unknown Source")
 
         # Create job
         job_id = str(uuid.uuid4())
@@ -71,7 +86,9 @@ class EmailAgentExecutor:
             job_id=job_id,
             source_id=source_id,
             source_name=source_name,
-            direction=direction
+            direction=direction,
+            parent_job_id=parent_job_id,
+            edit_instructions=edit_instructions
         )
 
         # Launch agent as background task
@@ -84,7 +101,10 @@ class EmailAgentExecutor:
                     source_id=source_id,
                     job_id=job_id,
                     direction=direction,
-                    user_id=user_id
+                    user_id=user_id,
+                    edit_instructions=edit_instructions,
+                    previous_markdown=previous_markdown,
+                    previous_title=previous_title
                 )
             except Exception as e:
                 logger.exception("Email agent failed for job %s", job_id[:8])

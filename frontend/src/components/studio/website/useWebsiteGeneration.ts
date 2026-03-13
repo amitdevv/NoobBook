@@ -22,6 +22,9 @@ export const useWebsiteGeneration = (projectId: string) => {
   const [isGeneratingWebsite, setIsGeneratingWebsite] = useState(false);
   const pollingRef = useRef(false);
   const [viewingWebsiteJob, setViewingWebsiteJob] = useState<WebsiteJob | null>(null);
+  const [pendingEdit, setPendingEdit] = useState<{ jobId: string; input: string } | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const configErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Load saved website jobs from backend
@@ -51,7 +54,17 @@ export const useWebsiteGeneration = (projectId: string) => {
                 (job) => setCurrentWebsiteJob(job)
               );
               if (finalJob.status === 'ready' || finalJob.status === 'error') {
-                setSavedWebsiteJobs((prev) => [finalJob, ...prev]);
+                if (finalJob.status === 'ready' && finalJob.parent_job_id) {
+                  // Edit completed after refresh — keep parent so user can view previous versions
+                  setSavedWebsiteJobs((prev) => [finalJob, ...prev]);
+                } else if (finalJob.status === 'error' && finalJob.parent_job_id) {
+                  // Edit failed after refresh — delete orphaned error job
+                  websitesAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+                    console.warn('[Studio] Failed to delete failed edit job', err);
+                  });
+                } else {
+                  setSavedWebsiteJobs((prev) => [finalJob, ...prev]);
+                }
               }
             } catch {
               // Polling failed — job stays visible via next load
@@ -139,14 +152,77 @@ export const useWebsiteGeneration = (projectId: string) => {
     link.click();
   };
 
+  const handleWebsiteEdit = async (parentJob: WebsiteJob, editInstructions: string) => {
+    if (isGeneratingWebsite) return;
+    setIsGeneratingWebsite(true);
+    setPendingEdit({ jobId: parentJob.id, input: editInstructions });
+
+    try {
+      const startResponse = await websitesAPI.startGeneration(
+        projectId,
+        parentJob.source_id,
+        parentJob.direction,
+        parentJob.id,        // parentJobId
+        editInstructions     // editInstructions
+      );
+
+      if (!startResponse.success || !startResponse.job_id) {
+        console.error('[Studio] Website edit: API start failed', startResponse);
+        if (configErrorTimer.current) clearTimeout(configErrorTimer.current);
+        setConfigError(startResponse.error || 'Failed to start website edit.');
+        configErrorTimer.current = setTimeout(() => setConfigError(null), 10000);
+        showError(startResponse.error || 'Failed to start website edit.');
+        return;
+      }
+
+      // Only close modal once we know generation started
+      setCurrentWebsiteJob(null);
+      setViewingWebsiteJob(null);
+
+      showSuccess('Editing website...');
+
+      const finalJob = await websitesAPI.pollJobStatus(
+        projectId,
+        startResponse.job_id,
+        (job) => setCurrentWebsiteJob(job)
+      );
+
+      setCurrentWebsiteJob(finalJob);
+
+      if (finalJob.status === 'ready') {
+        setPendingEdit(null);
+        showSuccess(`Website edited: ${finalJob.site_name || 'Website'}`);
+        setSavedWebsiteJobs((prev) => [finalJob, ...prev]);
+        setViewingWebsiteJob(finalJob); // Reopen modal with new job
+      } else if (finalJob.status === 'error') {
+        showError(finalJob.error_message || 'Website edit failed.');
+        setViewingWebsiteJob(parentJob); // Restore parent modal so user can retry
+        websitesAPI.deleteJob(projectId, finalJob.id).catch((err) => {
+          console.warn('[Studio] Failed to delete failed edit job', err);
+        });
+      }
+    } catch (error) {
+      console.error('[Studio] Website edit: failed', error);
+      log.error({ err: error }, 'Website edit failed');
+      showError(error instanceof Error ? error.message : 'Website edit failed.');
+      setViewingWebsiteJob(parentJob); // Restore parent modal so user can retry
+    } finally {
+      setIsGeneratingWebsite(false);
+      setCurrentWebsiteJob(null);
+    }
+  };
+
   return {
     savedWebsiteJobs,
     currentWebsiteJob,
     isGeneratingWebsite,
     viewingWebsiteJob,
     setViewingWebsiteJob,
+    configError,
+    pendingEditInput: pendingEdit !== null && pendingEdit.jobId === viewingWebsiteJob?.id ? pendingEdit.input : '',
     loadSavedJobs,
     handleWebsiteGeneration,
+    handleWebsiteEdit,
     openWebsite,
     downloadWebsite,
   };
