@@ -171,7 +171,7 @@ class QuizService:
                     f"\n\n=== PREVIOUS QUIZ (refine based on edit instructions) ===\n"
                     f"{previous_content[:10000]}\n"
                     f"=== END PREVIOUS QUIZ ===\n\n"
-                    f"EDIT INSTRUCTIONS: {edit_instructions}\n\n"
+                    f"EDIT INSTRUCTIONS: {edit_instructions[:2000]}\n\n"
                     f"Use the previous quiz questions as baseline. Apply the edits. "
                     f"Keep unchanged questions intact."
                 )

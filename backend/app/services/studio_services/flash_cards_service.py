@@ -171,7 +171,7 @@ class FlashCardsService:
                     f"\n\n=== PREVIOUS FLASH CARDS (refine based on edit instructions) ===\n"
                     f"{previous_content[:10000]}\n"
                     f"=== END PREVIOUS FLASH CARDS ===\n\n"
-                    f"EDIT INSTRUCTIONS: {edit_instructions}\n\n"
+                    f"EDIT INSTRUCTIONS: {edit_instructions[:2000]}\n\n"
                     f"Use the previous flash cards as baseline. Apply the edits. "
                     f"Keep unchanged cards intact."
                 )
