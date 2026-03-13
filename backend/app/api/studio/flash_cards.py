@@ -23,6 +23,7 @@ Routes:
 - GET  /projects/<id>/studio/flash-card-jobs/<id>  - Job status
 - GET  /projects/<id>/studio/flash-card-jobs       - List jobs
 """
+import json
 import uuid
 from flask import jsonify, request, current_app
 from app.api.studio import studio_bp
@@ -35,14 +36,17 @@ from app.services.background_services.task_service import task_service
 @studio_bp.route('/projects/<project_id>/studio/flash-cards', methods=['POST'])
 def generate_flash_cards(project_id: str):
     """
-    Start flash card generation as a background task.
+    Start flash card generation or edit as a background task.
 
     Educational Note: Flash cards are generated from source content using
     Claude to create question/answer pairs for learning and memorization.
+    Edits refine existing cards based on user instructions.
 
     Request Body:
         - source_id: UUID of the source to generate cards from (required)
         - direction: Optional guidance for what to focus on
+        - parent_job_id: UUID of the parent job to edit (optional, for edits)
+        - edit_instructions: Instructions for editing the parent cards (optional, for edits)
 
     Response:
         - success: Boolean
@@ -61,6 +65,46 @@ def generate_flash_cards(project_id: str):
 
         direction = data.get('direction', 'Create flash cards covering the key concepts.')
 
+        # Edit mode: load parent job's cards as context for refinement
+        parent_job_id = data.get('parent_job_id')
+        edit_instructions = data.get('edit_instructions')
+        previous_content = None
+
+        # Reject edit requests without instructions — otherwise the service
+        # falls through to a full regeneration with a misleading "Edited" badge.
+        if parent_job_id and not edit_instructions:
+            return jsonify({
+                'success': False,
+                'error': 'edit_instructions is required when parent_job_id is provided'
+            }), 400
+
+        if parent_job_id:
+            # Clean up any previously failed edit jobs for this parent
+            try:
+                all_jobs = studio_index_service.list_flash_card_jobs(project_id)
+                for job in all_jobs:
+                    if (job.get("status") == "error"
+                            and job.get("parent_job_id") == parent_job_id):
+                        studio_index_service.delete_flash_card_job(project_id, job["id"])
+            except Exception:
+                pass  # Non-critical cleanup — don't block the new edit
+
+            parent_job = studio_index_service.get_flash_card_job(project_id, parent_job_id)
+            if not parent_job:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found'
+                }), 404
+
+            # Serialize previous cards as JSON string for LLM context
+            cards = parent_job.get('cards', [])
+            if not cards:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job has no cards to edit'
+                }), 400
+            previous_content = json.dumps(cards, indent=2)
+
         # Get source info for the job record
         source = source_index_service.get_source_from_index(project_id, source_id)
         if not source:
@@ -71,17 +115,19 @@ def generate_flash_cards(project_id: str):
 
         source_name = source.get('name', 'Unknown')
 
-        # Create job record
+        # Create job record with edit lineage
         job_id = str(uuid.uuid4())
         studio_index_service.create_flash_card_job(
             project_id=project_id,
             job_id=job_id,
             source_id=source_id,
             source_name=source_name,
-            direction=direction
+            direction=direction,
+            parent_job_id=parent_job_id,
+            edit_instructions=edit_instructions
         )
 
-        # Submit background task
+        # Submit background task with edit context
         task_service.submit_task(
             task_type="flash_cards",
             target_id=job_id,
@@ -89,7 +135,9 @@ def generate_flash_cards(project_id: str):
             project_id=project_id,
             source_id=source_id,
             job_id=job_id,
-            direction=direction
+            direction=direction,
+            previous_content=previous_content,
+            edit_instructions=edit_instructions
         )
 
         return jsonify({
@@ -154,10 +202,17 @@ def list_flash_card_jobs(project_id: str):
         source_id = request.args.get('source_id')
         jobs = studio_index_service.list_flash_card_jobs(project_id, source_id)
 
+        # Filter out orphaned failed-edit jobs (error + parent_job_id).
+        # These are leftover from edit failures and should never be shown.
+        clean_jobs = [
+            job for job in jobs
+            if not (job.get("status") == "error" and job.get("parent_job_id"))
+        ]
+
         return jsonify({
             'success': True,
-            'jobs': jobs,
-            'count': len(jobs)
+            'jobs': clean_jobs,
+            'count': len(clean_jobs)
         }), 200
 
     except Exception as e:
@@ -165,4 +220,37 @@ def list_flash_card_jobs(project_id: str):
         return jsonify({
             'success': False,
             'error': f'Failed to list jobs: {str(e)}'
+        }), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/flash-card-jobs/<job_id>', methods=['DELETE'])
+def delete_flash_card_job(project_id: str, job_id: str):
+    """
+    Delete a flash card job.
+
+    Response:
+        - success: Boolean
+        - message: Status message
+    """
+    try:
+        job = studio_index_service.get_flash_card_job(project_id, job_id)
+
+        if not job:
+            return jsonify({
+                'success': False,
+                'error': f'Flash card job {job_id} not found'
+            }), 404
+
+        studio_index_service.delete_flash_card_job(project_id, job_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Flash card job {job_id} deleted'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting flash card job: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete flash card job: {str(e)}'
         }), 500

@@ -19,8 +19,10 @@ export const MindMapSection: React.FC = () => {
     isGeneratingMindMap,
     viewingMindMapJob,
     setViewingMindMapJob,
+    pendingEditInput,
     loadSavedJobs,
     handleMindMapGeneration,
+    handleMindMapEdit,
   } = useMindMapGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedMindMapJobs);
@@ -58,6 +60,9 @@ export const MindMapSection: React.FC = () => {
       <MindMapViewerModal
         viewingMindMapJob={viewingMindMapJob}
         onClose={() => setViewingMindMapJob(null)}
+        onEdit={(instructions) => viewingMindMapJob && handleMindMapEdit(viewingMindMapJob, instructions)}
+        isGenerating={isGeneratingMindMap}
+        defaultEditInput={pendingEditInput}
       />
     </>
   );

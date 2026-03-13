@@ -12,7 +12,7 @@ The tool-based approach ensures structured output with questions, options,
 correct answers, hints, and explanations.
 """
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -104,27 +104,32 @@ class QuizService:
         project_id: str,
         source_id: str,
         job_id: str,
-        direction: str = "Create quiz questions covering the key concepts."
+        direction: str = "Create quiz questions covering the key concepts.",
+        previous_content: Optional[str] = None,
+        edit_instructions: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Generate quiz questions for a source.
+        Generate quiz questions for a source, or edit existing questions.
 
         Args:
             project_id: The project UUID
             source_id: The source UUID
             job_id: The job ID for status tracking
             direction: User's direction for what to focus on
+            previous_content: JSON string of previous questions (for edits)
+            edit_instructions: User instructions for editing (for edits)
 
         Returns:
             Dict with success status, questions array, and metadata
         """
         started_at = datetime.now()
+        is_edit = bool(previous_content and edit_instructions)
 
         # Update job to processing
         studio_index_service.update_quiz_job(
             project_id, job_id,
             status="processing",
-            progress="Reading source content...",
+            progress="Editing quiz..." if is_edit else "Reading source content...",
             started_at=datetime.now().isoformat()
         )
 
@@ -136,15 +141,19 @@ class QuizService:
 
             source_name = source.get("name", "Unknown")
 
-            # Get source content
-            studio_index_service.update_quiz_job(
-                project_id, job_id,
-                progress="Analyzing content..."
-            )
+            # For edits, skip source fetching — previous content is the baseline
+            if is_edit:
+                content = "[Source content available via previous quiz questions below]"
+            else:
+                # Get source content
+                studio_index_service.update_quiz_job(
+                    project_id, job_id,
+                    progress="Analyzing content..."
+                )
 
-            content = self._get_source_content(project_id, source_id)
-            if not content:
-                raise ValueError("No content found for source")
+                content = self._get_source_content(project_id, source_id)
+                if not content:
+                    raise ValueError("No content found for source")
 
             # Load config and tool
             config = self._load_config()
@@ -155,6 +164,18 @@ class QuizService:
                 direction=direction,
                 content=content[:15000]  # Limit content to ~15k chars
             )
+
+            # Append edit context so Claude refines rather than regenerates
+            if is_edit:
+                edit_context = (
+                    f"\n\n=== PREVIOUS QUIZ (refine based on edit instructions) ===\n"
+                    f"{previous_content[:10000]}\n"
+                    f"=== END PREVIOUS QUIZ ===\n\n"
+                    f"EDIT INSTRUCTIONS: {edit_instructions[:2000]}\n\n"
+                    f"Use the previous quiz questions as baseline. Apply the edits. "
+                    f"Keep unchanged questions intact."
+                )
+                user_message += edit_context
 
             # Call Claude with the quiz tool
             studio_index_service.update_quiz_job(

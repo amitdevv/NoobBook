@@ -19,7 +19,9 @@ def create_quiz_job(
     job_id: str,
     source_id: str,
     source_name: str,
-    direction: str
+    direction: str,
+    parent_job_id: Optional[str] = None,
+    edit_instructions: Optional[str] = None
 ) -> Dict[str, Any]:
     job_data = {
         "id": job_id,
@@ -33,6 +35,8 @@ def create_quiz_job(
         "topic_summary": None,
         "question_count": 0,
         "generation_time_seconds": None,
+        "parent_job_id": parent_job_id,
+        "edit_instructions": edit_instructions,
     }
     return create_job(project_id, JOB_TYPE, job_data)
 

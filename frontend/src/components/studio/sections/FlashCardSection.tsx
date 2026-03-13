@@ -19,8 +19,10 @@ export const FlashCardSection: React.FC = () => {
     isGeneratingFlashCards,
     viewingFlashCardJob,
     setViewingFlashCardJob,
+    pendingEditInput,
     loadSavedJobs,
     handleFlashCardGeneration,
+    handleFlashCardEdit,
   } = useFlashCardGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedFlashCardJobs);
@@ -58,6 +60,9 @@ export const FlashCardSection: React.FC = () => {
       <FlashCardViewerModal
         viewingFlashCardJob={viewingFlashCardJob}
         onClose={() => setViewingFlashCardJob(null)}
+        onEdit={(instructions) => viewingFlashCardJob && handleFlashCardEdit(viewingFlashCardJob, instructions)}
+        isGenerating={isGeneratingFlashCards}
+        defaultEditInput={pendingEditInput}
       />
     </>
   );

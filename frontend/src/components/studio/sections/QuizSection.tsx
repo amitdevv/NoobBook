@@ -20,8 +20,10 @@ export const QuizSection: React.FC = () => {
     isGeneratingQuiz,
     viewingQuizJob,
     setViewingQuizJob,
+    pendingEditInput,
     loadSavedJobs,
     handleQuizGeneration,
+    handleQuizEdit,
   } = useQuizGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedQuizJobs);
@@ -59,6 +61,9 @@ export const QuizSection: React.FC = () => {
       <QuizViewerModal
         viewingQuizJob={viewingQuizJob}
         onClose={() => setViewingQuizJob(null)}
+        onEdit={(instructions) => viewingQuizJob && handleQuizEdit(viewingQuizJob, instructions)}
+        isGenerating={isGeneratingQuiz}
+        defaultEditInput={pendingEditInput}
       />
     </>
   );
