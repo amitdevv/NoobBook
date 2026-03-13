@@ -32,23 +32,28 @@ from app.api.studio import studio_bp
 from app.services.studio_services import audio_overview_service, studio_index_service
 from app.services.source_services import source_index_service
 from app.services.integrations.elevenlabs import tts_service
-from app.services.integrations.supabase import storage_service
+from app.services.integrations.supabase import storage_service  # For downloading previous scripts during edits
 from app.services.background_services.task_service import task_service
 
 
 @studio_bp.route('/projects/<project_id>/studio/audio-overview', methods=['POST'])
 def generate_audio_overview(project_id: str):
     """
-    Start audio overview generation as a background task.
+    Start audio overview generation or edit as a background task.
 
     Educational Note: This endpoint is non-blocking:
     1. Creates a job record with status="pending"
     2. Submits background task via task_service
     3. Returns job_id immediately for status polling
 
+    For edits, the previous script is loaded and passed to the agent as context,
+    so Claude can refine the audio based on user instructions.
+
     Request Body:
         - source_id: UUID of the source to generate overview for (required)
         - direction: Optional guidance for the script style/focus
+        - parent_job_id: UUID of the parent job to edit (optional, for edits)
+        - edit_instructions: Instructions for editing the parent audio (optional, for edits)
 
     Response:
         - success: Boolean
@@ -59,11 +64,6 @@ def generate_audio_overview(project_id: str):
         data = request.get_json() or {}
 
         source_id = data.get('source_id')
-        if not source_id:
-            return jsonify({
-                'success': False,
-                'error': 'source_id is required'
-            }), 400
 
         direction = data.get('direction', 'Create an engaging audio overview of this content.')
 
@@ -72,6 +72,59 @@ def generate_audio_overview(project_id: str):
             return jsonify({
                 'success': False,
                 'error': 'ElevenLabs API key not configured. Please add it in Admin Settings.'
+            }), 400
+
+        # Edit mode: load parent job's script as context for refinement
+        parent_job_id = data.get('parent_job_id')
+        edit_instructions = data.get('edit_instructions')
+        previous_content = None
+
+        if parent_job_id and not edit_instructions:
+            return jsonify({
+                'success': False,
+                'error': 'edit_instructions is required when parent_job_id is provided'
+            }), 400
+
+        if parent_job_id:
+            # Clean up any previously failed edit jobs for this parent
+            try:
+                all_jobs = studio_index_service.list_audio_jobs(project_id)
+                for job in all_jobs:
+                    if (job.get("status") == "error"
+                            and job.get("parent_job_id") == parent_job_id):
+                        studio_index_service.delete_audio_job(project_id, job["id"])
+            except Exception:
+                pass  # Non-critical cleanup -- don't block the new edit
+
+            parent_job = studio_index_service.get_audio_job(project_id, parent_job_id)
+            if not parent_job:
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found'
+                }), 404
+
+            # Download the previous script from Supabase Storage
+            previous_content = storage_service.download_studio_file(
+                project_id=project_id,
+                job_type="audio",
+                job_id=parent_job_id,
+                filename="script.txt"
+            )
+            if previous_content is None:
+                return jsonify({
+                    'success': False,
+                    'error': 'Could not load previous audio script for editing. Please try regenerating.'
+                }), 422
+
+            # Inherit source_id from parent if not explicitly provided
+            if not source_id:
+                source_id = parent_job.get('source_id')
+
+        # Now enforce source_id after potential inheritance
+        if not source_id:
+            return jsonify({
+                'success': False,
+                'error': 'source_id is required'
             }), 400
 
         # Get source info for the job record
@@ -91,7 +144,9 @@ def generate_audio_overview(project_id: str):
             job_id=job_id,
             source_id=source_id,
             source_name=source_name,
-            direction=direction
+            direction=direction,
+            parent_job_id=parent_job_id,
+            edit_instructions=edit_instructions
         )
 
         # Submit background task
@@ -102,7 +157,9 @@ def generate_audio_overview(project_id: str):
             project_id=project_id,
             source_id=source_id,
             job_id=job_id,
-            direction=direction
+            direction=direction,
+            previous_content=previous_content,
+            edit_instructions=edit_instructions
         )
 
         return jsonify({
@@ -170,10 +227,16 @@ def list_audio_jobs(project_id: str):
         source_id = request.args.get('source_id')
         jobs = studio_index_service.list_audio_jobs(project_id, source_id)
 
+        # Filter out orphaned failed-edit jobs (error + parent_job_id).
+        clean_jobs = [
+            job for job in jobs
+            if not (job.get("status") == "error" and job.get("parent_job_id"))
+        ]
+
         return jsonify({
             'success': True,
-            'jobs': jobs,
-            'count': len(jobs)
+            'jobs': clean_jobs,
+            'count': len(clean_jobs)
         }), 200
 
     except Exception as e:

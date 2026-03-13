@@ -9,6 +9,7 @@ import { useWireframeGeneration } from '../wireframes/useWireframeGeneration';
 import { WireframeListItem } from '../wireframes/WireframeListItem';
 import { WireframeProgressIndicator } from '../wireframes/WireframeProgressIndicator';
 import { WireframeViewerModal } from '../wireframes/WireframeViewerModal';
+import { ConfigErrorBanner } from '../shared/ConfigErrorBanner';
 
 export const WireframeSection: React.FC = () => {
   const { projectId, registerGenerationHandler } = useStudioContext();
@@ -19,8 +20,11 @@ export const WireframeSection: React.FC = () => {
     isGeneratingWireframe,
     viewingWireframeJob,
     setViewingWireframeJob,
+    configError,
+    pendingEditInput,
     loadSavedJobs,
     handleWireframeGeneration,
+    handleWireframeEdit,
   } = useWireframeGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedWireframeJobs);
@@ -37,12 +41,14 @@ export const WireframeSection: React.FC = () => {
     registerGenerationHandler('wireframes', handleGenerate);
   }, [registerGenerationHandler, handleGenerate]);
 
-  if (filteredJobs.length === 0 && !isGeneratingWireframe) {
+  if (filteredJobs.length === 0 && !isGeneratingWireframe && !configError) {
     return null;
   }
 
   return (
     <>
+      <ConfigErrorBanner message={configError} />
+
       {isGeneratingWireframe && (
         <WireframeProgressIndicator currentWireframeJob={currentWireframeJob} />
       )}
@@ -58,6 +64,9 @@ export const WireframeSection: React.FC = () => {
       <WireframeViewerModal
         job={viewingWireframeJob}
         onClose={() => setViewingWireframeJob(null)}
+        onEdit={(instructions) => viewingWireframeJob && handleWireframeEdit(viewingWireframeJob, instructions)}
+        isGenerating={isGeneratingWireframe}
+        defaultEditInput={pendingEditInput}
       />
     </>
   );

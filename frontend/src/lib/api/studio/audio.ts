@@ -38,6 +38,9 @@ export interface AudioJob {
     voice_id?: string;
     model_id?: string;
   } | null;
+  // Edit lineage
+  parent_job_id: string | null;
+  edit_instructions: string | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -87,21 +90,27 @@ export interface TTSStatusResponse {
  */
 export const audioAPI = {
   /**
-   * Start audio overview generation
+   * Start audio overview generation or edit
    * Educational Note: Non-blocking - returns immediately with job_id
    */
   async startGeneration(
     projectId: string,
     sourceId: string,
-    direction?: string
+    direction?: string,
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartAudioResponse> {
     try {
+      const body: Record<string, unknown> = {
+        source_id: sourceId,
+        direction: direction || 'Create an engaging audio overview of this content.',
+      };
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
+
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/audio-overview`,
-        {
-          source_id: sourceId,
-          direction: direction || 'Create an engaging audio overview of this content.',
-        }
+        body
       );
       return response.data;
     } catch (error) {

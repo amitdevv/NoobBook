@@ -5,7 +5,7 @@
  * Only re-renders when audio state changes - isolated from other sections.
  */
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useStudioContext, useFilteredJobs } from '../StudioContext';
 import { useAudioGeneration } from '../audio/useAudioGeneration';
 import { AudioListItem } from '../audio/AudioListItem';
@@ -28,6 +28,7 @@ export const AudioSection: React.FC = () => {
     handleLoadedMetadata,
     loadSavedJobs,
     handleAudioGeneration,
+    handleAudioEdit,
     playAudio,
     pauseAudio,
     seekTo,
@@ -35,7 +36,13 @@ export const AudioSection: React.FC = () => {
     cyclePlaybackRate,
     downloadAudio,
     formatDuration,
+    editingJobId,
+    setEditingJobId,
+    pendingEditInput,
   } = useAudioGeneration(projectId);
+
+  // Track which item has its edit input open — only one at a time
+  const [openEditJobId, setOpenEditJobId] = useState<string | null>(null);
 
   const filteredJobs = useFilteredJobs(savedAudioJobs);
 
@@ -84,6 +91,12 @@ export const AudioSection: React.FC = () => {
           onCycleSpeed={cyclePlaybackRate}
           onDownload={downloadAudio}
           formatDuration={formatDuration}
+          onEdit={handleAudioEdit}
+          isEditing={editingJobId === job.id}
+          isGenerating={isGeneratingAudio}
+          defaultEditInput={editingJobId === job.id ? pendingEditInput : ''}
+          isEditOpen={openEditJobId === job.id || editingJobId === job.id}
+          onToggleEdit={() => setOpenEditJobId(prev => prev === job.id ? null : job.id)}
         />
       ))}
     </>
