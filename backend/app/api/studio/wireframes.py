@@ -71,14 +71,34 @@ def generate_wireframe(project_id: str):
                     {"success": False, "error": "Parent job not found or has no content to edit"}
                 ), 404
 
-            # Use description + title as previous content context for the agent
+            # Build previous content context for the agent.
+            # Trade-off: We include a compact element summary (type + text) rather
+            # than the full Excalidraw JSON. Full element data (coordinates, styles,
+            # bindings) would blow up the context window for complex wireframes and
+            # Claude regenerates layout from scratch anyway via the agentic loop.
+            # The summary gives Claude enough to understand *what* exists so it can
+            # preserve intent while honouring the edit instructions.
             previous_parts = []
             if parent_job.get("title"):
                 previous_parts.append(f"Title: {parent_job['title']}")
             if parent_job.get("description"):
                 previous_parts.append(f"Description: {parent_job['description']}")
-            # Include element count for context
-            previous_parts.append(f"Element count: {parent_job.get('element_count', len(parent_job.get('elements', [])))}")
+
+            # Compact element summary: type + label/text for each element
+            elements = parent_job.get("elements", [])
+            previous_parts.append(f"Element count: {len(elements)}")
+            if elements:
+                summary_lines = []
+                for elem in elements:
+                    elem_type = elem.get("type", "unknown")
+                    # Text elements have 'text', others may have 'originalText'
+                    label = elem.get("text") or elem.get("originalText") or ""
+                    if label:
+                        summary_lines.append(f'  - {elem_type}: "{label}"')
+                    else:
+                        summary_lines.append(f"  - {elem_type}")
+                previous_parts.append("Elements:\n" + "\n".join(summary_lines))
+
             previous_content = "\n".join(previous_parts)
 
             # Inherit source info from parent if not provided

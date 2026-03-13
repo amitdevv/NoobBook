@@ -109,6 +109,12 @@ def generate_audio_overview(project_id: str):
                 job_id=parent_job_id,
                 filename="script.txt"
             )
+            if previous_content is None:
+                return jsonify({
+                    'success': False,
+                    'error': 'Could not load previous audio script for editing. Please try regenerating.'
+                }), 422
+
             # Inherit source_id from parent if not explicitly provided
             if not source_id:
                 source_id = parent_job.get('source_id')
