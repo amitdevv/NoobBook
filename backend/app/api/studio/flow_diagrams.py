@@ -33,14 +33,16 @@ from app.services.background_services.task_service import task_service
 @studio_bp.route('/projects/<project_id>/studio/flow-diagram', methods=['POST'])
 def generate_flow_diagram(project_id: str):
     """
-    Start flow diagram generation as a background task.
+    Start flow diagram generation or edit via background task.
 
     Educational Note: Flow diagrams are generated from source content using
     Claude to create Mermaid diagram syntax for visual process mapping.
 
     Request Body:
-        - source_id: UUID of the source to generate diagram from (required)
+        - source_id: UUID of the source to generate diagram from (optional)
         - direction: Optional guidance for what to focus on
+        - parent_job_id: UUID of the parent job to edit (optional, for edits)
+        - edit_instructions: Instructions for editing the parent diagram (optional, for edits)
 
     Response:
         - success: Boolean
@@ -52,6 +54,34 @@ def generate_flow_diagram(project_id: str):
 
         source_id = data.get('source_id')
         direction = data.get('direction', 'Create a diagram showing the key processes and relationships.')
+
+        # Edit mode: load parent job's mermaid syntax as context for refinement
+        parent_job_id = data.get('parent_job_id')
+        edit_instructions = data.get('edit_instructions')
+        previous_content = None
+
+        if parent_job_id:
+            # Clean up any previously failed edit jobs for this parent
+            try:
+                all_jobs = studio_index_service.list_flow_diagram_jobs(project_id)
+                for job in all_jobs:
+                    if (job.get("status") == "error"
+                            and job.get("parent_job_id") == parent_job_id):
+                        studio_index_service.delete_flow_diagram_job(project_id, job["id"])
+            except Exception:
+                pass  # Non-critical cleanup -- don't block the new edit
+
+            parent_job = studio_index_service.get_flow_diagram_job(project_id, parent_job_id)
+            if not parent_job or not parent_job.get('mermaid_syntax'):
+                return jsonify({
+                    'success': False,
+                    'error': 'Parent job not found or has no content to edit'
+                }), 404
+
+            previous_content = parent_job['mermaid_syntax']
+            # Inherit source info from parent if not provided
+            if not source_id:
+                source_id = parent_job.get('source_id')
 
         # Source is optional — can generate from direction alone
         source_name = 'Direction Only'
@@ -71,7 +101,9 @@ def generate_flow_diagram(project_id: str):
             job_id=job_id,
             source_id=source_id,
             source_name=source_name,
-            direction=direction
+            direction=direction,
+            parent_job_id=parent_job_id,
+            edit_instructions=edit_instructions
         )
 
         # Submit background task
@@ -82,7 +114,9 @@ def generate_flow_diagram(project_id: str):
             project_id=project_id,
             source_id=source_id,
             job_id=job_id,
-            direction=direction
+            direction=direction,
+            previous_content=previous_content,
+            edit_instructions=edit_instructions
         )
 
         return jsonify({
@@ -147,10 +181,17 @@ def list_flow_diagram_jobs(project_id: str):
         source_id = request.args.get('source_id')
         jobs = studio_index_service.list_flow_diagram_jobs(project_id, source_id)
 
+        # Filter out orphaned failed-edit jobs (error + parent_job_id).
+        # These are leftover from edit failures and should never be shown.
+        clean_jobs = [
+            job for job in jobs
+            if not (job.get("status") == "error" and job.get("parent_job_id"))
+        ]
+
         return jsonify({
             'success': True,
-            'jobs': jobs,
-            'count': len(jobs)
+            'jobs': clean_jobs,
+            'count': len(clean_jobs)
         }), 200
 
     except Exception as e:

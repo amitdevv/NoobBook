@@ -25,14 +25,16 @@ from app.services.background_services.task_service import task_service
 @studio_bp.route("/projects/<project_id>/studio/wireframe", methods=["POST"])
 def generate_wireframe(project_id: str):
     """
-    Start wireframe generation as a background task.
+    Start wireframe generation or edit as a background task.
 
     Educational Note: Wireframes are generated from source content using
     Claude to create Excalidraw element definitions for UI prototyping.
 
     Request Body:
-        - source_id: UUID of the source to generate wireframe from (required)
+        - source_id: UUID of the source to generate wireframe from (optional)
         - direction: Optional guidance for what to wireframe
+        - parent_job_id: UUID of the parent job to edit (optional, for edits)
+        - edit_instructions: Instructions for editing the parent wireframe (optional, for edits)
 
     Response:
         - success: Boolean
@@ -46,6 +48,42 @@ def generate_wireframe(project_id: str):
         direction = data.get(
             "direction", "Create a wireframe for the main page layout."
         )
+
+        # Edit mode: load parent job's description as context for refinement
+        parent_job_id = data.get("parent_job_id")
+        edit_instructions = data.get("edit_instructions")
+        previous_content = None
+
+        if parent_job_id:
+            # Clean up any previously failed edit jobs for this parent
+            try:
+                all_jobs = studio_index_service.list_wireframe_jobs(project_id)
+                for job in all_jobs:
+                    if (job.get("status") == "error"
+                            and job.get("parent_job_id") == parent_job_id):
+                        studio_index_service.delete_wireframe_job(project_id, job["id"])
+            except Exception:
+                pass  # Non-critical cleanup -- don't block the new edit
+
+            parent_job = studio_index_service.get_wireframe_job(project_id, parent_job_id)
+            if not parent_job or not parent_job.get("elements"):
+                return jsonify(
+                    {"success": False, "error": "Parent job not found or has no content to edit"}
+                ), 404
+
+            # Use description + title as previous content context for the agent
+            previous_parts = []
+            if parent_job.get("title"):
+                previous_parts.append(f"Title: {parent_job['title']}")
+            if parent_job.get("description"):
+                previous_parts.append(f"Description: {parent_job['description']}")
+            # Include element count for context
+            previous_parts.append(f"Element count: {parent_job.get('element_count', len(parent_job.get('elements', [])))}")
+            previous_content = "\n".join(previous_parts)
+
+            # Inherit source info from parent if not provided
+            if not source_id:
+                source_id = parent_job.get("source_id")
 
         # Source is optional — can generate from direction alone
         source_name = "Direction Only"
@@ -65,6 +103,8 @@ def generate_wireframe(project_id: str):
             source_id=source_id,
             source_name=source_name,
             direction=direction,
+            parent_job_id=parent_job_id,
+            edit_instructions=edit_instructions,
         )
 
         # Submit background task
@@ -76,6 +116,8 @@ def generate_wireframe(project_id: str):
             source_id=source_id,
             job_id=job_id,
             direction=direction,
+            previous_content=previous_content,
+            edit_instructions=edit_instructions,
         )
 
         return jsonify(
@@ -139,7 +181,13 @@ def list_wireframe_jobs(project_id: str):
         source_id = request.args.get("source_id")
         jobs = studio_index_service.list_wireframe_jobs(project_id, source_id)
 
-        return jsonify({"success": True, "jobs": jobs, "count": len(jobs)}), 200
+        # Filter out orphaned failed-edit jobs (error + parent_job_id).
+        clean_jobs = [
+            job for job in jobs
+            if not (job.get("status") == "error" and job.get("parent_job_id"))
+        ]
+
+        return jsonify({"success": True, "jobs": clean_jobs, "count": len(clean_jobs)}), 200
 
     except Exception as e:
         current_app.logger.error(f"Error listing wireframe jobs: {e}")

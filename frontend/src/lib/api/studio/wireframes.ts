@@ -54,6 +54,9 @@ export interface WireframeJob {
   canvas_height: number;
   element_count: number;
   generation_time_seconds: number | null;
+  // Edit lineage
+  parent_job_id: string | null;
+  edit_instructions: string | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -94,18 +97,22 @@ export interface ListWireframeJobsResponse {
  */
 export const wireframesAPI = {
   /**
-   * Start wireframe generation
+   * Start wireframe generation or edit
    */
   async startGeneration(
     projectId: string,
     sourceId?: string,
-    direction?: string
+    direction?: string,
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartWireframeResponse> {
     try {
-      const body: Record<string, string> = {
+      const body: Record<string, unknown> = {
         direction: direction || 'Create a wireframe for the main page layout.',
       };
       if (sourceId) body.source_id = sourceId;
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
 
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/wireframe`,

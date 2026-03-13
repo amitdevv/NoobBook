@@ -2,11 +2,13 @@
  * AudioListItem Component
  * Educational Note: Renders saved audio with inline playback controls.
  * Includes a seekbar timeline that appears when the item is actively playing or paused.
+ * Supports iterative editing via an inline edit input.
  */
 
-import React from 'react';
-import { SpeakerHigh, Play, Pause, DownloadSimple } from '@phosphor-icons/react';
+import React, { useState, useEffect } from 'react';
+import { SpeakerHigh, Play, Pause, DownloadSimple, PencilSimple } from '@phosphor-icons/react';
 import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
 import type { AudioJob } from '@/lib/api/studio';
 
 interface AudioListItemProps {
@@ -22,6 +24,10 @@ interface AudioListItemProps {
   onCycleSpeed: () => void;
   onDownload: (job: AudioJob) => void;
   formatDuration: (seconds: number) => string;
+  onEdit?: (job: AudioJob, instructions: string) => void;
+  isEditing?: boolean;
+  isGenerating?: boolean;
+  defaultEditInput?: string;
 }
 
 export const AudioListItem: React.FC<AudioListItemProps> = ({
@@ -37,11 +43,35 @@ export const AudioListItem: React.FC<AudioListItemProps> = ({
   onCycleSpeed,
   onDownload,
   formatDuration,
+  onEdit,
+  isEditing = false,
+  isGenerating = false,
+  defaultEditInput = '',
 }) => {
-  // isActive: this job is loaded (playing or paused) — show timeline
+  // isActive: this job is loaded (playing or paused) -- show timeline
   const isActive = playingJobId === job.id;
-  // isPlaying: actually producing audio right now — animate bars, show pause icon
+  // isPlaying: actually producing audio right now -- animate bars, show pause icon
   const isPlaying = isActive && !isPaused;
+
+  const [showEditInput, setShowEditInput] = useState(isEditing);
+  const [editInput, setEditInput] = useState(defaultEditInput);
+
+  // Sync with external editing state
+  useEffect(() => {
+    setShowEditInput(isEditing);
+  }, [isEditing]);
+
+  // Sync edit input when defaultEditInput changes (e.g. after failed edit preserves input)
+  useEffect(() => {
+    setEditInput(defaultEditInput);
+  }, [defaultEditInput]);
+
+  const handleEdit = () => {
+    if (editInput.trim() && onEdit) {
+      onEdit(job, editInput.trim());
+      setShowEditInput(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-1.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 transition-colors">
@@ -60,7 +90,15 @@ export const AudioListItem: React.FC<AudioListItemProps> = ({
           )}
         </div>
         <div className="flex-1 min-w-0 overflow-hidden">
-          <p className="text-xs font-medium truncate">{job.source_name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-medium truncate">{job.source_name}</p>
+            {job.parent_job_id && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] text-primary bg-primary/10 px-1 py-0.5 rounded flex-shrink-0">
+                <PencilSimple size={8} />
+                edited
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           <Button
@@ -75,6 +113,17 @@ export const AudioListItem: React.FC<AudioListItemProps> = ({
               <Play size={16} weight="fill" />
             )}
           </Button>
+          {onEdit && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 p-0"
+              onClick={() => setShowEditInput(!showEditInput)}
+              disabled={isGenerating}
+            >
+              <PencilSimple size={16} />
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -115,6 +164,30 @@ export const AudioListItem: React.FC<AudioListItemProps> = ({
           >
             {playbackRate}x
           </button>
+        </div>
+      )}
+
+      {/* Edit input row (visible when edit button clicked) */}
+      {showEditInput && onEdit && (
+        <div className="flex gap-2 pt-1 border-t border-orange-200 bg-orange-50/30 rounded-b-md -mx-2.5 -mb-2.5 px-2.5 py-2">
+          <Input
+            value={editInput}
+            onChange={(e) => setEditInput(e.target.value)}
+            placeholder="Describe changes... (e.g., 'make it shorter', 'more conversational')"
+            className="flex-1 h-8 text-xs"
+            disabled={isGenerating}
+            onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && !isGenerating && handleEdit()}
+            autoFocus
+          />
+          <Button
+            onClick={handleEdit}
+            disabled={!editInput.trim() || isGenerating}
+            size="sm"
+            className="h-8"
+          >
+            <PencilSimple size={12} className="mr-1" />
+            Edit
+          </Button>
         </div>
       )}
     </div>

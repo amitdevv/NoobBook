@@ -41,6 +41,9 @@ export interface FlowDiagramJob {
   title: string | null;
   description: string | null;
   generation_time_seconds: number | null;
+  // Edit lineage
+  parent_job_id: string | null;
+  edit_instructions: string | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -81,18 +84,22 @@ export interface ListFlowDiagramJobsResponse {
  */
 export const flowDiagramsAPI = {
   /**
-   * Start flow diagram generation
+   * Start flow diagram generation or edit
    */
   async startGeneration(
     projectId: string,
     sourceId?: string,
-    direction?: string
+    direction?: string,
+    parentJobId?: string,
+    editInstructions?: string
   ): Promise<StartFlowDiagramResponse> {
     try {
-      const body: Record<string, string> = {
+      const body: Record<string, unknown> = {
         direction: direction || 'Create a diagram showing the key processes and relationships.',
       };
       if (sourceId) body.source_id = sourceId;
+      if (parentJobId) body.parent_job_id = parentJobId;
+      if (editInstructions) body.edit_instructions = editInstructions;
 
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/flow-diagram`,

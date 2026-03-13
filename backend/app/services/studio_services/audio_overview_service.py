@@ -69,10 +69,12 @@ class AudioOverviewService:
         project_id: str,
         source_id: str,
         job_id: str,
-        direction: str = "Create an engaging audio overview of this content."
+        direction: str = "Create an engaging audio overview of this content.",
+        previous_content: str = None,
+        edit_instructions: str = None
     ) -> Dict[str, Any]:
         """
-        Generate an audio overview for a source.
+        Generate an audio overview for a source, or edit a previous audio script.
 
         Educational Note: This is the main orchestrator that:
         1. Gets source metadata
@@ -80,11 +82,16 @@ class AudioOverviewService:
         3. Converts script to audio
         4. Updates job status throughout
 
+        For edits, the previous script is passed to the agent as context so
+        Claude can refine it based on the user's edit instructions.
+
         Args:
             project_id: The project UUID
             source_id: The source UUID to generate overview for
             job_id: The job ID for status tracking
             direction: User's direction for the overview style/focus
+            previous_content: Previous script text to refine (for edits)
+            edit_instructions: Instructions for how to edit the previous audio
 
         Returns:
             Dict with success status, audio file path, and metadata
@@ -134,7 +141,9 @@ class AudioOverviewService:
             token_count=token_count,
             is_large=is_large,
             direction=direction,
-            job_id=job_id
+            job_id=job_id,
+            previous_content=previous_content,
+            edit_instructions=edit_instructions
         )
 
         if not script_result.get("success"):
@@ -240,7 +249,9 @@ class AudioOverviewService:
         token_count: int,
         is_large: bool,
         direction: str,
-        job_id: str
+        job_id: str,
+        previous_content: str = None,
+        edit_instructions: str = None
     ) -> Dict[str, Any]:
         """
         Generate script using agentic loop.
@@ -248,6 +259,9 @@ class AudioOverviewService:
         Educational Note: The agent reads source content and writes script sections
         until it signals completion with is_final=True. Script is stored in
         Supabase Storage at: {project_id}/audio/{job_id}/script.txt
+
+        For edits, the previous script is appended to the user message so Claude
+        can refine it. Source reading is skipped when previous content is available.
 
         Args:
             project_id: The project UUID
@@ -257,6 +271,8 @@ class AudioOverviewService:
             is_large: Whether source is large (needs chunked reading)
             direction: User's direction for the script
             job_id: Job ID for progress updates and Supabase storage path
+            previous_content: Previous script text to refine (for edits)
+            edit_instructions: Instructions for how to edit the previous script
 
         Returns:
             Dict with success status, iterations, and usage stats
@@ -272,6 +288,20 @@ class AudioOverviewService:
             token_count=token_count,
             is_large=str(is_large)
         )
+
+        # Append edit context if editing a previous audio script
+        if previous_content and edit_instructions:
+            edit_context = (
+                f"\n\n=== PREVIOUS SCRIPT (refine based on edit instructions) ===\n"
+                f"{previous_content}\n"
+                f"=== END PREVIOUS SCRIPT ===\n\n"
+                f"EDIT INSTRUCTIONS: {edit_instructions}\n\n"
+                f"Use the previous script as baseline. Apply the edits. "
+                f"Keep unchanged sections. Write the complete revised script "
+                f"using write_script_section. You do NOT need to read the source "
+                f"again — the previous script already covers it."
+            )
+            user_message += edit_context
 
         messages = [{"role": "user", "content": user_message}]
 

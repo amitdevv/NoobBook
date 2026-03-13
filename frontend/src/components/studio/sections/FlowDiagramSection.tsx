@@ -9,6 +9,7 @@ import { useFlowDiagramGeneration } from '../flow-diagrams/useFlowDiagramGenerat
 import { FlowDiagramListItem } from '../flow-diagrams/FlowDiagramListItem';
 import { FlowDiagramProgressIndicator } from '../flow-diagrams/FlowDiagramProgressIndicator';
 import { FlowDiagramViewerModal } from '../flow-diagrams/FlowDiagramViewerModal';
+import { ConfigErrorBanner } from '../shared/ConfigErrorBanner';
 
 export const FlowDiagramSection: React.FC = () => {
   const { projectId, registerGenerationHandler } = useStudioContext();
@@ -19,8 +20,11 @@ export const FlowDiagramSection: React.FC = () => {
     isGeneratingFlowDiagram,
     viewingFlowDiagramJob,
     setViewingFlowDiagramJob,
+    configError,
+    pendingEditInput,
     loadSavedJobs,
     handleFlowDiagramGeneration,
+    handleFlowDiagramEdit,
   } = useFlowDiagramGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedFlowDiagramJobs);
@@ -37,12 +41,14 @@ export const FlowDiagramSection: React.FC = () => {
     registerGenerationHandler('flow_diagram', handleGenerate);
   }, [registerGenerationHandler, handleGenerate]);
 
-  if (filteredJobs.length === 0 && !isGeneratingFlowDiagram) {
+  if (filteredJobs.length === 0 && !isGeneratingFlowDiagram && !configError) {
     return null;
   }
 
   return (
     <>
+      <ConfigErrorBanner message={configError} />
+
       {isGeneratingFlowDiagram && (
         <FlowDiagramProgressIndicator currentFlowDiagramJob={currentFlowDiagramJob} />
       )}
@@ -58,6 +64,9 @@ export const FlowDiagramSection: React.FC = () => {
       <FlowDiagramViewerModal
         job={viewingFlowDiagramJob}
         onClose={() => setViewingFlowDiagramJob(null)}
+        onEdit={(instructions) => viewingFlowDiagramJob && handleFlowDiagramEdit(viewingFlowDiagramJob, instructions)}
+        isGenerating={isGeneratingFlowDiagram}
+        defaultEditInput={pendingEditInput}
       />
     </>
   );

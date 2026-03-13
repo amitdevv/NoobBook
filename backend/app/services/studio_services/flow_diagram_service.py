@@ -111,16 +111,20 @@ class FlowDiagramService:
         project_id: str,
         source_id: str = None,
         job_id: str = "",
-        direction: str = "Create a diagram showing the key processes and relationships."
+        direction: str = "Create a diagram showing the key processes and relationships.",
+        previous_content: str = None,
+        edit_instructions: str = None
     ) -> Dict[str, Any]:
         """
-        Generate a Mermaid flow diagram for a source.
+        Generate a Mermaid flow diagram for a source, or edit a previous diagram.
 
         Args:
             project_id: The project UUID
             source_id: The source UUID
             job_id: The job ID for status tracking
             direction: User's direction for what to focus on
+            previous_content: Previous Mermaid syntax to refine (for edits)
+            edit_instructions: Instructions for how to edit the previous diagram
 
         Returns:
             Dict with success status, mermaid_syntax, and metadata
@@ -156,7 +160,18 @@ class FlowDiagramService:
             tool = self._load_tool()
 
             # Build the user message
-            if content:
+            if previous_content and edit_instructions:
+                # Edit mode: use previous content as baseline, skip source fetching
+                user_message = (
+                    f"Generate a Mermaid diagram based on this direction:\n\n{direction}\n\n"
+                    f"=== PREVIOUS DIAGRAM (refine based on edit instructions) ===\n"
+                    f"{previous_content}\n"
+                    f"=== END PREVIOUS DIAGRAM ===\n\n"
+                    f"EDIT INSTRUCTIONS: {edit_instructions}\n\n"
+                    f"Use the previous Mermaid diagram as baseline. Apply the edits. "
+                    f"Keep unchanged elements intact."
+                )
+            elif content:
                 user_message = config["user_message_template"].format(
                     direction=direction,
                     content=content[:15000]  # Limit content to ~15k chars

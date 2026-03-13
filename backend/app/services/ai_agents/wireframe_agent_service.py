@@ -53,6 +53,8 @@ class WireframeAgentService:
         source_id: str = None,
         job_id: str = "",
         direction: str = "Create a wireframe for the main page layout.",
+        previous_content: str = None,
+        edit_instructions: str = None,
     ) -> Dict[str, Any]:
         """
         Run the agent to generate a wireframe using an agentic loop.
@@ -62,6 +64,8 @@ class WireframeAgentService:
             source_id: The source UUID
             job_id: The job ID for status tracking
             direction: User's direction for what to wireframe
+            previous_content: Previous wireframe description (for edits)
+            edit_instructions: Instructions for how to edit the previous wireframe
 
         Returns:
             Dict with success status, elements, and metadata
@@ -110,6 +114,18 @@ class WireframeAgentService:
             else:
                 # No source — generate from direction alone
                 user_message = f"Create a wireframe based on this direction:\n\nDIRECTION:\n{direction}\n\nGenerate a complete wireframe layout using the agentic workflow."
+
+            # Append edit context if editing a previous wireframe
+            if previous_content and edit_instructions:
+                edit_context = (
+                    f"\n\n=== PREVIOUS WIREFRAME (refine based on edit instructions) ===\n"
+                    f"{previous_content}\n"
+                    f"=== END PREVIOUS WIREFRAME ===\n\n"
+                    f"EDIT INSTRUCTIONS: {edit_instructions}\n\n"
+                    f"Use the previous wireframe as baseline. Apply the edits. "
+                    f"Keep unchanged elements and layout structure."
+                )
+                user_message += edit_context
 
             messages = [{"role": "user", "content": user_message}]
 

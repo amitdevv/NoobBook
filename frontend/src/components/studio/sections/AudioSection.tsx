@@ -28,6 +28,7 @@ export const AudioSection: React.FC = () => {
     handleLoadedMetadata,
     loadSavedJobs,
     handleAudioGeneration,
+    handleAudioEdit,
     playAudio,
     pauseAudio,
     seekTo,
@@ -35,6 +36,9 @@ export const AudioSection: React.FC = () => {
     cyclePlaybackRate,
     downloadAudio,
     formatDuration,
+    editingJobId,
+    setEditingJobId,
+    pendingEditInput,
   } = useAudioGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedAudioJobs);
@@ -84,6 +88,10 @@ export const AudioSection: React.FC = () => {
           onCycleSpeed={cyclePlaybackRate}
           onDownload={downloadAudio}
           formatDuration={formatDuration}
+          onEdit={handleAudioEdit}
+          isEditing={editingJobId === job.id}
+          isGenerating={isGeneratingAudio}
+          defaultEditInput={editingJobId === job.id ? pendingEditInput : ''}
         />
       ))}
     </>
