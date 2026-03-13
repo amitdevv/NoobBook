@@ -54,6 +54,12 @@ def generate_wireframe(project_id: str):
         edit_instructions = data.get("edit_instructions")
         previous_content = None
 
+        if parent_job_id and not edit_instructions:
+            return jsonify({
+                "success": False,
+                "error": "edit_instructions is required when parent_job_id is provided"
+            }), 400
+
         if parent_job_id:
             # Clean up any previously failed edit jobs for this parent
             try:
