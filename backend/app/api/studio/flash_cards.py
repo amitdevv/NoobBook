@@ -70,6 +70,14 @@ def generate_flash_cards(project_id: str):
         edit_instructions = data.get('edit_instructions')
         previous_content = None
 
+        # Reject edit requests without instructions — otherwise the service
+        # falls through to a full regeneration with a misleading "Edited" badge.
+        if parent_job_id and not edit_instructions:
+            return jsonify({
+                'success': False,
+                'error': 'edit_instructions is required when parent_job_id is provided'
+            }), 400
+
         if parent_job_id:
             # Clean up any previously failed edit jobs for this parent
             try:
