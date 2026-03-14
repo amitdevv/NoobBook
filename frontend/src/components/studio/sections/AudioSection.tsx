@@ -37,7 +37,6 @@ export const AudioSection: React.FC = () => {
     downloadAudio,
     formatDuration,
     editingJobId,
-    setEditingJobId,
     pendingEditInput,
   } = useAudioGeneration(projectId);
 
