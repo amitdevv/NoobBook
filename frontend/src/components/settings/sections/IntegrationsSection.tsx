@@ -865,13 +865,8 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
                       <textarea
                         className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         rows={3}
-                        value={showMcpToken ? mcpForm.stdio_env : mcpForm.stdio_env.split('\n').map(l => {
-                          const eq = l.indexOf('=');
-                          return eq > 0 ? l.substring(0, eq + 1) + '***' : l;
-                        }).join('\n')}
-                        readOnly={!showMcpToken}
+                        value={mcpForm.stdio_env}
                         onChange={(e) => {
-                          if (!showMcpToken) return;
                           setMcpForm((s) => ({ ...s, stdio_env: e.target.value }));
                           setMcpValidation({});
                         }}
