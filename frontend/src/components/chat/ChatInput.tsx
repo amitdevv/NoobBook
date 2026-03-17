@@ -7,7 +7,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { Textarea } from '../ui/textarea';
-import { PaperPlaneTilt, Microphone, CircleNotch } from '@phosphor-icons/react';
+import { PaperPlaneTilt, Microphone, CircleNotch, CodeBlock } from '@phosphor-icons/react';
 
 interface ChatInputProps {
   message: string;
@@ -15,9 +15,11 @@ interface ChatInputProps {
   isRecording: boolean;
   sending: boolean;
   transcriptionConfigured: boolean;
+  rawMode: boolean;
   onMessageChange: (value: string) => void;
   onSend: () => void;
   onMicClick: () => void;
+  onToggleRawMode: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -26,9 +28,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isRecording,
   sending,
   transcriptionConfigured,
+  rawMode,
   onMessageChange,
   onSend,
   onMicClick,
+  onToggleRawMode,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -109,6 +113,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           disabled={sending || isRecording}
           rows={1}
         />
+
+        {/* Raw Mode Toggle */}
+        <button
+          type="button"
+          onClick={onToggleRawMode}
+          title={rawMode ? 'Switch to normal view' : 'Switch to raw message view'}
+          className={`flex-shrink-0 p-1.5 rounded-full transition-colors ${
+            rawMode
+              ? 'bg-amber-600 text-white'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <CodeBlock size={18} weight={rawMode ? 'bold' : 'regular'} />
+        </button>
 
         {/* Send Button - seamlessly integrated */}
         <button

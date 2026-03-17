@@ -74,10 +74,12 @@ def get_chat(project_id, chat_id):
     Get full chat data including all messages.
 
     Educational Note: Loads the complete conversation history
-    for display in the chat interface.
+    for display in the chat interface. Pass ?raw=true to include
+    all messages with original content blocks (for debug/raw view).
     """
     try:
-        chat = chat_service.get_chat(project_id, chat_id)
+        include_raw = request.args.get("raw", "false").lower() == "true"
+        chat = chat_service.get_chat(project_id, chat_id, include_raw=include_raw)
 
         if not chat:
             return jsonify({

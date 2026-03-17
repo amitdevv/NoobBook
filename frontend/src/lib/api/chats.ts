@@ -62,6 +62,21 @@ export interface Chat {
 }
 
 /**
+ * Educational Note: Raw message for debug/raw view.
+ * Includes the original content blocks (tool_use, tool_result, etc.)
+ * that are normally filtered out for the normal chat display.
+ */
+export interface RawMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  content: any;
+  message_type: 'user_input' | 'ai_response' | 'tool_use' | 'tool_result';
+  created_at: string;
+  model?: string;
+}
+
+/**
  * Educational Note: Response from sending a message.
  * Contains both the user's message and the AI's response.
  */
@@ -136,6 +151,23 @@ class ChatsAPI {
       return response.data.chat;
     } catch (error) {
       log.error({ err: error }, 'failed to fetch chat');
+      throw error;
+    }
+  }
+
+  /**
+   * Get raw messages for debug/raw view.
+   * Educational Note: Returns ALL messages including tool_use and tool_result
+   * intermediates with their original content blocks.
+   */
+  async getRawMessages(projectId: string, chatId: string): Promise<RawMessage[]> {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/projects/${projectId}/chats/${chatId}?raw=true`
+      );
+      return response.data.chat.messages;
+    } catch (error) {
+      log.error({ err: error }, 'failed to fetch raw messages');
       throw error;
     }
   }

@@ -4,6 +4,7 @@ import { SourcesPanel } from '../sources';
 import { ChatPanel } from '../chat';
 import { StudioPanel, type StudioSignal } from '../studio';
 import { ProjectHeader } from './ProjectHeader';
+import { ActiveTasksBar } from './ActiveTasksBar';
 import { CaretLeft, CaretRight, Warning } from '@phosphor-icons/react';
 import {
   ResizablePanelGroup,
@@ -75,6 +76,22 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   // activeChatId tracks which chat is open; selectedSourceIds tracks that chat's selections.
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
+  // Single source of truth for which chats are currently processing
+  const [sendingChatIds, setSendingChatIds] = useState<Set<string>>(new Set());
+  const [chatNamesMap, setChatNamesMap] = useState<Map<string, string>>(new Map());
+  const addSendingChat = useCallback((chatId: string, chatName?: string) => {
+    setSendingChatIds(prev => new Set(prev).add(chatId));
+    if (chatName) {
+      setChatNamesMap(prev => new Map(prev).set(chatId, chatName));
+    }
+  }, []);
+  const removeSendingChat = useCallback((chatId: string) => {
+    setSendingChatIds(prev => {
+      const next = new Set(prev);
+      next.delete(chatId);
+      return next;
+    });
+  }, []);
 
   const handleActiveChatChange = useCallback((chatId: string | null, sourceIds: string[]) => {
     setActiveChatId(chatId);
@@ -83,6 +100,14 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
 
   const handleSelectedSourcesChange = useCallback((newIds: string[]) => {
     setSelectedSourceIds(newIds);
+  }, []);
+
+  // For ActiveTasksBar "Open" button — triggers ChatPanel to switch to a chat
+  const [openChatId, setOpenChatId] = useState<string | null>(null);
+  const handleOpenChat = useCallback((chatId: string) => {
+    setOpenChatId(chatId);
+    // Reset after a tick so clicking "Open" on the same chat again works
+    setTimeout(() => setOpenChatId(null), 100);
   }, []);
 
   return (
@@ -150,6 +175,10 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   onSignalsChange={handleSignalsChange}
                   selectedSourceIds={selectedSourceIds}
                   onActiveChatChange={handleActiveChatChange}
+                  sendingChatIds={sendingChatIds}
+                  onAddSendingChat={addSendingChat}
+                  onRemoveSendingChat={removeSendingChat}
+                  openChatId={openChatId}
                 />
               </div>
             </ResizablePanel>
@@ -189,6 +218,14 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>
+
+        {/* Floating Active Tasks Status Bar */}
+        <ActiveTasksBar
+          projectId={project.id}
+          sendingChatIds={sendingChatIds}
+          chatNames={chatNamesMap}
+          onOpenChat={handleOpenChat}
+        />
 
         {/* Footer Disclaimer - sits on background layer */}
         <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">

@@ -111,17 +111,18 @@ class ChatService:
 
         raise RuntimeError("Failed to create chat")
 
-    def get_chat(self, project_id: str, chat_id: str) -> Optional[Dict[str, Any]]:
+    def get_chat(self, project_id: str, chat_id: str, include_raw: bool = False) -> Optional[Dict[str, Any]]:
         """
         Get full chat data including messages and studio signals.
 
         Educational Note: Filters out tool_use and tool_result messages
-        from the response. These are internal messages used in the tool
-        chain and shouldn't be displayed to users.
+        from the response by default. When include_raw=True, returns ALL
+        messages with their original content blocks for debug/raw view.
 
         Args:
             project_id: The project UUID
             chat_id: The chat UUID
+            include_raw: If True, include all messages with original content
 
         Returns:
             Full chat data or None if not found
@@ -151,47 +152,63 @@ class ChatService:
 
         messages = messages_response.data or []
 
-        # Filter out tool chain messages for display
-        # Educational Note: During a tool_use loop, main_chat_service stores:
-        #   1. Intermediate assistant messages with LIST content (serialized content
-        #      blocks containing text + tool_use blocks)
-        #   2. Tool_result user messages with LIST content
-        #   3. Final assistant message with DICT content ({"text": "..."})
-        # The final message already contains all accumulated text from the tool
-        # chain, so intermediate list-content messages must be skipped to avoid
-        # showing duplicate responses.
-        display_messages = []
-        for msg in messages:
-            content = msg.get("content")
-            role = msg.get("role")
+        if include_raw:
+            # Raw mode: return ALL messages with original content and derived type
+            display_messages = []
+            for msg in messages:
+                content = msg.get("content")
+                role = msg.get("role")
+                message_type = self._derive_message_type(role, content)
+                display_messages.append({
+                    "id": msg.get("id"),
+                    "role": role,
+                    "content": content,  # Original JSONB (string, dict, or list)
+                    "message_type": message_type,
+                    "created_at": msg.get("created_at"),
+                    "model": msg.get("model"),
+                })
+        else:
+            # Normal mode: filter out tool chain intermediates
+            # Educational Note: During a tool_use loop, main_chat_service stores:
+            #   1. Intermediate assistant messages with LIST content (serialized content
+            #      blocks containing text + tool_use blocks)
+            #   2. Tool_result user messages with LIST content
+            #   3. Final assistant message with DICT content ({"text": "..."})
+            # The final message already contains all accumulated text from the tool
+            # chain, so intermediate list-content messages must be skipped to avoid
+            # showing duplicate responses.
+            display_messages = []
+            for msg in messages:
+                content = msg.get("content")
+                role = msg.get("role")
 
-            if role not in ["user", "assistant"]:
-                continue
+                if role not in ["user", "assistant"]:
+                    continue
 
-            # Skip list-content messages — these are tool chain intermediates
-            # (tool_use assistant responses and tool_result user messages)
-            if isinstance(content, list):
-                continue
+                # Skip list-content messages — these are tool chain intermediates
+                # (tool_use assistant responses and tool_result user messages)
+                if isinstance(content, list):
+                    continue
 
-            if isinstance(content, dict):
-                text_content = content.get("text", "")
-            elif isinstance(content, str):
-                text_content = content
-            else:
-                text_content = str(content) if content else ""
+                if isinstance(content, dict):
+                    text_content = content.get("text", "")
+                elif isinstance(content, str):
+                    text_content = content
+                else:
+                    text_content = str(content) if content else ""
 
-            if not text_content.strip():
-                continue
+                if not text_content.strip():
+                    continue
 
-            # Create a clean message object for frontend
-            display_messages.append({
-                "id": msg.get("id"),
-                "role": role,
-                "content": text_content,  # Always a string
-                "timestamp": msg.get("created_at"),  # Map created_at to timestamp
-                "model": msg.get("model"),
-                "citations": msg.get("citations", [])
-            })
+                # Create a clean message object for frontend
+                display_messages.append({
+                    "id": msg.get("id"),
+                    "role": role,
+                    "content": text_content,  # Always a string
+                    "timestamp": msg.get("created_at"),  # Map created_at to timestamp
+                    "model": msg.get("model"),
+                    "citations": msg.get("citations", [])
+                })
 
         # Get studio signals
         signals_response = (
@@ -223,6 +240,24 @@ class ChatService:
         chat["message_count"] = len(messages)
 
         return chat
+
+    @staticmethod
+    def _derive_message_type(role: str, content) -> str:
+        """Derive a human-readable message type for the raw view."""
+        if role == "user":
+            if isinstance(content, list):
+                return "tool_result"
+            return "user_input"
+        if role == "assistant":
+            if isinstance(content, list):
+                # List content = tool_use blocks from Claude
+                has_tool_use = any(
+                    isinstance(b, dict) and b.get("type") == "tool_use"
+                    for b in content
+                )
+                return "tool_use" if has_tool_use else "ai_response"
+            return "ai_response"
+        return "unknown"
 
     def get_chat_metadata(self, project_id: str, chat_id: str) -> Optional[Dict[str, Any]]:
         """

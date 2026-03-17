@@ -18,6 +18,7 @@ import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { ChatList } from './ChatList';
 import { ChatEmptyState } from './ChatEmptyState';
+import { RawMessageView } from './RawMessageView';
 import { exportChatAsMarkdown } from '@/lib/exportChatMarkdown';
 import { createLogger } from '@/lib/logger';
 
@@ -31,6 +32,10 @@ interface ChatPanelProps {
   onSignalsChange?: (signals: StudioSignal[]) => void; // Called when studio signals change
   selectedSourceIds: string[]; // Per-chat source selection from parent
   onActiveChatChange: (chatId: string | null, selectedSourceIds: string[]) => void; // Notify parent of chat change
+  sendingChatIds: Set<string>; // All chats currently processing (owned by parent)
+  onAddSendingChat: (chatId: string, chatName?: string) => void;
+  onRemoveSendingChat: (chatId: string) => void;
+  openChatId?: string | null; // When set, ChatPanel switches to this chat
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -41,6 +46,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onSignalsChange,
   selectedSourceIds,
   onActiveChatChange,
+  sendingChatIds,
+  onAddSendingChat,
+  onRemoveSendingChat,
+  openChatId,
 }) => {
   const { toasts, dismissToast, success, error } = useToast();
 
@@ -50,8 +59,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [showChatList, setShowChatList] = useState(false);
   const [allChats, setAllChats] = useState<ChatMetadata[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  // Derive sending state for current chat from parent-owned Set
+  const sending = activeChat ? sendingChatIds.has(activeChat.id) : false;
   const [exportingChat, setExportingChat] = useState(false);
+  const [rawMode, setRawMode] = useState(false);
 
   // Sources state for header display
   const [sources, setSources] = useState<Source[]>([]);
@@ -136,6 +147,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
+  // Switch to a specific chat when parent requests it (e.g. from ActiveTasksBar "Open" button)
+  useEffect(() => {
+    if (openChatId && openChatId !== activeChat?.id) {
+      loadFullChat(openChatId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openChatId]);
+
   /**
    * Refetch sources when sourcesVersion changes
    * Educational Note: This triggers when SourcesPanel notifies us that sources
@@ -170,8 +189,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     if (!message.trim() || !activeChat || sending) return;
 
     const userMessage = message.trim();
+    const sendingChatId = activeChat.id;
     setMessage('');
-    setSending(true);
+    onAddSendingChat(sendingChatId, activeChat.title);
 
     // Optimistically add user message to UI immediately
     const tempUserMessage = {
@@ -257,7 +277,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         };
       });
     } finally {
-      setSending(false);
+      onRemoveSendingChat(sendingChatId);
     }
   };
 
@@ -438,11 +458,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         exportingChat={exportingChat}
       />
 
-      <ChatMessages
-        messages={activeChat?.messages || []}
-        sending={sending}
-        projectId={projectId}
-      />
+      {rawMode && activeChat ? (
+        <RawMessageView projectId={projectId} chatId={activeChat.id} />
+      ) : (
+        <ChatMessages
+          messages={activeChat?.messages || []}
+          sending={sending}
+          projectId={projectId}
+        />
+      )}
 
       <ChatInput
         message={message}
@@ -450,9 +474,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         isRecording={isRecording}
         sending={sending}
         transcriptionConfigured={transcriptionConfigured}
+        rawMode={rawMode}
         onMessageChange={setMessage}
         onSend={handleSend}
         onMicClick={handleMicClick}
+        onToggleRawMode={() => setRawMode((prev) => !prev)}
       />
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

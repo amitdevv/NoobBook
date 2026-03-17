@@ -29,3 +29,4 @@ projects_bp = Blueprint('projects', __name__)
 from app.api.projects import routes  # noqa: F401
 from app.api.projects import costs  # noqa: F401
 from app.api.projects import memory  # noqa: F401
+from app.api.projects import active_tasks  # noqa: F401
