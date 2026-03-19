@@ -457,6 +457,32 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   };
 
   /**
+   * Handle adding a Freshdesk source
+   */
+  const handleAddFreshdesk = async (name?: string, description?: string) => {
+    if (sources.length >= MAX_SOURCES) {
+      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
+      return;
+    }
+
+    try {
+      await sourcesAPI.addFreshdeskSource(projectId, name, description);
+      success('Freshdesk source added — syncing tickets...');
+      await loadSources();
+      setSheetOpen(false);
+    } catch (err: unknown) {
+      log.error({ err }, 'failed to add Freshdesk source');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add Freshdesk source';
+      if (typeof err === 'object' && err !== null && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { error?: string } } };
+        error(axiosErr.response?.data?.error || errorMessage);
+      } else {
+        error(errorMessage);
+      }
+    }
+  };
+
+  /**
    * Handle source deletion
    */
   const handleDeleteSource = async (sourceId: string, sourceName: string) => {
@@ -725,6 +751,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         onAddResearch={handleAddResearch}
         onAddDatabase={handleAddDatabase}
         onAddMcp={handleAddMcp}
+        onAddFreshdesk={handleAddFreshdesk}
         onImportComplete={loadSources}
         uploading={uploading}
       />

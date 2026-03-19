@@ -14,6 +14,7 @@ import { GoogleDriveTab } from './GoogleDriveTab';
 import { ResearchTab } from './ResearchTab';
 import { DatabaseTab } from './DatabaseTab';
 import { McpTab } from './McpTab';
+import { FreshdeskTab } from './FreshdeskTab';
 import { MAX_SOURCES } from '../../lib/api/sources';
 
 interface AddSourcesSheetProps {
@@ -27,6 +28,7 @@ interface AddSourcesSheetProps {
   onAddResearch: (topic: string, description: string, links: string[]) => Promise<void>;
   onAddDatabase: (connectionId: string, name?: string, description?: string) => Promise<void>;
   onAddMcp: (connectionId: string, resourceUris: string[], name?: string, description?: string) => Promise<void>;
+  onAddFreshdesk: (name?: string, description?: string) => Promise<void>;
   onImportComplete: () => void;
   uploading: boolean;
 }
@@ -42,6 +44,7 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
   onAddResearch,
   onAddDatabase,
   onAddMcp,
+  onAddFreshdesk,
   onImportComplete,
   uploading,
 }) => {
@@ -104,6 +107,12 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
               >
                 MCP
               </TabsTrigger>
+              <TabsTrigger
+                value="freshdesk"
+                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
+              >
+                Freshdesk
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="upload" className="mt-6">
@@ -156,6 +165,17 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
                 isAtLimit={isAtLimit}
                 onAddMcp={async (connectionId, resourceUris, name, description) => {
                   await onAddMcp(connectionId, resourceUris, name, description);
+                  onImportComplete();
+                  onOpenChange(false);
+                }}
+              />
+            </TabsContent>
+
+            <TabsContent value="freshdesk" className="mt-6">
+              <FreshdeskTab
+                isAtLimit={isAtLimit}
+                onAddFreshdesk={async (name, description) => {
+                  await onAddFreshdesk(name, description);
                   onImportComplete();
                   onOpenChange(false);
                 }}

@@ -1,0 +1,28 @@
+{
+    "name": "return_ticket_analysis",
+    "description": "Return final analysis with structured insights.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "summary": {
+                "type": "string"
+            },
+            "findings": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                }
+            },
+            "recommendations": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                }
+            }
+        },
+        "required": [
+            "summary",
+            "findings"
+        ]
+    }
+}

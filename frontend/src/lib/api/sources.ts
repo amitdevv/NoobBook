@@ -392,6 +392,34 @@ class SourcesAPI {
     }
   }
 
+  async addFreshdeskSource(
+    projectId: string,
+    name?: string,
+    description?: string
+  ): Promise<Source> {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/projects/${projectId}/sources/freshdesk`,
+        { name, description }
+      );
+      return response.data.source;
+    } catch (error) {
+      log.error({ err: error }, 'failed to add Freshdesk source');
+      throw error;
+    }
+  }
+
+  async syncFreshdesk(projectId: string, sourceId: string): Promise<void> {
+    try {
+      await axios.post(
+        `${API_BASE_URL}/projects/${projectId}/sources/${sourceId}/freshdesk-sync`
+      );
+    } catch (error) {
+      log.error({ err: error }, 'failed to sync Freshdesk');
+      throw error;
+    }
+  }
+
   /**
    * Cancel processing for a source
    * Educational Note: This stops any running tasks and sets status back to "uploaded"

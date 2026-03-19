@@ -26,6 +26,7 @@ from app.services.tool_executors import source_search_executor
 from app.services.tool_executors import memory_executor
 from app.services.tool_executors import csv_analyzer_agent_executor
 from app.services.tool_executors import database_analyzer_agent_executor
+from app.services.tool_executors import freshdesk_analyzer_agent_executor
 from app.services.tool_executors import studio_signal_executor
 from app.services.integrations.knowledge_bases import knowledge_base_service
 from app.services.integrations.mcp.mcp_tool_service import mcp_tool_service
@@ -55,6 +56,7 @@ class MainChatService:
         self._memory_tool = None
         self._csv_analyzer_tool = None
         self._database_analyzer_tool = None
+        self._freshdesk_analyzer_tool = None
         self._studio_signal_tool = None
 
     def _get_search_tool(self) -> Dict[str, Any]:
@@ -83,6 +85,14 @@ class MainChatService:
             )
         return self._database_analyzer_tool
 
+    def _get_freshdesk_analyzer_tool(self) -> Dict[str, Any]:
+        """Load the analyze_freshdesk_agent tool definition (cached)."""
+        if self._freshdesk_analyzer_tool is None:
+            self._freshdesk_analyzer_tool = tool_loader.load_tool(
+                "chat_tools", "analyze_freshdesk_agent_tool"
+            )
+        return self._freshdesk_analyzer_tool
+
     def _get_studio_signal_tool(self) -> Dict[str, Any]:
         """Load the studio_signal tool definition (cached)."""
         if self._studio_signal_tool is None:
@@ -94,6 +104,7 @@ class MainChatService:
         has_active_sources: bool,
         has_csv_sources: bool = False,
         has_database_sources: bool = False,
+        has_freshdesk_sources: bool = False,
         user_id: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], Dict]:
         """
@@ -103,6 +114,7 @@ class MainChatService:
         Search tool is only available when there are active non-CSV sources.
         CSV analyzer tool is available when there are CSV sources.
         Database analyzer tool is available when there are DATABASE sources.
+        Freshdesk analyzer tool is available when there are FRESHDESK sources.
         Knowledge base tools (Jira, Notion, GitHub) are added if configured.
         MCP tools are added if the user has tool-enabled MCP connections.
 
@@ -110,6 +122,7 @@ class MainChatService:
             has_active_sources: Whether project has active non-CSV sources
             has_csv_sources: Whether project has active CSV sources
             has_database_sources: Whether project has active DATABASE sources
+            has_freshdesk_sources: Whether project has active FRESHDESK sources
             user_id: The requesting user's ID (for MCP tool access)
 
         Returns:
@@ -129,6 +142,9 @@ class MainChatService:
 
         if has_database_sources:
             tools.append(self._get_database_analyzer_tool())
+
+        if has_freshdesk_sources:
+            tools.append(self._get_freshdesk_analyzer_tool())
 
         # Add all configured knowledge base tools (Jira, Notion, GitHub, etc.)
         tools.extend(knowledge_base_service.get_available_tools())
@@ -251,6 +267,18 @@ class MainChatService:
             else:
                 return f"Error: {result.get('error', 'Analysis failed')}"
 
+        elif tool_name == "analyze_freshdesk_agent":
+            # Freshdesk analyzer agent for answering questions about ticket data
+            result = freshdesk_analyzer_agent_executor.execute(
+                project_id=project_id,
+                source_id=tool_input.get("source_id", ""),
+                query=tool_input.get("query", "")
+            )
+            if result.get("success"):
+                return result.get("content", "No analysis result")
+            else:
+                return f"Error: {result.get('error', 'Analysis failed')}"
+
         elif tool_name == "studio_signal":
             # Studio signal returns immediately, actual storage happens in background
             result = studio_signal_executor.execute(
@@ -337,11 +365,13 @@ class MainChatService:
 
         csv_sources = [s for s in active_sources if _file_ext(s) == ".csv"]
         database_sources = [s for s in active_sources if _file_ext(s) == ".database"]
-        non_csv_sources = [s for s in active_sources if _file_ext(s) not in (".csv", ".database")]
+        freshdesk_sources = [s for s in active_sources if _file_ext(s) == ".freshdesk"]
+        non_csv_sources = [s for s in active_sources if _file_ext(s) not in (".csv", ".database", ".freshdesk")]
         tools, mcp_registry = self._get_tools(
             has_active_sources=bool(non_csv_sources),
             has_csv_sources=bool(csv_sources),
             has_database_sources=bool(database_sources),
+            has_freshdesk_sources=bool(freshdesk_sources),
             user_id=user_id,
         )
 

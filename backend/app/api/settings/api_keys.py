@@ -155,6 +155,18 @@ API_KEYS_CONFIG = [
         'description': 'Atlassian API token (from id.atlassian.com/manage-profile/security/api-tokens)',
         'category': 'integrations'
     },
+    {
+        'id': 'FRESHDESK_DOMAIN',
+        'name': 'Freshdesk Domain',
+        'description': 'Your Freshdesk subdomain (e.g. company.freshdesk.com)',
+        'category': 'integrations'
+    },
+    {
+        'id': 'FRESHDESK_API_KEY',
+        'name': 'Freshdesk API Key',
+        'description': 'Freshdesk API key (from Profile Settings > API Key)',
+        'category': 'integrations'
+    },
 ]
 
 
@@ -288,6 +300,9 @@ def update_api_keys():
                 elif key_id in ('JIRA_API_KEY', 'JIRA_CLOUD_ID', 'JIRA_EMAIL'):
                     from app.services.integrations.knowledge_bases.jira.jira_service import jira_service
                     jira_service.reload_config()
+                elif key_id in ('FRESHDESK_API_KEY', 'FRESHDESK_DOMAIN'):
+                    from app.services.integrations.freshdesk.freshdesk_service import freshdesk_service
+                    freshdesk_service.reload_config()
 
         current_app.logger.info(f"Updated {updated_count} API keys")
 
@@ -477,6 +492,16 @@ def _validate_key(key_id: str, value: str) -> tuple[bool, str]:
 
     elif key_id in ['JIRA_CLOUD_ID', 'JIRA_EMAIL']:
         # Supporting fields for Jira — just accept them
+        is_valid = bool(value)
+        message = 'Value accepted' if is_valid else 'Value is empty'
+        return is_valid, message
+
+    elif key_id == 'FRESHDESK_API_KEY':
+        freshdesk_domain = env_service.get_key('FRESHDESK_DOMAIN')
+        return validation_service.validate_freshdesk_key(value, freshdesk_domain)
+
+    elif key_id == 'FRESHDESK_DOMAIN':
+        # Supporting field — just accept it
         is_valid = bool(value)
         message = 'Value accepted' if is_valid else 'Value is empty'
         return is_valid, message

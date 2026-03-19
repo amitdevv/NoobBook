@@ -17,6 +17,7 @@ from app.services.app_settings.validation.tavily_validator import validate_tavil
 from app.services.app_settings.validation.pinecone_validator import validate_pinecone_key
 from app.services.app_settings.validation.notion_validator import validate_notion_key
 from app.services.app_settings.validation.jira_validator import validate_jira_key
+from app.services.app_settings.validation.freshdesk_validator import validate_freshdesk_key
 
 
 class ValidationService:
@@ -67,3 +68,7 @@ class ValidationService:
     def validate_jira_key(self, api_token: str, email: Optional[str] = None, cloud_id: Optional[str] = None) -> Tuple[bool, str]:
         """Validate Jira credentials (API token + email + cloud ID)."""
         return validate_jira_key(api_token, email, cloud_id)
+
+    def validate_freshdesk_key(self, api_key: str, domain: Optional[str] = None) -> Tuple[bool, str]:
+        """Validate Freshdesk credentials (API key + domain)."""
+        return validate_freshdesk_key(api_key, domain)
