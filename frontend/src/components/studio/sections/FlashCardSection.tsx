@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { useFlashCardGeneration } from '../flashcards/useFlashCardGeneration';
 import { FlashCardListItem } from '../flashcards/FlashCardListItem';
 import { FlashCardProgressIndicator } from '../flashcards/FlashCardProgressIndicator';

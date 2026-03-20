@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Copy, Check, Eye, EyeSlash, Warning } from '@phosphor-icons/react';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('password-display');

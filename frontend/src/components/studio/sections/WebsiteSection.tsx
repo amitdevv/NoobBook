@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { useWebsiteGeneration } from '../website/useWebsiteGeneration';
 import { WebsiteListItem } from '../website/WebsiteListItem';
 import { WebsiteProgressIndicator } from '../website/WebsiteProgressIndicator';

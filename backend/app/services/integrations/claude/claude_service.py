@@ -12,7 +12,7 @@ Key Design Decisions:
 """
 import logging
 import os
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Callable
 import anthropic
 
 from app.utils.cost_tracking import add_usage as add_cost_usage
@@ -127,7 +127,108 @@ class ClaudeService:
             anthropic.APIError: If API call fails
         """
         client = self._get_client()
+        api_params = self._build_api_params(
+            messages=messages,
+            system_prompt=system_prompt,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            tools=tools,
+            tool_choice=tool_choice,
+            extra_headers=extra_headers,
+        )
 
+        # Make API call
+        response = client.messages.create(**api_params)
+
+        # Track costs if project_id provided
+        if project_id:
+            add_cost_usage(
+                project_id=project_id,
+                model=response.model,
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens
+            )
+
+        # Return raw response data - all parsing happens in claude_parsing_utils
+        return {
+            "content_blocks": response.content,  # Raw Anthropic content blocks
+            "model": response.model,
+            "usage": {
+                "input_tokens": response.usage.input_tokens,
+                "output_tokens": response.usage.output_tokens,
+            },
+            "stop_reason": response.stop_reason,
+        }
+
+    def stream_message(
+        self,
+        messages: List[Dict[str, Any]],
+        system_prompt: Optional[str] = None,
+        model: str = "claude-sonnet-4-6",
+        max_tokens: int = 4096,
+        temperature: float = 0.0,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[Dict[str, Any]] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
+        project_id: Optional[str] = None,
+        on_text_delta: Optional[Callable[[str], None]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Stream a Claude response and forward text deltas through a callback.
+
+        Educational Note: This uses Anthropic's streaming API so callers can
+        surface partial assistant text in real time while still receiving a
+        final response object compatible with send_message().
+        """
+        client = self._get_client()
+        api_params = self._build_api_params(
+            messages=messages,
+            system_prompt=system_prompt,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            tools=tools,
+            tool_choice=tool_choice,
+            extra_headers=extra_headers,
+        )
+
+        with client.messages.stream(**api_params) as stream:
+            for delta in stream.text_stream:
+                if on_text_delta:
+                    on_text_delta(delta)
+            response = stream.get_final_message()
+
+        if project_id:
+            add_cost_usage(
+                project_id=project_id,
+                model=response.model,
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens
+            )
+
+        return {
+            "content_blocks": response.content,
+            "model": response.model,
+            "usage": {
+                "input_tokens": response.usage.input_tokens,
+                "output_tokens": response.usage.output_tokens,
+            },
+            "stop_reason": response.stop_reason,
+        }
+
+    def _build_api_params(
+        self,
+        messages: List[Dict[str, Any]],
+        system_prompt: Optional[str],
+        model: str,
+        max_tokens: int,
+        temperature: float,
+        tools: Optional[List[Dict[str, Any]]],
+        tool_choice: Optional[Dict[str, Any]],
+        extra_headers: Optional[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        """Build the shared Anthropic request payload."""
         # Build API call parameters
         api_params = {
             "model": model,
@@ -152,28 +253,7 @@ class ClaudeService:
         if extra_headers:
             api_params["extra_headers"] = extra_headers
 
-        # Make API call
-        response = client.messages.create(**api_params)
-
-        # Track costs if project_id provided
-        if project_id:
-            add_cost_usage(
-                project_id=project_id,
-                model=response.model,
-                input_tokens=response.usage.input_tokens,
-                output_tokens=response.usage.output_tokens
-            )
-
-        # Return raw response data - all parsing happens in claude_parsing_utils
-        return {
-            "content_blocks": response.content,  # Raw Anthropic content blocks
-            "model": response.model,
-            "usage": {
-                "input_tokens": response.usage.input_tokens,
-                "output_tokens": response.usage.output_tokens,
-            },
-            "stop_reason": response.stop_reason,
-        }
+        return api_params
 
     def count_tokens(
         self,

@@ -28,6 +28,137 @@ interface PRDViewerModalProps {
   onEdit?: (instructions: string) => void;
 }
 
+const PRDContent: React.FC<{
+  projectId: string;
+  jobId: string;
+}> = ({ projectId, jobId }) => {
+  const [markdownContent, setMarkdownContent] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    prdsAPI.getPreview(projectId, jobId)
+      .then((response) => {
+        if (cancelled) return;
+        if (response.success && response.markdown_content) {
+          setMarkdownContent(response.markdown_content);
+        } else {
+          setMarkdownContent('*Failed to load PRD content*');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMarkdownContent('*Error loading PRD content*');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, jobId]);
+
+  if (markdownContent === null) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <SpinnerGap size={24} className="animate-spin text-amber-500" />
+        <span className="ml-2 text-muted-foreground">Loading PRD content...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="prose prose-sm dark:prose-invert max-w-none">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h1: ({ children }) => (
+            <h1 className="text-2xl font-bold mt-6 mb-4 text-foreground">{children}</h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="text-xl font-semibold mt-5 mb-3 text-foreground border-b pb-2">{children}</h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="text-lg font-medium mt-4 mb-2 text-foreground">{children}</h3>
+          ),
+          table: ({ children }) => (
+            <div className="overflow-x-auto my-4">
+              <table className="min-w-full border border-border rounded">{children}</table>
+            </div>
+          ),
+          th: ({ children }) => (
+            <th className="px-3 py-2 bg-muted text-left text-sm font-medium border-b">{children}</th>
+          ),
+          td: ({ children }) => (
+            <td className="px-3 py-2 text-sm border-b border-border">{children}</td>
+          ),
+          ul: ({ children }) => (
+            <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>
+          ),
+          p: ({ children }) => (
+            <p className="my-2 text-foreground/90 leading-relaxed">{children}</p>
+          ),
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-4 border-amber-500 pl-4 my-4 italic text-muted-foreground">
+              {children}
+            </blockquote>
+          ),
+          code: ({ className, children }) => {
+            const isInline = !className;
+            if (isInline) {
+              return (
+                <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">
+                  {children}
+                </code>
+              );
+            }
+            return (
+              <code className="block bg-muted p-3 rounded text-sm font-mono overflow-x-auto">
+                {children}
+              </code>
+            );
+          },
+          hr: () => <hr className="my-6 border-border" />,
+          strong: ({ children }) => (
+            <strong className="font-semibold text-foreground">{children}</strong>
+          ),
+        }}
+      >
+        {markdownContent}
+      </ReactMarkdown>
+    </div>
+  );
+};
+
+const PRDEditBar: React.FC<{ onEdit: (instructions: string) => void }> = ({ onEdit }) => {
+  const [editInput, setEditInput] = useState('');
+
+  const handleEdit = () => {
+    const trimmed = editInput.trim();
+    if (!trimmed) return;
+    onEdit(trimmed);
+    setEditInput('');
+  };
+
+  return (
+    <div className="flex gap-2 px-6 py-3 border-t-2 border-orange-200 bg-orange-50/30 flex-shrink-0">
+      <Input
+        value={editInput}
+        onChange={(e) => setEditInput(e.target.value)}
+        placeholder="Describe changes... (e.g., 'add more user stories', 'expand technical section')"
+        className="flex-1"
+        onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && handleEdit()}
+      />
+      <Button onClick={handleEdit} disabled={!editInput.trim()} size="sm">
+        <PencilSimple size={14} className="mr-1" />
+        Edit
+      </Button>
+    </div>
+  );
+};
+
 export const PRDViewerModal: React.FC<PRDViewerModalProps> = ({
   projectId,
   viewingPRDJob,
@@ -35,44 +166,6 @@ export const PRDViewerModal: React.FC<PRDViewerModalProps> = ({
   onDownload,
   onEdit,
 }) => {
-  const [markdownContent, setMarkdownContent] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [editInput, setEditInput] = useState('');
-
-  useEffect(() => {
-    setEditInput('');
-  }, [viewingPRDJob?.id]);
-
-  const handleEdit = () => {
-    if (editInput.trim() && onEdit) {
-      onEdit(editInput.trim());
-      setEditInput('');
-    }
-  };
-
-  // Fetch markdown content when modal opens
-  useEffect(() => {
-    if (viewingPRDJob) {
-      setIsLoading(true);
-      prdsAPI.getPreview(projectId, viewingPRDJob.id)
-        .then((response) => {
-          if (response.success && response.markdown_content) {
-            setMarkdownContent(response.markdown_content);
-          } else {
-            setMarkdownContent('*Failed to load PRD content*');
-          }
-        })
-        .catch(() => {
-          setMarkdownContent('*Error loading PRD content*');
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else {
-      setMarkdownContent('');
-    }
-  }, [viewingPRDJob, projectId]);
-
   return (
     <Dialog open={viewingPRDJob !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-4xl h-[85vh] p-0 flex flex-col">
@@ -106,100 +199,18 @@ export const PRDViewerModal: React.FC<PRDViewerModalProps> = ({
         {/* Markdown Content */}
         <ScrollArea className="flex-1">
           <div className="px-6 py-4">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <SpinnerGap size={24} className="animate-spin text-amber-500" />
-                <span className="ml-2 text-muted-foreground">Loading PRD content...</span>
-              </div>
-            ) : (
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    // Style headings
-                    h1: ({ children }) => (
-                      <h1 className="text-2xl font-bold mt-6 mb-4 text-foreground">{children}</h1>
-                    ),
-                    h2: ({ children }) => (
-                      <h2 className="text-xl font-semibold mt-5 mb-3 text-foreground border-b pb-2">{children}</h2>
-                    ),
-                    h3: ({ children }) => (
-                      <h3 className="text-lg font-medium mt-4 mb-2 text-foreground">{children}</h3>
-                    ),
-                    // Style tables
-                    table: ({ children }) => (
-                      <div className="overflow-x-auto my-4">
-                        <table className="min-w-full border border-border rounded">{children}</table>
-                      </div>
-                    ),
-                    th: ({ children }) => (
-                      <th className="px-3 py-2 bg-muted text-left text-sm font-medium border-b">{children}</th>
-                    ),
-                    td: ({ children }) => (
-                      <td className="px-3 py-2 text-sm border-b border-border">{children}</td>
-                    ),
-                    // Style lists
-                    ul: ({ children }) => (
-                      <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>
-                    ),
-                    ol: ({ children }) => (
-                      <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>
-                    ),
-                    // Style paragraphs
-                    p: ({ children }) => (
-                      <p className="my-2 text-foreground/90 leading-relaxed">{children}</p>
-                    ),
-                    // Style blockquotes
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-4 border-amber-500 pl-4 my-4 italic text-muted-foreground">
-                        {children}
-                      </blockquote>
-                    ),
-                    // Style code blocks
-                    code: ({ className, children }) => {
-                      const isInline = !className;
-                      if (isInline) {
-                        return (
-                          <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">
-                            {children}
-                          </code>
-                        );
-                      }
-                      return (
-                        <code className="block bg-muted p-3 rounded text-sm font-mono overflow-x-auto">
-                          {children}
-                        </code>
-                      );
-                    },
-                    // Style horizontal rules
-                    hr: () => <hr className="my-6 border-border" />,
-                    // Style strong/bold
-                    strong: ({ children }) => (
-                      <strong className="font-semibold text-foreground">{children}</strong>
-                    ),
-                  }}
-                >
-                  {markdownContent}
-                </ReactMarkdown>
-              </div>
+            {viewingPRDJob && (
+              <PRDContent
+                key={viewingPRDJob.id}
+                projectId={projectId}
+                jobId={viewingPRDJob.id}
+              />
             )}
           </div>
         </ScrollArea>
 
         {onEdit && (
-          <div className="flex gap-2 px-6 py-3 border-t-2 border-orange-200 bg-orange-50/30 flex-shrink-0">
-            <Input
-              value={editInput}
-              onChange={(e) => setEditInput(e.target.value)}
-              placeholder="Describe changes... (e.g., 'add more user stories', 'expand technical section')"
-              className="flex-1"
-              onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && handleEdit()}
-            />
-            <Button onClick={handleEdit} disabled={!editInput.trim()} size="sm">
-              <PencilSimple size={14} className="mr-1" />
-              Edit
-            </Button>
-          </div>
+          <PRDEditBar key={viewingPRDJob?.id || 'prd-edit'} onEdit={onEdit} />
         )}
       </DialogContent>
     </Dialog>

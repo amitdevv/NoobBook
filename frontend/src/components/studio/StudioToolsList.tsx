@@ -7,7 +7,7 @@
 import React from 'react';
 import { ScrollArea } from '../ui/scroll-area';
 import { StudioToolItem } from './StudioToolItem';
-import { useStudioContext } from './StudioContext';
+import { useStudioContext } from './studio-hooks';
 import {
   generationOptions,
   categoryMeta,

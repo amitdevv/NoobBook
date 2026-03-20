@@ -12,7 +12,7 @@ import { Switch } from '../../ui/switch';
 import { Plus, Trash, CircleNotch, Check } from '@phosphor-icons/react';
 import { brandAPI, type ColorPalette, type CustomColor, type ColorEnabled, getDefaultColors, getDefaultColorEnabled } from '../../../lib/api/brand';
 import { ColorPicker } from '../ColorPicker';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('brand-colors');

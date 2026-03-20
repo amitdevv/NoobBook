@@ -12,7 +12,8 @@ import {
   type Source,
 } from '../../lib/api/sources';
 import { chatsAPI } from '../../lib/api/chats';
-import { useToast, ToastContainer } from '../ui/toast';
+import { ToastContainer } from '../ui/toast';
+import { useToast } from '../ui/use-toast';
 import { SourcesHeader } from './SourcesHeader';
 import { SourcesList } from './SourcesList';
 import { SourcesFooter } from './SourcesFooter';

@@ -8,7 +8,7 @@ import { Label } from '../../ui/label';
 import { Switch } from '../../ui/switch';
 import { CircleNotch, Check } from '@phosphor-icons/react';
 import { brandAPI, type FeatureSettings, getDefaultFeatureSettings } from '../../../lib/api/brand';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('brand-feature-settings');

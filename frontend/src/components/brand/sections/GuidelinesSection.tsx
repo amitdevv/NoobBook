@@ -10,7 +10,7 @@ import { Textarea } from '../../ui/textarea';
 import { Badge } from '../../ui/badge';
 import { Plus, X, CircleNotch, Check, PencilSimple, Trash } from '@phosphor-icons/react';
 import { brandAPI, type BrandVoice, type BestPractices } from '../../../lib/api/brand';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('brand-guidelines');

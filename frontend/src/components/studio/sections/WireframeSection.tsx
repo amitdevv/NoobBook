@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { useWireframeGeneration } from '../wireframes/useWireframeGeneration';
 import { WireframeListItem } from '../wireframes/WireframeListItem';
 import { WireframeProgressIndicator } from '../wireframes/WireframeProgressIndicator';

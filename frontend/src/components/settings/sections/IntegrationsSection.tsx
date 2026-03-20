@@ -3,7 +3,7 @@
  * Manages Google Drive and Database connections.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,7 +36,7 @@ import {
 } from '@phosphor-icons/react';
 import { googleDriveAPI, databasesAPI, mcpAPI } from '@/lib/api/settings';
 import type { GoogleStatus, DatabaseConnection, DatabaseType, McpConnection, McpAuthType, McpTransport } from '@/lib/api/settings';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('integrations-section');
@@ -111,20 +111,14 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
 
   const { success, error, info } = useToast();
 
-  useEffect(() => {
-    loadGoogleStatus();
-    loadDatabases();
-    loadMcpConnections();
-  }, []);
-
-  const loadGoogleStatus = async () => {
+  const loadGoogleStatus = useCallback(async () => {
     try {
       const status = await googleDriveAPI.getStatus();
       setGoogleStatus(status);
     } catch (err) {
       log.error({ err }, 'failed to load Google status');
     }
-  };
+  }, []);
 
   const handleGoogleConnect = async () => {
     setGoogleLoading(true);
@@ -175,7 +169,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
     }
   };
 
-  const loadDatabases = async () => {
+  const loadDatabases = useCallback(async () => {
     setDbLoading(true);
     try {
       const dbs = await databasesAPI.listDatabases();
@@ -185,7 +179,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
     } finally {
       setDbLoading(false);
     }
-  };
+  }, []);
 
   const handleValidateDatabase = async () => {
     setDbValidating(true);
@@ -237,7 +231,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
   };
 
   // MCP Handlers
-  const loadMcpConnections = async () => {
+  const loadMcpConnections = useCallback(async () => {
     setMcpLoading(true);
     try {
       const conns = await mcpAPI.listConnections();
@@ -248,7 +242,13 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
     } finally {
       setMcpLoading(false);
     }
-  };
+  }, [error]);
+
+  useEffect(() => {
+    loadGoogleStatus();
+    loadDatabases();
+    loadMcpConnections();
+  }, [loadGoogleStatus, loadDatabases, loadMcpConnections]);
 
   const buildMcpAuthConfig = (): Record<string, string> => {
     const token = mcpForm.auth_token.trim();

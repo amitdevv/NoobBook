@@ -4,7 +4,7 @@
  * Features: Platform-specific styling, images with download, copy to clipboard.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,7 @@ import {
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { ShareNetwork, DownloadSimple, PencilSimple } from '@phosphor-icons/react';
-import { useToast } from '../../ui/toast';
+import { useToast } from '../../ui/use-toast';
 import type { SocialPostJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 
@@ -27,6 +27,43 @@ interface SocialPostViewerModalProps {
   defaultEditInput?: string;
 }
 
+const SocialPostEditBar: React.FC<{
+  defaultValue: string;
+  isGenerating?: boolean;
+  onEdit: (instructions: string) => void;
+}> = ({ defaultValue, isGenerating, onEdit }) => {
+  const [editInput, setEditInput] = useState(defaultValue);
+
+  const handleEdit = () => {
+    const trimmed = editInput.trim();
+    if (!trimmed || isGenerating) return;
+    onEdit(trimmed);
+  };
+
+  return (
+    <div className="px-6 py-3 border-t-2 border-orange-200 bg-orange-50/30 flex-shrink-0">
+      <div className="flex gap-2">
+        <Input
+          value={editInput}
+          onChange={(e) => setEditInput(e.target.value)}
+          placeholder="Describe changes... (e.g., 'make tone more casual', 'add emojis')"
+          className="flex-1"
+          disabled={isGenerating}
+          onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && !isGenerating && onEdit(editInput.trim())}
+        />
+        <Button
+          onClick={handleEdit}
+          disabled={!editInput.trim() || isGenerating}
+          size="sm"
+        >
+          <PencilSimple size={14} className="mr-1" />
+          Edit
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 export const SocialPostViewerModal: React.FC<SocialPostViewerModalProps> = ({
   viewingSocialPostJob,
   onClose,
@@ -35,12 +72,6 @@ export const SocialPostViewerModal: React.FC<SocialPostViewerModalProps> = ({
   defaultEditInput,
 }) => {
   const { success: showSuccess } = useToast();
-  const [editInput, setEditInput] = useState('');
-
-  // Clear edit input when viewing a different job, restore on retry
-  useEffect(() => {
-    setEditInput(defaultEditInput || '');
-  }, [viewingSocialPostJob?.id, defaultEditInput]);
   const postCount = viewingSocialPostJob?.posts.length || 0;
 
   // Responsive grid: 1 post = centered single col, 2 = 2-col, 3 = 3-col
@@ -151,26 +182,12 @@ export const SocialPostViewerModal: React.FC<SocialPostViewerModalProps> = ({
 
         {/* Edit input section */}
         {onEdit && (
-          <div className="px-6 py-3 border-t-2 border-orange-200 bg-orange-50/30 flex-shrink-0">
-            <div className="flex gap-2">
-              <Input
-                value={editInput}
-                onChange={(e) => setEditInput(e.target.value)}
-                placeholder="Describe changes... (e.g., 'make tone more casual', 'add emojis')"
-                className="flex-1"
-                disabled={isGenerating}
-                onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && !isGenerating && onEdit(editInput.trim())}
-              />
-              <Button
-                onClick={() => editInput.trim() && onEdit(editInput.trim())}
-                disabled={!editInput.trim() || isGenerating}
-                size="sm"
-              >
-                <PencilSimple size={14} className="mr-1" />
-                Edit
-              </Button>
-            </div>
-          </div>
+          <SocialPostEditBar
+            key={`${viewingSocialPostJob?.id || 'social-edit'}:${defaultEditInput || ''}`}
+            defaultValue={defaultEditInput || ''}
+            isGenerating={isGenerating}
+            onEdit={onEdit}
+          />
         )}
       </DialogContent>
     </Dialog>

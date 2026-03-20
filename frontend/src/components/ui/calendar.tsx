@@ -5,7 +5,8 @@ import { CaretDown, CaretLeft, CaretRight } from "@phosphor-icons/react"
 import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker"
 
 import { cn } from "src/lib/utils"
-import { Button, buttonVariants } from "src/components/ui/button"
+import { Button } from "src/components/ui/button"
+import { buttonVariants } from "src/components/ui/button-variants"
 
 function Calendar({
   className,

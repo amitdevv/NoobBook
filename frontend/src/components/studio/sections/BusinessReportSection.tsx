@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { useBusinessReportGeneration } from '../businessReport/useBusinessReportGeneration';
 import { BusinessReportListItem } from '../businessReport/BusinessReportListItem';
 import { BusinessReportProgressIndicator } from '../businessReport/BusinessReportProgressIndicator';

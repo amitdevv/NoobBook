@@ -8,7 +8,7 @@
 import { useState, useRef } from 'react';
 import { mindMapsAPI, type MindMapJob } from '@/lib/api/studio';
 import type { StudioSignal } from '../types';
-import { useToast } from '../../ui/toast';
+import { useToast } from '../../ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('mind-map-generation');

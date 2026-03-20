@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { useQuizGeneration } from '../quiz/useQuizGeneration';
 import { QuizListItem } from '../quiz/QuizListItem';
 import { QuizProgressIndicator } from '../quiz/QuizProgressIndicator';

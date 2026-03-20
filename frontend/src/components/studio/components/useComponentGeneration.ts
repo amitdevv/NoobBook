@@ -6,7 +6,7 @@
 
 import { useState, useRef } from 'react';
 import { componentsAPI, type ComponentJob } from '@/lib/api/studio';
-import { useToast } from '../../ui/toast';
+import { useToast } from '../../ui/use-toast';
 import type { StudioSignal } from '../types';
 import { createLogger } from '@/lib/logger';
 

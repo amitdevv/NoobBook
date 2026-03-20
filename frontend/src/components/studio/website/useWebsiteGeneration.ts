@@ -7,7 +7,7 @@
 import { useState, useRef } from 'react';
 import { websitesAPI, type WebsiteJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
-import { useToast } from '../../ui/toast';
+import { useToast } from '../../ui/use-toast';
 import type { StudioSignal } from '../types';
 import { createLogger } from '@/lib/logger';
 

@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { useBlogGeneration } from '../blog/useBlogGeneration';
 import { BlogListItem } from '../blog/BlogListItem';
 import { BlogProgressIndicator } from '../blog/BlogProgressIndicator';

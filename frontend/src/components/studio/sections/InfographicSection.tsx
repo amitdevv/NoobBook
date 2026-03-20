@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { useInfographicGeneration } from '../infographic/useInfographicGeneration';
 import { InfographicListItem } from '../infographic/InfographicListItem';
 import { InfographicProgressIndicator } from '../infographic/InfographicProgressIndicator';

@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { usePresentationGeneration } from '../presentations/usePresentationGeneration';
 import { PresentationListItem } from '../presentations/PresentationListItem';
 import { PresentationProgressIndicator } from '../presentations/PresentationProgressIndicator';

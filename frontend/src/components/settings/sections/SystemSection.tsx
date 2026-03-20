@@ -15,7 +15,7 @@ import {
 import { CircleNotch } from '@phosphor-icons/react';
 import { processingSettingsAPI } from '@/lib/api/settings';
 import type { AvailableTier } from '@/lib/api/settings';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('system-section');

@@ -9,12 +9,11 @@ import { Button } from '../ui/button';
 import { Sparkle, ChatCircle, Plus } from '@phosphor-icons/react';
 
 interface ChatEmptyStateProps {
-  projectName: string;
+  projectName?: string;
   onNewChat: () => void;
 }
 
 export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
-  projectName: _projectName,
   onNewChat,
 }) => {
   return (

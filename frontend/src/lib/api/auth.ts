@@ -1,3 +1,4 @@
+import type { AxiosError } from 'axios';
 import { api } from './client';
 import { setSession, clearSession } from '../auth/session';
 
@@ -28,6 +29,11 @@ export interface AuthResponse {
   error?: string;
 }
 
+interface ApiErrorBody {
+  error?: string;
+  message?: string;
+}
+
 export const authAPI = {
   async me(): Promise<MeResponse> {
     const response = await api.get('/auth/me');
@@ -42,11 +48,12 @@ export const authAPI = {
         setSession(data.session.access_token, data.session.refresh_token);
       }
       return data;
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as AxiosError<ApiErrorBody>;
       const message =
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        err?.message ||
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
         'Sign in failed';
       return { success: false, error: message };
     }
@@ -60,11 +67,12 @@ export const authAPI = {
         setSession(data.session.access_token, data.session.refresh_token);
       }
       return data;
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as AxiosError<ApiErrorBody>;
       const message =
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        err?.message ||
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
         'Sign up failed';
       return { success: false, error: message };
     }

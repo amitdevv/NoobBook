@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { settingsAPI } from '@/lib/api/settings';
 import type { ApiKey } from '@/lib/api/settings';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('api-keys-section');

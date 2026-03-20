@@ -25,7 +25,7 @@ import {
   POPULAR_FONTS,
   FONT_WEIGHTS,
 } from '../../../lib/api/brand';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('brand-typography');

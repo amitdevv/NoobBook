@@ -14,7 +14,8 @@
  * 5. Logout clears tokens and resets user state
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useCallback } from 'react';
+import type { AxiosError } from 'axios';
 import { authAPI } from '@/lib/api/auth';
 import { getAccessToken, clearSession } from '@/lib/auth/session';
 
@@ -32,6 +33,11 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: 'admin' | 'user' }>;
   signup: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: 'admin' | 'user' }>;
   logout: () => Promise<void>;
+}
+
+interface ApiErrorBody {
+  error?: string;
+  message?: string;
 }
 
 // ==================== Context ====================
@@ -87,8 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       return { success: false as const, error: result.error || 'Login failed' };
-    } catch (err: any) {
-      const message = err.response?.data?.error || 'Login failed. Please try again.';
+    } catch (err) {
+      const message = (err as AxiosError<ApiErrorBody>).response?.data?.error || 'Login failed. Please try again.';
       return { success: false as const, error: message };
     }
   }, []);
@@ -106,8 +112,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       return { success: false as const, error: result.error || 'Signup failed' };
-    } catch (err: any) {
-      const message = err.response?.data?.error || 'Signup failed. Please try again.';
+    } catch (err) {
+      const message = (err as AxiosError<ApiErrorBody>).response?.data?.error || 'Signup failed. Please try again.';
       return { success: false as const, error: message };
     }
   }, []);
@@ -127,14 +133,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-// ==================== Hook ====================
-
-export function useAuth(): AuthContextType {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 }

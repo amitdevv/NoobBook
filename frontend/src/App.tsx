@@ -63,7 +63,7 @@ function AppContent({
 }: AppContentProps) {
   const navigate = useNavigate();
 
-  const handleProjectCreated = (_project: Project) => {
+  const handleProjectCreated = () => {
     setShowCreateDialog(false);
     setRefreshTrigger(prev => prev + 1);
   };

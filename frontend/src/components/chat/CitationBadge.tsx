@@ -43,7 +43,6 @@ interface CitationBadgeProps {
 export const CitationBadge: React.FC<CitationBadgeProps> = ({
   citationNumber,
   chunkId,
-  sourceId: _sourceId,
   pageNumber,
   projectId,
   sourceName,

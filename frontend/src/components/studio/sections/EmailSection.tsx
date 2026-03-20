@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { useEmailGeneration } from '../email/useEmailGeneration';
 import { EmailListItem } from '../email/EmailListItem';
 import { EmailProgressIndicator } from '../email/EmailProgressIndicator';

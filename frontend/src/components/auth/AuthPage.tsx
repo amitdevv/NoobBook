@@ -4,7 +4,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { useToast } from '../ui/toast';
+import { useToast } from '../ui/use-toast';
 import { authAPI } from '@/lib/api/auth';
 import { createLogger } from '@/lib/logger';
 

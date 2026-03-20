@@ -8,7 +8,7 @@ import { useState, useRef } from 'react';
 import { blogsAPI, type BlogJob, type BlogType } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
-import { useToast } from '../../ui/toast';
+import { useToast } from '../../ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('blog-generation');
