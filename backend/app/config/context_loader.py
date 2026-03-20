@@ -107,6 +107,7 @@ class ContextLoader:
             "- Use the search_sources tool to retrieve information from embedded sources (documents, links, etc.).",
             "- For CSV sources, use analyze_csv_agent when the user asks questions that require calculations/plots from the CSV data.",
             "- For DATABASE sources, use analyze_database_agent when the user asks questions that require LIVE data from the database (counts, metrics, lists, trends).",
+            "- For FRESHDESK sources, use analyze_freshdesk_agent when the user asks questions about support ticket data (trends, metrics, SLA, agent performance, etc.).",
             "",
         ]
 
@@ -136,13 +137,15 @@ class ContextLoader:
                 lines.append("  - Chat tool: analyze_csv_agent (for calculations/plots)")
             if file_ext == ".database":
                 lines.append("  - Chat tool: analyze_database_agent (for live SQL queries)")
+            if file_ext == ".freshdesk":
+                lines.append("  - Chat tool: analyze_freshdesk_agent (for ticket analytics)")
             if file_ext == ".mcp":
                 lines.append("  - Chat tool: search_sources (RAG search over MCP resources)")
             if summary_text:
                 lines.append(f"  - Summary: {summary_text}")
             lines.append("")
 
-        lines.append("When answering, pick the correct tool based on the source type (search_sources vs analyze_csv_agent vs analyze_database_agent).")
+        lines.append("When answering, pick the correct tool based on the source type (search_sources vs analyze_csv_agent vs analyze_database_agent vs analyze_freshdesk_agent).")
         lines.append("")
 
         return "\n".join(lines)
@@ -177,6 +180,7 @@ class ContextLoader:
             ".csv": "CSV Spreadsheet",
             ".research": "Research Document",
             ".database": "Database (Postgres/MySQL)",
+            ".freshdesk": "Freshdesk Tickets",
             ".mcp": "MCP Server Resources",
         }
 

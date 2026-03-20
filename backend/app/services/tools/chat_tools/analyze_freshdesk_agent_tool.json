@@ -1,0 +1,21 @@
+{
+    "name": "analyze_freshdesk_agent",
+    "description": "Trigger a Freshdesk ticket analysis agent for support ticket analysis.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "source_id": {
+                "type": "string",
+                "description": "The FRESHDESK source ID"
+            },
+            "query": {
+                "type": "string",
+                "description": "Question about Freshdesk tickets"
+            }
+        },
+        "required": [
+            "source_id",
+            "query"
+        ]
+    }
+}

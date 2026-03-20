@@ -224,6 +224,30 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     loadSources();
   }, [loadSources]);
 
+  // Auto-sync Freshdesk sources every 15 minutes
+  useEffect(() => {
+    const FRESHDESK_SYNC_INTERVAL = 15 * 60 * 1000; // 15 minutes
+
+    const interval = setInterval(async () => {
+      const freshdeskSources = sources.filter(
+        (s) => s.status === 'ready' &&
+          ((s.embedding_info as Record<string, string>)?.file_extension || '') === '.freshdesk'
+      );
+      for (const src of freshdeskSources) {
+        try {
+          const result = await sourcesAPI.syncFreshdesk(projectId, src.id);
+          success(`Auto-synced ${result.tickets_fetched} Freshdesk tickets`);
+          await loadSources();
+        } catch {
+          // Silent — don't spam errors for background sync
+        }
+      }
+    }, FRESHDESK_SYNC_INTERVAL);
+
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, sources.length]);
+
   /**
    * Detect when sources transition to "ready" status
    * Educational Note: When a source finishes processing, ChatPanel needs to know
@@ -453,6 +477,46 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       } else {
         error(errorMessage);
       }
+    }
+  };
+
+  /**
+   * Handle adding a Freshdesk source
+   */
+  const handleAddFreshdesk = async (name?: string, description?: string) => {
+    if (sources.length >= MAX_SOURCES) {
+      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
+      return;
+    }
+
+    try {
+      await sourcesAPI.addFreshdeskSource(projectId, name, description);
+      success('Freshdesk source added — syncing tickets...');
+      await loadSources();
+      setSheetOpen(false);
+    } catch (err: unknown) {
+      log.error({ err }, 'failed to add Freshdesk source');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add Freshdesk source';
+      if (typeof err === 'object' && err !== null && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { error?: string } } };
+        error(axiosErr.response?.data?.error || errorMessage);
+      } else {
+        error(errorMessage);
+      }
+    }
+  };
+
+  /**
+   * Handle Freshdesk sync
+   */
+  const handleSyncFreshdesk = async (sourceId: string) => {
+    try {
+      const result = await sourcesAPI.syncFreshdesk(projectId, sourceId);
+      success(`Synced ${result.tickets_fetched} tickets from Freshdesk`);
+      await loadSources();
+    } catch (err: unknown) {
+      log.error({ err }, 'failed to sync Freshdesk');
+      error('Failed to sync Freshdesk tickets');
     }
   };
 
@@ -708,6 +772,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
             onCancelProcessing={handleCancelProcessing}
             onRetryProcessing={handleRetryProcessing}
             onViewProcessed={handleViewProcessed}
+            onSyncFreshdesk={handleSyncFreshdesk}
           />
 
           <SourcesFooter sourcesCount={sourcesCount} totalSize={totalSize} />
@@ -725,6 +790,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         onAddResearch={handleAddResearch}
         onAddDatabase={handleAddDatabase}
         onAddMcp={handleAddMcp}
+        onAddFreshdesk={handleAddFreshdesk}
         onImportComplete={loadSources}
         uploading={uploading}
       />

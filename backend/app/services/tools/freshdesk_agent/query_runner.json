@@ -1,0 +1,21 @@
+{
+    "name": "query_runner",
+    "description": "Execute read-only SQL against freshdesk_tickets table.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "sql_query": {
+                "type": "string",
+                "description": "SELECT SQL query"
+            },
+            "explanation": {
+                "type": "string",
+                "description": "What this query analyzes"
+            }
+        },
+        "required": [
+            "sql_query",
+            "explanation"
+        ]
+    }
+}

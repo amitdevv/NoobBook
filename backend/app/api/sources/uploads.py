@@ -324,6 +324,84 @@ def add_database_source(project_id: str):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@sources_bp.route('/projects/<project_id>/sources/freshdesk', methods=['POST'])
+def add_freshdesk_source_endpoint(project_id: str):
+    """
+    Add a Freshdesk ticket source to a project.
+
+    Educational Note: Freshdesk sources sync ticket data from a configured
+    Freshdesk account into a local table for fast SQL-based analysis.
+    Credentials come from .env (FRESHDESK_API_KEY, FRESHDESK_DOMAIN).
+
+    Request Body:
+        {
+            "name": "Support Tickets",   # optional display name
+            "description": "Q1 tickets", # optional
+            "days_back": 30              # optional, default 30
+        }
+    """
+    try:
+        data = request.get_json() or {}
+
+        source = source_service.add_freshdesk_source(
+            project_id=project_id,
+            name=data.get('name'),
+            description=data.get('description', ''),
+            days_back=data.get('days_back', 30),
+        )
+
+        return jsonify({
+            'success': True,
+            'source': source,
+            'message': 'Freshdesk source added successfully'
+        }), 201
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error adding Freshdesk source: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@sources_bp.route('/projects/<project_id>/sources/<source_id>/freshdesk-sync', methods=['POST'])
+def sync_freshdesk_source(project_id: str, source_id: str):
+    """
+    Trigger an incremental sync for an existing Freshdesk source.
+
+    Educational Note: After the initial backfill, users can trigger
+    incremental syncs to pull in new/updated tickets since the last sync.
+
+    Request Body:
+        {
+            "mode": "incremental",  # optional, default "incremental"
+            "days_back": 7          # optional, only used for "backfill" mode
+        }
+    """
+    try:
+        from app.services.integrations.freshdesk.freshdesk_sync_service import freshdesk_sync_service
+
+        data = request.get_json(silent=True) or {}
+        mode = data.get('mode', 'incremental')
+        days_back = data.get('days_back', 30)
+
+        stats = freshdesk_sync_service.sync_tickets(
+            project_id=project_id,
+            source_id=source_id,
+            mode=mode,
+            days_back=days_back,
+        )
+
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'message': f'Freshdesk sync complete: {stats.get("tickets_fetched", 0)} tickets processed'
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Error syncing Freshdesk source: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @sources_bp.route('/projects/<project_id>/sources/mcp', methods=['POST'])
 def add_mcp_source(project_id: str):
     """

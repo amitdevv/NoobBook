@@ -53,6 +53,7 @@ interface SourceItemProps {
   onCancelProcessing: (sourceId: string) => void;
   onRetryProcessing: (sourceId: string) => void;
   onViewProcessed: (sourceId: string) => void;
+  onSyncFreshdesk?: (sourceId: string) => void;
 }
 
 /**
@@ -198,9 +199,11 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   onCancelProcessing,
   onRetryProcessing,
   onViewProcessed,
+  onSyncFreshdesk,
 }) => {
   const { icon: Icon, weight: iconWeight } = getSourceIcon(source);
   const statusDisplay = getStatusDisplay(source.status, source);
+  const isFreshdesk = ((source.embedding_info as Record<string, string>)?.file_extension || '') === '.freshdesk';
   // "processing" or "embedding" are actively working - show spinner and allow cancel
   const isProcessing = source.status === 'processing';
   const isEmbedding = source.status === 'embedding';
@@ -324,6 +327,17 @@ export const SourceItem: React.FC<SourceItemProps> = ({
           )}
         </div>
       </div>
+
+      {/* Freshdesk Sync Button */}
+      {isFreshdesk && source.status === 'ready' && onSyncFreshdesk && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onSyncFreshdesk(source.id); }}
+          className="flex-shrink-0 p-1 rounded hover:bg-amber-50 text-muted-foreground hover:text-amber-600 transition-colors"
+          title="Sync latest tickets from Freshdesk"
+        >
+          <ArrowClockwise size={14} />
+        </button>
+      )}
 
       {/* Active Checkbox - only enabled for ready/partial sources */}
       <Checkbox

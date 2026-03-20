@@ -42,6 +42,7 @@ interface ActiveTasksBarProps {
   projectId: string;
   sendingChatIds?: Set<string>;
   chatNames?: Map<string, string>;
+  activeChatId?: string | null;
   onOpenChat?: (chatId: string) => void;
 }
 
@@ -120,6 +121,7 @@ export const ActiveTasksBar: React.FC<ActiveTasksBarProps> = ({
   projectId,
   sendingChatIds,
   chatNames,
+  activeChatId,
   onOpenChat,
 }) => {
   const [tasks, setTasks] = useState<ActiveTask[]>([]);
@@ -204,6 +206,13 @@ export const ActiveTasksBar: React.FC<ActiveTasksBarProps> = ({
   const dismissCompleted = useCallback((chatId: string) => {
     setCompletedChats(prev => prev.filter(c => c.chatId !== chatId));
   }, []);
+
+  // Auto-dismiss completed entry if user is already viewing that chat
+  useEffect(() => {
+    if (activeChatId && completedChats.some(c => c.chatId === activeChatId)) {
+      dismissCompleted(activeChatId);
+    }
+  }, [activeChatId, completedChats, dismissCompleted]);
 
   if (!visible && count === 0) return null;
 

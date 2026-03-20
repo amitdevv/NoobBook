@@ -24,6 +24,7 @@ from app.services.source_services.source_upload import (
     upload_text,
     upload_research,
     add_database_source,
+    add_freshdesk_source,
     add_mcp_source,
 )
 # Local path utils used for temp file staging during source processing
@@ -384,6 +385,22 @@ class SourceService:
                 user_id=user_id,
             )
         return add_database_source(project_id, connection_id, name, description)
+
+    def add_freshdesk_source(
+        self,
+        project_id: str,
+        name: Optional[str] = None,
+        description: str = "",
+        days_back: int = 30,
+    ) -> Dict[str, Any]:
+        """
+        Add a Freshdesk ticket source to a project.
+
+        Educational Note: This creates a Freshdesk source that stores a small
+        `.freshdesk` metadata file in Supabase Storage and triggers processing
+        to sync tickets and make them queryable via the analysis agent.
+        """
+        return add_freshdesk_source(project_id, name, description, days_back)
 
     def add_mcp_source(
         self,

@@ -180,12 +180,14 @@ class ChatsAPI {
   async sendMessage(
     projectId: string,
     chatId: string,
-    message: string
+    message: string,
+    signal?: AbortSignal
   ): Promise<SendMessageResponse> {
     try {
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/chats/${chatId}/messages`,
-        { message }
+        { message },
+        signal ? { signal } : undefined
       );
       return {
         user_message: response.data.user_message,

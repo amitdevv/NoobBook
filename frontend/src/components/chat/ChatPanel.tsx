@@ -5,7 +5,7 @@
  * and manages chat state and API interactions.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sparkle } from '@phosphor-icons/react';
 import { Skeleton } from '../ui/skeleton';
 import { chatsAPI } from '@/lib/api/chats';
@@ -63,6 +63,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const sending = activeChat ? sendingChatIds.has(activeChat.id) : false;
   const [exportingChat, setExportingChat] = useState(false);
   const [rawMode, setRawMode] = useState(false);
+  // AbortController for cancelling in-flight chat requests
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Sources state for header display
   const [sources, setSources] = useState<Source[]>([]);
@@ -190,6 +192,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     const userMessage = message.trim();
     const sendingChatId = activeChat.id;
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setMessage('');
     onAddSendingChat(sendingChatId, activeChat.title);
 
@@ -210,7 +214,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     });
 
     try {
-      const result = await chatsAPI.sendMessage(projectId, activeChat.id, userMessage);
+      const result = await chatsAPI.sendMessage(projectId, activeChat.id, userMessage, controller.signal);
 
       // Replace temp message with real messages from API
       setActiveChat((prev) => {
@@ -266,9 +270,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         }
       }, 4000);
     } catch (err) {
-      log.error({ err }, 'failed to Lsending messageE');
-      error('Failed to send message');
-      // Remove the optimistic message on error
+      // Don't show error toast if user intentionally stopped
+      const isAborted = err instanceof Error && err.name === 'CanceledError';
+      if (isAborted) {
+        log.info('Chat request stopped by user');
+      } else {
+        log.error({ err }, 'failed to send message');
+        error('Failed to send message');
+      }
+      // Remove the optimistic message on error/abort
       setActiveChat((prev) => {
         if (!prev) return null;
         return {
@@ -278,6 +288,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       });
     } finally {
       onRemoveSendingChat(sendingChatId);
+      abortControllerRef.current = null;
+    }
+  };
+
+  /**
+   * Stop the current in-flight chat request
+   */
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
   };
 
@@ -477,6 +498,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         rawMode={rawMode}
         onMessageChange={setMessage}
         onSend={handleSend}
+        onStop={handleStop}
         onMicClick={handleMicClick}
         onToggleRawMode={() => setRawMode((prev) => !prev)}
       />

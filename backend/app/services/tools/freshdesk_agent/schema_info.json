@@ -1,0 +1,9 @@
+{
+    "name": "schema_info",
+    "description": "Get freshdesk_tickets schema and ticket count.",
+    "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+    }
+}

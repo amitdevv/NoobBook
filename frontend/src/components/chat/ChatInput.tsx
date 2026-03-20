@@ -7,7 +7,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { Textarea } from '../ui/textarea';
-import { PaperPlaneTilt, Microphone, CircleNotch, CodeBlock } from '@phosphor-icons/react';
+import { PaperPlaneTilt, Microphone, CodeBlock, StopCircle } from '@phosphor-icons/react';
 
 interface ChatInputProps {
   message: string;
@@ -18,6 +18,7 @@ interface ChatInputProps {
   rawMode: boolean;
   onMessageChange: (value: string) => void;
   onSend: () => void;
+  onStop: () => void;
   onMicClick: () => void;
   onToggleRawMode: () => void;
 }
@@ -31,6 +32,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   rawMode,
   onMessageChange,
   onSend,
+  onStop,
   onMicClick,
   onToggleRawMode,
 }) => {
@@ -128,19 +130,26 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           <CodeBlock size={18} weight={rawMode ? 'bold' : 'regular'} />
         </button>
 
-        {/* Send Button - seamlessly integrated */}
-        <button
-          type="button"
-          onClick={onSend}
-          disabled={!message.trim() || sending || isRecording}
-          className="flex-shrink-0 p-1.5 rounded-full text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {sending ? (
-            <CircleNotch size={18} className="animate-spin" />
-          ) : (
+        {/* Send / Stop Button */}
+        {sending ? (
+          <button
+            type="button"
+            onClick={onStop}
+            title="Stop responding"
+            className="flex-shrink-0 p-1.5 rounded-full text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <StopCircle size={18} weight="fill" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onSend}
+            disabled={!message.trim() || isRecording}
+            className="flex-shrink-0 p-1.5 rounded-full text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <PaperPlaneTilt size={18} />
-          )}
-        </button>
+          </button>
+        )}
       </div>
 
       <p className="text-xs text-muted-foreground mt-2 text-center">

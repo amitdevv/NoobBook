@@ -224,6 +224,7 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
           projectId={project.id}
           sendingChatIds={sendingChatIds}
           chatNames={chatNamesMap}
+          activeChatId={activeChatId}
           onOpenChat={handleOpenChat}
         />
 

@@ -22,6 +22,7 @@ interface SourcesListProps {
   onCancelProcessing: (sourceId: string) => void;
   onRetryProcessing: (sourceId: string) => void;
   onViewProcessed: (sourceId: string) => void;
+  onSyncFreshdesk?: (sourceId: string) => void;
 }
 
 export const SourcesList: React.FC<SourcesListProps> = ({
@@ -35,6 +36,7 @@ export const SourcesList: React.FC<SourcesListProps> = ({
   onCancelProcessing,
   onRetryProcessing,
   onViewProcessed,
+  onSyncFreshdesk,
 }) => {
   // Filter sources based on search
   const filteredSources = sources.filter((source) =>
@@ -82,6 +84,7 @@ export const SourcesList: React.FC<SourcesListProps> = ({
                 onCancelProcessing={onCancelProcessing}
                 onRetryProcessing={onRetryProcessing}
                 onViewProcessed={onViewProcessed}
+                onSyncFreshdesk={onSyncFreshdesk}
               />
             ))}
           </div>
