@@ -2,7 +2,8 @@ import * as React from "react"
 import { CaretLeft, CaretRight, DotsThree } from "@phosphor-icons/react"
 
 import { cn } from "@/lib/utils"
-import { type ButtonProps, buttonVariants } from "@/components/ui/button"
+import { type ButtonProps } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button-variants"
 
 const Pagination = ({ className, ...props }: React.ComponentProps<"nav">) => (
   <nav

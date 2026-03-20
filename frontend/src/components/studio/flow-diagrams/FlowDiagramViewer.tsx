@@ -214,7 +214,7 @@ export const FlowDiagramViewer: React.FC<FlowDiagramViewerProps> = ({
     // Sanitize HTML void elements to be XML-compatible (self-closing)
     // This fixes: "Opening and ending tag mismatch: br line 1 and p"
     // Uses negative lookahead (?![^>]*\/>) to skip already self-closing tags
-    let sanitizedSvg = svgContent
+    const sanitizedSvg = svgContent
       .replace(/<br(?![^>]*\/>)([^>]*)>/gi, '<br$1/>')
       .replace(/<hr(?![^>]*\/>)([^>]*)>/gi, '<hr$1/>')
       .replace(/<img(?![^>]*\/>)([^>]*)>/gi, '<img$1/>')

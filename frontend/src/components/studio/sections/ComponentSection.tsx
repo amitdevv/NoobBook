@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { useComponentGeneration } from '../components/useComponentGeneration';
 import { ComponentListItem } from '../components/ComponentListItem';
 import { ComponentProgressIndicator } from '../components/ComponentProgressIndicator';

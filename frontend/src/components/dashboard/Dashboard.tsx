@@ -11,7 +11,8 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { Gear, Ghost, SignOut, Warning } from '@phosphor-icons/react';
-import { ToastContainer, useToast } from '../ui/toast';
+import { ToastContainer } from '../ui/toast';
+import { useToast } from '../ui/use-toast';
 
 /**
  * Dashboard Component

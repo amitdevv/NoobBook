@@ -54,7 +54,7 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
 
   // Reset to first slide when opening a new presentation
   useEffect(() => {
-    if (viewingPresentationJob) {
+    if (viewingPresentationJob?.id) {
       setCurrentSlide(1);
     }
   }, [viewingPresentationJob?.id]);

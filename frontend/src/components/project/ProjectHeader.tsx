@@ -32,7 +32,8 @@ import { ArrowLeft, DotsThreeVertical, Plus, Trash, FolderOpen, Gear, CircleNotc
 import { Input } from '../ui/input';
 import { chatsAPI, type PromptConfig } from '../../lib/api/chats';
 import { projectsAPI, type CostTracking, type MemoryData } from '../../lib/api';
-import { useToast, ToastContainer } from '../ui/toast';
+import { ToastContainer } from '../ui/toast';
+import { useToast } from '../ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('project-header');
@@ -91,27 +92,10 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   const [expandedPrompts, setExpandedPrompts] = React.useState<Set<string>>(new Set());
 
   /**
-   * Educational Note: Load costs when component mounts.
-   */
-  useEffect(() => {
-    loadCosts();
-  }, [project.id]);
-
-  /**
-   * Refresh costs when costsVersion changes (triggered after chat messages)
-   * Educational Note: Uses version counter pattern for cross-component updates
-   */
-  useEffect(() => {
-    if (costsVersion !== undefined && costsVersion > 0) {
-      loadCosts();
-    }
-  }, [costsVersion]);
-
-  /**
    * Load project cost tracking data
    * Educational Note: Costs are tracked cumulatively in Supabase projects table
    */
-  const loadCosts = async () => {
+  const loadCosts = React.useCallback(async () => {
     try {
       const response = await projectsAPI.getCosts(project.id);
       if (response.data.success) {
@@ -121,7 +105,24 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
       log.error({ err }, 'failed to load costs');
       // Silently fail - costs are not critical
     }
-  };
+  }, [project.id]);
+
+  /**
+   * Educational Note: Load costs when component mounts.
+   */
+  useEffect(() => {
+    loadCosts();
+  }, [loadCosts]);
+
+  /**
+   * Refresh costs when costsVersion changes (triggered after chat messages)
+   * Educational Note: Uses version counter pattern for cross-component updates
+   */
+  useEffect(() => {
+    if (costsVersion !== undefined && costsVersion > 0) {
+      loadCosts();
+    }
+  }, [costsVersion, loadCosts]);
 
   /**
    * Load memory data (user + project memory)

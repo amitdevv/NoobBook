@@ -29,7 +29,7 @@ export const api = axios.create({
   },
 });
 
-const attachAuthHeader = (config: any) => {
+const attachAuthHeader = (config: InternalAxiosRequestConfig) => {
   const token = getAccessToken();
   if (token) {
     config.headers = config.headers || {};
@@ -85,7 +85,7 @@ async function tryRefreshToken(): Promise<boolean> {
 // Educational Note: axios.create() instances have separate interceptor chains, so registering
 // on both the `api` instance AND the global `axios` default won't double-fire for `api` requests.
 // The shared `refreshPromise` correctly deduplicates concurrent refresh attempts across both.
-async function handle401Error(error: AxiosError, retryWith: typeof api | typeof axios): Promise<any> {
+async function handle401Error(error: AxiosError, retryWith: typeof api | typeof axios): Promise<unknown> {
   const status = error.response?.status;
   const originalRequest = error.config as InternalAxiosRequestConfig & { _retried?: boolean };
 
@@ -101,6 +101,7 @@ async function handle401Error(error: AxiosError, retryWith: typeof api | typeof 
     if (refreshed) {
       originalRequest._retried = true;
       // Update the header with the fresh token and retry
+      originalRequest.headers = originalRequest.headers || {};
       originalRequest.headers.Authorization = `Bearer ${getAccessToken()}`;
       return retryWith(originalRequest);
     }

@@ -24,10 +24,25 @@ the main_chat_service orchestrates:
 
 Routes:
 - POST /projects/<id>/chats/<id>/messages - Send message, get AI response
+- POST /projects/<id>/chats/<id>/messages/stream - Send message, stream AI response
 """
-from flask import jsonify, request, current_app
+import json
+import queue
+import threading
+
+from flask import jsonify, request, current_app, Response, stream_with_context
 from app.api.messages import messages_bp
 from app.services.chat_services import main_chat_service
+from app.services.auth.rbac import get_request_identity
+
+
+_STREAM_SENTINEL = object()
+
+
+def _format_sse(event_name: str, payload: dict | None = None) -> str:
+    """Format a single SSE event chunk."""
+    data = json.dumps(payload or {}, ensure_ascii=False)
+    return f"event: {event_name}\ndata: {data}\n\n"
 
 
 @messages_bp.route('/projects/<project_id>/chats/<chat_id>/messages', methods=['POST'])
@@ -91,3 +106,63 @@ def send_message(project_id, chat_id):
             'success': False,
             'error': str(e)
         }), 500
+
+
+@messages_bp.route('/projects/<project_id>/chats/<chat_id>/messages/stream', methods=['POST'])
+def stream_message(project_id, chat_id):
+    """
+    Send a message in a chat and stream back assistant deltas as SSE.
+
+    The final saved assistant message is emitted as an `assistant_done` event.
+    """
+    data = request.get_json()
+
+    if not data or 'message' not in data:
+        return jsonify({
+            'success': False,
+            'error': 'Message is required'
+        }), 400
+
+    user_message_text = data['message']
+    identity = get_request_identity()
+    user_id = identity.user_id
+    app = current_app._get_current_object()
+    event_queue: "queue.Queue[object]" = queue.Queue()
+
+    def emit(event_name: str, payload: dict) -> None:
+        event_queue.put(_format_sse(event_name, payload))
+
+    def worker() -> None:
+        try:
+            main_chat_service.stream_message(
+                project_id=project_id,
+                chat_id=chat_id,
+                user_message_text=user_message_text,
+                user_id=user_id,
+                on_event=emit,
+            )
+        except ValueError as exc:
+            emit("error", {"message": str(exc)})
+        except Exception as exc:
+            app.logger.error(f"Error streaming message: {exc}")
+            emit("error", {"message": str(exc)})
+        finally:
+            event_queue.put(_STREAM_SENTINEL)
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+
+    def generate():
+        while True:
+            item = event_queue.get()
+            if item is _STREAM_SENTINEL:
+                break
+            yield item
+
+    headers = {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+    }
+    return Response(stream_with_context(generate()), headers=headers)

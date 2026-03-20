@@ -8,7 +8,7 @@ import { useState, useRef } from 'react';
 import { businessReportsAPI, type BusinessReportJob, type BusinessReportType } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
 import type { StudioSignal } from '../types';
-import { useToast } from '../../ui/toast';
+import { useToast } from '../../ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('business-report-generation');

@@ -7,7 +7,7 @@
 import { useState, useRef } from 'react';
 import { wireframesAPI, type WireframeJob } from '@/lib/api/studio/wireframes';
 import type { StudioSignal } from '../types';
-import { useToast } from '../../ui/toast';
+import { useToast } from '../../ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('wireframe-generation');

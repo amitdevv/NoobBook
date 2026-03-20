@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { useFlowDiagramGeneration } from '../flow-diagrams/useFlowDiagramGeneration';
 import { FlowDiagramListItem } from '../flow-diagrams/FlowDiagramListItem';
 import { FlowDiagramProgressIndicator } from '../flow-diagrams/FlowDiagramProgressIndicator';

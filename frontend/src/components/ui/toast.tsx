@@ -4,16 +4,9 @@
  * temporary messages to users.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { CheckCircle, XCircle, Info, X } from '@phosphor-icons/react';
-
-export type ToastType = 'success' | 'error' | 'info';
-
-interface Toast {
-  id: string;
-  type: ToastType;
-  message: string;
-}
+import type { Toast } from './use-toast';
 
 interface ToastContainerProps {
   toasts: Toast[];
@@ -80,27 +73,4 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
       </button>
     </div>
   );
-};
-
-// Toast hook for easy usage
-export const useToast = () => {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-
-  const showToast = (type: ToastType, message: string) => {
-    const id = Date.now().toString();
-    setToasts((prev) => [...prev, { id, type, message }]);
-  };
-
-  const dismissToast = (id: string) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  };
-
-  return {
-    toasts,
-    showToast,
-    dismissToast,
-    success: (message: string) => showToast('success', message),
-    error: (message: string) => showToast('error', message),
-    info: (message: string) => showToast('info', message),
-  };
 };

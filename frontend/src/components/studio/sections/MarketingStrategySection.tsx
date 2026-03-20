@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { useMarketingStrategyGeneration } from '../marketingStrategy/useMarketingStrategyGeneration';
 import { MarketingStrategyListItem } from '../marketingStrategy/MarketingStrategyListItem';
 import { MarketingStrategyProgressIndicator } from '../marketingStrategy/MarketingStrategyProgressIndicator';

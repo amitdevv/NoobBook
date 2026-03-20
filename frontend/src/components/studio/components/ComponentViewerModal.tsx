@@ -4,7 +4,7 @@
  * Displays component variations with iframe preview, copy code, and download options.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,7 @@ import { Input } from '../../ui/input';
 import { SquaresFour, Copy, DownloadSimple, Check, PencilSimple } from '@phosphor-icons/react';
 import { type ComponentJob } from '@/lib/api/studio';
 import { api, getAuthUrl } from '@/lib/api/client';
-import { useToast } from '../../ui/toast';
+import { useToast } from '../../ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('component-viewer');
@@ -30,26 +30,40 @@ interface ComponentViewerModalProps {
   onEdit?: (instructions: string) => void;
 }
 
+const ComponentEditBar: React.FC<{ onEdit: (instructions: string) => void }> = ({ onEdit }) => {
+  const [editInput, setEditInput] = useState('');
+
+  const handleEdit = () => {
+    const trimmed = editInput.trim();
+    if (!trimmed) return;
+    onEdit(trimmed);
+    setEditInput('');
+  };
+
+  return (
+    <div className="flex gap-2 pt-4 border-t-2 border-orange-200 bg-orange-50/30 px-1 pb-1 rounded-b-lg">
+      <Input
+        value={editInput}
+        onChange={(e) => setEditInput(e.target.value)}
+        placeholder="Describe changes... (e.g., 'more padding', 'horizontal layout')"
+        className="flex-1"
+        onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && handleEdit()}
+      />
+      <Button onClick={handleEdit} disabled={!editInput.trim()} size="sm">
+        <PencilSimple size={14} className="mr-1" />
+        Edit
+      </Button>
+    </div>
+  );
+};
+
 export const ComponentViewerModal: React.FC<ComponentViewerModalProps> = ({
-  projectId: _projectId,
   viewingComponentJob,
   onClose,
   onEdit,
 }) => {
   const { success: showSuccess } = useToast();
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [editInput, setEditInput] = useState('');
-
-  useEffect(() => {
-    setEditInput('');
-  }, [viewingComponentJob?.id]);
-
-  const handleEdit = () => {
-    if (editInput.trim() && onEdit) {
-      onEdit(editInput.trim());
-      setEditInput('');
-    }
-  };
 
   const copyToClipboard = async (previewUrl: string, index: number) => {
     try {
@@ -175,19 +189,7 @@ export const ComponentViewerModal: React.FC<ComponentViewerModalProps> = ({
             )}
 
             {onEdit && (
-              <div className="flex gap-2 pt-4 border-t-2 border-orange-200 bg-orange-50/30 px-1 pb-1 rounded-b-lg">
-                <Input
-                  value={editInput}
-                  onChange={(e) => setEditInput(e.target.value)}
-                  placeholder="Describe changes... (e.g., 'more padding', 'horizontal layout')"
-                  className="flex-1"
-                  onKeyDown={(e) => e.key === 'Enter' && editInput.trim() && handleEdit()}
-                />
-                <Button onClick={handleEdit} disabled={!editInput.trim()} size="sm">
-                  <PencilSimple size={14} className="mr-1" />
-                  Edit
-                </Button>
-              </div>
+              <ComponentEditBar key={viewingComponentJob?.id || 'component-edit'} onEdit={onEdit} />
             )}
 
             {/* Source info */}

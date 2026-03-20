@@ -64,6 +64,62 @@ export const useVoiceRecording = ({
   }, []);
 
   /**
+   * Stop recording and clean up resources
+   */
+  const stopRecording = useCallback(() => {
+    if (workletNodeRef.current) {
+      workletNodeRef.current.disconnect();
+      workletNodeRef.current = null;
+    }
+
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+
+    if (websocketRef.current) {
+      if (websocketRef.current.readyState === WebSocket.OPEN) {
+        websocketRef.current.send(JSON.stringify({
+          message_type: 'input_audio_chunk',
+          audio_base_64: '',
+          commit: true,
+          sample_rate: 16000,
+        }));
+
+        const currentPartial = partialTranscript;
+        setTimeout(() => {
+          if (currentPartial && !commitProcessedRef.current) {
+            log.debug('commit not processed, using partial fallback');
+            onTranscriptCommit(currentPartial);
+            setPartialTranscript('');
+          }
+
+          if (websocketRef.current) {
+            websocketRef.current.close();
+            websocketRef.current = null;
+          }
+        }, 500);
+      } else {
+        websocketRef.current.close();
+        websocketRef.current = null;
+      }
+    }
+
+    if (partialTranscript && !websocketRef.current && !commitProcessedRef.current) {
+      onTranscriptCommit(partialTranscript);
+      setPartialTranscript('');
+    }
+
+    setIsRecording(false);
+    log.debug('recording stopped');
+  }, [partialTranscript, onTranscriptCommit]);
+
+  /**
    * Educational Note: Start capturing audio from microphone and stream to WebSocket.
    * Uses AudioWorklet for efficient real-time processing without blocking the main thread.
    *
@@ -161,7 +217,7 @@ export const useVoiceRecording = ({
       onError('Failed to access microphone. Please check permissions.');
       stopRecording();
     }
-  }, [onError]);
+  }, [onError, stopRecording]);
 
   /**
    * Educational Note: Start real-time transcription with ElevenLabs WebSocket.
@@ -233,73 +289,7 @@ export const useVoiceRecording = ({
       log.error({ err }, 'failed to start recording');
       onError('Failed to start transcription. Check API key in settings.');
     }
-  }, [onError, onTranscriptCommit, startAudioCapture]);
-
-  /**
-   * Stop recording and clean up resources
-   */
-  const stopRecording = useCallback(() => {
-    // Stop audio capture first
-    if (workletNodeRef.current) {
-      workletNodeRef.current.disconnect();
-      workletNodeRef.current = null;
-    }
-
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-      mediaStreamRef.current = null;
-    }
-
-    // Close WebSocket with commit
-    if (websocketRef.current) {
-      // Educational Note: Send a manual commit before closing to ensure
-      // any remaining audio is transcribed. Without this, partial transcripts
-      // would be lost if user stops before VAD detects silence.
-      if (websocketRef.current.readyState === WebSocket.OPEN) {
-        websocketRef.current.send(JSON.stringify({
-          message_type: 'input_audio_chunk',
-          audio_base_64: '',
-          commit: true,
-          sample_rate: 16000,
-        }));
-
-        // Give a moment for committed_transcript to arrive before closing
-        // Also save partial transcript as fallback (only if commit wasn't processed)
-        const currentPartial = partialTranscript;
-        setTimeout(() => {
-          // Only add partial if no committed_transcript was received (fallback)
-          if (currentPartial && !commitProcessedRef.current) {
-            log.debug('commit not processed, using partial fallback');
-            onTranscriptCommit(currentPartial);
-            setPartialTranscript('');
-          }
-
-          if (websocketRef.current) {
-            websocketRef.current.close();
-            websocketRef.current = null;
-          }
-        }, 500);
-      } else {
-        websocketRef.current.close();
-        websocketRef.current = null;
-      }
-    }
-
-    // If there's a partial transcript and WebSocket was already closed, save it
-    // (only if commit wasn't already processed)
-    if (partialTranscript && !websocketRef.current && !commitProcessedRef.current) {
-      onTranscriptCommit(partialTranscript);
-      setPartialTranscript('');
-    }
-
-    setIsRecording(false);
-    log.debug('recording stopped');
-  }, [partialTranscript, onTranscriptCommit]);
+  }, [onError, onTranscriptCommit, startAudioCapture, stopRecording]);
 
   // Cleanup on unmount
   useEffect(() => {

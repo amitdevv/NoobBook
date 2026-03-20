@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { useMindMapGeneration } from '../mindmap/useMindMapGeneration';
 import { MindMapListItem } from '../mindmap/MindMapListItem';
 import { MindMapProgressIndicator } from '../mindmap/MindMapProgressIndicator';

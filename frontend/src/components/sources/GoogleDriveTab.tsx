@@ -27,7 +27,7 @@ import {
   MagnifyingGlass,
 } from '@phosphor-icons/react';
 import { googleDriveAPI, type GoogleFile, type GoogleStatus } from '@/lib/api/settings';
-import { useToast } from '../ui/toast';
+import { useToast } from '../ui/use-toast';
 import { DriveItem } from './drive';
 import { createLogger } from '@/lib/logger';
 
@@ -72,20 +72,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
 
   const { success, error } = useToast();
 
-  // Load Google status on mount
-  useEffect(() => {
-    loadStatus();
-  }, []);
-
-  // Load files when connected or folder changes
-  useEffect(() => {
-    if (status.connected) {
-      loadFiles(true);
-      setSearchQuery(''); // Reset search when changing folders
-    }
-  }, [status.connected, folderStack]);
-
-  const loadStatus = async () => {
+  const loadStatus = useCallback(async () => {
     setLoading(true);
     try {
       const googleStatus = await googleDriveAPI.getStatus();
@@ -95,7 +82,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   /**
    * Load files from Google Drive
@@ -136,6 +123,19 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
       setLoadingMore(false);
     }
   }, [folderStack, nextPageToken, error]);
+
+  // Load Google status on mount
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
+
+  // Load files when connected or folder changes
+  useEffect(() => {
+    if (status.connected) {
+      loadFiles(true);
+      setSearchQuery(''); // Reset search when changing folders
+    }
+  }, [status.connected, folderStack, loadFiles]);
 
   /**
    * Client-side search filtering

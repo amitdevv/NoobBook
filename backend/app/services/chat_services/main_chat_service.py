@@ -14,7 +14,7 @@ Message Flow:
 The service uses message_service for all message handling and tool parsing.
 """
 import logging
-from typing import Dict, Any, Tuple, List, Optional
+from typing import Dict, Any, Tuple, List, Optional, Callable
 
 from app.services.data_services import chat_service
 
@@ -36,6 +36,14 @@ from flask import has_request_context
 from app.services.auth.rbac import get_request_identity
 from app.services.data_services.project_service import DEFAULT_USER_ID
 from app.utils import claude_parsing_utils
+
+
+class ClaudeStreamError(Exception):
+    """Wrap a streaming error with any text that already streamed."""
+
+    def __init__(self, message: str, partial_text: str = ""):
+        super().__init__(message)
+        self.partial_text = partial_text
 
 
 class MainChatService:
@@ -311,31 +319,73 @@ class MainChatService:
         else:
             return f"Unknown tool: {tool_name}"
 
-    def send_message(
+    def _resolve_user_id(self, user_id: Optional[str] = None) -> str:
+        """Resolve the active user for chat execution."""
+        if user_id:
+            return user_id
+        identity = get_request_identity() if has_request_context() else None
+        return identity.user_id if identity else DEFAULT_USER_ID
+
+    def _emit_event(
+        self,
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]],
+        event_name: str,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Emit a structured event if a callback is registered."""
+        if on_event:
+            on_event(event_name, payload or {})
+
+    def _call_claude(
+        self,
+        *,
+        stream_text: bool,
+        on_text_delta: Optional[Callable[[str], None]] = None,
+        **kwargs,
+    ) -> Tuple[Dict[str, Any], str]:
+        """
+        Call Claude once, optionally streaming text deltas.
+
+        Returns:
+            Tuple of (response_dict, full_text_for_this_response)
+        """
+        if not stream_text:
+            response = claude_service.send_message(**kwargs)
+            return response, claude_parsing_utils.extract_text(response)
+
+        streamed_parts: List[str] = []
+
+        def handle_delta(delta: str) -> None:
+            streamed_parts.append(delta)
+            if on_text_delta:
+                on_text_delta(delta)
+
+        try:
+            response = claude_service.stream_message(
+                on_text_delta=handle_delta,
+                **kwargs,
+            )
+        except Exception as exc:
+            partial_text = "".join(streamed_parts)
+            raise ClaudeStreamError(str(exc), partial_text) from exc
+
+        return response, "".join(streamed_parts)
+
+    def _run_message_flow(
         self,
         project_id: str,
         chat_id: str,
-        user_message_text: str
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        user_message_text: str,
+        *,
+        stream_text: bool = False,
+        user_id: Optional[str] = None,
+        on_text_delta: Optional[Callable[[str], None]] = None,
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+    ) -> Dict[str, Any]:
         """
-        Process a user message and get AI response.
-
-        Educational Note: This method handles the complete message flow:
-        1. Store user message
-        2. Build context and call Claude
-        3. If tool_use: execute tool, send result, call again
-        4. When text response: store and return
-
-        Args:
-            project_id: The project UUID
-            chat_id: The chat UUID
-            user_message_text: The user's message text
-
-        Returns:
-            Tuple of (user_message_dict, assistant_message_dict)
+        Shared chat runner for both non-streaming and streaming flows.
         """
-        identity = get_request_identity() if has_request_context() else None
-        user_id = identity.user_id if identity else DEFAULT_USER_ID
+        resolved_user_id = self._resolve_user_id(user_id)
 
         # Verify chat exists
         chat = chat_service.get_chat(project_id, chat_id)
@@ -344,6 +394,7 @@ class MainChatService:
 
         # Step 1: Store user message
         user_msg = message_service.add_user_message(project_id, chat_id, user_message_text)
+        self._emit_event(on_event, "user_message", user_msg)
 
         # Step 2: Get config and build system prompt
         # Per-chat source selection: read which sources this chat has selected
@@ -353,7 +404,7 @@ class MainChatService:
         prompt_config = prompt_loader.get_project_prompt_config(project_id)
         base_prompt = prompt_config.get("system_prompt", "")
         system_prompt = self._build_system_prompt(
-            project_id, base_prompt, user_id=user_id, selected_source_ids=selected_source_ids
+            project_id, base_prompt, user_id=resolved_user_id, selected_source_ids=selected_source_ids
         )
 
         # Step 3: Get tools (memory always available, search for non-CSV, analyzer for CSV)
@@ -372,22 +423,29 @@ class MainChatService:
             has_csv_sources=bool(csv_sources),
             has_database_sources=bool(database_sources),
             has_freshdesk_sources=bool(freshdesk_sources),
-            user_id=user_id,
+            user_id=resolved_user_id,
         )
+
+        accumulated_text_parts: List[str] = []
 
         try:
             # Step 4: Build messages and call Claude
             api_messages = message_service.build_api_messages(project_id, chat_id)
+            self._emit_event(on_event, "ping")
 
-            response = claude_service.send_message(
+            response, response_text = self._call_claude(
+                stream_text=stream_text,
+                on_text_delta=on_text_delta,
                 messages=api_messages,
                 system_prompt=system_prompt,
                 model=prompt_config.get("model"),
                 max_tokens=prompt_config.get("max_tokens"),
                 temperature=prompt_config.get("temperature"),
                 tools=tools,
-                project_id=project_id
+                project_id=project_id,
             )
+            if response_text.strip():
+                accumulated_text_parts.append(response_text)
 
             # Step 5: Handle tool use loop
             # Educational Note: When Claude wants to use tools, stop_reason is "tool_use".
@@ -396,7 +454,6 @@ class MainChatService:
             # the response to the user, the tool_use is for background processing.
             # We accumulate text from all responses so we don't lose it.
             iteration = 0
-            accumulated_text_parts = []
 
             while claude_parsing_utils.is_tool_use(response) and iteration < self.MAX_TOOL_ITERATIONS:
                 iteration += 1
@@ -406,13 +463,6 @@ class MainChatService:
 
                 if not tool_use_blocks:
                     break
-
-                # Extract text from this response BEFORE storing
-                # Educational Note: Claude can respond with text + tool_use together.
-                # The text is the actual response to show the user!
-                response_text = claude_parsing_utils.extract_text(response)
-                if response_text.strip():
-                    accumulated_text_parts.append(response_text)
 
                 # Store the assistant's tool_use response
                 # Educational Note: The message chain must be:
@@ -440,7 +490,7 @@ class MainChatService:
                         chat_id,
                         tool_name,
                         tool_input,
-                        user_id=user_id,
+                        user_id=resolved_user_id,
                         mcp_registry=mcp_registry,
                     )
 
@@ -454,23 +504,23 @@ class MainChatService:
 
                 # Rebuild messages and call Claude again
                 api_messages = message_service.build_api_messages(project_id, chat_id)
+                self._emit_event(on_event, "ping")
 
-                response = claude_service.send_message(
+                response, response_text = self._call_claude(
+                    stream_text=stream_text,
+                    on_text_delta=on_text_delta,
                     messages=api_messages,
                     system_prompt=system_prompt,
                     model=prompt_config.get("model"),
                     max_tokens=prompt_config.get("max_tokens"),
                     temperature=prompt_config.get("temperature"),
                     tools=tools,
-                    project_id=project_id
+                    project_id=project_id,
                 )
+                if response_text.strip():
+                    accumulated_text_parts.append(response_text)
 
             # Step 6: Store final text response
-            # Get text from final response (may be empty if Claude sent text + tool_use earlier)
-            final_response_text = claude_parsing_utils.extract_text(response)
-            if final_response_text.strip():
-                accumulated_text_parts.append(final_response_text)
-
             # Combine all accumulated text
             # Educational Note: When Claude sends text + tool_use, the text comes first.
             # After tool execution, Claude may respond with more text OR empty (nothing to add).
@@ -484,14 +534,34 @@ class MainChatService:
                 model=response.get("model"),
                 tokens=response.get("usage")
             )
+            self._emit_event(on_event, "assistant_done", assistant_msg)
 
         except Exception as api_error:
+            partial_text = api_error.partial_text if isinstance(api_error, ClaudeStreamError) else ""
+            if partial_text.strip():
+                accumulated_text_parts.append(partial_text)
+            error_prefix = "\n\n".join(part for part in accumulated_text_parts if part.strip())
+            if error_prefix:
+                error_content = (
+                    f"{error_prefix}\n\n"
+                    f"Sorry, I encountered an error while finishing the response: {str(api_error)}"
+                )
+            else:
+                error_content = f"Sorry, I encountered an error: {str(api_error)}"
             # Store error message
             assistant_msg = message_service.add_assistant_message(
                 project_id=project_id,
                 chat_id=chat_id,
-                content=f"Sorry, I encountered an error: {str(api_error)}",
+                content=error_content,
                 error=True
+            )
+            self._emit_event(
+                on_event,
+                "error",
+                {
+                    "message": str(api_error),
+                    "assistant_message": assistant_msg,
+                },
             )
 
         # Step 7: Sync chat index
@@ -511,7 +581,49 @@ class MainChatService:
                 user_message_text
             )
 
-        return user_msg, assistant_msg
+        return {
+            "user_message": user_msg,
+            "assistant_message": assistant_msg,
+        }
+
+    def send_message(
+        self,
+        project_id: str,
+        chat_id: str,
+        user_message_text: str
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Process a user message and return the saved user + assistant messages."""
+        result = self._run_message_flow(
+            project_id=project_id,
+            chat_id=chat_id,
+            user_message_text=user_message_text,
+            stream_text=False,
+        )
+        return result["user_message"], result["assistant_message"]
+
+    def stream_message(
+        self,
+        project_id: str,
+        chat_id: str,
+        user_message_text: str,
+        *,
+        user_id: Optional[str] = None,
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+    ) -> Dict[str, Any]:
+        """Process a user message while streaming assistant text deltas."""
+        return self._run_message_flow(
+            project_id=project_id,
+            chat_id=chat_id,
+            user_message_text=user_message_text,
+            stream_text=True,
+            user_id=user_id,
+            on_text_delta=lambda delta: self._emit_event(
+                on_event,
+                "assistant_delta",
+                {"delta": delta},
+            ),
+            on_event=on_event,
+        )
 
     def _generate_and_update_chat_title(
         self,

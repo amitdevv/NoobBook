@@ -9,6 +9,7 @@ import axios from 'axios';
 import type { StudioSignal } from '../../components/studio/types';
 import { API_BASE_URL } from './client';
 import { createLogger } from '@/lib/logger';
+import { getAccessToken } from '../auth/session';
 
 const log = createLogger('chats-api');
 
@@ -85,6 +86,26 @@ export interface SendMessageResponse {
   assistant_message: Message;
 }
 
+export type ChatStreamEvent =
+  | { type: 'user_message'; payload: Message }
+  | { type: 'assistant_delta'; payload: { delta: string } }
+  | { type: 'assistant_done'; payload: Message }
+  | { type: 'error'; payload: { message: string; assistant_message?: Message | null } };
+
+export interface StreamMessageCallbacks {
+  onEvent?: (event: ChatStreamEvent) => void;
+  onUserMessage?: (message: Message) => void;
+  onAssistantDelta?: (delta: string) => void;
+  onAssistantDone?: (message: Message) => void;
+  onErrorEvent?: (payload: { message: string; assistant_message?: Message | null }) => void;
+}
+
+export interface StreamMessageResult {
+  hadUserMessage: boolean;
+  hadAssistantDelta: boolean;
+  terminalEvent: 'assistant_done' | 'error' | null;
+}
+
 /**
  * Educational Note: Prompt configuration from data/prompts/*.json files.
  * Each prompt defines model settings and the actual prompt text.
@@ -106,6 +127,75 @@ export interface PromptConfig {
 }
 
 class ChatsAPI {
+  private notifyStreamEvent(
+    event: ChatStreamEvent,
+    callbacks?: StreamMessageCallbacks
+  ) {
+    callbacks?.onEvent?.(event);
+    switch (event.type) {
+      case 'user_message':
+        callbacks?.onUserMessage?.(event.payload);
+        break;
+      case 'assistant_delta':
+        callbacks?.onAssistantDelta?.(event.payload.delta);
+        break;
+      case 'assistant_done':
+        callbacks?.onAssistantDone?.(event.payload);
+        break;
+      case 'error':
+        callbacks?.onErrorEvent?.(event.payload);
+        break;
+    }
+  }
+
+  private processSseChunk(
+    rawEvent: string,
+    callbacks: StreamMessageCallbacks | undefined,
+    state: StreamMessageResult,
+  ) {
+    let eventName = 'message';
+    const dataLines: string[] = [];
+
+    for (const line of rawEvent.split(/\r?\n/)) {
+      if (!line || line.startsWith(':')) {
+        continue;
+      }
+      if (line.startsWith('event:')) {
+        eventName = line.slice(6).trim();
+        continue;
+      }
+      if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).trimStart());
+      }
+    }
+
+    const payloadText = dataLines.join('\n');
+    const payload = payloadText ? JSON.parse(payloadText) : {};
+
+    switch (eventName) {
+      case 'user_message':
+        state.hadUserMessage = true;
+        this.notifyStreamEvent({ type: 'user_message', payload }, callbacks);
+        break;
+      case 'assistant_delta':
+        state.hadAssistantDelta = true;
+        this.notifyStreamEvent({ type: 'assistant_delta', payload }, callbacks);
+        break;
+      case 'assistant_done':
+        state.terminalEvent = 'assistant_done';
+        this.notifyStreamEvent({ type: 'assistant_done', payload }, callbacks);
+        break;
+      case 'error':
+        state.terminalEvent = 'error';
+        this.notifyStreamEvent({ type: 'error', payload }, callbacks);
+        break;
+      case 'ping':
+        break;
+      default:
+        log.warn({ eventName }, 'unknown chat stream event');
+    }
+  }
+
   /**
    * List all chats for a specific project
    * Educational Note: Returns chat metadata sorted by most recent first
@@ -197,6 +287,78 @@ class ChatsAPI {
       log.error({ err: error }, 'failed to send message');
       throw error;
     }
+  }
+
+  async streamMessage(
+    projectId: string,
+    chatId: string,
+    message: string,
+    callbacks?: StreamMessageCallbacks,
+    signal?: AbortSignal
+  ): Promise<StreamMessageResult> {
+    const token = getAccessToken();
+    const response = await fetch(
+      `${API_BASE_URL}/projects/${projectId}/chats/${chatId}/messages/stream`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ message }),
+        signal,
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(errorText || `Streaming request failed with status ${response.status}`);
+    }
+
+    if (!response.body) {
+      throw new Error('Streaming response body is missing');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    const state: StreamMessageResult = {
+      hadUserMessage: false,
+      hadAssistantDelta: false,
+      terminalEvent: null,
+    };
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+        let boundaryIndex = buffer.indexOf('\n\n');
+        while (boundaryIndex >= 0) {
+          const rawEvent = buffer.slice(0, boundaryIndex).trim();
+          buffer = buffer.slice(boundaryIndex + 2);
+          if (rawEvent) {
+            this.processSseChunk(rawEvent, callbacks, state);
+          }
+          boundaryIndex = buffer.indexOf('\n\n');
+        }
+
+        if (done) {
+          const tail = buffer.trim();
+          if (tail) {
+            this.processSseChunk(tail, callbacks, state);
+          }
+          break;
+        }
+      }
+    } catch (error) {
+      log.error({ err: error }, 'failed to stream message');
+      throw error;
+    } finally {
+      reader.releaseLock();
+    }
+
+    return state;
   }
 
   /**

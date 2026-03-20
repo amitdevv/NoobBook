@@ -32,6 +32,7 @@ interface ChatMessagesProps {
   messages: Message[];
   sending: boolean;
   projectId: string;
+  streamingAssistantContent?: string;
 }
 
 /**
@@ -446,7 +447,12 @@ const LoadingIndicator: React.FC = () => (
  * re-render this entire component (expensive markdown parsing). Memoization
  * ensures it only re-renders when messages, sending, or projectId actually change.
  */
-export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({ messages, sending, projectId }) => {
+export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
+  messages,
+  sending,
+  projectId,
+  streamingAssistantContent = '',
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -476,7 +482,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({ messages,
     }
 
     prevMessageCountRef.current = messages.length;
-  }, [messages, sending]);
+  }, [messages, sending, streamingAssistantContent]);
 
   // Track when user scrolls away from bottom
   const handleScroll = () => {
@@ -520,8 +526,15 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({ messages,
           </div>
         ))}
 
+        {streamingAssistantContent && (
+          <AIMessage
+            content={streamingAssistantContent}
+            projectId={projectId}
+          />
+        )}
+
         {/* Show loading indicator when sending */}
-        {sending && <LoadingIndicator />}
+        {sending && !streamingAssistantContent && <LoadingIndicator />}
 
         {/* Invisible element to scroll to */}
         <div ref={messagesEndRef} />

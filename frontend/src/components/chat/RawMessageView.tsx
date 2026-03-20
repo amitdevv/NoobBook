@@ -108,15 +108,13 @@ const RawMessageCard: React.FC<{ message: RawMessage; index: number }> = ({ mess
   );
 };
 
-export const RawMessageView: React.FC<RawMessageViewProps> = ({ projectId, chatId }) => {
+const RawMessageViewContent: React.FC<RawMessageViewProps> = ({ projectId, chatId }) => {
   const [messages, setMessages] = useState<RawMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     chatsAPI.getRawMessages(projectId, chatId)
       .then((msgs) => { if (!cancelled) setMessages(msgs); })
@@ -164,3 +162,7 @@ export const RawMessageView: React.FC<RawMessageViewProps> = ({ projectId, chatI
     </div>
   );
 };
+
+export const RawMessageView: React.FC<RawMessageViewProps> = ({ projectId, chatId }) => (
+  <RawMessageViewContent key={`${projectId}:${chatId}`} projectId={projectId} chatId={chatId} />
+);

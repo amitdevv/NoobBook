@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { CircleNotch, Warning } from '@phosphor-icons/react';
 import { usersAPI } from '@/lib/api/settings';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('delete-user-dialog');

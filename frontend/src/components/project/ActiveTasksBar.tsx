@@ -6,7 +6,7 @@
  * Shows chat names and a "Done" button when a chat finishes processing.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   CaretUp,
   CaretDown,
@@ -46,8 +46,9 @@ interface ActiveTasksBarProps {
   onOpenChat?: (chatId: string) => void;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const TASK_ICONS: Record<string, React.FC<any>> = {
+type TaskIconComponent = React.ComponentType<{ size?: number; className?: string }>;
+
+const TASK_ICONS: Record<string, TaskIconComponent> = {
   source: FileText,
   studio: Sparkle,
   background: Gear,
@@ -127,11 +128,7 @@ export const ActiveTasksBar: React.FC<ActiveTasksBarProps> = ({
   const [tasks, setTasks] = useState<ActiveTask[]>([]);
   const [completedChats, setCompletedChats] = useState<CompletedChat[]>([]);
   const [expanded, setExpanded] = useState(true);
-  const [visible, setVisible] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Track start times per chat ID so timers don't reset on re-renders
-  const chatSendStartsRef = useRef<Map<string, string>>(new Map());
-  // Track previous sending IDs to detect completions
+  const [chatSendStarts, setChatSendStarts] = useState<Map<string, string>>(() => new Map());
   const prevSendingRef = useRef<Set<string>>(new Set());
 
   const fetchTasks = useCallback(async () => {
@@ -140,87 +137,98 @@ export const ActiveTasksBar: React.FC<ActiveTasksBarProps> = ({
       if (resp.data.success) {
         setTasks(resp.data.tasks || []);
       }
-    } catch (_) {
+    } catch {
       // Silently ignore polling errors
     }
   }, [projectId]);
 
   // Poll every 3 seconds
   useEffect(() => {
-    fetchTasks();
-    pollRef.current = setInterval(fetchTasks, 3000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    const initialTimeout = window.setTimeout(() => {
+      void fetchTasks();
+    }, 0);
+    const intervalId = window.setInterval(() => {
+      void fetchTasks();
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(initialTimeout);
+      window.clearInterval(intervalId);
+    };
   }, [fetchTasks]);
 
-  // Sync start times and detect completions
-  const currentIds = sendingChatIds || new Set<string>();
-  const starts = chatSendStartsRef.current;
-  const names = chatNames || new Map<string, string>();
+  const currentIds = useMemo(() => sendingChatIds || new Set<string>(), [sendingChatIds]);
+  const names = useMemo(() => chatNames || new Map<string, string>(), [chatNames]);
 
-  // Detect chats that just finished (were in prev but not in current)
-  const prevIds = prevSendingRef.current;
-  for (const id of prevIds) {
-    if (!currentIds.has(id)) {
-      // This chat just finished — add to completed list
-      const name = names.get(id) || 'Chat';
-      setCompletedChats(prev => {
-        if (prev.some(c => c.chatId === id)) return prev;
-        return [...prev, { chatId: id, chatName: name, completedAt: new Date().toISOString() }];
+  useEffect(() => {
+    const nextIds = sendingChatIds || new Set<string>();
+    const previousIds = prevSendingRef.current;
+
+    setCompletedChats((prev) => {
+      const nextNames = chatNames || new Map<string, string>();
+      const newlyCompleted = [...previousIds]
+        .filter((id) => id !== activeChatId && !nextIds.has(id) && !prev.some((chat) => chat.chatId === id))
+        .map((id) => ({
+          chatId: id,
+          chatName: nextNames.get(id) || 'Chat',
+          completedAt: new Date().toISOString(),
+        }));
+
+      return newlyCompleted.length > 0 ? [...prev, ...newlyCompleted] : prev;
+    });
+
+    setChatSendStarts((prev) => {
+      const next = new Map(prev);
+      let changed = false;
+      const now = new Date().toISOString();
+
+      nextIds.forEach((id) => {
+        if (!next.has(id)) {
+          next.set(id, now);
+          changed = true;
+        }
       });
-    }
-  }
-  prevSendingRef.current = new Set(currentIds);
 
-  // Sync start times
-  for (const id of currentIds) {
-    if (!starts.has(id)) starts.set(id, new Date().toISOString());
-  }
-  for (const id of starts.keys()) {
-    if (!currentIds.has(id)) starts.delete(id);
-  }
+      [...next.keys()].forEach((id) => {
+        if (!nextIds.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+
+    prevSendingRef.current = new Set(nextIds);
+  }, [sendingChatIds, chatNames, activeChatId]);
 
   // Build the combined task list (API tasks + one entry per sending chat)
-  const chatTasks: ActiveTask[] = Array.from(currentIds).map((chatId) => ({
+  const chatTasks: ActiveTask[] = useMemo(() => Array.from(currentIds).map((chatId) => ({
     id: `__chat_sending_${chatId}__`,
     type: 'chat' as ActiveTask['type'],
     label: names.get(chatId) || 'Chat',
     detail: 'Processing...',
     status: 'sending',
-    created_at: starts.get(chatId) || new Date().toISOString(),
+    created_at: chatSendStarts.get(chatId) || new Date().toISOString(),
     chatId,
-  }));
+  })), [currentIds, names, chatSendStarts]);
   const allTasks: ActiveTask[] = [...chatTasks, ...tasks];
 
-  const count = allTasks.length + completedChats.length;
-
-  // Show/hide with slight delay to avoid flicker
-  useEffect(() => {
-    if (count > 0) {
-      setVisible(true);
-    } else {
-      const t = setTimeout(() => setVisible(false), 600);
-      return () => clearTimeout(t);
-    }
-  }, [count]);
+  const visibleCompletedChats = useMemo(
+    () => completedChats.filter((chat) => chat.chatId !== activeChatId),
+    [completedChats, activeChatId]
+  );
+  const visibleCount = allTasks.length + visibleCompletedChats.length;
 
   const dismissCompleted = useCallback((chatId: string) => {
     setCompletedChats(prev => prev.filter(c => c.chatId !== chatId));
   }, []);
 
-  // Auto-dismiss completed entry if user is already viewing that chat
-  useEffect(() => {
-    if (activeChatId && completedChats.some(c => c.chatId === activeChatId)) {
-      dismissCompleted(activeChatId);
-    }
-  }, [activeChatId, completedChats, dismissCompleted]);
-
-  if (!visible && count === 0) return null;
+  if (visibleCount === 0) return null;
 
   return (
     <div
-      className={`fixed bottom-14 right-6 z-40 transition-all duration-300 ease-out ${
-        count > 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
-      }`}
+      className="fixed bottom-14 right-6 z-40 transition-all duration-300 ease-out opacity-100 translate-y-0"
       style={{ maxWidth: 340, width: '100%' }}
     >
       <div className="bg-white rounded-xl shadow-lg shadow-stone-200/60 border border-stone-200 overflow-hidden">
@@ -241,7 +249,7 @@ export const ActiveTasksBar: React.FC<ActiveTasksBarProps> = ({
             Active Tasks
           </span>
           <span className="text-[11px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
-            {count}
+            {visibleCount}
           </span>
           <span className="text-stone-400 ml-0.5">
             {expanded ? <CaretUp size={13} /> : <CaretDown size={13} />}
@@ -260,7 +268,7 @@ export const ActiveTasksBar: React.FC<ActiveTasksBarProps> = ({
               <TaskRow key={task.id} task={task} />
             ))}
             {/* Completed chats with "Open" button */}
-            {completedChats.map((chat) => (
+            {visibleCompletedChats.map((chat) => (
               <CompletedRow
                 key={chat.chatId}
                 chat={chat}

@@ -5,42 +5,14 @@
  * This eliminates prop drilling while keeping sections isolated.
  */
 
-import React, { createContext, useContext, useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import type { StudioSignal, StudioItemId } from './types';
 import { generationOptions } from './types';
 import { createLogger } from '@/lib/logger';
+import { StudioContext } from './StudioContext.shared';
+import type { StudioContextValue } from './StudioContext.shared';
 
 const log = createLogger('studio-context');
-
-interface StudioContextValue {
-  // Core shared state
-  projectId: string;
-  signals: StudioSignal[];
-
-  // Memoized Set for O(1) source filtering - replaces O(n^2) nested .some() calls
-  validSourceIds: Set<string>;
-
-  // Signal picker state (shared because it's triggered from StudioToolsList)
-  pickerOpen: boolean;
-  setPickerOpen: (open: boolean) => void;
-  selectedItem: StudioItemId | null;
-  selectedSignals: StudioSignal[];
-
-  // Generation trigger - called by signal picker after selection
-  triggerGeneration: (optionId: StudioItemId, signal: StudioSignal) => void;
-
-  // Register generation handler from sections
-  registerGenerationHandler: (itemId: StudioItemId, handler: (signal: StudioSignal) => Promise<void>) => void;
-
-  // Handle generate request from tools list
-  handleGenerate: (optionId: StudioItemId, itemSignals: StudioSignal[]) => void;
-
-  // Utility functions
-  getItemTitle: (itemId: StudioItemId) => string;
-  getItemIcon: (itemId: StudioItemId) => React.ComponentType<{ size?: number; className?: string }> | undefined;
-}
-
-const StudioContext = createContext<StudioContextValue | null>(null);
 
 interface StudioProviderProps {
   projectId: string;
@@ -168,29 +140,4 @@ export const StudioProvider: React.FC<StudioProviderProps> = ({
       {children}
     </StudioContext.Provider>
   );
-};
-
-/**
- * Hook to access studio context
- * Throws if used outside StudioProvider
- */
-export const useStudioContext = (): StudioContextValue => {
-  const context = useContext(StudioContext);
-  if (!context) {
-    throw new Error('useStudioContext must be used within a StudioProvider');
-  }
-  return context;
-};
-
-/**
- * Hook to filter jobs by valid source IDs
- * Uses the memoized Set for O(1) lookups instead of O(n^2) nested .some() calls
- */
-export const useFilteredJobs = <T extends { source_id: string | null }>(jobs: T[]): T[] => {
-  const { validSourceIds } = useStudioContext();
-
-  return useMemo(() => {
-    // Jobs without a source_id (generated from direction alone) are always shown
-    return jobs.filter(job => !job.source_id || validSourceIds.has(job.source_id));
-  }, [jobs, validSourceIds]);
 };

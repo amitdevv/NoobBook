@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { useAudioGeneration } from '../audio/useAudioGeneration';
 import { AudioListItem } from '../audio/AudioListItem';
 import { AudioProgressIndicator } from '../audio/AudioProgressIndicator';

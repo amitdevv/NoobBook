@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext } from '../StudioContext';
+import { useStudioContext } from '../studio-hooks';
 import { useSocialPostGeneration } from '../social/useSocialPostGeneration';
 import { SocialPostListItem } from '../social/SocialPostListItem';
 import { SocialPostProgressIndicator } from '../social/SocialPostProgressIndicator';

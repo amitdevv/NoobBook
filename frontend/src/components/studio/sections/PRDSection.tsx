@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext, useFilteredJobs } from '../StudioContext';
+import { useStudioContext, useFilteredJobs } from '../studio-hooks';
 import { usePRDGeneration } from '../prd/usePRDGeneration';
 import { PRDListItem } from '../prd/PRDListItem';
 import { PRDProgressIndicator } from '../prd/PRDProgressIndicator';

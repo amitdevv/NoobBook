@@ -43,7 +43,7 @@ import {
 } from '@phosphor-icons/react';
 import { usersAPI } from '@/lib/api/settings';
 import type { UserSummary } from '@/lib/api/settings';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/use-toast';
 import { CreateUserDialog } from '../team/CreateUserDialog';
 import { DeleteUserDialog } from '../team/DeleteUserDialog';
 import { PasswordDisplay } from '../team/PasswordDisplay';

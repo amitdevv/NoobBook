@@ -11,7 +11,8 @@ import { Skeleton } from '../ui/skeleton';
 import { chatsAPI } from '@/lib/api/chats';
 import type { Chat, ChatMetadata, StudioSignal } from '@/lib/api/chats';
 import { sourcesAPI, type Source } from '@/lib/api/sources';
-import { useToast, ToastContainer } from '../ui/toast';
+import { ToastContainer } from '../ui/toast';
+import { useToast } from '../ui/use-toast';
 import { useVoiceRecording } from '../hooks/useVoiceRecording';
 import { ChatHeader } from './ChatHeader';
 import { ChatMessages } from './ChatMessages';
@@ -63,8 +64,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const sending = activeChat ? sendingChatIds.has(activeChat.id) : false;
   const [exportingChat, setExportingChat] = useState(false);
   const [rawMode, setRawMode] = useState(false);
+  const [streamingAssistantContent, setStreamingAssistantContent] = useState('');
   // AbortController for cancelling in-flight chat requests
   const abortControllerRef = useRef<AbortController | null>(null);
+  const canonicalUserMessageReceivedRef = useRef(false);
+  const assistantDeltaReceivedRef = useRef(false);
 
   // Sources state for header display
   const [sources, setSources] = useState<Source[]>([]);
@@ -191,10 +195,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     if (!message.trim() || !activeChat || sending) return;
 
     const userMessage = message.trim();
-    const sendingChatId = activeChat.id;
+    const currentChat = activeChat;
+    const sendingChatId = currentChat.id;
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    canonicalUserMessageReceivedRef.current = false;
+    assistantDeltaReceivedRef.current = false;
     setMessage('');
+    setRawMode(false);
+    setStreamingAssistantContent('');
     onAddSendingChat(sendingChatId, activeChat.title);
 
     // Optimistically add user message to UI immediately
@@ -213,34 +222,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       };
     });
 
-    try {
-      const result = await chatsAPI.sendMessage(projectId, activeChat.id, userMessage, controller.signal);
-
-      // Replace temp message with real messages from API
-      setActiveChat((prev) => {
-        if (!prev) return null;
-        // Remove the temp message and add real user + assistant messages
-        const messagesWithoutTemp = prev.messages.filter((m) => m.id !== tempUserMessage.id);
-        return {
-          ...prev,
-          messages: [...messagesWithoutTemp, result.user_message, result.assistant_message],
-          updated_at: new Date().toISOString(),
-        };
-      });
-
-      // Update the chat metadata in the list
+    const scheduleChatRefreshes = async (chatId: string) => {
       await loadChats();
-
-      // Trigger cost refresh in header
       onCostsChange?.();
 
-      // Fetch updated chat after delay (background tasks may have updated title/signals)
-      // Educational Note: Studio signals are added in background tasks, so we
-      // need to refetch the chat to get them. We do this twice - once quickly
-      // for signals and once later for auto-generated title.
-      const chatId = activeChat.id;
-
-      // Quick fetch for signals (1 second delay)
       setTimeout(async () => {
         try {
           const updatedChat = await chatsAPI.getChat(projectId, chatId);
@@ -253,7 +238,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         }
       }, 1000);
 
-      // Delayed fetch for title (4 second delay)
       setTimeout(async () => {
         try {
           const updatedChat = await chatsAPI.getChat(projectId, chatId);
@@ -261,7 +245,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             ? { ...prev, title: updatedChat.title, studio_signals: updatedChat.studio_signals || [] }
             : prev
           );
-          // Also update in chat list
           setAllChats(prev => prev.map(c =>
             c.id === chatId ? { ...c, title: updatedChat.title } : c
           ));
@@ -269,23 +252,110 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           // Silently ignore - title update is non-critical
         }
       }, 4000);
+    };
+
+    const replaceTempWithCanonicalUser = (canonicalUserMessage: Chat['messages'][number]) => {
+      canonicalUserMessageReceivedRef.current = true;
+      setActiveChat((prev) => {
+        if (!prev) return null;
+        const nextMessages = prev.messages.map((msg) =>
+          msg.id === tempUserMessage.id ? canonicalUserMessage : msg
+        );
+        const alreadyPresent = nextMessages.some((msg) => msg.id === canonicalUserMessage.id);
+        return {
+          ...prev,
+          messages: alreadyPresent ? nextMessages : [...nextMessages.filter((msg) => msg.id !== tempUserMessage.id), canonicalUserMessage],
+        };
+      });
+    };
+
+    const appendAssistantMessage = (assistantMessage: Chat['messages'][number]) => {
+      setStreamingAssistantContent('');
+      setActiveChat((prev) => {
+        if (!prev) return null;
+        const messagesWithoutTemp = prev.messages.filter((m) => m.id !== tempUserMessage.id);
+        if (messagesWithoutTemp.some((msg) => msg.id === assistantMessage.id)) {
+          return { ...prev, messages: messagesWithoutTemp, updated_at: new Date().toISOString() };
+        }
+        return {
+          ...prev,
+          messages: [...messagesWithoutTemp, assistantMessage],
+          updated_at: new Date().toISOString(),
+        };
+      });
+    };
+
+    const applyFallbackResponse = (result: { user_message: Chat['messages'][number]; assistant_message: Chat['messages'][number] }) => {
+      canonicalUserMessageReceivedRef.current = true;
+      setStreamingAssistantContent('');
+      setActiveChat((prev) => {
+        if (!prev) return null;
+        const messagesWithoutTemp = prev.messages.filter((m) => m.id !== tempUserMessage.id);
+        return {
+          ...prev,
+          messages: [...messagesWithoutTemp, result.user_message, result.assistant_message],
+          updated_at: new Date().toISOString(),
+        };
+      });
+    };
+
+    try {
+      const streamResult = await chatsAPI.streamMessage(
+        projectId,
+        currentChat.id,
+        userMessage,
+        {
+          onUserMessage: replaceTempWithCanonicalUser,
+          onAssistantDelta: (delta) => {
+            assistantDeltaReceivedRef.current = true;
+            setStreamingAssistantContent((prev) => prev + delta);
+          },
+          onAssistantDone: appendAssistantMessage,
+          onErrorEvent: (payload) => {
+            setStreamingAssistantContent('');
+            if (payload.assistant_message) {
+              appendAssistantMessage(payload.assistant_message);
+            }
+          },
+        },
+        controller.signal
+      );
+
+      if (streamResult.terminalEvent) {
+        await scheduleChatRefreshes(currentChat.id);
+      }
     } catch (err) {
       // Don't show error toast if user intentionally stopped
-      const isAborted = err instanceof Error && err.name === 'CanceledError';
+      const isAborted = err instanceof Error && (err.name === 'CanceledError' || err.name === 'AbortError');
       if (isAborted) {
         log.info('Chat request stopped by user');
       } else {
-        log.error({ err }, 'failed to send message');
-        error('Failed to send message');
+        const shouldFallback = !canonicalUserMessageReceivedRef.current && !assistantDeltaReceivedRef.current;
+
+        if (shouldFallback) {
+          try {
+            const fallbackResult = await chatsAPI.sendMessage(projectId, currentChat.id, userMessage);
+            applyFallbackResponse(fallbackResult);
+            await scheduleChatRefreshes(currentChat.id);
+          } catch (fallbackError) {
+            log.error({ err: fallbackError }, 'failed to send message via fallback');
+            error('Failed to send message');
+          }
+        } else {
+          log.error({ err }, 'failed to send message');
+          error('Failed to send message');
+        }
       }
-      // Remove the optimistic message on error/abort
-      setActiveChat((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          messages: prev.messages.filter((m) => m.id !== tempUserMessage.id),
-        };
-      });
+      setStreamingAssistantContent('');
+      if (!canonicalUserMessageReceivedRef.current) {
+        setActiveChat((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            messages: prev.messages.filter((m) => m.id !== tempUserMessage.id),
+          };
+        });
+      }
     } finally {
       onRemoveSendingChat(sendingChatId);
       abortControllerRef.current = null;
@@ -300,6 +370,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    setStreamingAssistantContent('');
   };
 
   /**
@@ -486,6 +557,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           messages={activeChat?.messages || []}
           sending={sending}
           projectId={projectId}
+          streamingAssistantContent={streamingAssistantContent}
         />
       )}
 

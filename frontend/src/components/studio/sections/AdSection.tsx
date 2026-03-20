@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import { useStudioContext } from '../StudioContext';
+import { useStudioContext } from '../studio-hooks';
 import { useAdGeneration } from '../ads/useAdGeneration';
 import { AdListItem } from '../ads/AdListItem';
 import { AdProgressIndicator } from '../ads/AdProgressIndicator';

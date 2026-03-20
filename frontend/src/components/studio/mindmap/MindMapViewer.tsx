@@ -171,12 +171,12 @@ function MindMapViewerInner({ nodes: mindMapNodes }: MindMapViewerProps) {
 
   // Get all descendants of a node
   const getDescendants = useCallback((nodeId: string): string[] => {
-    const children = childrenMap.get(nodeId) || [];
-    let descendants = [...children];
-    children.forEach((childId) => {
-      descendants = [...descendants, ...getDescendants(childId)];
-    });
-    return descendants;
+    const collectDescendants = (currentNodeId: string): string[] => {
+      const children = childrenMap.get(currentNodeId) || [];
+      return children.flatMap((childId) => [childId, ...collectDescendants(childId)]);
+    };
+
+    return collectDescendants(nodeId);
   }, [childrenMap]);
 
   // Count direct children

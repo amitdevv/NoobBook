@@ -14,7 +14,7 @@ export interface ApiKey {
   id: string;
   name: string;
   description: string;
-  category: 'ai' | 'storage' | 'utility';
+  category: 'ai' | 'storage' | 'utility' | 'integrations' | 'observability';
   required?: boolean;
   value: string;
   is_set: boolean;
