@@ -251,7 +251,7 @@ export const ApiKeysSection: React.FC = () => {
     </div>
   );
 
-  const renderCategorySection = (title: string, category: 'ai' | 'storage' | 'utility' | 'integrations') => {
+  const renderCategorySection = (title: string, category: 'ai' | 'storage' | 'utility' | 'integrations' | 'observability') => {
     const categoryKeys = apiKeys.filter(k => k.category === category);
     if (categoryKeys.length === 0) return null;
 
@@ -295,6 +295,8 @@ export const ApiKeysSection: React.FC = () => {
         {renderCategorySection('Utility Services', 'utility')}
         <Separator />
         {renderCategorySection('Integrations', 'integrations')}
+        <Separator />
+        {renderCategorySection('Observability', 'observability')}
       </div>
 
       <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>

@@ -167,6 +167,30 @@ API_KEYS_CONFIG = [
         'description': 'Freshdesk API key (from Profile Settings > API Key)',
         'category': 'integrations'
     },
+    {
+        'id': 'OPIK_API_KEY',
+        'name': 'Opik API Key',
+        'description': 'Opik LLM observability — auto-traces all Claude calls (comet.com/opik)',
+        'category': 'observability'
+    },
+    {
+        'id': 'OPIK_WORKSPACE',
+        'name': 'Opik Workspace',
+        'description': 'Opik workspace name from your dashboard',
+        'category': 'observability'
+    },
+    {
+        'id': 'OPIK_PROJECT_NAME',
+        'name': 'Opik Project Name',
+        'description': 'Project name in Opik dashboard (default: NoobBook)',
+        'category': 'observability'
+    },
+    {
+        'id': 'OPIK_URL_OVERRIDE',
+        'name': 'Opik URL Override',
+        'description': 'Custom URL for self-hosted Opik (leave empty for Opik Cloud)',
+        'category': 'observability'
+    },
 ]
 
 
@@ -303,6 +327,10 @@ def update_api_keys():
                 elif key_id in ('FRESHDESK_API_KEY', 'FRESHDESK_DOMAIN'):
                     from app.services.integrations.freshdesk.freshdesk_service import freshdesk_service
                     freshdesk_service.reload_config()
+                elif key_id in ('OPIK_API_KEY', 'OPIK_WORKSPACE', 'OPIK_PROJECT_NAME', 'OPIK_URL_OVERRIDE'):
+                    # Reset Claude client so it re-initializes with/without Opik wrapping
+                    from app.services.integrations.claude.claude_service import claude_service
+                    claude_service._client = None
 
         current_app.logger.info(f"Updated {updated_count} API keys")
 
@@ -502,6 +530,14 @@ def _validate_key(key_id: str, value: str) -> tuple[bool, str]:
 
     elif key_id == 'FRESHDESK_DOMAIN':
         # Supporting field — just accept it
+        is_valid = bool(value)
+        message = 'Value accepted' if is_valid else 'Value is empty'
+        return is_valid, message
+
+    elif key_id == 'OPIK_API_KEY':
+        return validation_service.validate_opik_key(value)
+
+    elif key_id in ['OPIK_WORKSPACE', 'OPIK_PROJECT_NAME', 'OPIK_URL_OVERRIDE']:
         is_valid = bool(value)
         message = 'Value accepted' if is_valid else 'Value is empty'
         return is_valid, message

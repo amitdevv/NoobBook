@@ -18,6 +18,7 @@ from app.services.app_settings.validation.pinecone_validator import validate_pin
 from app.services.app_settings.validation.notion_validator import validate_notion_key
 from app.services.app_settings.validation.jira_validator import validate_jira_key
 from app.services.app_settings.validation.freshdesk_validator import validate_freshdesk_key
+from app.services.app_settings.validation.opik_validator import validate_opik_key
 
 
 class ValidationService:
@@ -72,3 +73,7 @@ class ValidationService:
     def validate_freshdesk_key(self, api_key: str, domain: Optional[str] = None) -> Tuple[bool, str]:
         """Validate Freshdesk credentials (API key + domain)."""
         return validate_freshdesk_key(api_key, domain)
+
+    def validate_opik_key(self, api_key: str) -> Tuple[bool, str]:
+        """Validate an Opik API key."""
+        return validate_opik_key(api_key)

@@ -48,7 +48,38 @@ class ClaudeService:
             if not api_key:
                 logger.error("ANTHROPIC_API_KEY not found in environment")
                 raise ValueError("ANTHROPIC_API_KEY not found in environment")
-            self._client = anthropic.Anthropic(api_key=api_key)
+
+            client = anthropic.Anthropic(api_key=api_key)
+
+            # Wrap with Opik observability if configured
+            # Educational Note: track_anthropic() is a transparent wrapper that
+            # auto-logs every API call (prompt, response, tokens, latency, cost)
+            # to the Opik dashboard. If OPIK_API_KEY is not set, we skip entirely.
+            opik_api_key = os.getenv('OPIK_API_KEY')
+            if opik_api_key:
+                try:
+                    import opik
+                    from opik.integrations.anthropic import track_anthropic
+
+                    opik_url = os.getenv('OPIK_URL_OVERRIDE')
+                    opik_workspace = os.getenv('OPIK_WORKSPACE')
+                    opik_project = os.getenv('OPIK_PROJECT_NAME', 'NoobBook')
+
+                    configure_kwargs = {"api_key": opik_api_key}
+                    if opik_workspace:
+                        configure_kwargs["workspace"] = opik_workspace
+                    if opik_url:
+                        configure_kwargs["url_override"] = opik_url
+
+                    opik.configure(**configure_kwargs)
+                    client = track_anthropic(client, project_name=opik_project)
+                    logger.info("Opik observability enabled (project: %s)", opik_project)
+                except ImportError:
+                    logger.warning("OPIK_API_KEY set but 'opik' package not installed. Skipping.")
+                except Exception as e:
+                    logger.warning("Failed to init Opik: %s. Continuing without observability.", e)
+
+            self._client = client
         return self._client
 
     def send_message(
