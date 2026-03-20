@@ -224,6 +224,30 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     loadSources();
   }, [loadSources]);
 
+  // Auto-sync Freshdesk sources every 15 minutes
+  useEffect(() => {
+    const FRESHDESK_SYNC_INTERVAL = 15 * 60 * 1000; // 15 minutes
+
+    const interval = setInterval(async () => {
+      const freshdeskSources = sources.filter(
+        (s) => s.status === 'ready' &&
+          ((s.embedding_info as Record<string, string>)?.file_extension || '') === '.freshdesk'
+      );
+      for (const src of freshdeskSources) {
+        try {
+          const result = await sourcesAPI.syncFreshdesk(projectId, src.id);
+          success(`Auto-synced ${result.tickets_fetched} Freshdesk tickets`);
+          await loadSources();
+        } catch {
+          // Silent — don't spam errors for background sync
+        }
+      }
+    }, FRESHDESK_SYNC_INTERVAL);
+
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, sources.length]);
+
   /**
    * Detect when sources transition to "ready" status
    * Educational Note: When a source finishes processing, ChatPanel needs to know
@@ -483,6 +507,20 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   };
 
   /**
+   * Handle Freshdesk sync
+   */
+  const handleSyncFreshdesk = async (sourceId: string) => {
+    try {
+      const result = await sourcesAPI.syncFreshdesk(projectId, sourceId);
+      success(`Synced ${result.tickets_fetched} tickets from Freshdesk`);
+      await loadSources();
+    } catch (err: unknown) {
+      log.error({ err }, 'failed to sync Freshdesk');
+      error('Failed to sync Freshdesk tickets');
+    }
+  };
+
+  /**
    * Handle source deletion
    */
   const handleDeleteSource = async (sourceId: string, sourceName: string) => {
@@ -734,6 +772,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
             onCancelProcessing={handleCancelProcessing}
             onRetryProcessing={handleRetryProcessing}
             onViewProcessed={handleViewProcessed}
+            onSyncFreshdesk={handleSyncFreshdesk}
           />
 
           <SourcesFooter sourcesCount={sourcesCount} totalSize={totalSize} />

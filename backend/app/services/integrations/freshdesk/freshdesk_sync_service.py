@@ -11,6 +11,8 @@ Two sync modes:
 - incremental: Fetches tickets updated since the last sync timestamp
 """
 import logging
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -390,6 +392,50 @@ class FreshdeskSyncService:
             return round(delta.total_seconds() / 3600, 2)
         except (ValueError, TypeError):
             return None
+
+    # ------------------------------------------------------------------
+    # Auto-sync: background thread that runs incremental sync periodically
+    # ------------------------------------------------------------------
+
+    _auto_sync_threads: Dict[str, threading.Thread] = {}
+    _auto_sync_stop_flags: Dict[str, threading.Event] = {}
+    AUTO_SYNC_INTERVAL_SECONDS = 15 * 60  # 15 minutes
+
+    def start_auto_sync(self, project_id: str, source_id: str) -> None:
+        """Start a background thread that syncs tickets every 15 minutes."""
+        key = f"{project_id}:{source_id}"
+        if key in self._auto_sync_threads and self._auto_sync_threads[key].is_alive():
+            logger.info("Auto-sync already running for %s", key)
+            return
+
+        stop_flag = threading.Event()
+        self._auto_sync_stop_flags[key] = stop_flag
+
+        def _sync_loop():
+            logger.info("Auto-sync started for %s (every %ds)", key, self.AUTO_SYNC_INTERVAL_SECONDS)
+            while not stop_flag.is_set():
+                stop_flag.wait(self.AUTO_SYNC_INTERVAL_SECONDS)
+                if stop_flag.is_set():
+                    break
+                try:
+                    logger.info("Auto-sync running incremental sync for %s", key)
+                    stats = self.sync_tickets(project_id, source_id, mode="incremental")
+                    logger.info("Auto-sync complete for %s: %s", key, stats)
+                except Exception as e:
+                    logger.error("Auto-sync error for %s: %s", key, e)
+            logger.info("Auto-sync stopped for %s", key)
+
+        t = threading.Thread(target=_sync_loop, daemon=True, name=f"freshdesk-sync-{source_id[:8]}")
+        t.start()
+        self._auto_sync_threads[key] = t
+
+    def stop_auto_sync(self, project_id: str, source_id: str) -> None:
+        """Stop the auto-sync thread for a source."""
+        key = f"{project_id}:{source_id}"
+        flag = self._auto_sync_stop_flags.pop(key, None)
+        if flag:
+            flag.set()
+        self._auto_sync_threads.pop(key, None)
 
 
 # Singleton instance

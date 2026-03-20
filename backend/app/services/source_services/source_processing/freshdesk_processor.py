@@ -233,4 +233,7 @@ def process_freshdesk(
         summary_info=summary_info if summary_info else None,
     )
 
+    # Step 6: Start auto-sync (incremental every 15 minutes)
+    freshdesk_sync_service.start_auto_sync(project_id, source_id)
+
     return {"success": True, "status": "ready"}

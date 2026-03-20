@@ -380,7 +380,7 @@ def sync_freshdesk_source(project_id: str, source_id: str):
     try:
         from app.services.integrations.freshdesk.freshdesk_sync_service import freshdesk_sync_service
 
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         mode = data.get('mode', 'incremental')
         days_back = data.get('days_back', 30)
 

@@ -409,11 +409,15 @@ class SourcesAPI {
     }
   }
 
-  async syncFreshdesk(projectId: string, sourceId: string): Promise<void> {
+  async syncFreshdesk(projectId: string, sourceId: string): Promise<{ tickets_fetched: number; message: string }> {
     try {
-      await axios.post(
+      const resp = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/sources/${sourceId}/freshdesk-sync`
       );
+      return {
+        tickets_fetched: resp.data.stats?.tickets_fetched || 0,
+        message: resp.data.message || 'Sync complete',
+      };
     } catch (error) {
       log.error({ err: error }, 'failed to sync Freshdesk');
       throw error;
