@@ -6,7 +6,8 @@
 #
 # No MinIO — uses native Linux file backend with xattr for Supabase Storage.
 # No Vector — Coolify provides its own log management.
-# No container_name — Coolify manages container naming.
+# No bind mounts — Coolify can't resolve host paths, so config files are
+# baked into custom Dockerfiles under docker/supabase/*.Dockerfile.
 #
 # For LOCAL development, use docker-compose.yml + docker/setup.sh instead.
 # =============================================================================
@@ -17,19 +18,14 @@ services:
   # SUPABASE INFRASTRUCTURE
   # ===========================================================================
 
-  # --- PostgreSQL 15 ---
+  # --- PostgreSQL 15 (init SQL scripts baked into image) ---
   db:
-    image: supabase/postgres:15.8.1.085
+    build:
+      context: ./docker/supabase
+      dockerfile: ../dev-deployment-dockerfiles/db.Dockerfile
     restart: unless-stopped
     volumes:
-      - ./docker/supabase/volumes/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:Z
-      - ./docker/supabase/volumes/db/webhooks.sql:/docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql:Z
-      - ./docker/supabase/volumes/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:Z
-      - ./docker/supabase/volumes/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:Z
       - db-data:/var/lib/postgresql/data
-      - ./docker/supabase/volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/migrations/97-_supabase.sql:Z
-      - ./docker/supabase/volumes/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:Z
-      - ./docker/supabase/volumes/db/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql:Z
       - db-config:/etc/postgresql-custom
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
@@ -87,12 +83,12 @@ services:
     networks:
       - noobbook-network
 
-  # --- Kong (API gateway) — internal only, no exposed ports ---
+  # --- Kong (API gateway — kong.yml baked into image) ---
   kong:
-    image: kong:2.8.1
+    build:
+      context: ./docker/supabase
+      dockerfile: ../dev-deployment-dockerfiles/kong.Dockerfile
     restart: unless-stopped
-    volumes:
-      - ./docker/supabase/volumes/api/kong.yml:/home/kong/temp.yml:ro,z
     depends_on:
       analytics:
         condition: service_healthy
@@ -287,12 +283,12 @@ services:
     networks:
       - noobbook-network
 
-  # --- Edge Functions (placeholder — not used by NoobBook) ---
+  # --- Edge Functions (placeholder baked into image) ---
   functions:
-    image: supabase/edge-runtime:v1.70.0
+    build:
+      context: ./docker/supabase
+      dockerfile: ../dev-deployment-dockerfiles/functions.Dockerfile
     restart: unless-stopped
-    volumes:
-      - ./docker/supabase/volumes/functions:/home/deno/functions:Z
     depends_on:
       analytics:
         condition: service_healthy
@@ -347,18 +343,15 @@ services:
       LOGFLARE_URL: http://analytics:4000
       NEXT_PUBLIC_ENABLE_LOGS: true
       NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
-      SNIPPETS_MANAGEMENT_FOLDER: /app/snippets
-    volumes:
-      - ./docker/supabase/volumes/snippets:/app/snippets:Z
     networks:
       - noobbook-network
 
-  # --- Supavisor (connection pooler) ---
+  # --- Supavisor (connection pooler — config baked into image) ---
   supavisor:
-    image: supabase/supavisor:2.7.4
+    build:
+      context: ./docker/supabase
+      dockerfile: ../dev-deployment-dockerfiles/supavisor.Dockerfile
     restart: unless-stopped
-    volumes:
-      - ./docker/supabase/volumes/pooler/pooler.exs:/etc/pooler/pooler.exs:ro,z
     healthcheck:
       test:
         [
@@ -416,11 +409,12 @@ services:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - ./backend/supabase/init.sql:/init.sql:ro
-      - ./backend/supabase/migrations:/migrations:ro
+      - migrate-init:/init-files
     depends_on:
       db:
         condition: service_healthy
+      migrate-prep:
+        condition: service_completed_successfully
     entrypoint: >
       sh -c '
         set -e
@@ -437,7 +431,7 @@ services:
 
         if [ "$$HAS_TABLES" = "f" ]; then
           echo "Fresh database — running init.sql..."
-          $$PSQL -f /init.sql
+          $$PSQL -f /init-files/init.sql
         fi
 
         echo "Creating migration tracker..."
@@ -449,7 +443,7 @@ services:
         ROW_COUNT=$$($$PSQL -tAc "SELECT count(*) FROM schema_migrations")
         if [ "$$ROW_COUNT" = "0" ]; then
           echo "  First run — seeding tracker with already-applied migrations..."
-          for f in /migrations/*.sql; do
+          for f in /init-files/migrations/*.sql; do
             [ -f "$$f" ] || continue
             name=$$(basename "$$f")
             $$PSQL -c "INSERT INTO schema_migrations (filename) VALUES ('"'"'$$name'"'"') ON CONFLICT DO NOTHING"
@@ -465,7 +459,7 @@ services:
         fi
 
         echo "Applying migrations..."
-        for f in /migrations/*.sql; do
+        for f in /init-files/migrations/*.sql; do
           [ -f "$$f" ] || continue
           name=$$(basename "$$f")
           already=$$($$PSQL -tAc "SELECT 1 FROM schema_migrations WHERE filename = '"'"'$$name'"'"'")
@@ -482,6 +476,17 @@ services:
       '
     networks:
       - noobbook-network
+
+  # --- Prep container: copies migration SQL into a shared volume ---
+  # (Coolify can't bind-mount from host, so we bake files into an image
+  # and copy them to a volume that the migrate service can read.)
+  migrate-prep:
+    build:
+      context: ./backend
+      dockerfile: ../docker/dev-deployment-dockerfiles/migrate.Dockerfile
+    restart: "no"
+    volumes:
+      - migrate-init:/init-files
 
   # --- Backend (Flask + SocketIO) ---
   backend:
@@ -544,13 +549,14 @@ services:
       - backend
 
 # =============================================================================
-# VOLUMES — persistent data survives container rebuilds and redeployments
+# VOLUMES
 # =============================================================================
 volumes:
   db-data:
   db-config:
   storage-data:
   backend-data:
+  migrate-init:
 
 # =============================================================================
 # NETWORK
