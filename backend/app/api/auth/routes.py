@@ -88,6 +88,41 @@ def signout():
     return jsonify({"success": True}), 200
 
 
+@auth_bp.route("/auth/reset-password", methods=["POST"])
+def reset_password():
+    """
+    Reset a user's password using a secret reset key.
+
+    Educational Note: Since SMTP is not configured, we can't send reset emails.
+    This endpoint allows password reset using a shared secret (NOOBBOOK_RESET_KEY).
+    If no reset key is configured, falls back to NOOBBOOK_BOOTSTRAP_ADMIN_PASSWORD.
+    """
+    import os
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip()
+    new_password = (data.get("new_password") or "").strip()
+    reset_key = (data.get("reset_key") or "").strip()
+
+    if not email or not new_password:
+        return jsonify({"success": False, "error": "email and new_password are required"}), 400
+
+    # Verify reset key
+    expected_key = os.getenv("NOOBBOOK_RESET_KEY") or os.getenv("NOOBBOOK_BOOTSTRAP_ADMIN_PASSWORD", "")
+    if not expected_key or reset_key != expected_key:
+        return jsonify({"success": False, "error": "Invalid reset key"}), 403
+
+    # Find user and update password
+    try:
+        user = auth_service._find_user_by_email(email)
+        if not user:
+            return jsonify({"success": False, "error": "User not found"}), 404
+
+        auth_service.supabase.auth.admin.update_user_by_id(user.id, {"password": new_password})
+        return jsonify({"success": True, "message": f"Password reset for {email}"}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @auth_bp.route("/auth/refresh", methods=["POST"])
 def refresh():
     """
