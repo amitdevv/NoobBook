@@ -1,3 +1,3 @@
 FROM supabase/supavisor:2.7.4
 
-COPY volumes/pooler/pooler.exs /etc/pooler/pooler.exs
+COPY docker/supabase/volumes/pooler/pooler.exs /etc/pooler/pooler.exs

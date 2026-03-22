@@ -21,8 +21,8 @@ services:
   # --- PostgreSQL 15 (init SQL scripts baked into image) ---
   db:
     build:
-      context: ./docker/supabase
-      dockerfile: ../dev-deployment-dockerfiles/db.Dockerfile
+      context: .
+      dockerfile: docker/dev-deployment-dockerfiles/db.Dockerfile
     restart: unless-stopped
     volumes:
       - db-data:/var/lib/postgresql/data
@@ -86,8 +86,8 @@ services:
   # --- Kong (API gateway — kong.yml baked into image) ---
   kong:
     build:
-      context: ./docker/supabase
-      dockerfile: ../dev-deployment-dockerfiles/kong.Dockerfile
+      context: .
+      dockerfile: docker/dev-deployment-dockerfiles/kong.Dockerfile
     restart: unless-stopped
     depends_on:
       analytics:
@@ -286,8 +286,8 @@ services:
   # --- Edge Functions (placeholder baked into image) ---
   functions:
     build:
-      context: ./docker/supabase
-      dockerfile: ../dev-deployment-dockerfiles/functions.Dockerfile
+      context: .
+      dockerfile: docker/dev-deployment-dockerfiles/functions.Dockerfile
     restart: unless-stopped
     depends_on:
       analytics:
@@ -349,8 +349,8 @@ services:
   # --- Supavisor (connection pooler — config baked into image) ---
   supavisor:
     build:
-      context: ./docker/supabase
-      dockerfile: ../dev-deployment-dockerfiles/supavisor.Dockerfile
+      context: .
+      dockerfile: docker/dev-deployment-dockerfiles/supavisor.Dockerfile
     restart: unless-stopped
     healthcheck:
       test:
@@ -482,8 +482,8 @@ services:
   # and copy them to a volume that the migrate service can read.)
   migrate-prep:
     build:
-      context: ./backend
-      dockerfile: ../docker/dev-deployment-dockerfiles/migrate.Dockerfile
+      context: .
+      dockerfile: docker/dev-deployment-dockerfiles/migrate.Dockerfile
     restart: "no"
     volumes:
       - migrate-init:/init-files
