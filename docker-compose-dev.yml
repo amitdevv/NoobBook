@@ -5,10 +5,8 @@
 # Coolify picks this up from the repo — set all env vars in the Coolify UI.
 #
 # No MinIO — uses native Linux file backend with xattr for Supabase Storage.
-# No external network — everything runs on a single internal network.
-#
-# See .env.coolify.example for required environment variables and
-# instructions on generating Supabase secrets.
+# No Vector — Coolify provides its own log management.
+# No container_name — Coolify manages container naming.
 #
 # For LOCAL development, use docker-compose.yml + docker/setup.sh instead.
 # =============================================================================
@@ -21,7 +19,6 @@ services:
 
   # --- PostgreSQL 15 ---
   db:
-    container_name: supabase-db
     image: supabase/postgres:15.8.1.085
     restart: unless-stopped
     volumes:
@@ -29,7 +26,7 @@ services:
       - ./docker/supabase/volumes/db/webhooks.sql:/docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql:Z
       - ./docker/supabase/volumes/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:Z
       - ./docker/supabase/volumes/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:Z
-      - db-data:/var/lib/postgresql/data:Z
+      - db-data:/var/lib/postgresql/data
       - ./docker/supabase/volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/migrations/97-_supabase.sql:Z
       - ./docker/supabase/volumes/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:Z
       - ./docker/supabase/volumes/db/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql:Z
@@ -39,9 +36,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    depends_on:
-      vector:
-        condition: service_healthy
     environment:
       POSTGRES_HOST: /var/run/postgresql
       PGPORT: ${POSTGRES_PORT:-5432}
@@ -63,38 +57,8 @@ services:
     networks:
       - noobbook-network
 
-  # --- Vector (log collection) ---
-  vector:
-    container_name: supabase-vector
-    image: timberio/vector:0.28.1-alpine
-    restart: unless-stopped
-    volumes:
-      - ./docker/supabase/volumes/logs/vector.yml:/etc/vector/vector.yml:ro,z
-      - ${DOCKER_SOCKET_LOCATION:-/var/run/docker.sock}:/var/run/docker.sock:ro,z
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://vector:9001/health"
-        ]
-      timeout: 5s
-      interval: 5s
-      retries: 3
-    environment:
-      LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
-    command: ["--config", "/etc/vector/vector.yml"]
-    security_opt:
-      - "label=disable"
-    networks:
-      - noobbook-network
-
   # --- Analytics (Logflare) ---
   analytics:
-    container_name: supabase-analytics
     image: supabase/logflare:1.30.3
     restart: unless-stopped
     healthcheck:
@@ -109,7 +73,7 @@ services:
       LOGFLARE_NODE_HOST: 127.0.0.1
       DB_USERNAME: supabase_admin
       DB_DATABASE: _supabase
-      DB_HOSTNAME: ${POSTGRES_HOST:-db}
+      DB_HOSTNAME: db
       DB_PORT: ${POSTGRES_PORT:-5432}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_SCHEMA: _analytics
@@ -117,7 +81,7 @@ services:
       LOGFLARE_PRIVATE_ACCESS_TOKEN: ${LOGFLARE_PRIVATE_ACCESS_TOKEN}
       LOGFLARE_SINGLE_TENANT: true
       LOGFLARE_SUPABASE_MODE: true
-      POSTGRES_BACKEND_URL: postgresql://supabase_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-db}:${POSTGRES_PORT:-5432}/_supabase
+      POSTGRES_BACKEND_URL: postgresql://supabase_admin:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/_supabase
       POSTGRES_BACKEND_SCHEMA: _analytics
       LOGFLARE_FEATURE_FLAG_OVERRIDE: multibackend=true
     networks:
@@ -125,7 +89,6 @@ services:
 
   # --- Kong (API gateway) — internal only, no exposed ports ---
   kong:
-    container_name: supabase-kong
     image: kong:2.8.1
     restart: unless-stopped
     volumes:
@@ -150,7 +113,6 @@ services:
 
   # --- Auth (GoTrue) ---
   auth:
-    container_name: supabase-auth
     image: supabase/gotrue:v2.185.0
     restart: unless-stopped
     healthcheck:
@@ -176,7 +138,7 @@ services:
       GOTRUE_API_PORT: 9999
       API_EXTERNAL_URL: ${API_EXTERNAL_URL:-http://localhost:8000}
       GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       GOTRUE_SITE_URL: ${SITE_URL}
       GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS:-}
       GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
@@ -205,7 +167,6 @@ services:
 
   # --- PostgREST (auto-generated REST API) ---
   rest:
-    container_name: supabase-rest
     image: postgrest/postgrest:v14.3
     restart: unless-stopped
     depends_on:
@@ -214,7 +175,7 @@ services:
       analytics:
         condition: service_healthy
     environment:
-      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS:-public,storage,graphql_public}
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${JWT_SECRET}
@@ -227,7 +188,6 @@ services:
 
   # --- Realtime (WebSocket subscriptions) ---
   realtime:
-    container_name: realtime-dev.supabase-realtime
     image: supabase/realtime:v2.72.0
     restart: unless-stopped
     depends_on:
@@ -247,7 +207,7 @@ services:
       start_period: 10s
     environment:
       PORT: 4000
-      DB_HOST: ${POSTGRES_HOST:-db}
+      DB_HOST: db
       DB_PORT: ${POSTGRES_PORT:-5432}
       DB_USER: supabase_admin
       DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -268,7 +228,6 @@ services:
 
   # --- Storage API (native file backend — no MinIO needed on Linux) ---
   storage:
-    container_name: supabase-storage
     image: supabase/storage-api:latest
     restart: unless-stopped
     volumes:
@@ -281,7 +240,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://storage:5000/status"
+          "http://localhost:5000/status"
         ]
       timeout: 5s
       interval: 5s
@@ -296,7 +255,7 @@ services:
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
       POSTGREST_URL: http://rest:3000
       PGRST_JWT_SECRET: ${JWT_SECRET}
-      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       REQUEST_ALLOW_X_FORWARDED_PATH: "true"
       FILE_SIZE_LIMIT: 52428800
       STORAGE_BACKEND: file
@@ -310,7 +269,6 @@ services:
 
   # --- pg-meta (database introspection for Studio) ---
   meta:
-    container_name: supabase-meta
     image: supabase/postgres-meta:v0.95.2
     restart: unless-stopped
     depends_on:
@@ -320,7 +278,7 @@ services:
         condition: service_healthy
     environment:
       PG_META_PORT: 8080
-      PG_META_DB_HOST: ${POSTGRES_HOST:-db}
+      PG_META_DB_HOST: db
       PG_META_DB_PORT: ${POSTGRES_PORT:-5432}
       PG_META_DB_NAME: ${POSTGRES_DB:-postgres}
       PG_META_DB_USER: supabase_admin
@@ -331,7 +289,6 @@ services:
 
   # --- Edge Functions (placeholder — not used by NoobBook) ---
   functions:
-    container_name: supabase-edge-functions
     image: supabase/edge-runtime:v1.70.0
     restart: unless-stopped
     volumes:
@@ -344,7 +301,7 @@ services:
       SUPABASE_URL: http://kong:8000
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
-      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       VERIFY_JWT: "false"
     command: ["start", "--main-service", "/home/deno/functions/main"]
     networks:
@@ -352,7 +309,6 @@ services:
 
   # --- Studio (Supabase dashboard) ---
   studio:
-    container_name: supabase-studio
     image: supabase/studio:2026.01.27-sha-6aa59ff
     restart: unless-stopped
     healthcheck:
@@ -361,7 +317,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://studio:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})"
+          "fetch('http://localhost:3000/api/platform/profile').then((r) => {if (r.status !== 200) throw new Error(r.status)})"
         ]
       timeout: 10s
       interval: 5s
@@ -373,7 +329,7 @@ services:
       HOSTNAME: "::"
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      POSTGRES_HOST: ${POSTGRES_HOST:-db}
+      POSTGRES_HOST: db
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
@@ -399,7 +355,6 @@ services:
 
   # --- Supavisor (connection pooler) ---
   supavisor:
-    container_name: supabase-pooler
     image: supabase/supavisor:2.7.4
     restart: unless-stopped
     volumes:
@@ -428,7 +383,7 @@ services:
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      DATABASE_URL: ecto://supabase_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-db}:${POSTGRES_PORT:-5432}/_supabase
+      DATABASE_URL: ecto://supabase_admin:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/_supabase
       CLUSTER_POSTGRES: true
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}
       VAULT_ENC_KEY: ${VAULT_ENC_KEY}
@@ -457,7 +412,6 @@ services:
   # --- Database migration (runs once, then exits) ---
   migrate:
     image: postgres:16-alpine
-    container_name: noobbook-migrate
     restart: "no"
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -470,11 +424,11 @@ services:
     entrypoint: >
       sh -c '
         set -e
-        PSQL="psql -v ON_ERROR_STOP=1 -h supabase-db -p 5432 -U postgres -d postgres"
+        PSQL="psql -v ON_ERROR_STOP=1 -h db -p 5432 -U postgres -d postgres"
         export PGPASSWORD="$${POSTGRES_PASSWORD}"
 
         echo "Waiting for Supabase database..."
-        until pg_isready -h supabase-db -p 5432 -U postgres 2>/dev/null; do
+        until pg_isready -h db -p 5432 -U postgres 2>/dev/null; do
           sleep 2
         done
 
@@ -535,12 +489,11 @@ services:
       context: ./backend
       args:
         GIT_SHA: ${GIT_SHA:-unknown}
-    container_name: noobbook-backend
     restart: unless-stopped
     environment:
       - FLASK_ENV=production
       - PORT=5001
-      - SUPABASE_URL=http://supabase-kong:8000
+      - SUPABASE_URL=http://kong:8000
       - SUPABASE_ANON_KEY=${ANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_ROLE_KEY}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
@@ -570,7 +523,9 @@ services:
     volumes:
       - backend-data:/app/data
     networks:
-      - noobbook-network
+      noobbook-network:
+        aliases:
+          - noobbook-backend
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -580,7 +535,6 @@ services:
   # Coolify handles SSL termination via Cloudflare / Let's Encrypt.
   frontend:
     build: ./frontend
-    container_name: noobbook-frontend
     restart: unless-stopped
     ports:
       - "80:80"
@@ -594,17 +548,12 @@ services:
 # =============================================================================
 volumes:
   db-data:
-    name: noobbook-db-data
   db-config:
-    name: noobbook-db-config
   storage-data:
-    name: noobbook-storage-data
   backend-data:
-    name: noobbook-backend-data
 
 # =============================================================================
-# NETWORK — single internal network, not external (Coolify manages networking)
+# NETWORK
 # =============================================================================
 networks:
   noobbook-network:
-    name: noobbook-network
