@@ -413,6 +413,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      storage:
+        condition: service_healthy
       migrate-prep:
         condition: service_completed_successfully
     entrypoint: >
