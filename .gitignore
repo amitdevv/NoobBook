@@ -83,6 +83,8 @@ docker/supabase/volumes/db/data/
 docker/supabase/volumes/storage/
 docker/supabase/volumes/snippets/
 docker/supabase/volumes/functions/
+!docker/supabase/volumes/functions/main/
+!docker/supabase/volumes/functions/main/index.ts
 
 # Unignore vendored Supabase config files matched by "logs/" rule above
 !docker/supabase/volumes/logs/
