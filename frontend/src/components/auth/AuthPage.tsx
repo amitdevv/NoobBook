@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { useToast } from '../ui/use-toast';
 import { authAPI } from '@/lib/api/auth';
 import { createLogger } from '@/lib/logger';
+import { Eye, EyeSlash } from '@phosphor-icons/react';
 
 const log = createLogger('auth-page');
 
@@ -20,6 +21,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { success, error } = useToast();
 
   const handleSubmit = async () => {
@@ -106,14 +108,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signin-password">Password</Label>
-                <Input
-                  id="signin-password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={submitting}
-                />
+                <div className="relative">
+                  <Input
+                    id="signin-password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={submitting}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-stone-700"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeSlash size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <Button className="w-full" onClick={handleSubmit} disabled={submitting}>
                 {submitting ? 'Signing in…' : portal === 'admin' ? 'Sign in as admin' : 'Sign in'}
@@ -134,14 +147,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signup-password">Password</Label>
-                <Input
-                  id="signup-password"
-                  type="password"
-                  placeholder="Create a password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={submitting}
-                />
+                <div className="relative">
+                  <Input
+                    id="signup-password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Create a password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={submitting}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-stone-700"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeSlash size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <Button className="w-full" onClick={handleSubmit} disabled={submitting}>
                 {submitting
