@@ -372,7 +372,7 @@ def download_blog_post(project_id: str, job_id: str):
                 zip_file.writestr(markdown_file, markdown_content)
 
             # Add image files from Supabase
-            images = job.get('images', [])
+            images = job.get('images') or []
             for image_info in images:
                 image_filename = image_info.get('filename')
                 if image_filename:

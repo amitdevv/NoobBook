@@ -88,7 +88,7 @@ def generate_website(project_id: str):
 
             # Collect all file content from Supabase Storage
             file_contents = []
-            for fname in parent_job.get('files', []):
+            for fname in (parent_job.get('files') or []):
                 content = storage_service.download_studio_file(
                     project_id=project_id,
                     job_type="websites",
@@ -352,7 +352,7 @@ def download_website(project_id: str, job_id: str):
 
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
             # Add text files (HTML, CSS, JS) from job metadata
-            for fname in job.get('files', []):
+            for fname in job.get('files') or []:
                 content = storage_service.download_studio_file(
                     project_id, "websites", job_id, fname
                 )
@@ -360,7 +360,7 @@ def download_website(project_id: str, job_id: str):
                     zip_file.writestr(fname, content)
 
             # Add image assets
-            for image_info in job.get('images', []):
+            for image_info in job.get('images') or []:
                 img_filename = image_info.get('filename')
                 if img_filename:
                     img_data = storage_service.download_studio_binary(

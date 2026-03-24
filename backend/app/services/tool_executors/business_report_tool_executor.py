@@ -322,6 +322,7 @@ class BusinessReportToolExecutor:
                 markdown_file=markdown_filename,
                 markdown_url=f"/api/v1/projects/{project_id}/studio/business-reports/{markdown_filename}",
                 preview_url=f"/api/v1/projects/{project_id}/studio/business-reports/{job_id}/preview",
+                charts=collected_charts,
                 word_count=word_count,
                 iterations=iterations,
                 input_tokens=input_tokens,

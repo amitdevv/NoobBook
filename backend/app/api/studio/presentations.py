@@ -84,7 +84,7 @@ def generate_presentation(project_id: str):
 
             # Collect all slide HTML content from Supabase Storage
             slide_contents = []
-            for slide_file in parent_job.get('slide_files', []):
+            for slide_file in parent_job.get('slide_files') or []:
                 content = storage_service.download_studio_file(
                     project_id=project_id,
                     job_type="presentations",
@@ -280,7 +280,7 @@ def preview_presentation(project_id: str, job_id: str):
                 'error': 'Job not found'
             }), 404
 
-        slide_files = job.get('slide_files', [])
+        slide_files = job.get('slide_files') or []
         if not slide_files:
             return jsonify({
                 'success': False,
@@ -375,7 +375,7 @@ def download_presentation(project_id: str, job_id: str):
 
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 # Add slide HTML files and base-styles.css
-                slide_files = job.get('slide_files', [])
+                slide_files = job.get('slide_files') or []
                 for slide_file in slide_files:
                     content = storage_service.download_studio_file(
                         project_id, "presentations", job_id, f"slides/{slide_file}"
@@ -391,7 +391,7 @@ def download_presentation(project_id: str, job_id: str):
                     zip_file.writestr("slides/base-styles.css", css_content)
 
                 # Add screenshots
-                screenshots = job.get('screenshots', [])
+                screenshots = job.get('screenshots') or []
                 for screenshot_info in screenshots:
                     screenshot_name = screenshot_info.get('filename', '')
                     if not screenshot_name:

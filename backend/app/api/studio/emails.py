@@ -355,7 +355,7 @@ def download_email_template(project_id: str, job_id: str):
                 zip_file.writestr(html_file, html_content)
 
             # Add image files
-            images = job.get('images', [])
+            images = job.get('images') or []
             for image_info in images:
                 image_filename = image_info.get('filename')
                 if image_filename:

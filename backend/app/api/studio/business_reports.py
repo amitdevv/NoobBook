@@ -352,7 +352,7 @@ def download_business_report(project_id: str, job_id: str):
                 zip_file.writestr(markdown_file, md_content)
 
             # Add chart files (stored in ai-images via csv_analyzer_agent)
-            charts = job.get('charts', [])
+            charts = job.get('charts') or []
             for chart_info in charts:
                 chart_filename = chart_info.get('filename')
                 if chart_filename:
