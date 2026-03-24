@@ -81,11 +81,7 @@ export const useAudioGeneration = (projectId: string) => {
   };
 
   const handleAudioGeneration = async (signal: StudioSignal) => {
-    const sourceId = signal.sources[0]?.source_id;
-    if (!sourceId) {
-      log.error({ sources: signal.sources }, 'no source_id found in signal');
-      showError('No source specified for audio generation.');
-      return;
+    const sourceId = signal.sources[0]?.source_id || "";
     }
 
     setIsGeneratingAudio(true);

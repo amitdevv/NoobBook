@@ -82,11 +82,7 @@ export const useFlashCardGeneration = (projectId: string) => {
    * Handle flash card generation
    */
   const handleFlashCardGeneration = async (signal: StudioSignal) => {
-    const sourceId = signal.sources[0]?.source_id;
-    if (!sourceId) {
-      showError('No source specified for flash card generation.');
-      return;
-    }
+    const sourceId = signal.sources[0]?.source_id || "";
 
     setIsGeneratingFlashCards(true);
     setCurrentFlashCardJob(null);

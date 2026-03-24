@@ -93,11 +93,7 @@ export const usePresentationGeneration = (projectId: string) => {
     setCurrentPresentationJob(null);
 
     try {
-      const sourceId = signal.sources[0]?.source_id;
-      if (!sourceId) {
-        showError('No source selected');
-        return;
-      }
+      const sourceId = signal.sources[0]?.source_id || "";
 
       // Start presentation generation
       const startResponse = await presentationsAPI.startGeneration(

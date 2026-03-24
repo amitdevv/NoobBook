@@ -76,11 +76,7 @@ export const useQuizGeneration = (projectId: string) => {
   };
 
   const handleQuizGeneration = async (signal: StudioSignal) => {
-    const sourceId = signal.sources[0]?.source_id;
-    if (!sourceId) {
-      showError('No source specified for quiz generation.');
-      return;
-    }
+    const sourceId = signal.sources[0]?.source_id || "";
 
     setIsGeneratingQuiz(true);
     setCurrentQuizJob(null);

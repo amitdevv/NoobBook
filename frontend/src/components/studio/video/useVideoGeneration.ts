@@ -95,11 +95,7 @@ export const useVideoGeneration = (projectId: string) => {
     setCurrentVideoJob(null);
 
     try {
-      const sourceId = signal.sources[0]?.source_id;
-      if (!sourceId) {
-        showError('No source selected');
-        return;
-      }
+      const sourceId = signal.sources[0]?.source_id || "";
 
       // Start video generation
       const startResponse = await videosAPI.startGeneration(

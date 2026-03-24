@@ -84,11 +84,7 @@ export const useBusinessReportGeneration = (projectId: string) => {
   };
 
   const handleBusinessReportGeneration = async (signal: BusinessReportSignal) => {
-    const sourceId = signal.sources[0]?.source_id;
-    if (!sourceId) {
-      showError('No source specified for business report generation.');
-      return;
-    }
+    const sourceId = signal.sources[0]?.source_id || "";
 
     setIsGeneratingBusinessReport(true);
     setCurrentBusinessReportJob(null);

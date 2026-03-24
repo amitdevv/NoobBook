@@ -97,7 +97,6 @@ def get_request_identity() -> RequestIdentity:
     if token and is_supabase_enabled():
         try:
             supabase = get_supabase()
-            # supabase-py supports passing jwt to get_user
             user_resp = supabase.auth.get_user(token)
             user = getattr(user_resp, "user", None) or user_resp
             user_id = getattr(user, "id", None) or (user.get("id") if isinstance(user, dict) else None)
@@ -110,9 +109,7 @@ def get_request_identity() -> RequestIdentity:
                     role=role,
                     is_authenticated=True,
                 )
-        except Exception:
-            # Fall through to dev/single-user mode
-            pass
+        except Exception as e:
 
     # 2) Dev headers (useful until full auth UI is wired)
     header_user_id = (request.headers.get("X-NoobBook-User-Id") or "").strip()
