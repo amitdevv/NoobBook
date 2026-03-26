@@ -82,7 +82,6 @@ export const useAudioGeneration = (projectId: string) => {
 
   const handleAudioGeneration = async (signal: StudioSignal) => {
     const sourceId = signal.sources[0]?.source_id || "";
-    }
 
     setIsGeneratingAudio(true);
     setCurrentAudioJob(null);
