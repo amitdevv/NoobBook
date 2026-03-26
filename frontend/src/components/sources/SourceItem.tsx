@@ -330,27 +330,28 @@ export const SourceItem: React.FC<SourceItemProps> = ({
         </div>
       </div>
 
-      {/* Freshdesk Sync Button */}
-      {isFreshdesk && source.status === 'ready' && onBackfillFreshdesk && (
-        <button
-          onClick={(e) => { e.stopPropagation(); if (confirm('Clear all tickets and re-fetch last 30 days?')) onBackfillFreshdesk(source.id); }}
-          className="flex-shrink-0 p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors"
-          title="Backfill: clear all data and re-fetch last 30 days"
-        >
-          <ArrowClockwise size={14} weight="bold" />
-        </button>
-      )}
-      {isFreshdesk && source.status === 'ready' && onSyncFreshdesk && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onSyncFreshdesk(source.id); }}
-          className="flex-shrink-0 p-1 rounded hover:bg-amber-50 text-muted-foreground hover:text-amber-600 transition-colors"
-          title="Sync latest tickets from Freshdesk"
-        >
-          <ArrowClockwise size={14} />
-        </button>
-      )}
+      {/* Freshdesk buttons + Checkbox in a single flex container */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {isFreshdesk && source.status === 'ready' && onBackfillFreshdesk && (
+          <button
+            onClick={(e) => { e.stopPropagation(); if (confirm('Clear all tickets and re-fetch last 30 days?')) onBackfillFreshdesk(source.id); }}
+            className="p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+            title="Backfill: clear all data and re-fetch last 30 days"
+          >
+            <ArrowClockwise size={13} weight="bold" />
+          </button>
+        )}
+        {isFreshdesk && source.status === 'ready' && onSyncFreshdesk && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onSyncFreshdesk(source.id); }}
+            className="p-1 rounded hover:bg-amber-50 text-muted-foreground hover:text-amber-600 transition-colors opacity-0 group-hover:opacity-100"
+            title="Sync latest tickets"
+          >
+            <ArrowClockwise size={13} />
+          </button>
+        )}
 
-      {/* Active Checkbox - only enabled for ready/partial sources */}
+        {/* Active Checkbox */}
       <Checkbox
         checked={source.active}
         onCheckedChange={(checked) => onToggleActive(source.id, checked === true)}
@@ -358,6 +359,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
         className={`flex-shrink-0 ${!canToggleActive ? 'opacity-30' : ''}`}
         title={canToggleActive ? (source.active ? 'Click to exclude from chat' : 'Click to include in chat') : 'Source must be processed first'}
       />
+      </div>
 
       {/* Status Icon for non-ready states */}
       {statusDisplay && source.status !== 'ready' && (
