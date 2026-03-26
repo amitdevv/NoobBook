@@ -162,7 +162,7 @@ const getStatusDisplay = (status: Source['status'], source?: Source) => {
     case 'uploaded':
       // Uploaded but not yet processing - could be cancelled or waiting
       return {
-        icon: ArrowClockwise,
+        icon: ArrowsClockwise,
         color: 'text-muted-foreground',
         animate: false,
         tooltip: 'Ready to process',
@@ -277,7 +277,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
           {/* Retry/Start option - for error or uploaded (waiting) state */}
           {(source.status === 'error' || isWaitingToProcess) && (
             <DropdownMenuItem onClick={() => onRetryProcessing(source.id)}>
-              <ArrowClockwise size={14} className="mr-2" />
+              <ArrowsClockwise size={14} className="mr-2" />
               {isWaitingToProcess ? 'Start Processing' : 'Retry Processing'}
             </DropdownMenuItem>
           )}
@@ -402,7 +402,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
               className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-accent transition-colors"
               title="Click to start processing"
             >
-              <ArrowClockwise
+              <ArrowsClockwise
                 size={16}
                 weight="bold"
                 className="text-muted-foreground group-hover:text-primary"
@@ -421,7 +421,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
                 className="text-destructive group-hover:hidden"
               />
               {/* Retry icon - hidden by default, visible on hover */}
-              <ArrowClockwise
+              <ArrowsClockwise
                 size={16}
                 weight="bold"
                 className="text-primary hidden group-hover:block"
