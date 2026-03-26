@@ -68,28 +68,46 @@ class FreshdeskSyncService:
         def _is_cancelled() -> bool:
             return task_service.is_target_cancelled(source_id)
 
-        def _on_progress(total_fetched: int) -> None:
-            """Update source processing_info with live ticket count."""
+        def _on_progress(total_fetched: int, rate_info: dict = None) -> None:
+            """Update source processing_info with live ticket count + ETA."""
             try:
                 from app.services.source_services import source_service
-                source_service.update_source(project_id, source_id, processing_info={
+                info = {
                     "syncing": True,
                     "tickets_fetched": total_fetched,
                     "mode": mode,
-                })
+                }
+                if rate_info:
+                    rate_total = rate_info.get("rate_total", 50)
+                    info["rate_limit"] = rate_total
+                    # ETA: rough estimate based on rate limit (pages/min)
+                    # Each page = 100 tickets, rate_total = pages we can do per minute
+                    if total_fetched > 0:
+                        info["pages_fetched"] = total_fetched // 100
+                source_service.update_source(project_id, source_id, processing_info=info)
             except Exception:
-                pass  # Non-critical — don't break sync for progress updates
+                pass  # Non-critical
 
         try:
-            updated_since = self._get_updated_since(source_id, mode, days_back)
             freshdesk_service.populate_caches()
 
-            # Fetch tickets with cancellation + progress support
-            raw_tickets = freshdesk_service.fetch_all_tickets(
-                updated_since=updated_since,
-                cancel_check=_is_cancelled,
-                on_progress=_on_progress,
-            )
+            # Use batched fetch for backfill (handles 50k+ tickets via date-range windows)
+            # Use single fetch for incremental (typically small number of recent tickets)
+            if mode == "backfill":
+                raw_tickets = freshdesk_service.fetch_all_tickets_batched(
+                    days_back=days_back,
+                    batch_days=5,
+                    cancel_check=_is_cancelled,
+                    on_progress=_on_progress,
+                )
+            else:
+                updated_since = self._get_updated_since(source_id, mode, days_back)
+                raw_tickets = freshdesk_service.fetch_all_tickets(
+                    updated_since=updated_since,
+                    cancel_check=_is_cancelled,
+                    on_progress=_on_progress,
+                )
+
             stats["tickets_fetched"] = len(raw_tickets)
 
             if _is_cancelled():
@@ -99,22 +117,29 @@ class FreshdeskSyncService:
             if not raw_tickets:
                 logger.info(
                     "Freshdesk sync: no tickets found (source_id=%s, mode=%s)",
-                    source_id,
-                    mode,
+                    source_id, mode,
                 )
                 return stats
 
-            # Transform and upsert tickets
+            # Transform and batch-upsert tickets (100 at a time for performance)
+            batch: List[Dict] = []
             for raw_ticket in raw_tickets:
                 try:
                     transformed = self._transform_ticket(raw_ticket, source_id)
-                    was_created = self._upsert_ticket(transformed)
-                    if was_created:
-                        stats["tickets_created"] += 1
-                    else:
-                        stats["tickets_updated"] += 1
+                    batch.append(transformed)
                 except Exception as e:
                     stats["errors"] += 1
+                    logger.error("Transform error for ticket %s: %s", raw_ticket.get("id"), e)
+
+                if len(batch) >= 100:
+                    self._upsert_batch(batch)
+                    stats["tickets_created"] += len(batch)
+                    batch = []
+
+            # Final batch
+            if batch:
+                self._upsert_batch(batch)
+                stats["tickets_created"] += len(batch)
                     logger.error(
                         "Failed to sync ticket %s: %s",
                         raw_ticket.get("id"),
@@ -378,6 +403,18 @@ class FreshdeskSyncService:
         ).execute()
 
         return is_new
+
+    def _upsert_batch(self, tickets: List[Dict[str, Any]]) -> None:
+        """Batch upsert tickets for performance (100 at a time instead of 1-by-1)."""
+        if not tickets:
+            return
+        try:
+            supabase = get_supabase()
+            supabase.table("freshdesk_tickets").upsert(
+                tickets, on_conflict="source_id,ticket_id"
+            ).execute()
+        except Exception as e:
+            logger.error("Batch upsert failed (%d tickets): %s", len(tickets), e)
 
     @staticmethod
     def _compute_hours_between(

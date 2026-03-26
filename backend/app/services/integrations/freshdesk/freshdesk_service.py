@@ -150,7 +150,12 @@ class FreshdeskService:
                 time.sleep(retry_after)
 
             if response.status_code == 200:
-                return {"success": True, "data": response.json()}
+                rate_total = int(response.headers.get("X-RateLimit-Total", 50))
+                return {
+                    "success": True, "data": response.json(),
+                    "rate_remaining": int(rate_remaining) if rate_remaining else rate_total,
+                    "rate_total": rate_total,
+                }
             elif response.status_code == 429:
                 # Rate limited — retry after waiting
                 if _retry_count < max_retries:
@@ -214,9 +219,13 @@ class FreshdeskService:
         result = self._make_request("tickets", params=params)
         if not result["success"]:
             logger.error("Failed to list tickets (page %d): %s", page, result.get("error"))
-            return []
+            return [], {}
 
-        return result.get("data", [])
+        rate_info = {
+            "rate_remaining": result.get("rate_remaining", 0),
+            "rate_total": result.get("rate_total", 50),
+        }
+        return result.get("data", []), rate_info
 
     def fetch_all_tickets(
         self,
@@ -225,24 +234,19 @@ class FreshdeskService:
         on_progress: Optional[Any] = None,
     ) -> List[Dict]:
         """
-        Fetch all tickets across all pages.
-
-        Args:
-            updated_since: ISO datetime string to filter tickets
-            cancel_check: Optional callable that returns True if sync should stop
-            on_progress: Optional callable(total_fetched) called after each page
+        Fetch all tickets across all pages with progress + cancellation support.
+        on_progress receives (total_fetched, rate_info_dict).
         """
         all_tickets: List[Dict] = []
         page = 1
         per_page = 100
 
         while True:
-            # Check for cancellation before each page
             if cancel_check and cancel_check():
                 logger.info("Freshdesk fetch cancelled after %d tickets", len(all_tickets))
                 break
 
-            tickets = self.list_tickets(
+            tickets, rate_info = self.list_tickets(
                 updated_since=updated_since,
                 page=page,
                 per_page=per_page,
@@ -253,13 +257,13 @@ class FreshdeskService:
 
             all_tickets.extend(tickets)
             logger.info(
-                "Freshdesk: fetched page %d (%d tickets, %d total)",
+                "Freshdesk: page %d (%d tickets, %d total, rate=%s/%s)",
                 page, len(tickets), len(all_tickets),
+                rate_info.get("rate_remaining"), rate_info.get("rate_total"),
             )
 
-            # Report progress
             if on_progress:
-                on_progress(len(all_tickets))
+                on_progress(len(all_tickets), rate_info)
 
             if len(tickets) < per_page:
                 break
@@ -269,6 +273,53 @@ class FreshdeskService:
             if page > 300:
                 logger.warning("Freshdesk: hit 300-page safety limit")
                 break
+
+        return all_tickets
+
+    def fetch_all_tickets_batched(
+        self,
+        days_back: int = 30,
+        batch_days: int = 5,
+        cancel_check: Optional[Any] = None,
+        on_progress: Optional[Any] = None,
+    ) -> List[Dict]:
+        """
+        Fetch tickets in date-range batches to overcome the 300-page API limit.
+
+        Educational Note: Freshdesk limits pagination to 300 pages (30k tickets).
+        For enterprise clients with 50k+ tickets/month, we split the date range
+        into smaller windows (default 5 days each) and fetch each independently.
+        This gives a theoretical max of (days_back/batch_days) × 30k tickets.
+        """
+        from datetime import datetime, timedelta, timezone
+
+        all_tickets: List[Dict] = []
+        now = datetime.now(timezone.utc)
+        num_batches = (days_back + batch_days - 1) // batch_days
+
+        for i in range(num_batches):
+            if cancel_check and cancel_check():
+                break
+
+            batch_start = now - timedelta(days=min((i + 1) * batch_days, days_back))
+            logger.info(
+                "Freshdesk batch %d/%d: fetching from %s",
+                i + 1, num_batches, batch_start.strftime("%Y-%m-%d"),
+            )
+
+            batch_tickets = self.fetch_all_tickets(
+                updated_since=batch_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                cancel_check=cancel_check,
+                on_progress=lambda total, rate: on_progress(
+                    len(all_tickets) + total, rate
+                ) if on_progress else None,
+            )
+
+            all_tickets.extend(batch_tickets)
+            logger.info(
+                "Freshdesk batch %d/%d complete: %d tickets (total: %d)",
+                i + 1, num_batches, len(batch_tickets), len(all_tickets),
+            )
 
         return all_tickets
 

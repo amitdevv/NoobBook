@@ -492,7 +492,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
     try {
       await sourcesAPI.addFreshdeskSource(projectId, name, description);
-      success('Freshdesk source added — syncing tickets...');
+      success('Freshdesk sync started — fetching last 30 days of tickets. Check the status bar for progress.');
       await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
