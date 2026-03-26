@@ -6,7 +6,7 @@
  * Uses a 3-dot dropdown menu for actions (rename, download, delete).
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   FileText,
   FilePdf,
@@ -31,7 +31,8 @@ import {
   DotsThreeVertical,
   PencilSimple,
   Stop,
-  ArrowClockwise,
+  ArrowsClockwise,
+  CloudArrowDown,
   Plug,
 } from '@phosphor-icons/react';
 import {
@@ -41,6 +42,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import { formatFileSize, isSourceViewable, type Source } from '../../lib/api/sources';
 
@@ -206,6 +216,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   const { icon: Icon, weight: iconWeight } = getSourceIcon(source);
   const statusDisplay = getStatusDisplay(source.status, source);
   const isFreshdesk = ((source.embedding_info as Record<string, string>)?.file_extension || '') === '.freshdesk';
+  const [backfillDialogOpen, setBackfillDialogOpen] = useState(false);
   // "processing" or "embedding" are actively working - show spinner and allow cancel
   const isProcessing = source.status === 'processing';
   const isEmbedding = source.status === 'embedding';
@@ -237,6 +248,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   };
 
   return (
+    <>
     <div
       onClick={handleRowClick}
       className={`grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 p-2 rounded-lg hover:bg-accent group transition-colors ${
@@ -334,11 +346,11 @@ export const SourceItem: React.FC<SourceItemProps> = ({
       <div className="flex items-center gap-1 flex-shrink-0">
         {isFreshdesk && source.status === 'ready' && onBackfillFreshdesk && (
           <button
-            onClick={(e) => { e.stopPropagation(); if (confirm('Clear all tickets and re-fetch last 30 days?')) onBackfillFreshdesk(source.id); }}
+            onClick={(e) => { e.stopPropagation(); setBackfillDialogOpen(true); }}
             className="p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-            title="Backfill: clear all data and re-fetch last 30 days"
+            title="Re-sync: clear all data and re-fetch last 30 days"
           >
-            <ArrowClockwise size={13} weight="bold" />
+            <ArrowsClockwise size={13} />
           </button>
         )}
         {isFreshdesk && source.status === 'ready' && onSyncFreshdesk && (
@@ -347,7 +359,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
             className="p-1 rounded hover:bg-amber-50 text-muted-foreground hover:text-amber-600 transition-colors opacity-0 group-hover:opacity-100"
             title="Sync latest tickets"
           >
-            <ArrowClockwise size={13} />
+            <CloudArrowDown size={13} />
           </button>
         )}
 
@@ -419,5 +431,35 @@ export const SourceItem: React.FC<SourceItemProps> = ({
         </>
       )}
     </div>
+
+      {/* Backfill Confirmation Dialog */}
+      <AlertDialog open={backfillDialogOpen} onOpenChange={setBackfillDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ArrowsClockwise size={20} className="text-amber-600" />
+              Re-sync Freshdesk Tickets
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will <strong>clear all synced tickets</strong> from the database and re-fetch the last 30 days from Freshdesk. Existing analysis data will be replaced with fresh data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="soft" onClick={() => setBackfillDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setBackfillDialogOpen(false);
+                onBackfillFreshdesk?.(source.id);
+              }}
+            >
+              Re-sync All Tickets
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
