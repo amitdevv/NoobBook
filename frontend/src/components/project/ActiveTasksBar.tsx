@@ -57,14 +57,6 @@ const TASK_ICONS: Record<string, TaskIconComponent> = {
   chat: ChatCircle,
 };
 
-/** Format elapsed time since a timestamp */
-function formatElapsed(createdAt: string): string {
-  const diff = Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000));
-  if (diff < 60) return `${diff}s`;
-  const mins = Math.floor(diff / 60);
-  const secs = diff % 60;
-  return `${mins}m ${secs.toString().padStart(2, '0')}s`;
-}
 
 const TaskRow: React.FC<{ task: ActiveTask; onCancel?: (taskId: string) => void }> = ({ task, onCancel }) => {
   const Icon = TASK_ICONS[task.type] || Gear;
