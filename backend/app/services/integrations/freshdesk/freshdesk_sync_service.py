@@ -140,11 +140,6 @@ class FreshdeskSyncService:
             if batch:
                 self._upsert_batch(batch)
                 stats["tickets_created"] += len(batch)
-                    logger.error(
-                        "Failed to sync ticket %s: %s",
-                        raw_ticket.get("id"),
-                        e,
-                    )
 
             logger.info(
                 "Freshdesk sync complete (source_id=%s): fetched=%d, created=%d, updated=%d, errors=%d",
