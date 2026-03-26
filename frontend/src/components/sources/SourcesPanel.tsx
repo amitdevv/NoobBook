@@ -236,8 +236,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       );
       for (const src of freshdeskSources) {
         try {
-          const result = await sourcesAPI.syncFreshdesk(projectId, src.id);
-          success(`Auto-synced ${result.tickets_fetched} Freshdesk tickets`);
+          await sourcesAPI.syncFreshdesk(projectId, src.id);
           await loadSources();
         } catch {
           // Silent — don't spam errors for background sync
