@@ -236,8 +236,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       );
       for (const src of freshdeskSources) {
         try {
-          const result = await sourcesAPI.syncFreshdesk(projectId, src.id);
-          success(`Auto-synced ${result.tickets_fetched} Freshdesk tickets`);
+          await sourcesAPI.syncFreshdesk(projectId, src.id);
           await loadSources();
         } catch {
           // Silent — don't spam errors for background sync
@@ -492,7 +491,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
     try {
       await sourcesAPI.addFreshdeskSource(projectId, name, description);
-      success('Freshdesk source added — syncing tickets...');
+      success('Freshdesk sync started — fetching last 30 days of tickets. Check the status bar for progress.');
       await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
@@ -512,12 +511,23 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
    */
   const handleSyncFreshdesk = async (sourceId: string) => {
     try {
-      const result = await sourcesAPI.syncFreshdesk(projectId, sourceId);
-      success(`Synced ${result.tickets_fetched} tickets from Freshdesk`);
+      await sourcesAPI.syncFreshdesk(projectId, sourceId);
+      success('Freshdesk sync started — check status bar for progress');
       await loadSources();
     } catch (err: unknown) {
       log.error({ err }, 'failed to sync Freshdesk');
       error('Failed to sync Freshdesk tickets');
+    }
+  };
+
+  const handleBackfillFreshdesk = async (sourceId: string) => {
+    try {
+      await sourcesAPI.backfillFreshdesk(projectId, sourceId);
+      success('Freshdesk backfill started — check status bar for progress');
+      await loadSources();
+    } catch (err: unknown) {
+      log.error({ err }, 'failed to backfill Freshdesk');
+      error('Failed to backfill Freshdesk tickets');
     }
   };
 
@@ -774,6 +784,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
             onRetryProcessing={handleRetryProcessing}
             onViewProcessed={handleViewProcessed}
             onSyncFreshdesk={handleSyncFreshdesk}
+            onBackfillFreshdesk={handleBackfillFreshdesk}
           />
 
           <SourcesFooter sourcesCount={sourcesCount} totalSize={totalSize} />

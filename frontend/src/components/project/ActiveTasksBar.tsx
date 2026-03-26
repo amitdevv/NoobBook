@@ -15,10 +15,12 @@ import {
   ChatCircle,
   Gear,
   CircleNotch,
+  StopCircle,
   CheckCircle,
   ArrowRight,
 } from '@phosphor-icons/react';
 import { API_BASE_URL } from '@/lib/api/client';
+import { sourcesAPI } from '@/lib/api/sources';
 import axios from 'axios';
 
 interface ActiveTask {
@@ -55,26 +57,12 @@ const TASK_ICONS: Record<string, TaskIconComponent> = {
   chat: ChatCircle,
 };
 
-/** Format elapsed time since a timestamp */
-function formatElapsed(createdAt: string): string {
-  const diff = Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000));
-  if (diff < 60) return `${diff}s`;
-  const mins = Math.floor(diff / 60);
-  const secs = diff % 60;
-  return `${mins}m ${secs.toString().padStart(2, '0')}s`;
-}
 
-const TaskRow: React.FC<{ task: ActiveTask }> = ({ task }) => {
-  const [elapsed, setElapsed] = useState(() => formatElapsed(task.created_at));
+const TaskRow: React.FC<{ task: ActiveTask; onCancel?: (taskId: string) => void }> = ({ task, onCancel }) => {
   const Icon = TASK_ICONS[task.type] || Gear;
 
-  useEffect(() => {
-    const id = setInterval(() => setElapsed(formatElapsed(task.created_at)), 1000);
-    return () => clearInterval(id);
-  }, [task.created_at]);
-
   return (
-    <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-stone-50 border border-stone-100">
+    <div className="group/task flex items-center gap-2.5 px-3 py-2 rounded-lg bg-stone-50 border border-stone-100">
       <div className="flex-shrink-0 w-7 h-7 rounded-md bg-amber-50 border border-amber-200 flex items-center justify-center">
         <Icon size={14} className="text-amber-700" />
       </div>
@@ -82,10 +70,18 @@ const TaskRow: React.FC<{ task: ActiveTask }> = ({ task }) => {
         <p className="text-xs font-medium text-stone-800 truncate">{task.label}</p>
         <p className="text-[11px] text-stone-500 truncate">{task.detail}</p>
       </div>
-      <span className="text-[11px] text-stone-400 font-mono tabular-nums flex-shrink-0">
-        {elapsed}
-      </span>
-      <CircleNotch size={14} className="animate-spin text-amber-600 flex-shrink-0" />
+      {onCancel && task.type === 'source' ? (
+        <button
+          onClick={() => onCancel(task.id)}
+          className="flex-shrink-0 text-stone-300 group-hover/task:text-red-500 transition-colors"
+          title="Stop processing"
+        >
+          <StopCircle size={16} weight="fill" className="hidden group-hover/task:block" />
+          <CircleNotch size={14} className="animate-spin text-amber-600 block group-hover/task:hidden" />
+        </button>
+      ) : (
+        <CircleNotch size={14} className="animate-spin text-amber-600 flex-shrink-0" />
+      )}
     </div>
   );
 };
@@ -265,7 +261,15 @@ export const ActiveTasksBar: React.FC<ActiveTasksBarProps> = ({
           <div className="px-2.5 pb-2.5 space-y-1.5 max-h-[350px] overflow-y-auto">
             {/* Active tasks */}
             {allTasks.map((task) => (
-              <TaskRow key={task.id} task={task} />
+              <TaskRow
+                key={task.id}
+                task={task}
+                onCancel={task.type === 'source' ? async (sourceId) => {
+                  try {
+                    await sourcesAPI.cancelProcessing(projectId, sourceId);
+                  } catch { /* ignore */ }
+                } : undefined}
+              />
             ))}
             {/* Completed chats with "Open" button */}
             {visibleCompletedChats.map((chat) => (

@@ -6,7 +6,7 @@
  * Uses a 3-dot dropdown menu for actions (rename, download, delete).
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   FileText,
   FilePdf,
@@ -31,7 +31,8 @@ import {
   DotsThreeVertical,
   PencilSimple,
   Stop,
-  ArrowClockwise,
+  ArrowsClockwise,
+  CloudArrowDown,
   Plug,
 } from '@phosphor-icons/react';
 import {
@@ -41,6 +42,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import { formatFileSize, isSourceViewable, type Source } from '../../lib/api/sources';
 
@@ -54,6 +64,7 @@ interface SourceItemProps {
   onRetryProcessing: (sourceId: string) => void;
   onViewProcessed: (sourceId: string) => void;
   onSyncFreshdesk?: (sourceId: string) => void;
+  onBackfillFreshdesk?: (sourceId: string) => void;
 }
 
 /**
@@ -151,7 +162,7 @@ const getStatusDisplay = (status: Source['status'], source?: Source) => {
     case 'uploaded':
       // Uploaded but not yet processing - could be cancelled or waiting
       return {
-        icon: ArrowClockwise,
+        icon: ArrowsClockwise,
         color: 'text-muted-foreground',
         animate: false,
         tooltip: 'Ready to process',
@@ -200,10 +211,12 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   onRetryProcessing,
   onViewProcessed,
   onSyncFreshdesk,
+  onBackfillFreshdesk,
 }) => {
   const { icon: Icon, weight: iconWeight } = getSourceIcon(source);
   const statusDisplay = getStatusDisplay(source.status, source);
   const isFreshdesk = ((source.embedding_info as Record<string, string>)?.file_extension || '') === '.freshdesk';
+  const [backfillDialogOpen, setBackfillDialogOpen] = useState(false);
   // "processing" or "embedding" are actively working - show spinner and allow cancel
   const isProcessing = source.status === 'processing';
   const isEmbedding = source.status === 'embedding';
@@ -235,6 +248,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   };
 
   return (
+    <>
     <div
       onClick={handleRowClick}
       className={`grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 p-2 rounded-lg hover:bg-accent group transition-colors ${
@@ -263,7 +277,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
           {/* Retry/Start option - for error or uploaded (waiting) state */}
           {(source.status === 'error' || isWaitingToProcess) && (
             <DropdownMenuItem onClick={() => onRetryProcessing(source.id)}>
-              <ArrowClockwise size={14} className="mr-2" />
+              <ArrowsClockwise size={14} className="mr-2" />
               {isWaitingToProcess ? 'Start Processing' : 'Retry Processing'}
             </DropdownMenuItem>
           )}
@@ -328,18 +342,28 @@ export const SourceItem: React.FC<SourceItemProps> = ({
         </div>
       </div>
 
-      {/* Freshdesk Sync Button */}
-      {isFreshdesk && source.status === 'ready' && onSyncFreshdesk && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onSyncFreshdesk(source.id); }}
-          className="flex-shrink-0 p-1 rounded hover:bg-amber-50 text-muted-foreground hover:text-amber-600 transition-colors"
-          title="Sync latest tickets from Freshdesk"
-        >
-          <ArrowClockwise size={14} />
-        </button>
-      )}
+      {/* Freshdesk buttons + Checkbox in a single flex container */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {isFreshdesk && source.status === 'ready' && onBackfillFreshdesk && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setBackfillDialogOpen(true); }}
+            className="p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+            title="Re-sync: clear all data and re-fetch last 30 days"
+          >
+            <ArrowsClockwise size={13} />
+          </button>
+        )}
+        {isFreshdesk && source.status === 'ready' && onSyncFreshdesk && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onSyncFreshdesk(source.id); }}
+            className="p-1 rounded hover:bg-amber-50 text-muted-foreground hover:text-amber-600 transition-colors opacity-0 group-hover:opacity-100"
+            title="Sync latest tickets"
+          >
+            <CloudArrowDown size={13} />
+          </button>
+        )}
 
-      {/* Active Checkbox - only enabled for ready/partial sources */}
+        {/* Active Checkbox */}
       <Checkbox
         checked={source.active}
         onCheckedChange={(checked) => onToggleActive(source.id, checked === true)}
@@ -347,6 +371,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
         className={`flex-shrink-0 ${!canToggleActive ? 'opacity-30' : ''}`}
         title={canToggleActive ? (source.active ? 'Click to exclude from chat' : 'Click to include in chat') : 'Source must be processed first'}
       />
+      </div>
 
       {/* Status Icon for non-ready states */}
       {statusDisplay && source.status !== 'ready' && (
@@ -377,7 +402,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
               className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-accent transition-colors"
               title="Click to start processing"
             >
-              <ArrowClockwise
+              <ArrowsClockwise
                 size={16}
                 weight="bold"
                 className="text-muted-foreground group-hover:text-primary"
@@ -396,7 +421,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
                 className="text-destructive group-hover:hidden"
               />
               {/* Retry icon - hidden by default, visible on hover */}
-              <ArrowClockwise
+              <ArrowsClockwise
                 size={16}
                 weight="bold"
                 className="text-primary hidden group-hover:block"
@@ -406,5 +431,35 @@ export const SourceItem: React.FC<SourceItemProps> = ({
         </>
       )}
     </div>
+
+      {/* Backfill Confirmation Dialog */}
+      <AlertDialog open={backfillDialogOpen} onOpenChange={setBackfillDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ArrowsClockwise size={20} className="text-amber-600" />
+              Re-sync Freshdesk Tickets
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will <strong>clear all synced tickets</strong> and re-fetch the last 30 days from Freshdesk. If you only need the latest updates, use the <strong>sync button</strong> instead — it fetches only new and updated tickets without clearing existing data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="soft" onClick={() => setBackfillDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setBackfillDialogOpen(false);
+                onBackfillFreshdesk?.(source.id);
+              }}
+            >
+              Re-sync All Tickets
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
