@@ -67,13 +67,7 @@ function formatElapsed(createdAt: string): string {
 }
 
 const TaskRow: React.FC<{ task: ActiveTask; onCancel?: (taskId: string) => void }> = ({ task, onCancel }) => {
-  const [elapsed, setElapsed] = useState(() => formatElapsed(task.created_at));
   const Icon = TASK_ICONS[task.type] || Gear;
-
-  useEffect(() => {
-    const id = setInterval(() => setElapsed(formatElapsed(task.created_at)), 1000);
-    return () => clearInterval(id);
-  }, [task.created_at]);
 
   return (
     <div className="group/task flex items-center gap-2.5 px-3 py-2 rounded-lg bg-stone-50 border border-stone-100">
@@ -84,9 +78,6 @@ const TaskRow: React.FC<{ task: ActiveTask; onCancel?: (taskId: string) => void 
         <p className="text-xs font-medium text-stone-800 truncate">{task.label}</p>
         <p className="text-[11px] text-stone-500 truncate">{task.detail}</p>
       </div>
-      <span className="text-[11px] text-stone-400 font-mono tabular-nums flex-shrink-0">
-        {elapsed}
-      </span>
       {onCancel && task.type === 'source' ? (
         <button
           onClick={() => onCancel(task.id)}
