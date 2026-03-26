@@ -363,38 +363,63 @@ def add_freshdesk_source_endpoint(project_id: str):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+def _run_freshdesk_sync(project_id: str, source_id: str, mode: str, days_back: int, clear_first: bool = False):
+    """
+    Background worker for Freshdesk sync/backfill.
+    Sets source to processing, runs sync, then back to ready.
+    """
+    from app.services.integrations.freshdesk.freshdesk_sync_service import freshdesk_sync_service
+    from app.services.source_services import source_service
+
+    try:
+        if clear_first:
+            from app.services.integrations.supabase import get_supabase
+            get_supabase().table("freshdesk_tickets").delete().eq("source_id", source_id).execute()
+
+        source_service.update_source(project_id, source_id, status="processing",
+                                     processing_info={"syncing": True, "mode": mode, "tickets_fetched": 0})
+
+        stats = freshdesk_sync_service.sync_tickets(
+            project_id=project_id, source_id=source_id, mode=mode, days_back=days_back,
+        )
+
+        # Get final ticket count
+        ticket_stats = freshdesk_sync_service.get_sync_stats(source_id)
+
+        source_service.update_source(project_id, source_id, status="ready",
+                                     processing_info={
+                                         "syncing": False,
+                                         "last_sync_mode": mode,
+                                         "tickets_fetched": stats.get("tickets_fetched", 0),
+                                         "tickets_synced": ticket_stats.get("ticket_count", 0),
+                                     })
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error("Freshdesk sync failed: %s", e)
+        from app.services.source_services import source_service
+        source_service.update_source(project_id, source_id, status="ready",
+                                     processing_info={"syncing": False, "error": str(e)})
+
+
 @sources_bp.route('/projects/<project_id>/sources/<source_id>/freshdesk-sync', methods=['POST'])
 def sync_freshdesk_source(project_id: str, source_id: str):
-    """
-    Trigger an incremental sync for an existing Freshdesk source.
-
-    Educational Note: After the initial backfill, users can trigger
-    incremental syncs to pull in new/updated tickets since the last sync.
-
-    Request Body:
-        {
-            "mode": "incremental",  # optional, default "incremental"
-            "days_back": 7          # optional, only used for "backfill" mode
-        }
-    """
+    """Trigger an incremental sync as a background task (shows progress in ActiveTasksBar)."""
     try:
-        from app.services.integrations.freshdesk.freshdesk_sync_service import freshdesk_sync_service
+        from app.services.background_services import task_service
 
         data = request.get_json(silent=True) or {}
         mode = data.get('mode', 'incremental')
         days_back = data.get('days_back', 30)
 
-        stats = freshdesk_sync_service.sync_tickets(
-            project_id=project_id,
-            source_id=source_id,
-            mode=mode,
-            days_back=days_back,
+        task_service.submit_task(
+            "freshdesk_sync", source_id,
+            _run_freshdesk_sync,
+            project_id, source_id, mode, days_back,
         )
 
         return jsonify({
             'success': True,
-            'stats': stats,
-            'message': f'Freshdesk sync complete: {stats.get("tickets_fetched", 0)} tickets processed'
+            'message': f'Freshdesk {mode} sync started'
         }), 200
 
     except Exception as e:
@@ -404,29 +429,19 @@ def sync_freshdesk_source(project_id: str, source_id: str):
 
 @sources_bp.route('/projects/<project_id>/sources/<source_id>/freshdesk-backfill', methods=['POST'])
 def backfill_freshdesk_source(project_id: str, source_id: str):
-    """
-    Clear all synced Freshdesk tickets and re-fetch last 30 days.
-    """
+    """Clear all tickets and re-fetch last 30 days as a background task."""
     try:
-        from app.services.integrations.freshdesk.freshdesk_sync_service import freshdesk_sync_service
-        from app.services.integrations.supabase import get_supabase
+        from app.services.background_services import task_service
 
-        # Step 1: Delete all existing tickets for this source
-        supabase = get_supabase()
-        supabase.table("freshdesk_tickets").delete().eq("source_id", source_id).execute()
-
-        # Step 2: Re-sync last 30 days
-        stats = freshdesk_sync_service.sync_tickets(
-            project_id=project_id,
-            source_id=source_id,
-            mode="backfill",
-            days_back=30,
+        task_service.submit_task(
+            "freshdesk_backfill", source_id,
+            _run_freshdesk_sync,
+            project_id, source_id, "backfill", 30, True,
         )
 
         return jsonify({
             'success': True,
-            'stats': stats,
-            'message': f'Backfill complete: {stats.get("tickets_fetched", 0)} tickets synced'
+            'message': 'Freshdesk backfill started'
         }), 200
 
     except Exception as e:

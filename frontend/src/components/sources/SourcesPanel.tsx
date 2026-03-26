@@ -512,8 +512,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
    */
   const handleSyncFreshdesk = async (sourceId: string) => {
     try {
-      const result = await sourcesAPI.syncFreshdesk(projectId, sourceId);
-      success(`Synced ${result.tickets_fetched} tickets from Freshdesk`);
+      await sourcesAPI.syncFreshdesk(projectId, sourceId);
+      success('Freshdesk sync started — check status bar for progress');
       await loadSources();
     } catch (err: unknown) {
       log.error({ err }, 'failed to sync Freshdesk');
@@ -523,8 +523,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   const handleBackfillFreshdesk = async (sourceId: string) => {
     try {
-      const result = await sourcesAPI.backfillFreshdesk(projectId, sourceId);
-      success(`Backfilled ${result.tickets_fetched} tickets from Freshdesk`);
+      await sourcesAPI.backfillFreshdesk(projectId, sourceId);
+      success('Freshdesk backfill started — check status bar for progress');
       await loadSources();
     } catch (err: unknown) {
       log.error({ err }, 'failed to backfill Freshdesk');
