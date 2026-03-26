@@ -441,7 +441,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
               Re-sync Freshdesk Tickets
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will <strong>clear all synced tickets</strong> from the database and re-fetch the last 30 days from Freshdesk. Existing analysis data will be replaced with fresh data.
+              This will <strong>clear all synced tickets</strong> and re-fetch the last 30 days from Freshdesk. If you only need the latest updates, use the <strong>sync button</strong> instead — it fetches only new and updated tickets without clearing existing data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
