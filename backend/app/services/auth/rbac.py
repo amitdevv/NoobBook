@@ -109,7 +109,8 @@ def get_request_identity() -> RequestIdentity:
                     role=role,
                     is_authenticated=True,
                 )
-        except Exception as e:
+        except Exception:
+            pass  # Fall through to dev/single-user mode
 
     # 2) Dev headers (useful until full auth UI is wired)
     header_user_id = (request.headers.get("X-NoobBook-User-Id") or "").strip()
