@@ -424,6 +424,21 @@ class SourcesAPI {
     }
   }
 
+  async backfillFreshdesk(projectId: string, sourceId: string): Promise<{ tickets_fetched: number; message: string }> {
+    try {
+      const resp = await axios.post(
+        `${API_BASE_URL}/projects/${projectId}/sources/${sourceId}/freshdesk-backfill`
+      );
+      return {
+        tickets_fetched: resp.data.stats?.tickets_fetched || 0,
+        message: resp.data.message || 'Backfill complete',
+      };
+    } catch (error) {
+      log.error({ err: error }, 'failed to backfill Freshdesk');
+      throw error;
+    }
+  }
+
   /**
    * Cancel processing for a source
    * Educational Note: This stops any running tasks and sets status back to "uploaded"

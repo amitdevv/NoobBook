@@ -521,6 +521,17 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }
   };
 
+  const handleBackfillFreshdesk = async (sourceId: string) => {
+    try {
+      const result = await sourcesAPI.backfillFreshdesk(projectId, sourceId);
+      success(`Backfilled ${result.tickets_fetched} tickets from Freshdesk`);
+      await loadSources();
+    } catch (err: unknown) {
+      log.error({ err }, 'failed to backfill Freshdesk');
+      error('Failed to backfill Freshdesk tickets');
+    }
+  };
+
   /**
    * Handle source deletion
    */
@@ -774,6 +785,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
             onRetryProcessing={handleRetryProcessing}
             onViewProcessed={handleViewProcessed}
             onSyncFreshdesk={handleSyncFreshdesk}
+            onBackfillFreshdesk={handleBackfillFreshdesk}
           />
 
           <SourcesFooter sourcesCount={sourcesCount} totalSize={totalSize} />

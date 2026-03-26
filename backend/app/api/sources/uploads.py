@@ -402,6 +402,38 @@ def sync_freshdesk_source(project_id: str, source_id: str):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@sources_bp.route('/projects/<project_id>/sources/<source_id>/freshdesk-backfill', methods=['POST'])
+def backfill_freshdesk_source(project_id: str, source_id: str):
+    """
+    Clear all synced Freshdesk tickets and re-fetch last 30 days.
+    """
+    try:
+        from app.services.integrations.freshdesk.freshdesk_sync_service import freshdesk_sync_service
+        from app.services.integrations.supabase import get_supabase
+
+        # Step 1: Delete all existing tickets for this source
+        supabase = get_supabase()
+        supabase.table("freshdesk_tickets").delete().eq("source_id", source_id).execute()
+
+        # Step 2: Re-sync last 30 days
+        stats = freshdesk_sync_service.sync_tickets(
+            project_id=project_id,
+            source_id=source_id,
+            mode="backfill",
+            days_back=30,
+        )
+
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'message': f'Backfill complete: {stats.get("tickets_fetched", 0)} tickets synced'
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Error backfilling Freshdesk source: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @sources_bp.route('/projects/<project_id>/sources/mcp', methods=['POST'])
 def add_mcp_source(project_id: str):
     """

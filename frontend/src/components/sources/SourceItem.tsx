@@ -54,6 +54,7 @@ interface SourceItemProps {
   onRetryProcessing: (sourceId: string) => void;
   onViewProcessed: (sourceId: string) => void;
   onSyncFreshdesk?: (sourceId: string) => void;
+  onBackfillFreshdesk?: (sourceId: string) => void;
 }
 
 /**
@@ -200,6 +201,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   onRetryProcessing,
   onViewProcessed,
   onSyncFreshdesk,
+  onBackfillFreshdesk,
 }) => {
   const { icon: Icon, weight: iconWeight } = getSourceIcon(source);
   const statusDisplay = getStatusDisplay(source.status, source);
@@ -329,6 +331,15 @@ export const SourceItem: React.FC<SourceItemProps> = ({
       </div>
 
       {/* Freshdesk Sync Button */}
+      {isFreshdesk && source.status === 'ready' && onBackfillFreshdesk && (
+        <button
+          onClick={(e) => { e.stopPropagation(); if (confirm('Clear all tickets and re-fetch last 30 days?')) onBackfillFreshdesk(source.id); }}
+          className="flex-shrink-0 p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors"
+          title="Backfill: clear all data and re-fetch last 30 days"
+        >
+          <ArrowClockwise size={14} weight="bold" />
+        </button>
+      )}
       {isFreshdesk && source.status === 'ready' && onSyncFreshdesk && (
         <button
           onClick={(e) => { e.stopPropagation(); onSyncFreshdesk(source.id); }}

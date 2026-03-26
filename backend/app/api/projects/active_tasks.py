@@ -37,11 +37,19 @@ def get_active_tasks(project_id: str):
                     # to catch the brief window before processing starts
                     if status == "uploaded":
                         continue
+                    # Show ticket count for Freshdesk sources during sync
+                    processing_info = src.get("processing_info") or {}
+                    tickets_fetched = processing_info.get("tickets_fetched")
+                    if tickets_fetched is not None:
+                        detail = f"Fetched {tickets_fetched} tickets..."
+                    else:
+                        detail = f"{'Embedding' if status == 'embedding' else 'Processing'}..."
+
                     tasks.append({
                         "id": src.get("id"),
                         "type": "source",
                         "label": src.get("name", "Source"),
-                        "detail": f"{'Embedding' if status == 'embedding' else 'Processing'}...",
+                        "detail": detail,
                         "status": status,
                         "created_at": src.get("created_at"),
                     })

@@ -110,21 +110,15 @@ class FreshdeskService:
         self,
         endpoint: str,
         params: Optional[Dict] = None,
+        _retry_count: int = 0,
     ) -> Dict[str, Any]:
         """
-        Make a GET request to the Freshdesk API.
+        Make a GET request to the Freshdesk API with automatic rate-limit retry.
 
         Educational Note: Freshdesk API uses Basic Auth with the API key as
         username and 'X' as password. Rate limits are communicated via the
-        X-RateLimit-Remaining header. When it reaches 0, we wait until the
-        rate limit resets (indicated by the Retry-After header).
-
-        Args:
-            endpoint: API endpoint (relative to base_url, e.g., "tickets")
-            params: Query parameters
-
-        Returns:
-            Dict with 'success' flag and either 'data' or 'error'
+        X-RateLimit-Remaining header. On 429 responses, we sleep and retry
+        automatically (up to 3 times) instead of failing.
         """
         self._load_config()
 
@@ -133,6 +127,8 @@ class FreshdeskService:
                 "success": False,
                 "error": "Freshdesk not configured. Please add FRESHDESK_API_KEY and FRESHDESK_DOMAIN to .env",
             }
+
+        max_retries = 3
 
         try:
             url = f"{self._base_url}/{endpoint}"
@@ -143,54 +139,42 @@ class FreshdeskService:
                 url, auth=auth, headers=headers, params=params, timeout=30
             )
 
-            # Handle rate limiting
-            # Educational Note: Freshdesk returns X-RateLimit-Remaining header.
-            # When exhausted, we should wait for the Retry-After period.
+            # Preemptive rate limit pause — sleep before we exhaust the limit
             rate_remaining = response.headers.get("X-RateLimit-Remaining")
-            if rate_remaining is not None and int(rate_remaining) <= 1:
+            if rate_remaining is not None and int(rate_remaining) <= 5:
                 retry_after = int(response.headers.get("Retry-After", "30"))
                 logger.warning(
-                    "Freshdesk rate limit nearly exhausted. Waiting %ds.",
-                    retry_after,
+                    "Freshdesk rate limit low (%s remaining). Sleeping %ds.",
+                    rate_remaining, retry_after,
                 )
                 time.sleep(retry_after)
 
             if response.status_code == 200:
                 return {"success": True, "data": response.json()}
+            elif response.status_code == 429:
+                # Rate limited — retry after waiting
+                if _retry_count < max_retries:
+                    retry_after = int(response.headers.get("Retry-After", "60"))
+                    logger.warning(
+                        "Freshdesk rate limited (429). Sleeping %ds then retrying (%d/%d).",
+                        retry_after, _retry_count + 1, max_retries,
+                    )
+                    time.sleep(retry_after)
+                    return self._make_request(endpoint, params, _retry_count=_retry_count + 1)
+                return {"success": False, "error": "Rate limited after max retries."}
             elif response.status_code == 401:
-                return {
-                    "success": False,
-                    "error": "Authentication failed. Check your FRESHDESK_API_KEY.",
-                }
+                return {"success": False, "error": "Authentication failed. Check your FRESHDESK_API_KEY."}
             elif response.status_code == 403:
-                return {
-                    "success": False,
-                    "error": "Permission denied. Check your Freshdesk permissions.",
-                }
+                return {"success": False, "error": "Permission denied. Check your Freshdesk permissions."}
             elif response.status_code == 404:
                 return {"success": False, "error": f"Not found: {endpoint}"}
-            elif response.status_code == 429:
-                retry_after = int(response.headers.get("Retry-After", "60"))
-                return {
-                    "success": False,
-                    "error": f"Rate limited. Retry after {retry_after}s.",
-                }
             else:
-                return {
-                    "success": False,
-                    "error": f"Freshdesk API error: {response.status_code} - {response.text[:200]}",
-                }
+                return {"success": False, "error": f"Freshdesk API error: {response.status_code} - {response.text[:200]}"}
 
         except requests.exceptions.Timeout:
-            return {
-                "success": False,
-                "error": "Request timed out. Freshdesk server might be slow or unreachable.",
-            }
+            return {"success": False, "error": "Request timed out."}
         except requests.exceptions.ConnectionError:
-            return {
-                "success": False,
-                "error": "Connection failed. Check FRESHDESK_DOMAIN and network connectivity.",
-            }
+            return {"success": False, "error": "Connection failed. Check FRESHDESK_DOMAIN."}
         except Exception as e:
             return {"success": False, "error": f"Request failed: {str(e)}"}
 
@@ -235,26 +219,29 @@ class FreshdeskService:
         return result.get("data", [])
 
     def fetch_all_tickets(
-        self, updated_since: Optional[str] = None
+        self,
+        updated_since: Optional[str] = None,
+        cancel_check: Optional[Any] = None,
+        on_progress: Optional[Any] = None,
     ) -> List[Dict]:
         """
         Fetch all tickets across all pages.
 
-        Educational Note: Freshdesk paginates at 100 tickets per page.
-        We iterate through pages until we get an empty page or fewer
-        results than the page size.
-
         Args:
             updated_since: ISO datetime string to filter tickets
-
-        Returns:
-            Combined list of all ticket dicts
+            cancel_check: Optional callable that returns True if sync should stop
+            on_progress: Optional callable(total_fetched) called after each page
         """
         all_tickets: List[Dict] = []
         page = 1
         per_page = 100
 
         while True:
+            # Check for cancellation before each page
+            if cancel_check and cancel_check():
+                logger.info("Freshdesk fetch cancelled after %d tickets", len(all_tickets))
+                break
+
             tickets = self.list_tickets(
                 updated_since=updated_since,
                 page=page,
@@ -267,18 +254,18 @@ class FreshdeskService:
             all_tickets.extend(tickets)
             logger.info(
                 "Freshdesk: fetched page %d (%d tickets, %d total)",
-                page,
-                len(tickets),
-                len(all_tickets),
+                page, len(tickets), len(all_tickets),
             )
 
-            # If we got fewer than per_page, we've reached the last page
+            # Report progress
+            if on_progress:
+                on_progress(len(all_tickets))
+
             if len(tickets) < per_page:
                 break
 
             page += 1
 
-            # Safety limit: Freshdesk API caps at 300 pages
             if page > 300:
                 logger.warning("Freshdesk: hit 300-page safety limit")
                 break

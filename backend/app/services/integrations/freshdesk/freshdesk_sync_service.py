@@ -46,43 +46,55 @@ class FreshdeskSyncService:
         """
         Sync tickets from Freshdesk into the local freshdesk_tickets table.
 
-        Args:
-            project_id: The project UUID
-            source_id: The source UUID (ties tickets to a specific source)
-            mode: 'backfill' (last N days) or 'incremental' (since last sync)
-            days_back: Number of days to look back for backfill mode
-
-        Returns:
-            Stats dict: {tickets_fetched, tickets_created, tickets_updated, errors}
+        Supports cancellation via task_service.is_target_cancelled() and
+        reports progress by updating the source's processing_info.
         """
+        from app.services.background_services import task_service
+
         self._current_project_id = project_id
 
         if not freshdesk_service.is_configured():
             return {
-                "tickets_fetched": 0,
-                "tickets_created": 0,
-                "tickets_updated": 0,
-                "errors": 1,
+                "tickets_fetched": 0, "tickets_created": 0,
+                "tickets_updated": 0, "errors": 1,
                 "error_message": "Freshdesk not configured",
             }
 
         stats = {
-            "tickets_fetched": 0,
-            "tickets_created": 0,
-            "tickets_updated": 0,
-            "errors": 0,
+            "tickets_fetched": 0, "tickets_created": 0,
+            "tickets_updated": 0, "errors": 0,
         }
 
-        try:
-            # Determine the updated_since filter based on sync mode
-            updated_since = self._get_updated_since(source_id, mode, days_back)
+        def _is_cancelled() -> bool:
+            return task_service.is_target_cancelled(source_id)
 
-            # Populate caches for name resolution before fetching tickets
+        def _on_progress(total_fetched: int) -> None:
+            """Update source processing_info with live ticket count."""
+            try:
+                from app.services.source_services import source_service
+                source_service.update_source(project_id, source_id, processing_info={
+                    "syncing": True,
+                    "tickets_fetched": total_fetched,
+                    "mode": mode,
+                })
+            except Exception:
+                pass  # Non-critical — don't break sync for progress updates
+
+        try:
+            updated_since = self._get_updated_since(source_id, mode, days_back)
             freshdesk_service.populate_caches()
 
-            # Fetch all tickets from Freshdesk
-            raw_tickets = freshdesk_service.fetch_all_tickets(updated_since=updated_since)
+            # Fetch tickets with cancellation + progress support
+            raw_tickets = freshdesk_service.fetch_all_tickets(
+                updated_since=updated_since,
+                cancel_check=_is_cancelled,
+                on_progress=_on_progress,
+            )
             stats["tickets_fetched"] = len(raw_tickets)
+
+            if _is_cancelled():
+                stats["cancelled"] = True
+                return stats
 
             if not raw_tickets:
                 logger.info(
