@@ -68,11 +68,14 @@ class FreshdeskSyncService:
         def _is_cancelled() -> bool:
             return task_service.is_target_cancelled(source_id)
 
+        _sync_start = time.time()
+
         def _on_progress(total_fetched: int, rate_info: dict = None) -> None:
             """Update source processing_info with live ticket count + ETA."""
             try:
                 from app.services.source_services import source_service
-                info = {
+                elapsed = time.time() - _sync_start
+                info: Dict[str, Any] = {
                     "syncing": True,
                     "tickets_fetched": total_fetched,
                     "mode": mode,
@@ -80,10 +83,16 @@ class FreshdeskSyncService:
                 if rate_info:
                     rate_total = rate_info.get("rate_total", 50)
                     info["rate_limit"] = rate_total
-                    # ETA: rough estimate based on rate limit (pages/min)
-                    # Each page = 100 tickets, rate_total = pages we can do per minute
-                    if total_fetched > 0:
-                        info["pages_fetched"] = total_fetched // 100
+                    # ETA calculation: based on actual throughput so far
+                    # tickets_per_second = total_fetched / elapsed
+                    # We can't know total tickets ahead of time, so estimate
+                    # based on rate limit: at rate_total req/min with 100 tickets/page,
+                    # max throughput = rate_total * 100 tickets/min
+                    # For now, show pages fetched and rate — the elapsed timer
+                    # in the frontend already shows how long it's been running
+                    if elapsed > 2 and total_fetched > 0:
+                        tickets_per_sec = total_fetched / elapsed
+                        info["tickets_per_sec"] = round(tickets_per_sec, 1)
                 source_service.update_source(project_id, source_id, processing_info=info)
             except Exception:
                 pass  # Non-critical
