@@ -452,10 +452,10 @@ class FreshdeskSyncService:
 
     _auto_sync_threads: Dict[str, threading.Thread] = {}
     _auto_sync_stop_flags: Dict[str, threading.Event] = {}
-    AUTO_SYNC_INTERVAL_SECONDS = 15 * 60  # 15 minutes
+    AUTO_SYNC_INTERVAL_SECONDS = 30 * 60  # 30 minutes
 
     def start_auto_sync(self, project_id: str, source_id: str) -> None:
-        """Start a background thread that syncs tickets every 15 minutes."""
+        """Start a background thread that syncs tickets every 30 minutes."""
         key = f"{project_id}:{source_id}"
         if key in self._auto_sync_threads and self._auto_sync_threads[key].is_alive():
             logger.info("Auto-sync already running for %s", key)
