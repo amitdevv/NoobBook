@@ -31,7 +31,7 @@ class DatabaseAnalyzerAgent:
     """
 
     AGENT_NAME = "database_analyzer_agent"
-    MAX_ITERATIONS = 20
+    MAX_ITERATIONS = 40
     TERMINATION_TOOL = "return_database_result"
 
     def __init__(self) -> None:
