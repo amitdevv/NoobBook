@@ -284,16 +284,36 @@ class FreshdeskService:
         on_progress: Optional[Any] = None,
     ) -> List[Dict]:
         """
-        Fetch tickets in date-range batches to overcome the 300-page API limit.
+        Smart fetch: try a single fetch first, only use date-range batching
+        if we hit the 300-page limit (30k+ tickets).
 
-        Educational Note: Freshdesk limits pagination to 300 pages (30k tickets).
-        For enterprise clients with 50k+ tickets/month, we split the date range
-        into smaller windows (default 5 days each) and fetch each independently.
-        This gives a theoretical max of (days_back/batch_days) × 30k tickets.
+        Educational Note: Freshdesk's updated_since is a >= filter with no
+        upper bound, so naively splitting into date-range batches causes
+        massive duplication (each batch overlaps with all later batches).
+        Instead, we only split when a single fetch proves insufficient.
         """
         from datetime import datetime, timedelta, timezone
 
-        all_tickets: List[Dict] = []
+        # First, try a single fetch for the full date range
+        since = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        all_tickets = self.fetch_all_tickets(
+            updated_since=since,
+            cancel_check=cancel_check,
+            on_progress=on_progress,
+        )
+
+        # If we didn't hit the 300-page limit, we got everything
+        if len(all_tickets) < 30000:
+            return all_tickets
+
+        # Enterprise path: hit the limit, need date-range batching
+        # Deduplicate by ticket ID since batches overlap
+        logger.warning(
+            "Freshdesk: hit 30k limit with single fetch, switching to date-range batching"
+        )
+        seen_ids = {t.get("id") for t in all_tickets}
         now = datetime.now(timezone.utc)
         num_batches = (days_back + batch_days - 1) // batch_days
 
@@ -315,9 +335,15 @@ class FreshdeskService:
                 ) if on_progress else None,
             )
 
-            all_tickets.extend(batch_tickets)
+            # Deduplicate: only add tickets we haven't seen
+            for ticket in batch_tickets:
+                tid = ticket.get("id")
+                if tid not in seen_ids:
+                    seen_ids.add(tid)
+                    all_tickets.append(ticket)
+
             logger.info(
-                "Freshdesk batch %d/%d complete: %d tickets (total: %d)",
+                "Freshdesk batch %d/%d: %d new tickets (total unique: %d)",
                 i + 1, num_batches, len(batch_tickets), len(all_tickets),
             )
 
