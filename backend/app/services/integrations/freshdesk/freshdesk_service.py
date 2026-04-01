@@ -140,26 +140,40 @@ class FreshdeskService:
             )
 
             # Preemptive rate limit pause — sleep before we exhaust the limit
-            rate_remaining = response.headers.get("X-RateLimit-Remaining")
-            if rate_remaining is not None and int(rate_remaining) <= 5:
-                retry_after = int(response.headers.get("Retry-After", "30"))
+            rate_remaining_raw = response.headers.get("X-RateLimit-Remaining")
+            try:
+                rate_remaining_int = int(rate_remaining_raw) if rate_remaining_raw else None
+            except (ValueError, TypeError):
+                rate_remaining_int = None
+
+            if rate_remaining_int is not None and rate_remaining_int <= 5:
+                try:
+                    retry_after = int(response.headers.get("Retry-After", "30"))
+                except (ValueError, TypeError):
+                    retry_after = 30
                 logger.warning(
                     "Freshdesk rate limit low (%s remaining). Sleeping %ds.",
-                    rate_remaining, retry_after,
+                    rate_remaining_raw, retry_after,
                 )
                 time.sleep(retry_after)
 
             if response.status_code == 200:
-                rate_total = int(response.headers.get("X-RateLimit-Total", 50))
+                try:
+                    rate_total = int(response.headers.get("X-RateLimit-Total", 50))
+                except (ValueError, TypeError):
+                    rate_total = 50
                 return {
                     "success": True, "data": response.json(),
-                    "rate_remaining": int(rate_remaining) if rate_remaining else rate_total,
+                    "rate_remaining": rate_remaining_int if rate_remaining_int is not None else rate_total,
                     "rate_total": rate_total,
                 }
             elif response.status_code == 429:
                 # Rate limited — retry after waiting
                 if _retry_count < max_retries:
-                    retry_after = int(response.headers.get("Retry-After", "60"))
+                    try:
+                        retry_after = int(response.headers.get("Retry-After", "60"))
+                    except (ValueError, TypeError):
+                        retry_after = 60
                     logger.warning(
                         "Freshdesk rate limited (429). Sleeping %ds then retrying (%d/%d).",
                         retry_after, _retry_count + 1, max_retries,

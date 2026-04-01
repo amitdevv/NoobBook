@@ -216,6 +216,10 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   const { icon: Icon, weight: iconWeight } = getSourceIcon(source);
   const statusDisplay = getStatusDisplay(source.status, source);
   const isFreshdesk = ((source.embedding_info as Record<string, string>)?.file_extension || '') === '.freshdesk';
+  const isSyncing = isFreshdesk && (
+    source.status === 'processing' ||
+    !!(source.processing_info as Record<string, unknown>)?.syncing
+  );
   const [backfillDialogOpen, setBackfillDialogOpen] = useState(false);
   // "processing" or "embedding" are actively working - show spinner and allow cancel
   const isProcessing = source.status === 'processing';
@@ -413,22 +417,32 @@ export const SourceItem: React.FC<SourceItemProps> = ({
       )}
     </div>
 
-      {/* Freshdesk sync action bar — always visible for ready Freshdesk sources */}
-      {isFreshdesk && source.status === 'ready' && (onSyncFreshdesk || onBackfillFreshdesk) && (
+      {/* Freshdesk sync action bar — visible for ready or syncing Freshdesk sources */}
+      {isFreshdesk && (source.status === 'ready' || isSyncing) && (onSyncFreshdesk || onBackfillFreshdesk) && (
         <div className="flex items-center gap-2 px-2 pb-2 -mt-1">
           {onSyncFreshdesk && (
             <button
               onClick={(e) => { e.stopPropagation(); onSyncFreshdesk(source.id); }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors"
+              disabled={isSyncing}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+                isSyncing
+                  ? 'bg-amber-50/50 text-amber-400 border-amber-100 cursor-not-allowed'
+                  : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200'
+              }`}
             >
-              <CloudArrowDown size={13} weight="bold" />
-              Sync New
+              {isSyncing ? <CircleNotch size={13} className="animate-spin" /> : <CloudArrowDown size={13} weight="bold" />}
+              {isSyncing ? 'Syncing...' : 'Sync New'}
             </button>
           )}
           {onBackfillFreshdesk && (
             <button
               onClick={(e) => { e.stopPropagation(); setBackfillDialogOpen(true); }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-stone-50 text-stone-500 hover:bg-red-50 hover:text-red-600 border border-stone-200 hover:border-red-200 transition-colors"
+              disabled={isSyncing}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+                isSyncing
+                  ? 'bg-stone-50/50 text-stone-300 border-stone-100 cursor-not-allowed'
+                  : 'bg-stone-50 text-stone-500 hover:bg-red-50 hover:text-red-600 border-stone-200 hover:border-red-200'
+              }`}
             >
               <ArrowsClockwise size={13} />
               Re-sync All

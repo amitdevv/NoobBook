@@ -51,8 +51,6 @@ class FreshdeskSyncService:
         """
         from app.services.background_services import task_service
 
-        self._current_project_id = project_id
-
         if not freshdesk_service.is_configured():
             return {
                 "tickets_fetched": 0, "tickets_created": 0,
@@ -134,7 +132,7 @@ class FreshdeskSyncService:
             batch: List[Dict] = []
             for raw_ticket in raw_tickets:
                 try:
-                    transformed = self._transform_ticket(raw_ticket, source_id)
+                    transformed = self._transform_ticket(raw_ticket, source_id, project_id)
                     batch.append(transformed)
                 except Exception as e:
                     stats["errors"] += 1
@@ -279,7 +277,7 @@ class FreshdeskSyncService:
         return since.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def _transform_ticket(
-        self, raw_ticket: Dict[str, Any], source_id: str
+        self, raw_ticket: Dict[str, Any], source_id: str, project_id: str = ""
     ) -> Dict[str, Any]:
         """
         Transform a raw Freshdesk API ticket into the local table schema.
@@ -324,7 +322,7 @@ class FreshdeskSyncService:
         return {
             "ticket_id": ticket_id,
             "source_id": source_id,
-            "project_id": self._current_project_id,
+            "project_id": project_id,
             "subject": raw_ticket.get("subject", ""),
             "description_text": raw_ticket.get("description_text", raw_ticket.get("description", "")),
             "status": STATUS_MAP.get(raw_ticket.get("status", 0), "Unknown"),

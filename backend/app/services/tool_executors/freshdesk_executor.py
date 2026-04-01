@@ -165,18 +165,22 @@ class FreshdeskExecutor:
 
             results = [_serialize_row(dict(r)) for r in rows]
             column_names = [desc[0] for desc in cur.description] if cur.description else []
+            truncated = len(results) == 100
 
             cur.close()
 
-            return {
+            result = {
                 "success": True,
                 "query": sql,
                 "row_count": len(results),
                 "results": results,
                 "column_names": column_names,
                 "execution_time_ms": elapsed,
-                "truncated": cur.rowcount > 100 if cur.rowcount and cur.rowcount > 0 else False,
+                "truncated": truncated,
             }
+            if truncated:
+                result["warning"] = "Results limited to 100 rows. Use GROUP BY, COUNT, or LIMIT to get aggregated data."
+            return result
         except Exception as e:
             return {"success": False, "error": str(e), "query": sql}
 
