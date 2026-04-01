@@ -545,7 +545,7 @@ class MainChatService:
             # Provide a human-readable message for known API error types.
             error_str = str(api_error)
             if "overloaded_error" in error_str or "overloaded" in error_str.lower():
-                friendly_error = "Anthropic (Claude's servers) are currently overloaded — this is on their end, not NoobBook. Please try again in a moment."
+                friendly_error = "Overloaded error is on Anthropic's (Claude's) end, not NoobBook. Please try again in a moment."
             elif "rate_limit" in error_str:
                 friendly_error = "Rate limit reached. Please wait a moment and try again."
             else:
