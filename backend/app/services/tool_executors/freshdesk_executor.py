@@ -11,6 +11,8 @@ import logging
 import os
 import re
 import time
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Dict, Tuple
 
 import psycopg2
@@ -42,6 +44,16 @@ freshdesk_tickets table columns:
 - resolution_time_hours (NUMERIC), first_response_time_hours (NUMERIC)
 - is_escalated (BOOLEAN), custom_fields (JSONB)
 """
+
+
+def _serialize_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert non-JSON-serializable types (datetime, Decimal) to strings."""
+    for key, val in row.items():
+        if isinstance(val, (datetime, date)):
+            row[key] = val.isoformat()
+        elif isinstance(val, Decimal):
+            row[key] = float(val)
+    return row
 
 
 class FreshdeskExecutor:
@@ -151,7 +163,7 @@ class FreshdeskExecutor:
             rows = cur.fetchmany(100)
             elapsed = round((time.time() - start) * 1000, 1)
 
-            results = [dict(r) for r in rows]
+            results = [_serialize_row(dict(r)) for r in rows]
             column_names = [desc[0] for desc in cur.description] if cur.description else []
 
             cur.close()
