@@ -541,13 +541,20 @@ class MainChatService:
             if partial_text.strip():
                 accumulated_text_parts.append(partial_text)
             error_prefix = "\n\n".join(part for part in accumulated_text_parts if part.strip())
-            if error_prefix:
-                error_content = (
-                    f"{error_prefix}\n\n"
-                    f"Sorry, I encountered an error while finishing the response: {str(api_error)}"
-                )
+
+            # Provide a human-readable message for known API error types.
+            error_str = str(api_error)
+            if "overloaded_error" in error_str or "overloaded" in error_str.lower():
+                friendly_error = "The AI service is currently overloaded. Please try again in a moment."
+            elif "rate_limit" in error_str:
+                friendly_error = "Rate limit reached. Please wait a moment and try again."
             else:
-                error_content = f"Sorry, I encountered an error: {str(api_error)}"
+                friendly_error = f"Sorry, I encountered an error: {error_str}"
+
+            if error_prefix:
+                error_content = f"{error_prefix}\n\n{friendly_error}"
+            else:
+                error_content = friendly_error
             # Store error message
             assistant_msg = message_service.add_assistant_message(
                 project_id=project_id,
