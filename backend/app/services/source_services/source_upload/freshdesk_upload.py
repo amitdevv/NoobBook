@@ -1,11 +1,10 @@
 """
 Freshdesk Upload Handler - Create a FRESHDESK source from configured Freshdesk account.
 
-Educational Note: A Freshdesk source is represented similarly to database sources:
-- We store a small `.freshdesk` "raw file" in Supabase Storage that contains
-  non-secret metadata (domain, created_at).
-- The actual API key lives in the environment variable FRESHDESK_API_KEY.
-- Processing syncs tickets and generates a processed text summary for the source.
+Educational Note: Freshdesk tickets are stored globally (not per-source).
+When adding Freshdesk to a new project, we check if tickets already exist
+in the global pool. If so, the source is marked ready immediately (no re-sync).
+If not, a full backfill sync is triggered.
 """
 
 from __future__ import annotations
@@ -18,10 +17,24 @@ from typing import Any, Dict, Optional
 
 from app.services.background_services import task_service
 from app.services.integrations.freshdesk.freshdesk_service import freshdesk_service
-from app.services.integrations.supabase import storage_service
+from app.services.integrations.supabase import get_supabase, storage_service
 from app.services.source_services import source_index_service
 
 logger = logging.getLogger(__name__)
+
+
+def _global_ticket_count() -> int:
+    """Check how many Freshdesk tickets are already synced globally."""
+    try:
+        supabase = get_supabase()
+        result = (
+            supabase.table("freshdesk_tickets")
+            .select("id", count="exact")
+            .execute()
+        )
+        return result.count if result.count is not None else 0
+    except Exception:
+        return 0
 
 
 def add_freshdesk_source(
@@ -77,13 +90,17 @@ def add_freshdesk_source(
     if not display_name:
         display_name = "Freshdesk Tickets"
 
+    # Check if global tickets already exist (skip sync if so)
+    existing_count = _global_ticket_count()
+    skip_sync = existing_count > 0
+
     source_metadata = {
         "id": source_id,
         "project_id": project_id,
         "name": display_name,
         "description": description,
         "type": "FRESHDESK",
-        "status": "uploaded",
+        "status": "ready" if skip_sync else "uploaded",
         "raw_file_path": storage_path,
         "file_size": len(raw_bytes),
         "is_active": False,
@@ -94,17 +111,32 @@ def add_freshdesk_source(
             "stored_filename": stored_filename,
             "source_type": "freshdesk",
             "days_back": days_back,
+            "is_global": True,
         },
         "processing_info": {
             "created_at": datetime.now().isoformat(),
-            "note": "Freshdesk source created. Processing will sync tickets.",
+            "tickets_synced": existing_count if skip_sync else 0,
+            "note": (
+                f"Using {existing_count} existing global tickets (no re-sync needed)."
+                if skip_sync
+                else "Freshdesk source created. Processing will sync tickets."
+            ),
         },
     }
 
     source_index_service.add_source_to_index(project_id, source_metadata)
 
-    # Trigger processing in background
-    _submit_processing_task(project_id, source_id)
+    if skip_sync:
+        logger.info(
+            "Freshdesk source %s: %d global tickets exist, skipping sync",
+            source_id, existing_count,
+        )
+        # Start global auto-sync if not already running
+        from app.services.integrations.freshdesk.freshdesk_sync_service import freshdesk_sync_service
+        freshdesk_sync_service.start_auto_sync(project_id, source_id)
+    else:
+        # First-time sync: trigger full backfill
+        _submit_processing_task(project_id, source_id)
 
     return source_metadata
 

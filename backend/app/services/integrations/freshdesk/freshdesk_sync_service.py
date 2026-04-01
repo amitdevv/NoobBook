@@ -165,24 +165,21 @@ class FreshdeskSyncService:
 
         return stats
 
-    def get_sync_stats(self, source_id: str) -> Dict[str, Any]:
+    def get_sync_stats(self, source_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Get statistics about synced tickets for a source.
+        Get statistics about synced Freshdesk tickets (global).
 
-        Args:
-            source_id: The source UUID
-
-        Returns:
-            Dict with ticket_count, status_breakdown, date_range
+        Educational Note: Tickets are stored globally (not per-source), so
+        stats reflect the entire Freshdesk account regardless of which
+        project triggered the sync.
         """
         try:
             supabase = get_supabase()
 
-            # Total ticket count
+            # Total ticket count (global)
             count_result = (
                 supabase.table("freshdesk_tickets")
                 .select("id", count="exact")
-                .eq("source_id", source_id)
                 .execute()
             )
             ticket_count = count_result.count if count_result.count is not None else 0
@@ -198,7 +195,6 @@ class FreshdeskSyncService:
             tickets_result = (
                 supabase.table("freshdesk_tickets")
                 .select("status")
-                .eq("source_id", source_id)
                 .execute()
             )
             status_counts: Dict[str, int] = {}
@@ -210,7 +206,6 @@ class FreshdeskSyncService:
             earliest_result = (
                 supabase.table("freshdesk_tickets")
                 .select("created_at")
-                .eq("source_id", source_id)
                 .order("created_at", desc=False)
                 .limit(1)
                 .execute()
@@ -218,7 +213,6 @@ class FreshdeskSyncService:
             latest_result = (
                 supabase.table("freshdesk_tickets")
                 .select("created_at")
-                .eq("source_id", source_id)
                 .order("created_at", desc=True)
                 .limit(1)
                 .execute()
@@ -242,7 +236,7 @@ class FreshdeskSyncService:
             }
 
         except Exception as e:
-            logger.error("Failed to get sync stats for source %s: %s", source_id, e)
+            logger.error("Failed to get global sync stats: %s", e)
             return {
                 "ticket_count": 0,
                 "status_breakdown": {},
@@ -255,16 +249,8 @@ class FreshdeskSyncService:
         """
         Determine the updated_since filter based on sync mode.
 
-        For backfill: returns a datetime N days ago.
-        For incremental: queries the max synced_at from existing tickets.
-
-        Args:
-            source_id: The source UUID
-            mode: 'backfill' or 'incremental'
-            days_back: Days to look back for backfill mode
-
-        Returns:
-            ISO 8601 datetime string or None
+        Educational Note: Since tickets are global, incremental sync queries
+        the max synced_at across ALL tickets (not per-source).
         """
         if mode == "incremental":
             try:
@@ -272,7 +258,6 @@ class FreshdeskSyncService:
                 result = (
                     supabase.table("freshdesk_tickets")
                     .select("synced_at")
-                    .eq("source_id", source_id)
                     .order("synced_at", desc=True)
                     .limit(1)
                     .execute()
@@ -409,13 +394,14 @@ class FreshdeskSyncService:
         return is_new
 
     def _upsert_batch(self, tickets: List[Dict[str, Any]]) -> None:
-        """Batch upsert tickets for performance (100 at a time instead of 1-by-1)."""
+        """Batch upsert tickets for performance (100 at a time instead of 1-by-1).
+        Uses ticket_id as the unique key since tickets are stored globally."""
         if not tickets:
             return
         try:
             supabase = get_supabase()
             supabase.table("freshdesk_tickets").upsert(
-                tickets, on_conflict="source_id,ticket_id"
+                tickets, on_conflict="ticket_id"
             ).execute()
         except Exception as e:
             logger.error("Batch upsert failed (%d tickets): %s", len(tickets), e)
@@ -447,48 +433,57 @@ class FreshdeskSyncService:
             return None
 
     # ------------------------------------------------------------------
-    # Auto-sync: background thread that runs incremental sync periodically
+    # Auto-sync: single global background thread for incremental sync
+    # Educational Note: Since tickets are stored globally, only one
+    # auto-sync thread is needed regardless of how many projects use
+    # Freshdesk. Any project can trigger it, but it only runs once.
     # ------------------------------------------------------------------
 
-    _auto_sync_threads: Dict[str, threading.Thread] = {}
-    _auto_sync_stop_flags: Dict[str, threading.Event] = {}
+    _auto_sync_thread: Optional[threading.Thread] = None
+    _auto_sync_stop_flag: Optional[threading.Event] = None
+    _auto_sync_source_id: Optional[str] = None  # Track which source_id to use for progress
+    _auto_sync_project_id: Optional[str] = None
     AUTO_SYNC_INTERVAL_SECONDS = 30 * 60  # 30 minutes
 
     def start_auto_sync(self, project_id: str, source_id: str) -> None:
-        """Start a background thread that syncs tickets every 30 minutes."""
-        key = f"{project_id}:{source_id}"
-        if key in self._auto_sync_threads and self._auto_sync_threads[key].is_alive():
-            logger.info("Auto-sync already running for %s", key)
+        """Start the global auto-sync thread (only one runs at a time)."""
+        if self._auto_sync_thread and self._auto_sync_thread.is_alive():
+            logger.info("Global auto-sync already running")
             return
 
+        self._auto_sync_source_id = source_id
+        self._auto_sync_project_id = project_id
         stop_flag = threading.Event()
-        self._auto_sync_stop_flags[key] = stop_flag
+        self._auto_sync_stop_flag = stop_flag
 
         def _sync_loop():
-            logger.info("Auto-sync started for %s (every %ds)", key, self.AUTO_SYNC_INTERVAL_SECONDS)
+            logger.info("Global Freshdesk auto-sync started (every %ds)", self.AUTO_SYNC_INTERVAL_SECONDS)
             while not stop_flag.is_set():
                 stop_flag.wait(self.AUTO_SYNC_INTERVAL_SECONDS)
                 if stop_flag.is_set():
                     break
                 try:
-                    logger.info("Auto-sync running incremental sync for %s", key)
-                    stats = self.sync_tickets(project_id, source_id, mode="incremental")
-                    logger.info("Auto-sync complete for %s: %s", key, stats)
+                    logger.info("Auto-sync running global incremental sync")
+                    stats = self.sync_tickets(
+                        self._auto_sync_project_id,
+                        self._auto_sync_source_id,
+                        mode="incremental",
+                    )
+                    logger.info("Auto-sync complete: %s", stats)
                 except Exception as e:
-                    logger.error("Auto-sync error for %s: %s", key, e)
-            logger.info("Auto-sync stopped for %s", key)
+                    logger.error("Auto-sync error: %s", e)
+            logger.info("Global auto-sync stopped")
 
-        t = threading.Thread(target=_sync_loop, daemon=True, name=f"freshdesk-sync-{source_id[:8]}")
+        t = threading.Thread(target=_sync_loop, daemon=True, name="freshdesk-global-sync")
         t.start()
-        self._auto_sync_threads[key] = t
+        self._auto_sync_thread = t
 
-    def stop_auto_sync(self, project_id: str, source_id: str) -> None:
-        """Stop the auto-sync thread for a source."""
-        key = f"{project_id}:{source_id}"
-        flag = self._auto_sync_stop_flags.pop(key, None)
-        if flag:
-            flag.set()
-        self._auto_sync_threads.pop(key, None)
+    def stop_auto_sync(self, project_id: str = "", source_id: str = "") -> None:
+        """Stop the global auto-sync thread."""
+        if self._auto_sync_stop_flag:
+            self._auto_sync_stop_flag.set()
+        self._auto_sync_thread = None
+        self._auto_sync_stop_flag = None
 
 
 # Singleton instance

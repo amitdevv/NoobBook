@@ -342,35 +342,16 @@ export const SourceItem: React.FC<SourceItemProps> = ({
         </div>
       </div>
 
-      {/* Freshdesk buttons + Checkbox in a single flex container */}
+      {/* Checkbox + Freshdesk actions */}
       <div className="flex items-center gap-1 flex-shrink-0">
-        {isFreshdesk && source.status === 'ready' && onBackfillFreshdesk && (
-          <button
-            onClick={(e) => { e.stopPropagation(); setBackfillDialogOpen(true); }}
-            className="p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-            title="Re-sync: clear all data and re-fetch last 30 days"
-          >
-            <ArrowsClockwise size={13} />
-          </button>
-        )}
-        {isFreshdesk && source.status === 'ready' && onSyncFreshdesk && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onSyncFreshdesk(source.id); }}
-            className="p-1 rounded hover:bg-amber-50 text-muted-foreground hover:text-amber-600 transition-colors opacity-0 group-hover:opacity-100"
-            title="Sync latest tickets"
-          >
-            <CloudArrowDown size={13} />
-          </button>
-        )}
-
         {/* Active Checkbox */}
-      <Checkbox
-        checked={source.active}
-        onCheckedChange={(checked) => onToggleActive(source.id, checked === true)}
-        disabled={!canToggleActive}
-        className={`flex-shrink-0 ${!canToggleActive ? 'opacity-30' : ''}`}
-        title={canToggleActive ? (source.active ? 'Click to exclude from chat' : 'Click to include in chat') : 'Source must be processed first'}
-      />
+        <Checkbox
+          checked={source.active}
+          onCheckedChange={(checked) => onToggleActive(source.id, checked === true)}
+          disabled={!canToggleActive}
+          className={`flex-shrink-0 ${!canToggleActive ? 'opacity-30' : ''}`}
+          title={canToggleActive ? (source.active ? 'Click to exclude from chat' : 'Click to include in chat') : 'Source must be processed first'}
+        />
       </div>
 
       {/* Status Icon for non-ready states */}
@@ -431,6 +412,30 @@ export const SourceItem: React.FC<SourceItemProps> = ({
         </>
       )}
     </div>
+
+      {/* Freshdesk sync action bar — always visible for ready Freshdesk sources */}
+      {isFreshdesk && source.status === 'ready' && (onSyncFreshdesk || onBackfillFreshdesk) && (
+        <div className="flex items-center gap-2 px-2 pb-2 -mt-1">
+          {onSyncFreshdesk && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onSyncFreshdesk(source.id); }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors"
+            >
+              <CloudArrowDown size={13} weight="bold" />
+              Sync New
+            </button>
+          )}
+          {onBackfillFreshdesk && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setBackfillDialogOpen(true); }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-stone-50 text-stone-500 hover:bg-red-50 hover:text-red-600 border border-stone-200 hover:border-red-200 transition-colors"
+            >
+              <ArrowsClockwise size={13} />
+              Re-sync All
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Backfill Confirmation Dialog */}
       <AlertDialog open={backfillDialogOpen} onOpenChange={setBackfillDialogOpen}>
