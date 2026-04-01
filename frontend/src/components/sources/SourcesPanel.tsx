@@ -133,7 +133,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   selectedSourceIds = [],
   onSelectedSourcesChange,
 }) => {
-  const { toasts, dismissToast, success, error } = useToast();
+  const { toasts, dismissToast, success, error, info } = useToast();
 
   // State
   const [sources, setSources] = useState<Source[]>([]);
@@ -591,7 +591,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
    */
   const handleToggleActive = async (sourceId: string, active: boolean) => {
     if (!activeChatId) {
-      error('Create or select a chat first to toggle sources');
+      info('Open a chat first — sources are selected per chat');
       return;
     }
 

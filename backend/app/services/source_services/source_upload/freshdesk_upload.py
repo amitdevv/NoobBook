@@ -17,24 +17,10 @@ from typing import Any, Dict, Optional
 
 from app.services.background_services import task_service
 from app.services.integrations.freshdesk.freshdesk_service import freshdesk_service
-from app.services.integrations.supabase import get_supabase, storage_service
+from app.services.integrations.supabase import storage_service
 from app.services.source_services import source_index_service
 
 logger = logging.getLogger(__name__)
-
-
-def _global_ticket_count() -> int:
-    """Check how many Freshdesk tickets are already synced globally."""
-    try:
-        supabase = get_supabase()
-        result = (
-            supabase.table("freshdesk_tickets")
-            .select("id", count="exact")
-            .execute()
-        )
-        return result.count if result.count is not None else 0
-    except Exception:
-        return 0
 
 
 def add_freshdesk_source(
@@ -90,17 +76,13 @@ def add_freshdesk_source(
     if not display_name:
         display_name = "Freshdesk Tickets"
 
-    # Check if global tickets already exist (skip sync if so)
-    existing_count = _global_ticket_count()
-    skip_sync = existing_count > 0
-
     source_metadata = {
         "id": source_id,
         "project_id": project_id,
         "name": display_name,
         "description": description,
         "type": "FRESHDESK",
-        "status": "ready" if skip_sync else "uploaded",
+        "status": "uploaded",
         "raw_file_path": storage_path,
         "file_size": len(raw_bytes),
         "is_active": False,
@@ -115,28 +97,15 @@ def add_freshdesk_source(
         },
         "processing_info": {
             "created_at": datetime.now().isoformat(),
-            "tickets_synced": existing_count if skip_sync else 0,
-            "note": (
-                f"Using {existing_count} existing global tickets (no re-sync needed)."
-                if skip_sync
-                else "Freshdesk source created. Processing will sync tickets."
-            ),
+            "note": "Freshdesk source created. Processing will sync tickets.",
         },
     }
 
     source_index_service.add_source_to_index(project_id, source_metadata)
 
-    if skip_sync:
-        logger.info(
-            "Freshdesk source %s: %d global tickets exist, skipping sync",
-            source_id, existing_count,
-        )
-        # Start global auto-sync if not already running
-        from app.services.integrations.freshdesk.freshdesk_sync_service import freshdesk_sync_service
-        freshdesk_sync_service.start_auto_sync(project_id, source_id)
-    else:
-        # First-time sync: trigger full backfill
-        _submit_processing_task(project_id, source_id)
+    # Always run the processor — it skips the API sync if global tickets
+    # already exist, but still generates the processed text summary.
+    _submit_processing_task(project_id, source_id)
 
     return source_metadata
 
