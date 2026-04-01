@@ -479,27 +479,37 @@ class MainChatService:
                 )
 
                 # Execute each tool and add results
+                # Educational Note: We wrap each tool execution in try/except to ensure
+                # a tool_result is ALWAYS stored. Without this, if a tool throws an exception,
+                # the tool_use block is orphaned (no matching tool_result), which corrupts the
+                # message history and causes Claude API 400 errors on all future messages.
                 for tool_block in tool_use_blocks:
                     tool_id = tool_block.get("id")
                     tool_name = tool_block.get("name")
                     tool_input = tool_block.get("input", {})
 
-                    # Execute tool
-                    result = self._execute_tool(
-                        project_id,
-                        chat_id,
-                        tool_name,
-                        tool_input,
-                        user_id=resolved_user_id,
-                        mcp_registry=mcp_registry,
-                    )
+                    try:
+                        result = self._execute_tool(
+                            project_id,
+                            chat_id,
+                            tool_name,
+                            tool_input,
+                            user_id=resolved_user_id,
+                            mcp_registry=mcp_registry,
+                        )
+                        is_error = False
+                    except Exception as tool_error:
+                        logger.error(f"Tool execution failed for {tool_name}: {tool_error}")
+                        result = f"Tool execution failed: {str(tool_error)}"
+                        is_error = True
 
-                    # Add tool result as user message
+                    # Add tool result as user message (always, even on error)
                     message_service.add_tool_result_message(
                         project_id=project_id,
                         chat_id=chat_id,
                         tool_use_id=tool_id,
-                        result=result
+                        result=result,
+                        is_error=is_error,
                     )
 
                 # Rebuild messages and call Claude again

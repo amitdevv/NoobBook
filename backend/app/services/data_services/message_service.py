@@ -345,7 +345,116 @@ class MessageService:
                 "content": include_pending["content"]
             })
 
+        # Sanitize: fix orphaned tool_use/tool_result sequences from past errors
+        api_messages = self._sanitize_tool_sequences(api_messages)
+
         return api_messages
+
+    def _sanitize_tool_sequences(self, api_messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Fix broken tool_use/tool_result sequences in message history.
+
+        Educational Note: The Claude API requires every tool_use block to have a
+        matching tool_result in the next message. If a tool execution error left
+        orphaned tool_use blocks in the DB, this method strips them so the chat
+        can continue working.
+
+        Steps:
+        1. Strip tool_use blocks that don't have matching tool_results
+        2. Remove user messages that contain only orphaned tool_results
+        3. Merge consecutive same-role messages (can happen after stripping)
+        """
+        if not api_messages:
+            return api_messages
+
+        # --- Step 1: Find which tool_use IDs have valid tool_result matches ---
+        valid_tool_use_ids: set = set()
+        for i, msg in enumerate(api_messages):
+            if msg["role"] != "assistant" or not isinstance(msg["content"], list):
+                continue
+            tool_use_ids = {
+                block["id"] for block in msg["content"]
+                if isinstance(block, dict) and block.get("type") == "tool_use"
+            }
+            if not tool_use_ids:
+                continue
+            # Collect tool_result IDs from subsequent user messages
+            result_ids: set = set()
+            for j in range(i + 1, len(api_messages)):
+                next_msg = api_messages[j]
+                if next_msg["role"] == "user" and isinstance(next_msg["content"], list):
+                    for block in next_msg["content"]:
+                        if isinstance(block, dict) and block.get("type") == "tool_result":
+                            result_ids.add(block.get("tool_use_id"))
+                else:
+                    break  # Stop at first non-tool-result message
+            # Valid only if ALL tool_use IDs have matching results
+            if tool_use_ids.issubset(result_ids):
+                valid_tool_use_ids.update(tool_use_ids)
+
+        # --- Step 2: Filter out orphaned tool_use and tool_result blocks ---
+        filtered: List[Dict[str, Any]] = []
+        for msg in api_messages:
+            if msg["role"] == "assistant" and isinstance(msg["content"], list):
+                has_tool_use = any(
+                    isinstance(b, dict) and b.get("type") == "tool_use"
+                    for b in msg["content"]
+                )
+                if has_tool_use:
+                    # Keep only valid tool_use blocks and all non-tool_use blocks
+                    cleaned = [
+                        block for block in msg["content"]
+                        if not (isinstance(block, dict) and block.get("type") == "tool_use")
+                        or block.get("id") in valid_tool_use_ids
+                    ]
+                    # Extract text if only text blocks remain
+                    if cleaned and all(isinstance(b, dict) and b.get("type") == "text" for b in cleaned):
+                        text = "\n".join(b.get("text", "") for b in cleaned).strip()
+                        if text:
+                            filtered.append({"role": "assistant", "content": text})
+                    elif cleaned:
+                        filtered.append({"role": "assistant", "content": cleaned})
+                    # If empty after cleaning, skip the message entirely
+                    continue
+
+            if msg["role"] == "user" and isinstance(msg["content"], list):
+                has_tool_result = any(
+                    isinstance(b, dict) and b.get("type") == "tool_result"
+                    for b in msg["content"]
+                )
+                if has_tool_result:
+                    # Keep only tool_results with valid IDs
+                    cleaned = [
+                        block for block in msg["content"]
+                        if not (isinstance(block, dict) and block.get("type") == "tool_result")
+                        or block.get("tool_use_id") in valid_tool_use_ids
+                    ]
+                    if cleaned:
+                        filtered.append({"role": "user", "content": cleaned})
+                    # If empty, skip (orphaned tool_result message)
+                    continue
+
+            filtered.append(msg)
+
+        # --- Step 3: Merge consecutive same-role messages ---
+        merged: List[Dict[str, Any]] = []
+        for msg in filtered:
+            if merged and merged[-1]["role"] == msg["role"]:
+                prev_content = merged[-1]["content"]
+                curr_content = msg["content"]
+                # Merge two text strings
+                if isinstance(prev_content, str) and isinstance(curr_content, str):
+                    merged[-1]["content"] = prev_content + "\n\n" + curr_content
+                elif isinstance(prev_content, list) and isinstance(curr_content, list):
+                    # Merge two list messages (e.g. multiple tool_result blocks)
+                    merged[-1]["content"] = prev_content + curr_content
+                else:
+                    # Mixed types — skip merging, keep as-is to avoid breaking content blocks
+                    merged.append(msg)
+            else:
+                merged.append(msg)
+
+        return merged
 
     def build_context_from_messages(
         self,
