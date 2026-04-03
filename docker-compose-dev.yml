@@ -498,6 +498,12 @@ services:
       args:
         GIT_SHA: ${GIT_SHA:-unknown}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     environment:
       - FLASK_ENV=production
       - PORT=5001
