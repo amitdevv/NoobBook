@@ -4,9 +4,12 @@ Main entry point for NoobBook backend.
 Educational Note: This file creates and runs the Flask application.
 We keep it separate from the app factory to maintain clean separation
 of concerns and make testing easier.
+
+In production, Gunicorn imports this module to get the `app` object.
+In development, this file is run directly via `python run.py`.
 """
-import logging
 import os
+import logging
 import shutil
 from pathlib import Path
 from dotenv import load_dotenv

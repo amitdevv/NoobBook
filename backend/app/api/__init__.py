@@ -37,6 +37,12 @@ api_bp = Blueprint('api', __name__)
 
 from app.utils.auth_middleware import validate_token  # noqa: E402
 
+@api_bp.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for Docker/Coolify — no auth required."""
+    return {"status": "ok"}, 200
+
+
 @api_bp.before_request
 def authenticate_request():
     """Validate JWT for all API requests except auth endpoints."""
@@ -44,8 +50,8 @@ def authenticate_request():
     if request.method == 'OPTIONS':
         return None
 
-    # Skip authentication for auth routes (login, signup, refresh)
-    if request.path.startswith('/api/v1/auth/'):
+    # Skip authentication for auth and health routes
+    if request.path.startswith('/api/v1/auth/') or request.path == '/api/v1/health':
         return None
 
     user_id = validate_token()
