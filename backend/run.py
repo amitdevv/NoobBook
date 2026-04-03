@@ -14,6 +14,10 @@ import shutil
 from pathlib import Path
 from dotenv import load_dotenv
 
+# Load .env FIRST so FLASK_ENV is visible to all module-level code
+# (e.g. _async_mode in app/__init__.py reads FLASK_ENV at import time).
+load_dotenv()
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,13 +49,12 @@ def clear_pycache():
         logger.debug("Cleared %s __pycache__ folders", pycache_count)
 
 
-# Clear pycache on startup
-clear_pycache()
+# Only clear pycache in development — in production, bytecode cache
+# speeds up module loading and shouldn't be deleted on every worker start.
+if os.getenv('FLASK_ENV') != 'production':
+    clear_pycache()
 
 from app import create_app, socketio
-
-# Load environment variables from .env file
-load_dotenv()
 
 # Get configuration name from environment or use default
 config_name = os.getenv('FLASK_ENV', 'development')
