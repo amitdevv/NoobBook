@@ -1,11 +1,10 @@
 """
 Freshdesk Upload Handler - Create a FRESHDESK source from configured Freshdesk account.
 
-Educational Note: A Freshdesk source is represented similarly to database sources:
-- We store a small `.freshdesk` "raw file" in Supabase Storage that contains
-  non-secret metadata (domain, created_at).
-- The actual API key lives in the environment variable FRESHDESK_API_KEY.
-- Processing syncs tickets and generates a processed text summary for the source.
+Educational Note: Freshdesk tickets are stored globally (not per-source).
+When adding Freshdesk to a new project, we check if tickets already exist
+in the global pool. If so, the source is marked ready immediately (no re-sync).
+If not, a full backfill sync is triggered.
 """
 
 from __future__ import annotations
@@ -94,6 +93,7 @@ def add_freshdesk_source(
             "stored_filename": stored_filename,
             "source_type": "freshdesk",
             "days_back": days_back,
+            "is_global": True,
         },
         "processing_info": {
             "created_at": datetime.now().isoformat(),
@@ -103,7 +103,8 @@ def add_freshdesk_source(
 
     source_index_service.add_source_to_index(project_id, source_metadata)
 
-    # Trigger processing in background
+    # Always run the processor — it skips the API sync if global tickets
+    # already exist, but still generates the processed text summary.
     _submit_processing_task(project_id, source_id)
 
     return source_metadata

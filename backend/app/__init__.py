@@ -5,6 +5,8 @@ Educational Note: The application factory pattern allows us to create
 multiple app instances with different configurations (dev, test, prod).
 This is a Flask best practice for larger applications.
 """
+import os
+
 from flask import Flask, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
@@ -12,7 +14,9 @@ from flask_socketio import SocketIO
 from config import config
 from app.utils.logger import setup_logging
 
-# Initialize extensions globally but without app context
+# Initialize extensions globally but without app context.
+# Use gevent in production (for Gunicorn), threading in development (for Werkzeug).
+_async_mode = 'gevent' if os.getenv('FLASK_ENV') == 'production' else 'threading'
 socketio = SocketIO(cors_allowed_origins="*")
 
 
@@ -43,7 +47,7 @@ def create_app(config_name='development'):
          supports_credentials=True,
          allow_headers=["Content-Type", "Authorization"],
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"])
-    socketio.init_app(app, async_mode='threading')
+    socketio.init_app(app, async_mode=_async_mode)
 
     # Register blueprints (modular route handlers)
     from app.api import api_bp
@@ -72,8 +76,8 @@ def create_app(config_name='development'):
         if not path.startswith(api_prefix):
             return None
 
-        # Allow auth endpoints without authentication
-        if path.startswith(f"{api_prefix}/auth"):
+        # Allow auth and health endpoints without authentication
+        if path.startswith(f"{api_prefix}/auth") or path == f"{api_prefix}/health":
             return None
 
         identity = get_request_identity()

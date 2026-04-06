@@ -270,7 +270,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     };
 
     const appendAssistantMessage = (assistantMessage: Chat['messages'][number]) => {
-      setStreamingAssistantContent('');
+      // Append the final message first, THEN clear streaming content in the
+      // same React batch. This prevents a flash where neither the streaming
+      // bubble nor the final message is visible.
       setActiveChat((prev) => {
         if (!prev) return null;
         const messagesWithoutTemp = prev.messages.filter((m) => m.id !== tempUserMessage.id);
@@ -283,6 +285,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           updated_at: new Date().toISOString(),
         };
       });
+      setStreamingAssistantContent('');
     };
 
     const applyFallbackResponse = (result: { user_message: Chat['messages'][number]; assistant_message: Chat['messages'][number] }) => {

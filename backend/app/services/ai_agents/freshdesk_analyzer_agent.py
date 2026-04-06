@@ -32,7 +32,8 @@ class FreshdeskAnalyzerAgent:
         return self._tools
 
     def run(self, project_id: str, source_id: str, query: str) -> Dict[str, Any]:
-        """Run the Freshdesk analysis agentic loop."""
+        """Run the Freshdesk analysis agentic loop.
+        Always closes the DB connection on exit to prevent leaks."""
         execution_id = str(uuid.uuid4())[:8]
         logger.info("[FreshdeskAgent:%s] Starting analysis for source %s", execution_id, source_id)
 
@@ -55,98 +56,100 @@ class FreshdeskAnalyzerAgent:
         all_queries: List[str] = []
         consecutive_errors = 0
 
-        for iteration in range(1, self.MAX_ITERATIONS + 1):
-            logger.info("[FreshdeskAgent:%s] Iteration %d", execution_id, iteration)
+        try:
+            for iteration in range(1, self.MAX_ITERATIONS + 1):
+                logger.info("[FreshdeskAgent:%s] Iteration %d", execution_id, iteration)
 
-            response = claude_service.send_message(
-                messages=messages,
-                system_prompt=system_prompt,
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                tools=tools,
-                project_id=project_id,
-            )
-
-            # Track usage
-            usage = response.get("usage", {})
-            total_usage["input_tokens"] += usage.get("input_tokens", 0)
-            total_usage["output_tokens"] += usage.get("output_tokens", 0)
-
-            if claude_parsing_utils.is_end_turn(response):
-                text = claude_parsing_utils.extract_text(response)
-                return {
-                    "success": True,
-                    "content": text,
-                    "summary": text,
-                    "findings": [],
-                    "recommendations": [],
-                    "sql_queries": all_queries,
-                    "iterations": iteration,
-                    "usage": total_usage,
-                }
-
-            if not claude_parsing_utils.is_tool_use(response):
-                text = claude_parsing_utils.extract_text(response)
-                return {"success": True, "content": text, "iterations": iteration, "usage": total_usage}
-
-            # Process tool calls
-            tool_blocks = claude_parsing_utils.extract_tool_use_blocks(response)
-            content_blocks = response.get("content_blocks", [])
-            messages.append({"role": "assistant", "content": content_blocks})
-
-            tool_results = []
-            terminated = False
-            termination_result = None
-
-            for block in tool_blocks:
-                tool_name = block.get("name", "")
-                tool_input = block.get("input", {})
-                tool_id = block.get("id", "")
-
-                result, is_term = freshdesk_executor.execute_tool(
-                    tool_name, tool_input, project_id, source_id,
+                response = claude_service.send_message(
+                    messages=messages,
+                    system_prompt=system_prompt,
+                    model=model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    tools=tools,
+                    project_id=project_id,
                 )
 
-                if tool_name == "query_runner" and tool_input.get("sql_query"):
-                    all_queries.append(tool_input["sql_query"])
+                # Track usage
+                usage = response.get("usage", {})
+                total_usage["input_tokens"] += usage.get("input_tokens", 0)
+                total_usage["output_tokens"] += usage.get("output_tokens", 0)
 
-                if not result.get("success", True) if isinstance(result, dict) else False:
-                    consecutive_errors += 1
-                else:
-                    consecutive_errors = 0
+                if claude_parsing_utils.is_end_turn(response):
+                    text = claude_parsing_utils.extract_text(response)
+                    return {
+                        "success": True,
+                        "content": text,
+                        "summary": text,
+                        "findings": [],
+                        "recommendations": [],
+                        "sql_queries": all_queries,
+                        "iterations": iteration,
+                        "usage": total_usage,
+                    }
 
-                if consecutive_errors >= 3:
-                    return {"success": False, "error": "Too many consecutive tool errors", "sql_queries": all_queries}
+                if not claude_parsing_utils.is_tool_use(response):
+                    text = claude_parsing_utils.extract_text(response)
+                    return {"success": True, "content": text, "iterations": iteration, "usage": total_usage}
 
-                if is_term:
-                    terminated = True
-                    termination_result = result
+                # Process tool calls
+                tool_blocks = claude_parsing_utils.extract_tool_use_blocks(response)
+                content_blocks = response.get("content_blocks", [])
+                messages.append({"role": "assistant", "content": content_blocks})
 
-                import json
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tool_id,
-                    "content": json.dumps(result) if isinstance(result, dict) else str(result),
-                })
+                tool_results = []
+                terminated = False
+                termination_result = None
 
-            messages.append({"role": "user", "content": tool_results})
+                for block in tool_blocks:
+                    tool_name = block.get("name", "")
+                    tool_input = block.get("input", {})
+                    tool_id = block.get("id", "")
 
-            if terminated and termination_result:
-                return {
-                    "success": True,
-                    "content": termination_result.get("summary", ""),
-                    "summary": termination_result.get("summary", ""),
-                    "findings": termination_result.get("findings", []),
-                    "recommendations": termination_result.get("recommendations", []),
-                    "sql_queries": all_queries,
-                    "iterations": iteration,
-                    "usage": total_usage,
-                }
+                    result, is_term = freshdesk_executor.execute_tool(
+                        tool_name, tool_input, project_id, source_id,
+                    )
 
-        # Max iterations reached
-        freshdesk_executor.close()
-        return {"success": False, "error": f"Max iterations ({self.MAX_ITERATIONS}) reached", "sql_queries": all_queries}
+                    if tool_name == "query_runner" and tool_input.get("sql_query"):
+                        all_queries.append(tool_input["sql_query"])
+
+                    if not result.get("success", True) if isinstance(result, dict) else False:
+                        consecutive_errors += 1
+                    else:
+                        consecutive_errors = 0
+
+                    if consecutive_errors >= 3:
+                        return {"success": False, "error": "Too many consecutive tool errors", "sql_queries": all_queries}
+
+                    if is_term:
+                        terminated = True
+                        termination_result = result
+
+                    import json
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": json.dumps(result) if isinstance(result, dict) else str(result),
+                    })
+
+                messages.append({"role": "user", "content": tool_results})
+
+                if terminated and termination_result:
+                    return {
+                        "success": True,
+                        "content": termination_result.get("summary", ""),
+                        "summary": termination_result.get("summary", ""),
+                        "findings": termination_result.get("findings", []),
+                        "recommendations": termination_result.get("recommendations", []),
+                        "sql_queries": all_queries,
+                        "iterations": iteration,
+                        "usage": total_usage,
+                    }
+
+            # Max iterations reached
+            return {"success": False, "error": f"Max iterations ({self.MAX_ITERATIONS}) reached", "sql_queries": all_queries}
+        finally:
+            freshdesk_executor.close()
 
 
 freshdesk_analyzer_agent = FreshdeskAnalyzerAgent()

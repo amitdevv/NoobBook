@@ -1,15 +1,10 @@
 """
 Freshdesk Processor - Handles FRESHDESK source processing.
 
-Educational Note: A Freshdesk source is processed by:
-1) Syncing ticket data from Freshdesk API into the local freshdesk_tickets table
-2) Building a processed text summary of the synced data
-3) Generating an AI summary via summary_service
-4) Marking the source as ready (skipping embedding — the analysis agent queries live data)
-
-This enables:
-- Quick overview of Freshdesk data in the Sources UI
-- A foundation for the Freshdesk analysis agent (SQL querying over local ticket data)
+Educational Note: Freshdesk tickets are stored globally (not per-source).
+Processing checks if global tickets already exist — if so, it skips the
+sync and just builds the summary. Only the first Freshdesk source triggers
+a full API sync. Subsequent projects get instant access to existing data.
 """
 
 from __future__ import annotations
@@ -24,7 +19,7 @@ from app.services.ai_services.summary_service import summary_service
 from app.services.integrations.freshdesk.freshdesk_sync_service import (
     freshdesk_sync_service,
 )
-from app.services.integrations.supabase import storage_service
+from app.services.integrations.supabase import get_supabase, storage_service
 
 logger = logging.getLogger(__name__)
 
@@ -124,42 +119,51 @@ def process_freshdesk(
 
     days_back = embedding_info.get("days_back") or raw_meta.get("days_back") or 30
 
-    # Step 1: Sync tickets from Freshdesk
-    logger.info(
-        "Freshdesk processor: syncing tickets (source_id=%s, days_back=%d)",
-        source_id,
-        days_back,
-    )
+    # Step 1: Check if global tickets already exist (skip sync if so)
+    existing_stats = freshdesk_sync_service.get_sync_stats()
+    existing_count = existing_stats.get("ticket_count", 0)
 
-    try:
-        sync_stats = freshdesk_sync_service.sync_tickets(
-            project_id=project_id,
-            source_id=source_id,
-            mode="backfill",
-            days_back=days_back,
+    if existing_count > 0:
+        logger.info(
+            "Freshdesk processor: %d global tickets exist, skipping sync (source_id=%s)",
+            existing_count, source_id,
         )
-    except Exception as e:
-        source_service.update_source(
-            project_id,
-            source_id,
-            status="error",
-            processing_info={"error": f"Failed to sync Freshdesk tickets: {str(e)}"},
+        sync_stats = {
+            "tickets_fetched": 0, "tickets_created": 0,
+            "tickets_updated": 0, "errors": 0,
+            "skipped": True, "existing_count": existing_count,
+        }
+        ticket_stats = existing_stats
+    else:
+        # First time: sync tickets from Freshdesk API
+        logger.info(
+            "Freshdesk processor: syncing tickets (source_id=%s, days_back=%d)",
+            source_id, days_back,
         )
-        return {"success": False, "error": str(e)}
+        try:
+            sync_stats = freshdesk_sync_service.sync_tickets(
+                project_id=project_id,
+                source_id=source_id,
+                mode="backfill",
+                days_back=days_back,
+            )
+        except Exception as e:
+            source_service.update_source(
+                project_id, source_id, status="error",
+                processing_info={"error": f"Failed to sync Freshdesk tickets: {str(e)}"},
+            )
+            return {"success": False, "error": str(e)}
 
-    # Check for fatal sync errors
-    if sync_stats.get("tickets_fetched", 0) == 0 and sync_stats.get("errors", 0) > 0:
-        error_msg = sync_stats.get("error_message", "Failed to fetch any tickets from Freshdesk")
-        source_service.update_source(
-            project_id,
-            source_id,
-            status="error",
-            processing_info={"error": error_msg},
-        )
-        return {"success": False, "error": error_msg}
+        # Check for fatal sync errors
+        if sync_stats.get("tickets_fetched", 0) == 0 and sync_stats.get("errors", 0) > 0:
+            error_msg = sync_stats.get("error_message", "Failed to fetch any tickets from Freshdesk")
+            source_service.update_source(
+                project_id, source_id, status="error",
+                processing_info={"error": error_msg},
+            )
+            return {"success": False, "error": error_msg}
 
-    # Step 2: Get post-sync statistics
-    ticket_stats = freshdesk_sync_service.get_sync_stats(source_id)
+        ticket_stats = freshdesk_sync_service.get_sync_stats()
 
     # Step 3: Build processed text
     processed_text = _build_processed_text(

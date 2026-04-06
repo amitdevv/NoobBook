@@ -225,6 +225,15 @@ class SourceService:
             except Exception as e:
                 logger.error("Error deleting embeddings for %s: %s", source_id, e)
 
+        # Stop Freshdesk auto-sync if this is a Freshdesk source
+        file_ext = (source.get("embedding_info") or {}).get("file_extension", "")
+        if file_ext == ".freshdesk":
+            try:
+                from app.services.integrations.freshdesk.freshdesk_sync_service import freshdesk_sync_service
+                freshdesk_sync_service.stop_auto_sync()
+            except Exception as e:
+                logger.error("Error stopping Freshdesk auto-sync for %s: %s", source_id, e)
+
         # Delete all files from Supabase Storage
         from app.services.integrations.supabase import storage_service
 

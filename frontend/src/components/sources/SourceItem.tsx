@@ -216,6 +216,10 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   const { icon: Icon, weight: iconWeight } = getSourceIcon(source);
   const statusDisplay = getStatusDisplay(source.status, source);
   const isFreshdesk = ((source.embedding_info as Record<string, string>)?.file_extension || '') === '.freshdesk';
+  const isSyncing = isFreshdesk && (
+    source.status === 'processing' ||
+    !!(source.processing_info as Record<string, unknown>)?.syncing
+  );
   const [backfillDialogOpen, setBackfillDialogOpen] = useState(false);
   // "processing" or "embedding" are actively working - show spinner and allow cancel
   const isProcessing = source.status === 'processing';
@@ -342,35 +346,16 @@ export const SourceItem: React.FC<SourceItemProps> = ({
         </div>
       </div>
 
-      {/* Freshdesk buttons + Checkbox in a single flex container */}
+      {/* Checkbox + Freshdesk actions */}
       <div className="flex items-center gap-1 flex-shrink-0">
-        {isFreshdesk && source.status === 'ready' && onBackfillFreshdesk && (
-          <button
-            onClick={(e) => { e.stopPropagation(); setBackfillDialogOpen(true); }}
-            className="p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-            title="Re-sync: clear all data and re-fetch last 30 days"
-          >
-            <ArrowsClockwise size={13} />
-          </button>
-        )}
-        {isFreshdesk && source.status === 'ready' && onSyncFreshdesk && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onSyncFreshdesk(source.id); }}
-            className="p-1 rounded hover:bg-amber-50 text-muted-foreground hover:text-amber-600 transition-colors opacity-0 group-hover:opacity-100"
-            title="Sync latest tickets"
-          >
-            <CloudArrowDown size={13} />
-          </button>
-        )}
-
         {/* Active Checkbox */}
-      <Checkbox
-        checked={source.active}
-        onCheckedChange={(checked) => onToggleActive(source.id, checked === true)}
-        disabled={!canToggleActive}
-        className={`flex-shrink-0 ${!canToggleActive ? 'opacity-30' : ''}`}
-        title={canToggleActive ? (source.active ? 'Click to exclude from chat' : 'Click to include in chat') : 'Source must be processed first'}
-      />
+        <Checkbox
+          checked={source.active}
+          onCheckedChange={(checked) => onToggleActive(source.id, checked === true)}
+          disabled={!canToggleActive}
+          className={`flex-shrink-0 ${!canToggleActive ? 'opacity-30' : ''}`}
+          title={canToggleActive ? (source.active ? 'Click to exclude from chat' : 'Click to include in chat') : 'Source must be processed first'}
+        />
       </div>
 
       {/* Status Icon for non-ready states */}
@@ -431,6 +416,40 @@ export const SourceItem: React.FC<SourceItemProps> = ({
         </>
       )}
     </div>
+
+      {/* Freshdesk sync action bar — visible for ready or syncing Freshdesk sources */}
+      {isFreshdesk && (source.status === 'ready' || isSyncing) && (onSyncFreshdesk || onBackfillFreshdesk) && (
+        <div className="flex items-center gap-2 px-2 pb-2 -mt-1">
+          {onSyncFreshdesk && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onSyncFreshdesk(source.id); }}
+              disabled={isSyncing}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+                isSyncing
+                  ? 'bg-amber-50/50 text-amber-400 border-amber-100 cursor-not-allowed'
+                  : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200'
+              }`}
+            >
+              {isSyncing ? <CircleNotch size={13} className="animate-spin" /> : <CloudArrowDown size={13} weight="bold" />}
+              {isSyncing ? 'Syncing...' : 'Sync New'}
+            </button>
+          )}
+          {onBackfillFreshdesk && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setBackfillDialogOpen(true); }}
+              disabled={isSyncing}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors ${
+                isSyncing
+                  ? 'bg-stone-50/50 text-stone-300 border-stone-100 cursor-not-allowed'
+                  : 'bg-stone-50 text-stone-500 hover:bg-red-50 hover:text-red-600 border-stone-200 hover:border-red-200'
+              }`}
+            >
+              <ArrowsClockwise size={13} />
+              Re-sync All
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Backfill Confirmation Dialog */}
       <AlertDialog open={backfillDialogOpen} onOpenChange={setBackfillDialogOpen}>

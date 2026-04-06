@@ -16,6 +16,7 @@ services:
       - FLASK_ENV=production
       - PORT=5001
       - SUPABASE_URL=http://supabase-kong:8000
+      - SUPABASE_DB_URL=postgresql://postgres:${POSTGRES_PASSWORD}@supabase-db:5432/postgres
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost}
     volumes:
       - backend-data:/app/data

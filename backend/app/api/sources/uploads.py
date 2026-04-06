@@ -366,7 +366,8 @@ def add_freshdesk_source_endpoint(project_id: str):
 def _run_freshdesk_sync(project_id: str, source_id: str, mode: str, days_back: int, clear_first: bool = False):
     """
     Background worker for Freshdesk sync/backfill.
-    Sets source to processing, runs sync, then back to ready.
+    Educational Note: Tickets are stored globally — clear_first deletes ALL
+    tickets (not just for this source) since there's one shared pool.
     """
     from app.services.integrations.freshdesk.freshdesk_sync_service import freshdesk_sync_service
     from app.services.source_services import source_service
@@ -374,7 +375,8 @@ def _run_freshdesk_sync(project_id: str, source_id: str, mode: str, days_back: i
     try:
         if clear_first:
             from app.services.integrations.supabase import get_supabase
-            get_supabase().table("freshdesk_tickets").delete().eq("source_id", source_id).execute()
+            # Clear ALL global tickets (not scoped to source_id)
+            get_supabase().table("freshdesk_tickets").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
 
         source_service.update_source(project_id, source_id, status="processing",
                                      processing_info={"syncing": True, "mode": mode, "tickets_fetched": 0})
@@ -383,8 +385,8 @@ def _run_freshdesk_sync(project_id: str, source_id: str, mode: str, days_back: i
             project_id=project_id, source_id=source_id, mode=mode, days_back=days_back,
         )
 
-        # Get final ticket count
-        ticket_stats = freshdesk_sync_service.get_sync_stats(source_id)
+        # Get global ticket count
+        ticket_stats = freshdesk_sync_service.get_sync_stats()
 
         source_service.update_source(project_id, source_id, status="ready",
                                      processing_info={
@@ -405,6 +407,10 @@ def _run_freshdesk_sync(project_id: str, source_id: str, mode: str, days_back: i
 def sync_freshdesk_source(project_id: str, source_id: str):
     """Trigger an incremental sync as a background task (shows progress in ActiveTasksBar)."""
     try:
+        from app.services.integrations.freshdesk.freshdesk_service import freshdesk_service
+        if not freshdesk_service.is_configured():
+            return jsonify({'success': False, 'error': 'Freshdesk not configured. Add API key and domain in Settings.'}), 400
+
         from app.services.background_services import task_service
 
         data = request.get_json(silent=True) or {}
@@ -431,6 +437,10 @@ def sync_freshdesk_source(project_id: str, source_id: str):
 def backfill_freshdesk_source(project_id: str, source_id: str):
     """Clear all tickets and re-fetch last 30 days as a background task."""
     try:
+        from app.services.integrations.freshdesk.freshdesk_service import freshdesk_service
+        if not freshdesk_service.is_configured():
+            return jsonify({'success': False, 'error': 'Freshdesk not configured. Add API key and domain in Settings.'}), 400
+
         from app.services.background_services import task_service
 
         task_service.submit_task(

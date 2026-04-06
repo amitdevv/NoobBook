@@ -1,16 +1,19 @@
 """
-Freshdesk Executor - Runs SQL queries against the local freshdesk_tickets table.
+Freshdesk Executor - Runs SQL queries against the global freshdesk_tickets table.
 
 Educational Note: Unlike database_executor which connects to external databases,
 this executor queries the local Supabase PostgreSQL directly since Freshdesk
-tickets are synced into a local table. Always scopes queries by source_id.
+tickets are synced into a global table. All tickets belong to the same Freshdesk
+account, so no per-source scoping is needed.
 """
 
 import logging
 import os
 import re
 import time
-from typing import Any, Dict, Optional, Tuple
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any, Dict, Tuple
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -24,7 +27,7 @@ UNSAFE_SQL_RE = re.compile(
 
 FRESHDESK_SCHEMA = """
 freshdesk_tickets table columns:
-- ticket_id (BIGINT): Freshdesk ticket ID
+- ticket_id (BIGINT): Freshdesk ticket ID (unique)
 - subject (TEXT): Ticket subject
 - description_text (TEXT): Ticket body
 - status (TEXT): Open, Pending, Resolved, Closed, Waiting on Customer, Waiting on Third Party
@@ -43,14 +46,25 @@ freshdesk_tickets table columns:
 """
 
 
+def _serialize_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert non-JSON-serializable types (datetime, Decimal) to strings."""
+    for key, val in row.items():
+        if isinstance(val, (datetime, date)):
+            row[key] = val.isoformat()
+        elif isinstance(val, Decimal):
+            row[key] = float(val)
+    return row
+
+
 class FreshdeskExecutor:
-    """Executes Freshdesk agent tools against the local freshdesk_tickets table."""
+    """Executes Freshdesk agent tools against the global freshdesk_tickets table."""
 
     def __init__(self):
         self._conn = None
 
     def _get_connection_string(self) -> str:
-        """Get PostgreSQL connection string for local Supabase."""
+        """Get PostgreSQL connection string for local Supabase.
+        Prefers SUPABASE_DB_URL env var, falls back to constructing from parts."""
         db_url = os.getenv("SUPABASE_DB_URL")
         if db_url:
             return db_url
@@ -68,7 +82,10 @@ class FreshdeskExecutor:
                 return self._conn
             except Exception:
                 self._conn = None
-        self._conn = psycopg2.connect(self._get_connection_string(), connect_timeout=5)
+        conn_str = self._get_connection_string()
+        logger.info("Freshdesk executor connecting to: %s",
+                     conn_str.split("@")[-1] if "@" in conn_str else "unknown")
+        self._conn = psycopg2.connect(conn_str, connect_timeout=5)
         self._conn.autocommit = True
         return self._conn
 
@@ -95,23 +112,20 @@ class FreshdeskExecutor:
     ) -> Tuple[Dict[str, Any], bool]:
         """Execute a Freshdesk agent tool. Returns (result, is_termination)."""
         if tool_name == "schema_info":
-            return self._schema_info(source_id), False
+            return self._schema_info(), False
         elif tool_name == "query_runner":
-            return self._query_runner(tool_input, source_id), False
+            return self._query_runner(tool_input), False
         elif tool_name == "return_ticket_analysis":
             return tool_input, True
         else:
             return {"success": False, "error": f"Unknown tool: {tool_name}"}, False
 
-    def _schema_info(self, source_id: str) -> Dict[str, Any]:
-        """Return the freshdesk_tickets schema and ticket count for this source."""
+    def _schema_info(self) -> Dict[str, Any]:
+        """Return the freshdesk_tickets schema and global ticket count."""
         try:
             conn = self._get_connection()
             cur = conn.cursor()
-            cur.execute(
-                "SELECT COUNT(*) as cnt FROM freshdesk_tickets WHERE source_id = %s",
-                (source_id,),
-            )
+            cur.execute("SELECT COUNT(*) as cnt FROM freshdesk_tickets")
             row = cur.fetchone()
             count = row[0] if row else 0
             cur.close()
@@ -119,13 +133,12 @@ class FreshdeskExecutor:
                 "success": True,
                 "schema": FRESHDESK_SCHEMA.strip(),
                 "ticket_count": count,
-                "source_id": source_id,
             }
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def _query_runner(self, tool_input: Dict[str, Any], source_id: str) -> Dict[str, Any]:
-        """Execute a read-only SQL query scoped to the source_id."""
+    def _query_runner(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a read-only SQL query against the global freshdesk_tickets table."""
         sql = (tool_input.get("sql_query") or "").strip()
         if not sql:
             return {"success": False, "error": "sql_query is required"}
@@ -145,50 +158,31 @@ class FreshdeskExecutor:
             # Set query timeout
             cur.execute("SET statement_timeout = 10000")
 
-            # Inject source_id filter
-            # If WHERE exists, add AND; otherwise add WHERE
-            scoped_sql = self._inject_source_filter(sql, source_id)
-
             start = time.time()
-            cur.execute(scoped_sql)
+            cur.execute(sql)
             rows = cur.fetchmany(100)
             elapsed = round((time.time() - start) * 1000, 1)
 
-            results = [dict(r) for r in rows]
+            results = [_serialize_row(dict(r)) for r in rows]
             column_names = [desc[0] for desc in cur.description] if cur.description else []
+            truncated = len(results) == 100
 
             cur.close()
 
-            return {
+            result = {
                 "success": True,
-                "query": scoped_sql,
+                "query": sql,
                 "row_count": len(results),
                 "results": results,
                 "column_names": column_names,
                 "execution_time_ms": elapsed,
-                "truncated": cur.rowcount > 100 if cur.rowcount and cur.rowcount > 0 else False,
+                "truncated": truncated,
             }
+            if truncated:
+                result["warning"] = "Results limited to 100 rows. Use GROUP BY, COUNT, or LIMIT to get aggregated data."
+            return result
         except Exception as e:
             return {"success": False, "error": str(e), "query": sql}
-
-    def _inject_source_filter(self, sql: str, source_id: str) -> str:
-        """Inject WHERE source_id = ... into the query for data isolation."""
-        filter_clause = f"source_id = \'{source_id}\'"
-
-        # Simple heuristic: find WHERE and add AND, or add WHERE before GROUP/ORDER/LIMIT
-        sql_lower = sql.lower()
-        if "where" in sql_lower:
-            # Add AND after WHERE
-            where_idx = sql_lower.index("where") + 5
-            return sql[:where_idx] + f" {filter_clause} AND" + sql[where_idx:]
-        else:
-            # Find the first GROUP BY, ORDER BY, LIMIT, or end of query
-            for keyword in ["group by", "order by", "limit", "having"]:
-                if keyword in sql_lower:
-                    idx = sql_lower.index(keyword)
-                    return sql[:idx] + f" WHERE {filter_clause} " + sql[idx:]
-            # No clauses found, append WHERE at the end
-            return sql.rstrip(";") + f" WHERE {filter_clause}"
 
 
 freshdesk_executor = FreshdeskExecutor()

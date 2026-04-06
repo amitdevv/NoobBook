@@ -65,6 +65,9 @@ ehthumbs.db
 # Process IDs for startup/shutdown scripts
 .noobbook_pids
 
+# Local DB ping script (contains credentials)
+bin/ping-db
+
 # Build artifacts
 build/
 *.tsbuildinfo
