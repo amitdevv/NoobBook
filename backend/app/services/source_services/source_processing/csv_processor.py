@@ -105,8 +105,13 @@ def process_csv(
         "extracted_at": datetime.now().isoformat()
     }
 
-    # CSV files are NOT embedded - we analyze them on-demand
+    # CSV files are NOT embedded - we analyze them on-demand.
+    # We must preserve file_extension/mime_type because main_chat_service
+    # routes CSV sources to the csv_analyzer_agent tool by checking
+    # embedding_info["file_extension"] == ".csv".
     embedding_info = {
+        "file_extension": ".csv",
+        "mime_type": "text/csv",
         "is_embedded": False,
         "embedded_at": None,
         "token_count": 0,
