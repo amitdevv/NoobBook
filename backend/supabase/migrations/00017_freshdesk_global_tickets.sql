@@ -62,19 +62,38 @@ DO $$ BEGIN
 EXCEPTION WHEN others THEN NULL;
 END $$;
 
--- Step 3: Add global unique constraint on ticket_id alone (skip if exists)
+-- Step 3: Deduplicate existing rows BEFORE adding the unique constraint.
+-- The original schema allowed the same ticket_id to exist for different
+-- sources. Going global means we must keep only one row per ticket_id —
+-- we keep the most recently synced row.
+DELETE FROM freshdesk_tickets
+WHERE id IN (
+  SELECT id FROM (
+    SELECT id,
+           ROW_NUMBER() OVER (
+             PARTITION BY ticket_id
+             ORDER BY synced_at DESC NULLS LAST, created_at DESC NULLS LAST
+           ) AS rn
+    FROM freshdesk_tickets
+  ) ranked
+  WHERE ranked.rn > 1
+);
+
+-- Step 4: Add global unique constraint on ticket_id alone (skip if exists).
+-- Catches `duplicate_object` (42710) — the correct error for an existing
+-- constraint — instead of the previous `duplicate_table` which is for tables.
 DO $$ BEGIN
   ALTER TABLE freshdesk_tickets ADD CONSTRAINT freshdesk_tickets_ticket_unique UNIQUE (ticket_id);
-EXCEPTION WHEN duplicate_table THEN NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- Step 4: Drop old source-scoped indexes
+-- Step 5: Drop old source-scoped indexes
 DROP INDEX IF EXISTS idx_freshdesk_tickets_source_id;
 DROP INDEX IF EXISTS idx_freshdesk_tickets_status;
 DROP INDEX IF EXISTS idx_freshdesk_tickets_created;
 DROP INDEX IF EXISTS idx_freshdesk_tickets_agent;
 
--- Step 5: Create new global indexes
+-- Step 6: Create new global indexes
 CREATE INDEX IF NOT EXISTS idx_freshdesk_tickets_status_global ON freshdesk_tickets(status);
 CREATE INDEX IF NOT EXISTS idx_freshdesk_tickets_created_global ON freshdesk_tickets(ticket_created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_freshdesk_tickets_agent_global ON freshdesk_tickets(agent_name);
