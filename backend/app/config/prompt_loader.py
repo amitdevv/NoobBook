@@ -32,6 +32,61 @@ from config import Config
 logger = logging.getLogger(__name__)
 
 
+class PromptConfig(dict):
+    """
+    Dict subclass whose "model" key is resolved dynamically on every access.
+
+    Services in this codebase often cache the result of
+    prompt_loader.get_prompt_config(...) in self._prompt_config and reuse it
+    for the lifetime of the process. If we mutated config["model"] once at
+    load time, an admin changing the model override later would not take
+    effect until restart.
+
+    By overriding __getitem__ and get for the "model" key, every lookup re-reads
+    the env-var-backed override. Services can keep caching the PromptConfig
+    instance (everything else is static) while still picking up admin changes
+    immediately.
+    """
+
+    def __init__(self, data: Dict[str, Any], prompt_name: Optional[str] = None):
+        super().__init__(data)
+        # Use object.__setattr__ to bypass dict semantics
+        object.__setattr__(self, "_prompt_name", prompt_name)
+
+    def _resolved_model(self) -> Optional[Any]:
+        # Lazy import to avoid circular dependency at module load time
+        from app.config.model_loader import get_model_override_for_prompt
+
+        prompt_name = object.__getattribute__(self, "_prompt_name")
+        if not prompt_name:
+            return None
+        return get_model_override_for_prompt(prompt_name)
+
+    def __getitem__(self, key):
+        if key == "model":
+            override = self._resolved_model()
+            if override:
+                return override
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        if key == "model":
+            override = self._resolved_model()
+            if override:
+                return override
+        return super().get(key, default)
+
+    def raw_model(self) -> Optional[str]:
+        """
+        Return the JSON-baked model, bypassing any admin override.
+
+        Used by the settings UI to show what "Default" actually resolves to
+        for each prompt — so admins can see whether selecting Default keeps
+        Sonnet, Opus, Haiku, or a mix.
+        """
+        return super().get("model")
+
+
 class PromptLoader:
     """
     Loader class for managing system prompts.
@@ -69,7 +124,7 @@ class PromptLoader:
             if "prompt" in prompt_data and "system_prompt" not in prompt_data:
                 prompt_data["system_prompt"] = prompt_data.pop("prompt")
 
-            return prompt_data
+            return PromptConfig(prompt_data, prompt_name="default")
 
     def get_default_prompt(self) -> str:
         """
@@ -141,6 +196,8 @@ class PromptLoader:
         except (FileNotFoundError, json.JSONDecodeError):
             pass
 
+        # get_default_prompt_config already returns a PromptConfig tagged with
+        # prompt_name="default" so the admin "chat" category override applies.
         return config
 
     def update_project_prompt(self, project_id: str, prompt: Optional[str]) -> bool:
@@ -252,7 +309,7 @@ class PromptLoader:
 
         try:
             with open(prompt_file, 'r') as f:
-                return json.load(f)
+                return PromptConfig(json.load(f), prompt_name=prompt_name)
         except (FileNotFoundError, json.JSONDecodeError):
             return None
 

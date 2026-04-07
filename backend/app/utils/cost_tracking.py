@@ -5,8 +5,9 @@ Educational Note: This utility tracks Claude API usage costs by model.
 Costs are stored in Supabase projects table and updated after each API call.
 
 Pricing (per 1M tokens):
+- Opus:   $5 input, $25 output
 - Sonnet: $3 input, $15 output
-- Haiku: $1 input, $5 output
+- Haiku:  $1 input, $5 output
 """
 import logging
 from typing import Dict, Any, Optional
@@ -17,9 +18,15 @@ logger = logging.getLogger(__name__)
 
 # Pricing per 1M tokens
 PRICING = {
+    "opus": {"input": 5.0, "output": 25.0},
     "sonnet": {"input": 3.0, "output": 15.0},
     "haiku": {"input": 1.0, "output": 5.0},
 }
+
+# Tracked model buckets, in stable order. Used by _get_default_costs and
+# _ensure_cost_structure so the breakdown always shows every model bucket
+# even if a project has only used some of them.
+_MODEL_KEYS = ("opus", "sonnet", "haiku")
 
 # Lock for thread-safe operations
 _lock = Lock()
@@ -27,22 +34,23 @@ _lock = Lock()
 
 def _get_model_key(model_string: str) -> str:
     """
-    Extract model key (sonnet/haiku) from full model string.
+    Extract model key (opus/sonnet/haiku) from full model string.
 
     Args:
         model_string: Full model ID like "claude-sonnet-4-6"
 
     Returns:
-        "sonnet" or "haiku"
+        "opus", "sonnet", or "haiku"
     """
     model_lower = model_string.lower()
+    if "opus" in model_lower:
+        return "opus"
     if "sonnet" in model_lower:
         return "sonnet"
-    elif "haiku" in model_lower:
+    if "haiku" in model_lower:
         return "haiku"
-    else:
-        # Default to sonnet pricing for unknown models
-        return "sonnet"
+    # Default to sonnet pricing for unknown models
+    return "sonnet"
 
 
 def _calculate_cost(model_key: str, input_tokens: int, output_tokens: int) -> float:
@@ -95,6 +103,10 @@ def _save_costs(project_id: str, costs: Dict[str, Any], user_id: Optional[str] =
         return False
 
 
+def _empty_bucket() -> Dict[str, Any]:
+    return {"input_tokens": 0, "output_tokens": 0, "cost": 0.0}
+
+
 def _get_default_costs() -> Dict[str, Any]:
     """
     Get default cost tracking structure.
@@ -104,18 +116,7 @@ def _get_default_costs() -> Dict[str, Any]:
     """
     return {
         "total_cost": 0.0,
-        "by_model": {
-            "sonnet": {
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "cost": 0.0
-            },
-            "haiku": {
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "cost": 0.0
-            }
-        }
+        "by_model": {key: _empty_bucket() for key in _MODEL_KEYS},
     }
 
 
@@ -135,13 +136,9 @@ def _ensure_cost_structure(costs: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     if "by_model" not in costs:
         costs["by_model"] = {}
 
-    for model in ["sonnet", "haiku"]:
+    for model in _MODEL_KEYS:
         if model not in costs["by_model"]:
-            costs["by_model"][model] = {
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "cost": 0.0
-            }
+            costs["by_model"][model] = _empty_bucket()
 
     return costs
 

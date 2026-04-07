@@ -16,6 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
 
+from app.config import prompt_loader
 from app.services.integrations.supabase import storage_service
 from app.services.ai_services.csv_service import csv_service
 
@@ -104,8 +105,13 @@ def process_csv(
         "extracted_at": datetime.now().isoformat()
     }
 
-    # CSV files are NOT embedded - we analyze them on-demand
+    # CSV files are NOT embedded - we analyze them on-demand.
+    # We must preserve file_extension/mime_type because main_chat_service
+    # routes CSV sources to the csv_analyzer_agent tool by checking
+    # embedding_info["file_extension"] == ".csv".
     embedding_info = {
+        "file_extension": ".csv",
+        "mime_type": "text/csv",
         "is_embedded": False,
         "embedded_at": None,
         "token_count": 0,
@@ -113,10 +119,17 @@ def process_csv(
         "reason": "CSV files are analyzed on-demand, not embedded"
     }
 
-    # Summary comes from AI service (not separate summary_service)
+    # Summary comes from AI service (not separate summary_service).
+    # Pull the label from the live prompt config so the stored metadata
+    # reflects admin model overrides (extraction category) and stays accurate
+    # if the prompt's own model changes.
+    csv_prompt_config = prompt_loader.get_prompt_config("csv_processor")
+    summary_model = (
+        csv_prompt_config.get("model") if csv_prompt_config else "unknown"
+    )
     summary_info = {
         "summary": analysis_result.get("summary", ""),
-        "model": "claude-haiku-4-5-20251001",
+        "model": summary_model,
         "usage": analysis_result.get("usage", {}),
         "generated_at": analysis_result.get("generated_at", datetime.now().isoformat()),
         "strategy": "csv_analyzer",

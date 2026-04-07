@@ -19,6 +19,7 @@ import {
   IntegrationsSection,
   SystemSection,
   DesignSection,
+  ModelsSection,
 } from '../settings/sections';
 
 interface AppSettingsProps {
@@ -43,7 +44,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
 
   // Handle section change with admin check
   const handleSectionChange = (section: SettingsSection) => {
-    const adminOnlySections: SettingsSection[] = ['team', 'api-keys', 'design', 'system'];
+    const adminOnlySections: SettingsSection[] = ['team', 'api-keys', 'models', 'design', 'system'];
     if (!isAdmin && adminOnlySections.includes(section)) {
       return; // Prevent non-admins from switching to admin sections
     }
@@ -66,6 +67,8 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
         return isAdmin ? <TeamSection currentUserId={userId} /> : null;
       case 'api-keys':
         return isAdmin ? <ApiKeysSection /> : null;
+      case 'models':
+        return isAdmin ? <ModelsSection /> : null;
       case 'integrations':
         return <IntegrationsSection isAdmin={isAdmin} />;
       case 'design':
