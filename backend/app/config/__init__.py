@@ -36,6 +36,14 @@ from app.config.tier_loader import (
     OPENAI_TIERS,
     PINECONE_TIERS,
 )
+from app.config.model_loader import (
+    AVAILABLE_MODELS,
+    MODEL_CATEGORIES,
+    PROMPT_TO_CATEGORY,
+    get_category_override,
+    get_model_override_for_prompt,
+    get_current_settings,
+)
 
 __all__ = [
     "tool_loader",
@@ -54,4 +62,10 @@ __all__ = [
     "ANTHROPIC_TIERS",
     "OPENAI_TIERS",
     "PINECONE_TIERS",
+    "AVAILABLE_MODELS",
+    "MODEL_CATEGORIES",
+    "PROMPT_TO_CATEGORY",
+    "get_category_override",
+    "get_model_override_for_prompt",
+    "get_current_settings",
 ]

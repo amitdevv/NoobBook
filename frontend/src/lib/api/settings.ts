@@ -488,6 +488,75 @@ class ProcessingSettingsAPI {
 export const processingSettingsAPI = new ProcessingSettingsAPI();
 
 // ============================================================================
+// Model Settings Types and API
+// ============================================================================
+
+export interface ModelPricing {
+  input_per_mtok: number;
+  output_per_mtok: number;
+}
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+  description: string;
+  pricing: ModelPricing;
+}
+
+export interface ModelCategory {
+  id: string;
+  label: string;
+  description: string;
+  env_var: string;
+}
+
+// { chat: "claude-opus-4-6" | null, studio: ..., query: ..., extraction: ... }
+export type ModelSettings = Record<string, string | null>;
+
+export interface ModelSettingsResponse {
+  settings: ModelSettings;
+  available_models: ModelInfo[];
+  categories: ModelCategory[];
+}
+
+class ModelSettingsAPI {
+  /**
+   * Get current per-category model overrides plus the lists needed to
+   * render the admin UI.
+   */
+  async getSettings(): Promise<ModelSettingsResponse> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/settings/models`);
+      return {
+        settings: response.data.settings,
+        available_models: response.data.available_models,
+        categories: response.data.categories,
+      };
+    } catch (error) {
+      log.error({ err: error }, 'failed to fetch model settings');
+      throw error;
+    }
+  }
+
+  /**
+   * Update per-category model overrides. Pass a partial map — only
+   * categories you include are changed. Use null to clear an override
+   * (reverts that category to "Default" which uses each prompt's own model).
+   */
+  async updateSettings(settings: ModelSettings): Promise<ModelSettings> {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/settings/models`, settings);
+      return response.data.settings;
+    } catch (error) {
+      log.error({ err: error }, 'failed to update model settings');
+      throw error;
+    }
+  }
+}
+
+export const modelSettingsAPI = new ModelSettingsAPI();
+
+// ============================================================================
 // Google Drive Types and API
 // ============================================================================
 
