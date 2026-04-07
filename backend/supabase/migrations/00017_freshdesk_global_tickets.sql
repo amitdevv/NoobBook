@@ -80,11 +80,18 @@ WHERE id IN (
 );
 
 -- Step 4: Add global unique constraint on ticket_id alone (skip if exists).
--- Catches `duplicate_object` (42710) — the correct error for an existing
--- constraint — instead of the previous `duplicate_table` which is for tables.
+-- We check pg_constraint explicitly because adding an existing UNIQUE
+-- constraint can fail with either `duplicate_object` (42710) for the
+-- constraint or `duplicate_table` (42P07) for the underlying index name.
 DO $$ BEGIN
-  ALTER TABLE freshdesk_tickets ADD CONSTRAINT freshdesk_tickets_ticket_unique UNIQUE (ticket_id);
-EXCEPTION WHEN duplicate_object THEN NULL;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'freshdesk_tickets_ticket_unique'
+      AND conrelid = 'freshdesk_tickets'::regclass
+  ) THEN
+    ALTER TABLE freshdesk_tickets
+      ADD CONSTRAINT freshdesk_tickets_ticket_unique UNIQUE (ticket_id);
+  END IF;
 END $$;
 
 -- Step 5: Drop old source-scoped indexes
