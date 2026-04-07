@@ -28,6 +28,7 @@ from app.config import (
     AVAILABLE_MODELS,
     MODEL_CATEGORIES,
     get_current_settings,
+    get_all_default_models,
 )
 from app.services.app_settings import EnvService
 from app.services.auth.rbac import require_admin
@@ -62,11 +63,17 @@ def get_model_settings():
         }
     """
     try:
+        # `defaults` shows what each prompt actually resolves to when its
+        # category is set to "Default" — used by the UI to make Default
+        # honest about which models will be used (e.g. chat = mostly Sonnet
+        # but Haiku for chat_naming/memory).
+        defaults = get_all_default_models()
         return jsonify({
             'success': True,
             'settings': get_current_settings(),
             'available_models': list(AVAILABLE_MODELS.values()),
             'categories': list(MODEL_CATEGORIES.values()),
+            'defaults': defaults,
         }), 200
     except Exception as e:
         current_app.logger.error(f"Error getting model settings: {e}")

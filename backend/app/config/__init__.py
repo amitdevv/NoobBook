@@ -43,6 +43,8 @@ from app.config.model_loader import (
     get_category_override,
     get_model_override_for_prompt,
     get_current_settings,
+    get_default_models_for_category,
+    get_all_default_models,
 )
 
 __all__ = [
@@ -68,4 +70,6 @@ __all__ = [
     "get_category_override",
     "get_model_override_for_prompt",
     "get_current_settings",
+    "get_default_models_for_category",
+    "get_all_default_models",
 ]

@@ -150,3 +150,45 @@ def get_current_settings() -> Dict[str, Optional[str]]:
     "Default" (the prompt's own model is used).
     """
     return {cat_id: get_category_override(cat_id) for cat_id in MODEL_CATEGORIES}
+
+
+def get_default_models_for_category(category: str) -> Dict[str, list]:
+    """
+    For a given category, return a map of {model_id: [prompt_names]} showing
+    which model each prompt in the category uses by default (i.e. its
+    JSON-baked model, ignoring any admin override).
+
+    Used by the settings UI to clearly explain what "Default" means for each
+    category — e.g., chat is mostly Sonnet but uses Haiku for chat_naming and
+    memory; studio is mostly Sonnet with three Opus prompts.
+    """
+    # Lazy import to avoid circular dependency at module load time
+    from app.config.prompt_loader import prompt_loader
+
+    breakdown: Dict[str, list] = {}
+    for prompt_name, cat in PROMPT_TO_CATEGORY.items():
+        if cat != category:
+            continue
+        config = prompt_loader.get_prompt_config(prompt_name)
+        if config is None:
+            continue
+        # Use raw_model() to bypass any active override and get the
+        # JSON-baked model — that's what "Default" actually resolves to.
+        model = config.raw_model() if hasattr(config, "raw_model") else config.get("model")
+        if not model:
+            continue
+        breakdown.setdefault(model, []).append(prompt_name)
+    # Sort prompt lists for stable output
+    for prompts in breakdown.values():
+        prompts.sort()
+    return breakdown
+
+
+def get_all_default_models() -> Dict[str, Dict[str, list]]:
+    """
+    Return {category_id: {model_id: [prompt_names]}} for every category.
+
+    Used by GET /settings/models so the frontend can render the per-prompt
+    default breakdown under each dropdown.
+    """
+    return {cat_id: get_default_models_for_category(cat_id) for cat_id in MODEL_CATEGORIES}

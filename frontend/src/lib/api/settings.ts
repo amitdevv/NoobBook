@@ -513,10 +513,16 @@ export interface ModelCategory {
 // { chat: "claude-opus-4-6" | null, studio: ..., query: ..., extraction: ... }
 export type ModelSettings = Record<string, string | null>;
 
+// { chat: { "claude-sonnet-4-6": ["default"], "claude-haiku-4-5-20251001": ["chat_naming", "memory"] }, ... }
+// Shows which JSON-baked model each prompt uses by default. Lets the UI
+// explain what selecting "Default" actually means per category.
+export type ModelDefaults = Record<string, Record<string, string[]>>;
+
 export interface ModelSettingsResponse {
   settings: ModelSettings;
   available_models: ModelInfo[];
   categories: ModelCategory[];
+  defaults: ModelDefaults;
 }
 
 class ModelSettingsAPI {
@@ -531,6 +537,7 @@ class ModelSettingsAPI {
         settings: response.data.settings,
         available_models: response.data.available_models,
         categories: response.data.categories,
+        defaults: response.data.defaults,
       };
     } catch (error) {
       log.error({ err: error }, 'failed to fetch model settings');

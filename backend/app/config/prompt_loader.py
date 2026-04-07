@@ -76,6 +76,16 @@ class PromptConfig(dict):
                 return override
         return super().get(key, default)
 
+    def raw_model(self) -> Optional[str]:
+        """
+        Return the JSON-baked model, bypassing any admin override.
+
+        Used by the settings UI to show what "Default" actually resolves to
+        for each prompt — so admins can see whether selecting Default keeps
+        Sonnet, Opus, Haiku, or a mix.
+        """
+        return super().get("model")
+
 
 class PromptLoader:
     """
