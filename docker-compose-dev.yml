@@ -405,7 +405,7 @@ services:
 
   # --- Database migration (runs once, then exits) ---
   migrate:
-    image: postgres:16-alpine
+    image: postgres:18.3-alpine
     restart: "no"
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
