@@ -119,7 +119,8 @@ class ClaudeService:
         Opik uses background batching by default (flush=False), so the trace
         upload adds <5ms overhead — it never blocks the API response.
 
-        Falls back to a direct call if Opik wrapping fails.
+        API errors from fn() always propagate to the caller — only Opik
+        setup errors are caught and ignored.
         """
         if not self._opik_enabled or not opik_kwargs:
             return fn()
@@ -127,15 +128,18 @@ class ClaudeService:
         try:
             import opik
             from opik.opik_context import update_current_trace
-
-            @opik.track(name="noobbook_llm_call")
-            def tracked():
-                update_current_trace(**opik_kwargs)
-                return fn()
-
-            return tracked()
-        except Exception:
+        except ImportError:
             return fn()
+
+        @opik.track(name="noobbook_llm_call")
+        def tracked():
+            try:
+                update_current_trace(**opik_kwargs)
+            except Exception:
+                pass  # Never fail on metadata injection
+            return fn()  # API errors propagate normally
+
+        return tracked()  # API errors propagate to caller
 
     def send_message(
         self,
