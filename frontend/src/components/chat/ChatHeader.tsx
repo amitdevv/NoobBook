@@ -106,7 +106,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = React.memo(({
                 )}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Export as Markdown</TooltipContent>
+            <TooltipContent>Export as PDF</TooltipContent>
           </Tooltip>
           </TooltipProvider>
 

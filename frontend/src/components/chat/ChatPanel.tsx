@@ -20,7 +20,7 @@ import { ChatInput } from './ChatInput';
 import { ChatList } from './ChatList';
 import { ChatEmptyState } from './ChatEmptyState';
 import { RawMessageView } from './RawMessageView';
-import { exportChatAsMarkdown } from '@/lib/exportChatMarkdown';
+import { exportChatAsPdf } from '@/lib/exportChatPdf';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('chat-panel');
@@ -454,16 +454,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   /**
-   * Export the active chat as a Markdown file
+   * Export the active chat as a PDF file
    */
   const handleExportChat = useCallback(async () => {
     if (!activeChat) return;
     setExportingChat(true);
     try {
-      await exportChatAsMarkdown({ chat: activeChat, projectId, projectName });
-      success('Chat exported as Markdown');
+      await exportChatAsPdf({ chat: activeChat, projectId, projectName });
+      success('Chat exported as PDF');
     } catch (err) {
-      log.error({ err }, 'failed to Lexporting chatE');
+      log.error({ err }, 'Failed to export chat as PDF');
       error('Failed to export chat');
     } finally {
       setExportingChat(false);
