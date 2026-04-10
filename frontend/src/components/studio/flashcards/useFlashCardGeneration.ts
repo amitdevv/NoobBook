@@ -195,11 +195,14 @@ export const useFlashCardGeneration = (projectId: string) => {
    * Delete a flash card job
    */
   const handleFlashCardDelete = async (jobId: string) => {
+    if (!window.confirm('Are you sure you want to delete this? This cannot be undone.')) return;
     try {
       await flashCardsAPI.deleteJob(projectId, jobId);
       setSavedFlashCardJobs((prev) => prev.filter((j) => j.id !== jobId));
+      showSuccess('Deleted successfully.');
     } catch (error) {
       log.error({ err: error }, 'failed to delete flash card job');
+      showError('Failed to delete. Please try again.');
     }
   };
 

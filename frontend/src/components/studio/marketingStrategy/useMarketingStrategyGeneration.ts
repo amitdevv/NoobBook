@@ -167,11 +167,14 @@ export const useMarketingStrategyGeneration = (projectId: string) => {
    * Delete a marketing strategy job from the backend and remove from local state
    */
   const handleMarketingStrategyDelete = async (jobId: string) => {
+    if (!window.confirm('Are you sure you want to delete this? This cannot be undone.')) return;
     try {
       await marketingStrategiesAPI.deleteJob(projectId, jobId);
       setSavedMarketingStrategyJobs((prev) => prev.filter((j) => j.id !== jobId));
+      showSuccess('Deleted successfully.');
     } catch (error) {
       log.error({ err: error }, 'failed to delete marketing strategy job');
+      showError('Failed to delete. Please try again.');
     }
   };
 

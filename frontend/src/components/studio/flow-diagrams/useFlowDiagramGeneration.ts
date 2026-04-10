@@ -122,11 +122,14 @@ export const useFlowDiagramGeneration = (projectId: string) => {
   };
 
   const handleFlowDiagramDelete = async (jobId: string) => {
+    if (!window.confirm('Are you sure you want to delete this? This cannot be undone.')) return;
     try {
       await flowDiagramsAPI.deleteJob(projectId, jobId);
       setSavedFlowDiagramJobs((prev) => prev.filter((j) => j.id !== jobId));
+      showSuccess('Deleted successfully.');
     } catch (error) {
       log.error({ err: error }, 'failed to delete flow diagram job');
+      showError('Failed to delete. Please try again.');
     }
   };
 
