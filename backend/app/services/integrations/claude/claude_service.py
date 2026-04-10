@@ -106,7 +106,7 @@ class ClaudeService:
             kwargs["tags"] = tags
         return kwargs
 
-    def _run_tracked(self, fn, *, opik_kwargs: Dict[str, Any]):
+    def _run_tracked(self, fn, *, opik_kwargs: Dict[str, Any], trace_input: Optional[Dict[str, Any]] = None):
         """
         Run fn() inside an @opik.track() parent trace with metadata.
 
@@ -134,6 +134,8 @@ class ClaudeService:
         @opik.track(name="noobbook_llm_call")
         def tracked():
             try:
+                if trace_input:
+                    opik_kwargs["input"] = trace_input
                 update_current_trace(**opik_kwargs)
             except Exception:
                 pass  # Never fail on metadata injection
@@ -202,9 +204,11 @@ class ClaudeService:
 
         # Make API call (wrapped in Opik parent trace with metadata if enabled)
         opik_kwargs = self._build_opik_kwargs(project_id=project_id, user_id=user_id, chat_id=chat_id, tags=tags)
+        trace_input = {"model": model, "message_count": len(messages)}
         response = self._run_tracked(
             lambda: client.messages.create(**api_params),
             opik_kwargs=opik_kwargs,
+            trace_input=trace_input,
         )
 
         # Track costs if project_id provided
@@ -271,7 +275,8 @@ class ClaudeService:
                 return stream.get_final_message()
 
         opik_kwargs = self._build_opik_kwargs(project_id=project_id, user_id=user_id, chat_id=chat_id, tags=tags)
-        response = self._run_tracked(_do_stream, opik_kwargs=opik_kwargs)
+        trace_input = {"model": model, "message_count": len(messages), "streaming": True}
+        response = self._run_tracked(_do_stream, opik_kwargs=opik_kwargs, trace_input=trace_input)
 
         if project_id:
             add_cost_usage(
