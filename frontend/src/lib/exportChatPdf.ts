@@ -327,6 +327,10 @@ export async function exportChatAsPdf({
 
     console.log('[PDF Export] Canvas:', canvas.width, 'x', canvas.height);
 
+    if (canvas.width === 0 || canvas.height === 0) {
+      throw new Error('Failed to render chat content — canvas is empty');
+    }
+
     // ── Step 7: Build PDF from canvas pages ──
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageW = pdf.internal.pageSize.getWidth();
