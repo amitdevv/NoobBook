@@ -202,6 +202,15 @@ export const useBusinessReportGeneration = (projectId: string) => {
     }
   };
 
+  const handleBusinessReportDelete = async (jobId: string) => {
+    try {
+      await businessReportsAPI.deleteJob(projectId, jobId);
+      setSavedBusinessReportJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete business report job');
+    }
+  };
+
   const downloadBusinessReport = (jobId: string) => {
     const url = businessReportsAPI.getDownloadUrl(projectId, jobId);
     window.open(getAuthUrl(url), '_blank');
@@ -217,6 +226,7 @@ export const useBusinessReportGeneration = (projectId: string) => {
     loadSavedJobs,
     handleBusinessReportGeneration,
     handleBusinessReportEdit,
+    handleBusinessReportDelete,
     downloadBusinessReport,
   };
 };

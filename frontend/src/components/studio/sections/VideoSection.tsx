@@ -23,6 +23,7 @@ export const VideoSection: React.FC = () => {
     loadSavedJobs,
     handleVideoGeneration,
     handleVideoEdit,
+    handleVideoDelete,
     downloadVideo,
   } = useVideoGeneration(projectId);
 
@@ -61,6 +62,7 @@ export const VideoSection: React.FC = () => {
               downloadVideo(job.id, job.videos[0].filename);
             }
           }}
+          onDelete={() => handleVideoDelete(job.id)}
         />
       ))}
 

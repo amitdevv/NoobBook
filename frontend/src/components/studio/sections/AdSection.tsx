@@ -25,6 +25,7 @@ export const AdSection: React.FC = () => {
     loadSavedJobs,
     handleAdGeneration,
     handleAdEdit,
+    handleAdDelete,
   } = useAdGeneration(projectId);
 
   // Ads show if any ads_creative signal exists (not filtered by source_id)
@@ -61,6 +62,7 @@ export const AdSection: React.FC = () => {
           job={job}
           index={savedAdJobs.length - i}
           onClick={() => setViewingAdJob(job)}
+          onDelete={() => handleAdDelete(job.id)}
         />
       ))}
 

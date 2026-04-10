@@ -25,6 +25,7 @@ export const BlogSection: React.FC = () => {
     loadSavedJobs,
     handleBlogGeneration,
     handleBlogEdit,
+    handleBlogDelete,
     downloadBlog,
   } = useBlogGeneration(projectId);
 
@@ -63,6 +64,7 @@ export const BlogSection: React.FC = () => {
             e.stopPropagation();
             downloadBlog(job.id);
           }}
+          onDelete={() => handleBlogDelete(job.id)}
         />
       ))}
 

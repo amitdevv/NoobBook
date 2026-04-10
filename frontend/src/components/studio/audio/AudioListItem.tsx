@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { SpeakerHigh, Play, Pause, DownloadSimple, PencilSimple } from '@phosphor-icons/react';
+import { SpeakerHigh, Play, Pause, DownloadSimple, PencilSimple, Trash } from '@phosphor-icons/react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import type { AudioJob } from '@/lib/api/studio';
@@ -24,6 +24,7 @@ interface AudioListItemProps {
   onCycleSpeed: () => void;
   onDownload: (job: AudioJob) => void;
   formatDuration: (seconds: number) => string;
+  onDelete: () => void;
   onEdit?: (job: AudioJob, instructions: string) => void;
   isEditing?: boolean;
   isGenerating?: boolean;
@@ -45,6 +46,7 @@ export const AudioListItem: React.FC<AudioListItemProps> = ({
   onSeek,
   playbackRate,
   onCycleSpeed,
+  onDelete,
   onDownload,
   formatDuration,
   onEdit,
@@ -77,7 +79,7 @@ export const AudioListItem: React.FC<AudioListItemProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-1.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 transition-colors">
+    <div className="group flex flex-col gap-1.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 transition-colors">
       {/* Top row: icon + name + controls */}
       <div className="flex items-center gap-2.5">
         <div className="p-1.5 bg-primary/10 rounded-md flex-shrink-0 w-7 h-7 flex items-center justify-center">
@@ -135,6 +137,13 @@ export const AudioListItem: React.FC<AudioListItemProps> = ({
           >
             <DownloadSimple size={16} />
           </Button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="p-1 hover:bg-destructive/10 rounded flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Delete"
+          >
+            <Trash size={14} className="text-muted-foreground hover:text-destructive" />
+          </button>
         </div>
       </div>
 

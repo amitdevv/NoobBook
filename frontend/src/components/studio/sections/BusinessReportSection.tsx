@@ -23,6 +23,7 @@ export const BusinessReportSection: React.FC = () => {
     loadSavedJobs,
     handleBusinessReportGeneration,
     handleBusinessReportEdit,
+    handleBusinessReportDelete,
     downloadBusinessReport,
   } = useBusinessReportGeneration(projectId);
 
@@ -59,6 +60,7 @@ export const BusinessReportSection: React.FC = () => {
             e.stopPropagation();
             downloadBusinessReport(job.id);
           }}
+          onDelete={() => handleBusinessReportDelete(job.id)}
         />
       ))}
 

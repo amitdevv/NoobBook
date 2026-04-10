@@ -17,9 +17,10 @@ Diagram Types:
 - Pie charts, Gantt charts, etc.
 
 Routes:
-- POST /projects/<id>/studio/flow-diagram           - Start generation
-- GET  /projects/<id>/studio/flow-diagram-jobs/<id> - Job status
-- GET  /projects/<id>/studio/flow-diagram-jobs      - List jobs
+- POST   /projects/<id>/studio/flow-diagram              - Start generation
+- GET    /projects/<id>/studio/flow-diagram-jobs/<id>    - Job status
+- GET    /projects/<id>/studio/flow-diagram-jobs         - List jobs
+- DELETE /projects/<id>/studio/flow-diagram-jobs/<id>    - Delete job
 """
 import uuid
 from flask import jsonify, request, current_app
@@ -27,6 +28,7 @@ from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.services.studio_services.flow_diagram_service import flow_diagram_service
 from app.services.source_services import source_index_service
+from app.services.integrations.supabase import storage_service
 from app.services.background_services.task_service import task_service
 
 
@@ -205,4 +207,40 @@ def list_flow_diagram_jobs(project_id: str):
         return jsonify({
             'success': False,
             'error': f'Failed to list jobs: {str(e)}'
+        }), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/flow-diagram-jobs/<job_id>', methods=['DELETE'])
+def delete_flow_diagram_job(project_id: str, job_id: str):
+    """
+    Delete a flow diagram job and its files.
+
+    Response:
+        - Success status
+    """
+    try:
+        job = studio_index_service.get_flow_diagram_job(project_id, job_id)
+
+        if not job:
+            return jsonify({
+                'success': False,
+                'error': f'Flow diagram job {job_id} not found'
+            }), 404
+
+        # Delete files from Supabase Storage
+        storage_service.delete_studio_job_files(project_id, "flow_diagrams", job_id)
+
+        # Delete job from index
+        studio_index_service.delete_flow_diagram_job(project_id, job_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Flow diagram job {job_id} deleted'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting flow diagram job: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete flow diagram job: {str(e)}'
         }), 500

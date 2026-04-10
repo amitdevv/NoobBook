@@ -25,6 +25,7 @@ export const PresentationSection: React.FC = () => {
     loadSavedJobs,
     handlePresentationGeneration,
     handlePresentationEdit,
+    handlePresentationDelete,
     downloadPresentation,
   } = usePresentationGeneration(projectId);
 
@@ -63,6 +64,7 @@ export const PresentationSection: React.FC = () => {
             e.stopPropagation();
             downloadPresentation(job.id);
           }}
+          onDelete={() => handlePresentationDelete(job.id)}
         />
       ))}
 

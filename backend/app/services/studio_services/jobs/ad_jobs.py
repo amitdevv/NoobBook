@@ -42,3 +42,7 @@ def get_ad_job(project_id: str, job_id: str) -> Optional[Dict[str, Any]]:
 
 def list_ad_jobs(project_id: str) -> List[Dict[str, Any]]:
     return list_jobs(project_id, JOB_TYPE)
+
+
+def delete_ad_job(project_id: str, job_id: str) -> bool:
+    return delete_job(project_id, job_id)

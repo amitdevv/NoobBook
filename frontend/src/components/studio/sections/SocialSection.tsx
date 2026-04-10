@@ -26,6 +26,7 @@ export const SocialSection: React.FC = () => {
     loadSavedJobs,
     handleSocialPostGeneration,
     handleSocialPostEdit,
+    handleSocialPostDelete,
   } = useSocialPostGeneration(projectId);
 
   const hasSocialSignal = signals.some((s) => s.studio_item === 'social');
@@ -59,6 +60,7 @@ export const SocialSection: React.FC = () => {
           key={job.id}
           job={job}
           onClick={() => setViewingSocialPostJob(job)}
+          onDelete={() => handleSocialPostDelete(job.id)}
         />
       ))}
 

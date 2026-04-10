@@ -24,6 +24,7 @@ export const QuizSection: React.FC = () => {
     loadSavedJobs,
     handleQuizGeneration,
     handleQuizEdit,
+    handleQuizDelete,
   } = useQuizGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedQuizJobs);
@@ -55,6 +56,7 @@ export const QuizSection: React.FC = () => {
           key={job.id}
           job={job}
           onClick={() => setViewingQuizJob(job)}
+          onDelete={() => handleQuizDelete(job.id)}
         />
       ))}
 

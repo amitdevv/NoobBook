@@ -145,6 +145,15 @@ export const useEmailGeneration = (projectId: string) => {
     }
   };
 
+  const handleEmailDelete = async (jobId: string) => {
+    try {
+      await emailsAPI.deleteJob(projectId, jobId);
+      setSavedEmailJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete email job');
+    }
+  };
+
   const handleEmailEdit = async (parentJob: EmailJob, editInstructions: string) => {
     if (isGeneratingEmail) return;
     setIsGeneratingEmail(true);
@@ -220,5 +229,6 @@ export const useEmailGeneration = (projectId: string) => {
     loadSavedJobs,
     handleEmailGeneration,
     handleEmailEdit,
+    handleEmailDelete,
   };
 };

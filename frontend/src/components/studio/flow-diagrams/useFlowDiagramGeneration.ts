@@ -121,6 +121,15 @@ export const useFlowDiagramGeneration = (projectId: string) => {
     }
   };
 
+  const handleFlowDiagramDelete = async (jobId: string) => {
+    try {
+      await flowDiagramsAPI.deleteJob(projectId, jobId);
+      setSavedFlowDiagramJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete flow diagram job');
+    }
+  };
+
   const handleFlowDiagramEdit = async (parentJob: FlowDiagramJob, editInstructions: string) => {
     if (isGeneratingFlowDiagram) return;
     setIsGeneratingFlowDiagram(true);
@@ -188,5 +197,6 @@ export const useFlowDiagramGeneration = (projectId: string) => {
     loadSavedJobs,
     handleFlowDiagramGeneration,
     handleFlowDiagramEdit,
+    handleFlowDiagramDelete,
   };
 };

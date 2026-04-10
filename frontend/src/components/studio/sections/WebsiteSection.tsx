@@ -25,6 +25,7 @@ export const WebsiteSection: React.FC = () => {
     loadSavedJobs,
     handleWebsiteGeneration,
     handleWebsiteEdit,
+    handleWebsiteDelete,
     downloadWebsite,
   } = useWebsiteGeneration(projectId);
 
@@ -63,6 +64,7 @@ export const WebsiteSection: React.FC = () => {
             e.stopPropagation();
             downloadWebsite(job.id);
           }}
+          onDelete={() => handleWebsiteDelete(job.id)}
         />
       ))}
 

@@ -23,6 +23,7 @@ export const MindMapSection: React.FC = () => {
     loadSavedJobs,
     handleMindMapGeneration,
     handleMindMapEdit,
+    handleMindMapDelete,
   } = useMindMapGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedMindMapJobs);
@@ -54,6 +55,7 @@ export const MindMapSection: React.FC = () => {
           key={job.id}
           job={job}
           onClick={() => setViewingMindMapJob(job)}
+          onDelete={() => handleMindMapDelete(job.id)}
         />
       ))}
 

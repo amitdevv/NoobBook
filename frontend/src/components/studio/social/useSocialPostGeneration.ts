@@ -200,6 +200,18 @@ export const useSocialPostGeneration = (projectId: string) => {
     }
   };
 
+  /**
+   * Delete a social post job
+   */
+  const handleSocialPostDelete = async (jobId: string) => {
+    try {
+      await socialPostsAPI.deleteJob(projectId, jobId);
+      setSavedSocialPostJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete social post job');
+    }
+  };
+
   return {
     savedSocialPostJobs,
     currentSocialPostJob,
@@ -211,5 +223,6 @@ export const useSocialPostGeneration = (projectId: string) => {
     loadSavedJobs,
     handleSocialPostGeneration,
     handleSocialPostEdit,
+    handleSocialPostDelete,
   };
 };

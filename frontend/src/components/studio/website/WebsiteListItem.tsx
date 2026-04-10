@@ -5,24 +5,26 @@
  */
 
 import React from 'react';
-import { Globe, DownloadSimple } from '@phosphor-icons/react';
+import { Globe, DownloadSimple, Trash } from '@phosphor-icons/react';
 import type { WebsiteJob } from '@/lib/api/studio';
 
 interface WebsiteListItemProps {
   job: WebsiteJob;
   onOpen: () => void;
   onDownload: (e: React.MouseEvent) => void;
+  onDelete: () => void;
 }
 
 export const WebsiteListItem: React.FC<WebsiteListItemProps> = ({
   job,
   onOpen,
   onDownload,
+  onDelete,
 }) => {
   return (
     <div
       onClick={onOpen}
-      className="flex items-start gap-2.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 cursor-pointer transition-colors"
+      className="group flex items-start gap-2.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 cursor-pointer transition-colors"
     >
       <Globe size={16} weight="duotone" className="text-purple-600 mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">
@@ -40,6 +42,13 @@ export const WebsiteListItem: React.FC<WebsiteListItemProps> = ({
         title="Download ZIP"
       >
         <DownloadSimple size={14} className="text-purple-600" />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        className="p-1 hover:bg-destructive/10 rounded flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        title="Delete"
+      >
+        <Trash size={14} className="text-muted-foreground hover:text-destructive" />
       </button>
     </div>
   );

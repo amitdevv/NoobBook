@@ -25,6 +25,7 @@ export const EmailSection: React.FC = () => {
     loadSavedJobs,
     handleEmailGeneration,
     handleEmailEdit,
+    handleEmailDelete,
   } = useEmailGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedEmailJobs);
@@ -58,6 +59,7 @@ export const EmailSection: React.FC = () => {
           key={job.id}
           job={job}
           onClick={() => setViewingEmailJob(job)}
+          onDelete={() => handleEmailDelete(job.id)}
         />
       ))}
 

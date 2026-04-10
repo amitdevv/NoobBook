@@ -22,6 +22,7 @@ export const PRDSection: React.FC = () => {
     loadSavedJobs,
     handlePRDGeneration,
     handlePRDEdit,
+    handlePRDDelete,
     downloadPRD,
   } = usePRDGeneration(projectId);
 
@@ -58,6 +59,7 @@ export const PRDSection: React.FC = () => {
             e.stopPropagation();
             downloadPRD(job.id);
           }}
+          onDelete={() => handlePRDDelete(job.id)}
         />
       ))}
 

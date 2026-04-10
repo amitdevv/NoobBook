@@ -29,6 +29,7 @@ export const AudioSection: React.FC = () => {
     loadSavedJobs,
     handleAudioGeneration,
     handleAudioEdit,
+    handleAudioDelete,
     playAudio,
     pauseAudio,
     seekTo,
@@ -96,6 +97,7 @@ export const AudioSection: React.FC = () => {
           defaultEditInput={editingJobId === job.id ? pendingEditInput : ''}
           isEditOpen={openEditJobId === job.id || editingJobId === job.id}
           onToggleEdit={() => setOpenEditJobId(prev => prev === job.id ? null : job.id)}
+          onDelete={() => handleAudioDelete(job.id)}
         />
       ))}
     </>

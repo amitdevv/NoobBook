@@ -25,6 +25,7 @@ export const InfographicSection: React.FC = () => {
     loadSavedJobs,
     handleInfographicGeneration,
     handleInfographicEdit,
+    handleInfographicDelete,
   } = useInfographicGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedInfographicJobs);
@@ -58,6 +59,7 @@ export const InfographicSection: React.FC = () => {
           key={job.id}
           job={job}
           onClick={() => setViewingInfographicJob(job)}
+          onDelete={() => handleInfographicDelete(job.id)}
         />
       ))}
 

@@ -312,6 +312,7 @@ from app.services.studio_services.jobs.ad_jobs import (
     update_ad_job,
     get_ad_job,
     list_ad_jobs,
+    delete_ad_job,
 )
 
 from app.services.studio_services.jobs.flash_card_jobs import (

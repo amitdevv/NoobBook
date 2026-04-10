@@ -219,4 +219,22 @@ export const wireframesAPI = {
 
     throw new Error('Wireframe generation timed out');
   },
+
+  /**
+   * Delete a wireframe job
+   */
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/wireframe-jobs/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        return error.response.data;
+      }
+      log.error({ err: error }, 'failed to delete wireframe job');
+      throw error;
+    }
+  },
 };

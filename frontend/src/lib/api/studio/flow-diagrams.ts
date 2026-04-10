@@ -206,4 +206,22 @@ export const flowDiagramsAPI = {
 
     throw new Error('Flow diagram generation timed out');
   },
+
+  /**
+   * Delete a flow diagram job
+   */
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/flow-diagram-jobs/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        return error.response.data;
+      }
+      log.error({ err: error }, 'failed to delete flow diagram job');
+      throw error;
+    }
+  },
 };

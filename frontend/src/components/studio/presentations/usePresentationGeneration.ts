@@ -153,6 +153,15 @@ export const usePresentationGeneration = (projectId: string) => {
     link.click();
   };
 
+  const handlePresentationDelete = async (jobId: string) => {
+    try {
+      await presentationsAPI.deleteJob(projectId, jobId);
+      setSavedPresentationJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete presentation job');
+    }
+  };
+
   const handlePresentationEdit = async (parentJob: PresentationJob, editInstructions: string) => {
     if (isGeneratingPresentation) return;
     setIsGeneratingPresentation(true);
@@ -224,6 +233,7 @@ export const usePresentationGeneration = (projectId: string) => {
     loadSavedJobs,
     handlePresentationGeneration,
     handlePresentationEdit,
+    handlePresentationDelete,
     downloadPresentation,
     downloadPresentationSource,
   };

@@ -222,4 +222,22 @@ export const audioAPI = {
 
     throw new Error('Audio generation timed out');
   },
+
+  /**
+   * Delete an audio job
+   */
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/audio-jobs/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        return error.response.data;
+      }
+      log.error({ err: error }, 'failed to delete audio job');
+      throw error;
+    }
+  },
 };

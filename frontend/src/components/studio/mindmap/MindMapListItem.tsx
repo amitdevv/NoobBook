@@ -4,18 +4,19 @@
  */
 
 import React from 'react';
-import { TreeStructure } from '@phosphor-icons/react';
+import { TreeStructure, Trash } from '@phosphor-icons/react';
 import type { MindMapJob } from '@/lib/api/studio';
 
 interface MindMapListItemProps {
   job: MindMapJob;
   onClick: () => void;
+  onDelete: () => void;
 }
 
-export const MindMapListItem: React.FC<MindMapListItemProps> = ({ job, onClick }) => {
+export const MindMapListItem: React.FC<MindMapListItemProps> = ({ job, onClick, onDelete }) => {
   return (
     <div
-      className="flex items-center gap-2.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 transition-colors cursor-pointer"
+      className="group flex items-center gap-2.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 transition-colors cursor-pointer"
       onClick={onClick}
     >
       <div className="p-1.5 bg-blue-500/10 rounded-md flex-shrink-0">
@@ -27,6 +28,13 @@ export const MindMapListItem: React.FC<MindMapListItemProps> = ({ job, onClick }
       <span className="text-[11px] text-muted-foreground flex-shrink-0">
         {job.node_count}
       </span>
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        className="p-1 hover:bg-destructive/10 rounded flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        title="Delete"
+      >
+        <Trash size={14} className="text-muted-foreground hover:text-destructive" />
+      </button>
     </div>
   );
 };

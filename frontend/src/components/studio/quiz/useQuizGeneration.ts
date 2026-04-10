@@ -185,6 +185,18 @@ export const useQuizGeneration = (projectId: string) => {
     }
   };
 
+  /**
+   * Delete a quiz job
+   */
+  const handleQuizDelete = async (jobId: string) => {
+    try {
+      await quizzesAPI.deleteJob(projectId, jobId);
+      setSavedQuizJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete quiz job');
+    }
+  };
+
   return {
     savedQuizJobs,
     currentQuizJob,
@@ -195,5 +207,6 @@ export const useQuizGeneration = (projectId: string) => {
     loadSavedJobs,
     handleQuizGeneration,
     handleQuizEdit,
+    handleQuizDelete,
   };
 };

@@ -139,6 +139,18 @@ export const useWebsiteGeneration = (projectId: string) => {
   };
 
   /**
+   * Delete a website job
+   */
+  const handleWebsiteDelete = async (jobId: string) => {
+    try {
+      await websitesAPI.deleteJob(projectId, jobId);
+      setSavedWebsiteJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete website job');
+    }
+  };
+
+  /**
    * Download website as ZIP
    */
   const downloadWebsite = (jobId: string) => {
@@ -219,6 +231,7 @@ export const useWebsiteGeneration = (projectId: string) => {
     loadSavedJobs,
     handleWebsiteGeneration,
     handleWebsiteEdit,
+    handleWebsiteDelete,
     openWebsite,
     downloadWebsite,
   };

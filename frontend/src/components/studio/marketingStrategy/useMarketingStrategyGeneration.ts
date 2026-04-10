@@ -163,6 +163,18 @@ export const useMarketingStrategyGeneration = (projectId: string) => {
     window.open(getAuthUrl(url), '_blank');
   };
 
+  /**
+   * Delete a marketing strategy job from the backend and remove from local state
+   */
+  const handleMarketingStrategyDelete = async (jobId: string) => {
+    try {
+      await marketingStrategiesAPI.deleteJob(projectId, jobId);
+      setSavedMarketingStrategyJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete marketing strategy job');
+    }
+  };
+
   return {
     savedMarketingStrategyJobs,
     currentMarketingStrategyJob,
@@ -172,6 +184,7 @@ export const useMarketingStrategyGeneration = (projectId: string) => {
     loadSavedJobs,
     handleMarketingStrategyGeneration,
     handleMarketingStrategyEdit,
+    handleMarketingStrategyDelete,
     downloadMarketingStrategy,
   };
 };

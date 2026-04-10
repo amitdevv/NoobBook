@@ -163,6 +163,18 @@ export const usePRDGeneration = (projectId: string) => {
     window.open(getAuthUrl(url), '_blank');
   };
 
+  /**
+   * Delete a PRD job from the backend and remove from local state
+   */
+  const handlePRDDelete = async (jobId: string) => {
+    try {
+      await prdsAPI.deleteJob(projectId, jobId);
+      setSavedPRDJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete PRD job');
+    }
+  };
+
   return {
     savedPRDJobs,
     currentPRDJob,
@@ -172,6 +184,7 @@ export const usePRDGeneration = (projectId: string) => {
     loadSavedJobs,
     handlePRDGeneration,
     handlePRDEdit,
+    handlePRDDelete,
     downloadPRD,
   };
 };

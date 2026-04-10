@@ -193,6 +193,18 @@ export const useInfographicGeneration = (projectId: string) => {
     }
   };
 
+  /**
+   * Delete an infographic job from the backend and remove from local state
+   */
+  const handleInfographicDelete = async (jobId: string) => {
+    try {
+      await infographicsAPI.deleteJob(projectId, jobId);
+      setSavedInfographicJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete infographic job');
+    }
+  };
+
   return {
     savedInfographicJobs,
     currentInfographicJob,
@@ -204,5 +216,6 @@ export const useInfographicGeneration = (projectId: string) => {
     loadSavedJobs,
     handleInfographicGeneration,
     handleInfographicEdit,
+    handleInfographicDelete,
   };
 };

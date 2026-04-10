@@ -23,6 +23,7 @@ export const FlashCardSection: React.FC = () => {
     loadSavedJobs,
     handleFlashCardGeneration,
     handleFlashCardEdit,
+    handleFlashCardDelete,
   } = useFlashCardGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedFlashCardJobs);
@@ -54,6 +55,7 @@ export const FlashCardSection: React.FC = () => {
           key={job.id}
           job={job}
           onClick={() => setViewingFlashCardJob(job)}
+          onDelete={() => handleFlashCardDelete(job.id)}
         />
       ))}
 

@@ -301,6 +301,18 @@ export const useAudioGeneration = (projectId: string) => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  /**
+   * Delete an audio job from the backend and remove from local state
+   */
+  const handleAudioDelete = async (jobId: string) => {
+    try {
+      await audioAPI.deleteJob(projectId, jobId);
+      setSavedAudioJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete audio job');
+    }
+  };
+
   return {
     savedAudioJobs,
     currentAudioJob,
@@ -316,6 +328,7 @@ export const useAudioGeneration = (projectId: string) => {
     loadSavedJobs,
     handleAudioGeneration,
     handleAudioEdit,
+    handleAudioDelete,
     playAudio,
     pauseAudio,
     seekTo,

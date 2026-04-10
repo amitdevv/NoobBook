@@ -185,6 +185,18 @@ export const useMindMapGeneration = (projectId: string) => {
     }
   };
 
+  /**
+   * Delete a mind map job
+   */
+  const handleMindMapDelete = async (jobId: string) => {
+    try {
+      await mindMapsAPI.deleteJob(projectId, jobId);
+      setSavedMindMapJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete mind map job');
+    }
+  };
+
   return {
     savedMindMapJobs,
     currentMindMapJob,
@@ -195,5 +207,6 @@ export const useMindMapGeneration = (projectId: string) => {
     loadSavedJobs,
     handleMindMapGeneration,
     handleMindMapEdit,
+    handleMindMapDelete,
   };
 };

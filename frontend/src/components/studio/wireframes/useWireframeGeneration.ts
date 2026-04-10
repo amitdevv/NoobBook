@@ -176,6 +176,18 @@ export const useWireframeGeneration = (projectId: string) => {
     }
   };
 
+  /**
+   * Delete a wireframe job from the backend and remove from local state
+   */
+  const handleWireframeDelete = async (jobId: string) => {
+    try {
+      await wireframesAPI.deleteJob(projectId, jobId);
+      setSavedWireframeJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete wireframe job');
+    }
+  };
+
   return {
     savedWireframeJobs,
     currentWireframeJob,
@@ -187,5 +199,6 @@ export const useWireframeGeneration = (projectId: string) => {
     loadSavedJobs,
     handleWireframeGeneration,
     handleWireframeEdit,
+    handleWireframeDelete,
   };
 };

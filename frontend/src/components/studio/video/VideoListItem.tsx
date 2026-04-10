@@ -5,24 +5,26 @@
  */
 
 import React from 'react';
-import { VideoCamera, DownloadSimple, PencilSimple } from '@phosphor-icons/react';
+import { VideoCamera, DownloadSimple, PencilSimple, Trash } from '@phosphor-icons/react';
 import type { VideoJob } from '@/lib/api/studio';
 
 interface VideoListItemProps {
   job: VideoJob;
   onOpen: () => void;
   onDownload: (e: React.MouseEvent) => void;
+  onDelete: () => void;
 }
 
 export const VideoListItem: React.FC<VideoListItemProps> = ({
   job,
   onOpen,
   onDownload,
+  onDelete,
 }) => {
   return (
     <div
       onClick={onOpen}
-      className="flex items-start gap-2.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 cursor-pointer transition-colors"
+      className="group flex items-start gap-2.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 cursor-pointer transition-colors"
     >
       <VideoCamera size={16} weight="duotone" className="text-orange-600 mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">
@@ -46,6 +48,13 @@ export const VideoListItem: React.FC<VideoListItemProps> = ({
         title="Download Video"
       >
         <DownloadSimple size={14} className="text-orange-600" />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        className="p-1 hover:bg-destructive/10 rounded flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        title="Delete"
+      >
+        <Trash size={14} className="text-muted-foreground hover:text-destructive" />
       </button>
     </div>
   );

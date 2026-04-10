@@ -116,6 +116,15 @@ export const useComponentGeneration = (projectId: string) => {
     }
   };
 
+  const handleComponentDelete = async (jobId: string) => {
+    try {
+      await componentsAPI.deleteJob(projectId, jobId);
+      setSavedComponentJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete component job');
+    }
+  };
+
   /**
    * Handle component edit — creates a new job with previous context
    */
@@ -183,5 +192,6 @@ export const useComponentGeneration = (projectId: string) => {
     loadSavedJobs,
     handleComponentGeneration,
     handleComponentEdit,
+    handleComponentDelete,
   };
 };

@@ -5,19 +5,20 @@
  */
 
 import React from 'react';
-import { Target, DownloadSimple } from '@phosphor-icons/react';
+import { Target, DownloadSimple, Trash } from '@phosphor-icons/react';
 import type { MarketingStrategyJob } from '@/lib/api/studio';
 
 interface MarketingStrategyListItemProps {
   job: MarketingStrategyJob;
   onOpen: () => void;
   onDownload: (e: React.MouseEvent) => void;
+  onDelete: () => void;
 }
 
-export const MarketingStrategyListItem: React.FC<MarketingStrategyListItemProps> = ({ job, onOpen, onDownload }) => {
+export const MarketingStrategyListItem: React.FC<MarketingStrategyListItemProps> = ({ job, onOpen, onDownload, onDelete }) => {
   return (
     <div
-      className="flex items-center gap-2.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 transition-colors cursor-pointer"
+      className="group flex items-center gap-2.5 p-2.5 bg-muted/50 rounded-lg border hover:border-primary/50 transition-colors cursor-pointer"
       onClick={onOpen}
     >
       <div className="p-1.5 bg-emerald-500/10 rounded-md flex-shrink-0">
@@ -37,6 +38,13 @@ export const MarketingStrategyListItem: React.FC<MarketingStrategyListItemProps>
         title="Download Marketing Strategy"
       >
         <DownloadSimple size={14} className="text-muted-foreground" />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        className="p-1 hover:bg-destructive/10 rounded flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        title="Delete"
+      >
+        <Trash size={14} className="text-muted-foreground hover:text-destructive" />
       </button>
     </div>
   );

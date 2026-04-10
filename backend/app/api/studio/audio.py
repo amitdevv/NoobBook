@@ -18,12 +18,13 @@ Background Job Flow:
 4. When ready, audio_url points to GET /audio/<filename>
 
 Routes:
-- POST /projects/<id>/studio/audio-overview  - Start generation
-- GET  /projects/<id>/studio/jobs/<id>       - Job status
-- GET  /projects/<id>/studio/jobs            - List jobs
-- GET  /projects/<id>/studio/audio/<job_id>/<file> - Serve audio file
-- GET  /studio/tts/status                    - Check TTS config
-- GET  /studio/tts/voices                    - List available voices
+- POST   /projects/<id>/studio/audio-overview       - Start generation
+- GET    /projects/<id>/studio/jobs/<id>            - Job status
+- GET    /projects/<id>/studio/jobs                 - List jobs
+- GET    /projects/<id>/studio/audio/<job_id>/<file> - Serve audio file
+- DELETE /projects/<id>/studio/audio-jobs/<id>      - Delete job
+- GET    /studio/tts/status                         - Check TTS config
+- GET    /studio/tts/voices                         - List available voices
 """
 import io
 import uuid
@@ -331,4 +332,40 @@ def list_tts_voices():
         return jsonify({
             'success': False,
             'error': f'Failed to list voices: {str(e)}'
+        }), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/audio-jobs/<job_id>', methods=['DELETE'])
+def delete_audio_job(project_id: str, job_id: str):
+    """
+    Delete an audio job and its files.
+
+    Response:
+        - Success status
+    """
+    try:
+        job = studio_index_service.get_audio_job(project_id, job_id)
+
+        if not job:
+            return jsonify({
+                'success': False,
+                'error': f'Audio job {job_id} not found'
+            }), 404
+
+        # Delete files from Supabase Storage
+        storage_service.delete_studio_job_files(project_id, "audio", job_id)
+
+        # Delete job from index
+        studio_index_service.delete_audio_job(project_id, job_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Audio job {job_id} deleted'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting audio job: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete audio job: {str(e)}'
         }), 500

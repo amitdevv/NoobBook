@@ -19,11 +19,12 @@ Background Job Flow:
 4. When ready, images array contains file URLs
 
 Routes:
-- POST /projects/<id>/studio/ad-creative        - Start generation
-- GET  /projects/<id>/studio/ad-jobs/<id>       - Job status
-- GET  /projects/<id>/studio/ad-jobs            - List jobs
-- GET  /projects/<id>/studio/creatives/<job_id>/<file> - Serve image file
-- GET  /studio/gemini/status                    - Check Gemini config
+- POST   /projects/<id>/studio/ad-creative              - Start generation
+- GET    /projects/<id>/studio/ad-jobs/<id>             - Job status
+- GET    /projects/<id>/studio/ad-jobs                  - List jobs
+- GET    /projects/<id>/studio/creatives/<job_id>/<file> - Serve image file
+- DELETE /projects/<id>/studio/ad-jobs/<id>             - Delete job
+- GET    /studio/gemini/status                          - Check Gemini config
 """
 import io
 import uuid
@@ -243,4 +244,40 @@ def get_gemini_status():
         return jsonify({
             'success': False,
             'error': 'Failed to check Gemini status'
+        }), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/ad-jobs/<job_id>', methods=['DELETE'])
+def delete_ad_job(project_id: str, job_id: str):
+    """
+    Delete an ad creative job and its files.
+
+    Response:
+        - Success status
+    """
+    try:
+        job = studio_index_service.get_ad_job(project_id, job_id)
+
+        if not job:
+            return jsonify({
+                'success': False,
+                'error': f'Ad job {job_id} not found'
+            }), 404
+
+        # Delete files from Supabase Storage
+        storage_service.delete_studio_job_files(project_id, "ads", job_id)
+
+        # Delete job from index
+        studio_index_service.delete_ad_job(project_id, job_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Ad job {job_id} deleted'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting ad job: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete ad job: {str(e)}'
         }), 500

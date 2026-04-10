@@ -25,6 +25,7 @@ export const FlowDiagramSection: React.FC = () => {
     loadSavedJobs,
     handleFlowDiagramGeneration,
     handleFlowDiagramEdit,
+    handleFlowDiagramDelete,
   } = useFlowDiagramGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedFlowDiagramJobs);
@@ -58,6 +59,7 @@ export const FlowDiagramSection: React.FC = () => {
           key={job.id}
           job={job}
           onClick={() => setViewingFlowDiagramJob(job)}
+          onDelete={() => handleFlowDiagramDelete(job.id)}
         />
       ))}
 

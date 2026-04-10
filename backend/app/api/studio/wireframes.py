@@ -8,9 +8,10 @@ Educational Note: Wireframes demonstrate visual UI/UX prototyping:
 4. Users can edit, export to PNG/SVG
 
 Routes:
-- POST /projects/<id>/studio/wireframe           - Start generation
-- GET  /projects/<id>/studio/wireframe-jobs/<id> - Job status
-- GET  /projects/<id>/studio/wireframe-jobs      - List jobs
+- POST   /projects/<id>/studio/wireframe              - Start generation
+- GET    /projects/<id>/studio/wireframe-jobs/<id>    - Job status
+- GET    /projects/<id>/studio/wireframe-jobs         - List jobs
+- DELETE /projects/<id>/studio/wireframe-jobs/<id>    - Delete job
 """
 
 import uuid
@@ -19,6 +20,7 @@ from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.services.ai_agents.wireframe_agent_service import wireframe_agent_service
 from app.services.source_services import source_index_service
+from app.services.integrations.supabase import storage_service
 from app.services.background_services.task_service import task_service
 
 
@@ -220,3 +222,39 @@ def list_wireframe_jobs(project_id: str):
         return jsonify(
             {"success": False, "error": f"Failed to list jobs: {str(e)}"}
         ), 500
+
+
+@studio_bp.route('/projects/<project_id>/studio/wireframe-jobs/<job_id>', methods=['DELETE'])
+def delete_wireframe_job(project_id: str, job_id: str):
+    """
+    Delete a wireframe job and its files.
+
+    Response:
+        - Success status
+    """
+    try:
+        job = studio_index_service.get_wireframe_job(project_id, job_id)
+
+        if not job:
+            return jsonify({
+                'success': False,
+                'error': f'Wireframe job {job_id} not found'
+            }), 404
+
+        # Delete files from Supabase Storage
+        storage_service.delete_studio_job_files(project_id, "wireframes", job_id)
+
+        # Delete job from index
+        studio_index_service.delete_wireframe_job(project_id, job_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Wireframe job {job_id} deleted'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting wireframe job: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete wireframe job: {str(e)}'
+        }), 500

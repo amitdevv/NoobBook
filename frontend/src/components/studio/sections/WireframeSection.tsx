@@ -25,6 +25,7 @@ export const WireframeSection: React.FC = () => {
     loadSavedJobs,
     handleWireframeGeneration,
     handleWireframeEdit,
+    handleWireframeDelete,
   } = useWireframeGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedWireframeJobs);
@@ -58,6 +59,7 @@ export const WireframeSection: React.FC = () => {
           key={job.id}
           job={job}
           onClick={() => setViewingWireframeJob(job)}
+          onDelete={() => handleWireframeDelete(job.id)}
         />
       ))}
 

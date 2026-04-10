@@ -191,6 +191,18 @@ export const useFlashCardGeneration = (projectId: string) => {
     }
   };
 
+  /**
+   * Delete a flash card job
+   */
+  const handleFlashCardDelete = async (jobId: string) => {
+    try {
+      await flashCardsAPI.deleteJob(projectId, jobId);
+      setSavedFlashCardJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete flash card job');
+    }
+  };
+
   return {
     savedFlashCardJobs,
     currentFlashCardJob,
@@ -201,5 +213,6 @@ export const useFlashCardGeneration = (projectId: string) => {
     loadSavedJobs,
     handleFlashCardGeneration,
     handleFlashCardEdit,
+    handleFlashCardDelete,
   };
 };

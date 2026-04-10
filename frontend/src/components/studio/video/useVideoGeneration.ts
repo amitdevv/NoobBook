@@ -201,6 +201,18 @@ export const useVideoGeneration = (projectId: string) => {
   };
 
   /**
+   * Delete a video job
+   */
+  const handleVideoDelete = async (jobId: string) => {
+    try {
+      await videosAPI.deleteJob(projectId, jobId);
+      setSavedVideoJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete video job');
+    }
+  };
+
+  /**
    * Open video in modal viewer
    */
   const openVideo = (jobId: string) => {
@@ -231,6 +243,7 @@ export const useVideoGeneration = (projectId: string) => {
     loadSavedJobs,
     handleVideoGeneration,
     handleVideoEdit,
+    handleVideoDelete,
     openVideo,
     downloadVideo,
   };

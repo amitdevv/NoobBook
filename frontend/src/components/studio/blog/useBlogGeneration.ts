@@ -207,6 +207,15 @@ export const useBlogGeneration = (projectId: string) => {
     }
   };
 
+  const handleBlogDelete = async (jobId: string) => {
+    try {
+      await blogsAPI.deleteJob(projectId, jobId);
+      setSavedBlogJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete blog job');
+    }
+  };
+
   const downloadBlog = (jobId: string) => {
     const url = blogsAPI.getDownloadUrl(projectId, jobId);
     window.open(getAuthUrl(url), '_blank');
@@ -223,6 +232,7 @@ export const useBlogGeneration = (projectId: string) => {
     loadSavedJobs,
     handleBlogGeneration,
     handleBlogEdit,
+    handleBlogDelete,
     downloadBlog,
   };
 };

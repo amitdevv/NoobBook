@@ -22,6 +22,7 @@ export const MarketingStrategySection: React.FC = () => {
     loadSavedJobs,
     handleMarketingStrategyGeneration,
     handleMarketingStrategyEdit,
+    handleMarketingStrategyDelete,
     downloadMarketingStrategy,
   } = useMarketingStrategyGeneration(projectId);
 
@@ -58,6 +59,7 @@ export const MarketingStrategySection: React.FC = () => {
             e.stopPropagation();
             downloadMarketingStrategy(job.id);
           }}
+          onDelete={() => handleMarketingStrategyDelete(job.id)}
         />
       ))}
 

@@ -192,6 +192,18 @@ export const useAdGeneration = (projectId: string) => {
     }
   };
 
+  /**
+   * Delete an ad job from the backend and remove from local state
+   */
+  const handleAdDelete = async (jobId: string) => {
+    try {
+      await adsAPI.deleteJob(projectId, jobId);
+      setSavedAdJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete ad job');
+    }
+  };
+
   return {
     savedAdJobs,
     currentAdJob,
@@ -202,5 +214,6 @@ export const useAdGeneration = (projectId: string) => {
     loadSavedJobs,
     handleAdGeneration,
     handleAdEdit,
+    handleAdDelete,
   };
 };

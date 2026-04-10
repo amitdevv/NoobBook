@@ -22,6 +22,7 @@ export const ComponentSection: React.FC = () => {
     loadSavedJobs,
     handleComponentGeneration,
     handleComponentEdit,
+    handleComponentDelete,
   } = useComponentGeneration(projectId);
 
   const filteredJobs = useFilteredJobs(savedComponentJobs);
@@ -53,6 +54,7 @@ export const ComponentSection: React.FC = () => {
           key={job.id}
           job={job}
           onClick={() => setViewingComponentJob(job)}
+          onDelete={() => handleComponentDelete(job.id)}
         />
       ))}
 
