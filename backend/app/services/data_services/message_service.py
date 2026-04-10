@@ -125,6 +125,12 @@ class MessageService:
         else:
             db_content = content
 
+        # Store error flag inside the JSONB content so build_api_messages
+        # can filter these out and never send them to Claude.
+        if metadata and metadata.get("error"):
+            if isinstance(db_content, dict):
+                db_content = {**db_content, "error": True}
+
         # Create message data
         message_data = {
             "chat_id": chat_id,
@@ -199,13 +205,17 @@ class MessageService:
         else:
             text_content = str(content) if content else ""
 
+        raw_content = message.get("content")
+        is_error = isinstance(raw_content, dict) and raw_content.get("error", False)
+
         return {
             "id": message.get("id"),
             "role": message.get("role"),
             "content": text_content,
             "timestamp": message.get("created_at"),
             "model": message.get("model"),
-            "citations": message.get("citations", [])
+            "citations": message.get("citations", []),
+            "error": is_error,
         }
 
     def add_user_message(
@@ -322,10 +332,18 @@ class MessageService:
         """
         messages = self.get_messages(project_id, chat_id)
 
-        # Convert to API format
+        # Convert to API format, skipping error messages.
+        # Error messages are internal UI feedback (e.g. "overloaded, try again").
+        # Sending them to Claude as assistant responses confuses it and can cause
+        # follow-up requests to fail or behave strangely.
         api_messages = []
         for msg in messages:
             content = msg.get("content")
+
+            # Skip error messages — flagged via {"error": true} in the JSONB content
+            if isinstance(content, dict) and content.get("error"):
+                continue
+
             # If content is a dict with "text" key, extract it for simple messages
             # Otherwise keep the full content (for tool_use/tool_result)
             if isinstance(content, dict) and "text" in content and msg.get("role") in ["user", "assistant"]:
