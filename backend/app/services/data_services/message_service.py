@@ -348,6 +348,16 @@ class MessageService:
         # Sanitize: fix orphaned tool_use/tool_result sequences from past errors
         api_messages = self._sanitize_tool_sequences(api_messages)
 
+        # Safety guard: Claude API requires messages to end with a user message.
+        # If sanitization left trailing assistant messages (from orphaned tool_use
+        # or error messages), strip them to prevent 400 errors.
+        while api_messages and api_messages[-1]["role"] == "assistant":
+            api_messages.pop()
+
+        # Also ensure messages start with a user message
+        while api_messages and api_messages[0]["role"] != "user":
+            api_messages.pop(0)
+
         return api_messages
 
     def _sanitize_tool_sequences(self, api_messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
