@@ -351,8 +351,27 @@ class MessageService:
         # Safety guard: Claude API requires messages to end with a user message.
         # If sanitization left trailing assistant messages (from orphaned tool_use
         # or error messages), strip them to prevent 400 errors.
+        # Also delete those rows from the DB so the chat self-heals — future requests
+        # won't need to re-sanitize the same corrupted tail.
+        trailing_assistant_ids = []
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant":
+                trailing_assistant_ids.append(msg["id"])
+            else:
+                break
+
         while api_messages and api_messages[-1]["role"] == "assistant":
             api_messages.pop()
+
+        if trailing_assistant_ids:
+            try:
+                self.supabase.table(self.table).delete().in_("id", trailing_assistant_ids).execute()
+                logger.info(
+                    "Self-healed chat %s: deleted %d trailing assistant messages from DB",
+                    chat_id, len(trailing_assistant_ids)
+                )
+            except Exception as e:
+                logger.warning("Failed to self-heal chat %s DB trailing messages: %s", chat_id, e)
 
         # Also ensure messages start with a user message
         while api_messages and api_messages[0]["role"] != "user":
