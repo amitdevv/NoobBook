@@ -252,4 +252,16 @@ export const marketingStrategiesAPI = {
 
     throw new Error('Marketing strategy generation timed out');
   },
+
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/marketing-strategies/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete marketing strategy job');
+      throw error;
+    }
+  },
 };

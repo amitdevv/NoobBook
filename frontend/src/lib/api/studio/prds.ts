@@ -252,4 +252,16 @@ export const prdsAPI = {
 
     throw new Error('PRD generation timed out');
   },
+
+  async deleteJob(projectId: string, jobId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/projects/${projectId}/studio/prds/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      log.error({ err: error }, 'failed to delete PRD job');
+      throw error;
+    }
+  },
 };
