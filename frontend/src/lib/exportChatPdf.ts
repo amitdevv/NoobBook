@@ -412,12 +412,17 @@ export async function exportChatAsPdf({
   parts.push(`<div class="doc-footer">Exported from NoobBook — noobbooklm.com</div>`);
 
   // ── Step 4: Render to PDF ──
+  // Container must stay in the viewport for html2canvas to render it.
+  // We hide it behind everything with z-index instead of moving it offscreen.
   const container = document.createElement('div');
   container.className = 'pdf-export';
   container.innerHTML = parts.join('');
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  container.style.width = '180mm'; // A4 minus margins
+  container.style.position = 'fixed';
+  container.style.left = '0';
+  container.style.top = '0';
+  container.style.width = '180mm';
+  container.style.zIndex = '-9999';
+  container.style.pointerEvents = 'none';
   document.body.appendChild(container);
 
   const filename = `${slugify(chat.title || 'chat-export') || 'chat-export'}-${new Date().toISOString().slice(0, 10)}.pdf`;
