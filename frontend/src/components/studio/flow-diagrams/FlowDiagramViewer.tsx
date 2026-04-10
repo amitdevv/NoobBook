@@ -93,6 +93,19 @@ export const FlowDiagramViewer: React.FC<FlowDiagramViewerProps> = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [svgDimensions, setSvgDimensions] = useState({ width: 0, height: 0 });
 
+  // Sanitize mermaid syntax to fix common AI-generated issues
+  const sanitizeMermaid = (syntax: string): string => {
+    let cleaned = syntax.trim();
+    // Strip markdown code fences (```mermaid ... ```)
+    cleaned = cleaned.replace(/^```(?:mermaid)?\s*\n?/i, '').replace(/\n?```\s*$/, '');
+    // Fix smart quotes → straight quotes
+    cleaned = cleaned.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+    // Fix em-dash → regular dash in arrows
+    cleaned = cleaned.replace(/\u2014/g, '--');
+    cleaned = cleaned.replace(/\u2013/g, '--');
+    return cleaned.trim();
+  };
+
   // Render the mermaid diagram
   const renderDiagram = useCallback(async () => {
     if (!mermaidSyntax) return;
@@ -101,8 +114,11 @@ export const FlowDiagramViewer: React.FC<FlowDiagramViewerProps> = ({
       // Generate unique ID for this render
       const id = `mermaid-${Date.now()}`;
 
+      // Sanitize common AI-generated syntax issues before rendering
+      const sanitized = sanitizeMermaid(mermaidSyntax);
+
       // Render the diagram
-      const { svg } = await mermaid.render(id, mermaidSyntax);
+      const { svg } = await mermaid.render(id, sanitized);
       setSvgContent(svg);
       setError(null);
 

@@ -183,9 +183,13 @@ class StudioSignalExecutor:
                 # without adding any source files), this correctly leaves source_ids
                 # empty — the frontend handles that case with an error banner.
                 if not source_ids:
-                    # Business reports need CSV sources; other generators need embedded text sources
-                    include_csv = signal.get("studio_item") == "business_report"
-                    source_ids = self._get_fallback_source_ids(project_id, include_csv=include_csv)
+                    # Business reports need CSV/DB sources; other generators need embedded text sources
+                    studio_item = signal.get("studio_item", "")
+                    include_csv = studio_item == "business_report"
+                    include_db = studio_item in ("business_report", "flow_diagram")
+                    source_ids = self._get_fallback_source_ids(
+                        project_id, include_csv=include_csv, include_db=include_db
+                    )
                     if source_ids:
                         logger.info(
                             "Auto-filled %d source_ids for signal '%s' (Claude omitted sources)",
@@ -223,7 +227,9 @@ class StudioSignalExecutor:
                 "error": str(e)
             }
 
-    def _get_fallback_source_ids(self, project_id: str, include_csv: bool = False) -> List[str]:
+    def _get_fallback_source_ids(
+        self, project_id: str, include_csv: bool = False, include_db: bool = False
+    ) -> List[str]:
         """
         Get fallback source IDs from the project's active sources.
 
@@ -231,11 +237,13 @@ class StudioSignalExecutor:
         include source references, we fall back to the project's ready sources.
         By default, DB and CSV sources are excluded since most studio generators
         (email, blog, etc.) need document text, not structured data.
-        Business reports are the exception — they specifically need CSV sources.
+        Business reports and flow diagrams are exceptions — they can work with
+        CSV and database sources.
 
         Args:
             project_id: The project UUID
             include_csv: If True, include CSV sources (used for business_report signals)
+            include_db: If True, include database sources (business_report, flow_diagram)
 
         Returns:
             List of source ID strings (may be empty if no sources exist)
@@ -253,8 +261,8 @@ class StudioSignalExecutor:
                 source_name = src.get("name", "")
                 is_csv = file_ext == ".csv" or source_name.lower().endswith(".csv")
                 is_db = file_ext == ".database"
-                # Skip DB sources always — no generator uses them directly
-                if is_db:
+                # Skip DB sources unless explicitly requested
+                if is_db and not include_db:
                     continue
                 # Skip CSV sources unless explicitly requested (business_report needs them)
                 if is_csv and not include_csv:
