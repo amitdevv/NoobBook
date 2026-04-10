@@ -139,12 +139,16 @@ class DatabaseAnalyzerAgent:
                 total_output_tokens += response["usage"]["output_tokens"]
 
                 content_blocks = response.get("content_blocks", [])
-                serialized_content = claude_parsing_utils.serialize_content_blocks(content_blocks)
-                messages.append({"role": "assistant", "content": serialized_content})
-
                 tool_blocks = claude_parsing_utils.extract_tool_use_blocks(response)
+
+                # Check for tool blocks BEFORE appending to messages.
+                # Appending first then doing `continue` would leave messages ending
+                # with an assistant role, causing a prefill API error on the next iteration.
                 if not tool_blocks:
                     continue
+
+                serialized_content = claude_parsing_utils.serialize_content_blocks(content_blocks)
+                messages.append({"role": "assistant", "content": serialized_content})
 
                 tool_results_data = []
                 iteration_had_error = False

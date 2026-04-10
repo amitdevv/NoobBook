@@ -559,7 +559,7 @@ class MainChatService:
             elif "rate_limit" in error_str:
                 friendly_error = "Rate limit reached. Please wait a moment and try again."
             elif "assistant message prefill" in error_str or "must end with a user message" in error_str:
-                friendly_error = "Chat history has a corrupted message sequence. Please start a new chat to continue."
+                friendly_error = "Something went wrong with the message sequence. Please try sending your message again."
             else:
                 friendly_error = f"Sorry, I encountered an error: {error_str}"
 
