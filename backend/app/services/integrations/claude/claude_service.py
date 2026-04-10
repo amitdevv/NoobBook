@@ -204,7 +204,12 @@ class ClaudeService:
 
         # Make API call (wrapped in Opik parent trace with metadata if enabled)
         opik_kwargs = self._build_opik_kwargs(project_id=project_id, user_id=user_id, chat_id=chat_id, tags=tags)
-        trace_input = {"model": model, "message_count": len(messages)}
+        # Show the last user message as trace input for quick scanning in the dashboard
+        last_user_msg = next(
+            (m.get("content", "") for m in reversed(messages) if m.get("role") == "user"),
+            "",
+        )
+        trace_input = {"prompt": last_user_msg, "model": model, "message_count": len(messages)}
         response = self._run_tracked(
             lambda: client.messages.create(**api_params),
             opik_kwargs=opik_kwargs,
@@ -275,7 +280,11 @@ class ClaudeService:
                 return stream.get_final_message()
 
         opik_kwargs = self._build_opik_kwargs(project_id=project_id, user_id=user_id, chat_id=chat_id, tags=tags)
-        trace_input = {"model": model, "message_count": len(messages), "streaming": True}
+        last_user_msg = next(
+            (m.get("content", "") for m in reversed(messages) if m.get("role") == "user"),
+            "",
+        )
+        trace_input = {"prompt": last_user_msg, "model": model, "message_count": len(messages)}
         response = self._run_tracked(_do_stream, opik_kwargs=opik_kwargs, trace_input=trace_input)
 
         if project_id:
