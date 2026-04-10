@@ -167,11 +167,14 @@ export const usePRDGeneration = (projectId: string) => {
    * Delete a PRD job from the backend and remove from local state
    */
   const handlePRDDelete = async (jobId: string) => {
+    if (!window.confirm('Are you sure you want to delete this? This cannot be undone.')) return;
     try {
       await prdsAPI.deleteJob(projectId, jobId);
       setSavedPRDJobs((prev) => prev.filter((j) => j.id !== jobId));
+      showSuccess('Deleted successfully.');
     } catch (error) {
       log.error({ err: error }, 'failed to delete PRD job');
+      showError('Failed to delete. Please try again.');
     }
   };
 

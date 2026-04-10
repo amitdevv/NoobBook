@@ -305,11 +305,14 @@ export const useAudioGeneration = (projectId: string) => {
    * Delete an audio job from the backend and remove from local state
    */
   const handleAudioDelete = async (jobId: string) => {
+    if (!window.confirm('Are you sure you want to delete this? This cannot be undone.')) return;
     try {
       await audioAPI.deleteJob(projectId, jobId);
       setSavedAudioJobs((prev) => prev.filter((j) => j.id !== jobId));
+      showSuccess('Deleted successfully.');
     } catch (error) {
       log.error({ err: error }, 'failed to delete audio job');
+      showError('Failed to delete. Please try again.');
     }
   };
 

@@ -203,11 +203,14 @@ export const useBusinessReportGeneration = (projectId: string) => {
   };
 
   const handleBusinessReportDelete = async (jobId: string) => {
+    if (!window.confirm('Are you sure you want to delete this? This cannot be undone.')) return;
     try {
       await businessReportsAPI.deleteJob(projectId, jobId);
       setSavedBusinessReportJobs((prev) => prev.filter((j) => j.id !== jobId));
+      showSuccess('Deleted successfully.');
     } catch (error) {
       log.error({ err: error }, 'failed to delete business report job');
+      showError('Failed to delete. Please try again.');
     }
   };
 

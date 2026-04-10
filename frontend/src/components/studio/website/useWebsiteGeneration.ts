@@ -142,11 +142,14 @@ export const useWebsiteGeneration = (projectId: string) => {
    * Delete a website job
    */
   const handleWebsiteDelete = async (jobId: string) => {
+    if (!window.confirm('Are you sure you want to delete this? This cannot be undone.')) return;
     try {
       await websitesAPI.deleteJob(projectId, jobId);
       setSavedWebsiteJobs((prev) => prev.filter((j) => j.id !== jobId));
+      showSuccess('Deleted successfully.');
     } catch (error) {
       log.error({ err: error }, 'failed to delete website job');
+      showError('Failed to delete. Please try again.');
     }
   };
 

@@ -146,11 +146,14 @@ export const useEmailGeneration = (projectId: string) => {
   };
 
   const handleEmailDelete = async (jobId: string) => {
+    if (!window.confirm('Are you sure you want to delete this? This cannot be undone.')) return;
     try {
       await emailsAPI.deleteJob(projectId, jobId);
       setSavedEmailJobs((prev) => prev.filter((j) => j.id !== jobId));
+      showSuccess('Deleted successfully.');
     } catch (error) {
       log.error({ err: error }, 'failed to delete email job');
+      showError('Failed to delete. Please try again.');
     }
   };
 

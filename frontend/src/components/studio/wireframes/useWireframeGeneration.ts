@@ -180,11 +180,14 @@ export const useWireframeGeneration = (projectId: string) => {
    * Delete a wireframe job from the backend and remove from local state
    */
   const handleWireframeDelete = async (jobId: string) => {
+    if (!window.confirm('Are you sure you want to delete this? This cannot be undone.')) return;
     try {
       await wireframesAPI.deleteJob(projectId, jobId);
       setSavedWireframeJobs((prev) => prev.filter((j) => j.id !== jobId));
+      showSuccess('Deleted successfully.');
     } catch (error) {
       log.error({ err: error }, 'failed to delete wireframe job');
+      showError('Failed to delete. Please try again.');
     }
   };
 
