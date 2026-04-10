@@ -113,7 +113,8 @@ class CSVAnalyzerAgent:
                 temperature=config.get("temperature"),
                 tools=tools,
                 tool_choice={"type": "any"},
-                project_id=project_id
+                project_id=project_id,
+                tags=["query"],
             )
 
             total_input_tokens += response["usage"]["input_tokens"]

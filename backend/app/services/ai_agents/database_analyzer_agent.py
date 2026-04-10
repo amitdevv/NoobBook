@@ -133,6 +133,7 @@ class DatabaseAnalyzerAgent:
                     tool_choice={"type": "any"},
                     extra_headers={"anthropic-beta": "context-1m-2025-08-07"},
                     project_id=project_id,
+                    tags=["query"],
                 )
 
                 total_input_tokens += response["usage"]["input_tokens"]

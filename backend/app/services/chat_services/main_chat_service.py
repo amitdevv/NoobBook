@@ -443,6 +443,9 @@ class MainChatService:
                 temperature=prompt_config.get("temperature"),
                 tools=tools,
                 project_id=project_id,
+                user_id=resolved_user_id,
+                chat_id=chat_id,
+                tags=["chat"],
             )
             if response_text.strip():
                 accumulated_text_parts.append(response_text)
@@ -526,6 +529,9 @@ class MainChatService:
                     temperature=prompt_config.get("temperature"),
                     tools=tools,
                     project_id=project_id,
+                    user_id=resolved_user_id,
+                    chat_id=chat_id,
+                    tags=["chat"],
                 )
                 if response_text.strip():
                     accumulated_text_parts.append(response_text)

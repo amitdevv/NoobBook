@@ -71,18 +71,19 @@ export const StudioProvider: React.FC<StudioProviderProps> = ({
     return option?.icon;
   }, []);
 
-  // Trigger the actual generation workflow
-  const triggerGeneration = useCallback(async (optionId: StudioItemId, signal: StudioSignal) => {
+  // Trigger the actual generation workflow.
+  // Fire-and-forget: handlers manage their own state (isGeneratingXXX, pollingRef)
+  // and update the UI reactively. NOT awaiting allows multiple items to generate
+  // simultaneously — awaiting would block until polling completes (~2 min).
+  const triggerGeneration = useCallback((optionId: StudioItemId, signal: StudioSignal) => {
     setPickerOpen(false);
 
     const handler = generationHandlers.get(optionId);
     if (handler) {
       log.debug('calling handler for: %s signal: %o', optionId, signal);
-      try {
-        await handler(signal);
-      } catch (error) {
+      handler(signal).catch((error) => {
         log.error({ err: error }, 'generation handler threw error for: %s', optionId);
-      }
+      });
     } else {
       log.warn('no handler registered for: %s, registered: %o', optionId, [...generationHandlers.keys()]);
     }

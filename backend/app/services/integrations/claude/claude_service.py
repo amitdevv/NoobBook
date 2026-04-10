@@ -82,6 +82,48 @@ class ClaudeService:
             self._client = client
         return self._client
 
+    def _update_opik_context(
+        self,
+        project_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        chat_id: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+    ) -> None:
+        """
+        Inject per-request context into the current Opik trace.
+
+        Educational Note: track_anthropic() wraps the client at init time and
+        auto-creates a trace for every API call. But it has no per-request context.
+        update_current_trace() lets us attach user_id, project_id as metadata
+        and chat_id as thread_id (groups traces into conversation threads in the
+        Opik dashboard) after the trace has already started.
+
+        No-op if Opik is disabled or not installed.
+        """
+        if not os.getenv('OPIK_API_KEY'):
+            return
+        try:
+            from opik.opik_context import update_current_trace
+
+            metadata = {}
+            if project_id:
+                metadata["project_id"] = project_id
+            if user_id:
+                metadata["user_id"] = user_id
+
+            kwargs: Dict[str, Any] = {}
+            if metadata:
+                kwargs["metadata"] = metadata
+            if chat_id:
+                kwargs["thread_id"] = chat_id
+            if tags:
+                kwargs["tags"] = tags
+
+            if kwargs:
+                update_current_trace(**kwargs)
+        except Exception:
+            pass  # Never break API calls for observability
+
     def send_message(
         self,
         messages: List[Dict[str, Any]],
@@ -93,6 +135,9 @@ class ClaudeService:
         tool_choice: Optional[Dict[str, Any]] = None,
         extra_headers: Optional[Dict[str, str]] = None,
         project_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        chat_id: Optional[str] = None,
+        tags: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Send messages to Claude and get a response.
@@ -141,6 +186,9 @@ class ClaudeService:
         # Make API call
         response = client.messages.create(**api_params)
 
+        # Attach per-request context to the Opik trace (user, project, chat thread)
+        self._update_opik_context(project_id=project_id, user_id=user_id, chat_id=chat_id, tags=tags)
+
         # Track costs if project_id provided
         if project_id:
             add_cost_usage(
@@ -173,6 +221,9 @@ class ClaudeService:
         extra_headers: Optional[Dict[str, str]] = None,
         project_id: Optional[str] = None,
         on_text_delta: Optional[Callable[[str], None]] = None,
+        user_id: Optional[str] = None,
+        chat_id: Optional[str] = None,
+        tags: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Stream a Claude response and forward text deltas through a callback.
@@ -198,6 +249,9 @@ class ClaudeService:
                 if on_text_delta:
                     on_text_delta(delta)
             response = stream.get_final_message()
+
+        # Attach per-request context to the Opik trace (user, project, chat thread)
+        self._update_opik_context(project_id=project_id, user_id=user_id, chat_id=chat_id, tags=tags)
 
         if project_id:
             add_cost_usage(

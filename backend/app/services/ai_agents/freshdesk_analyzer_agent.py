@@ -68,6 +68,7 @@ class FreshdeskAnalyzerAgent:
                     temperature=temperature,
                     tools=tools,
                     project_id=project_id,
+                    tags=["query"],
                 )
 
                 # Track usage
