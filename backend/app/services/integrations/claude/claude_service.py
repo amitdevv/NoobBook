@@ -32,6 +32,7 @@ class ClaudeService:
     def __init__(self):
         """Initialize the Claude service."""
         self._client: Optional[anthropic.Anthropic] = None
+        self._opik_enabled: bool = False
 
     def _get_client(self) -> anthropic.Anthropic:
         """
@@ -73,6 +74,7 @@ class ClaudeService:
 
                     opik.configure(**configure_kwargs)
                     client = track_anthropic(client, project_name=opik_project)
+                    self._opik_enabled = True
                     logger.info("Opik observability enabled (project: %s)", opik_project)
                 except ImportError:
                     logger.warning("OPIK_API_KEY set but 'opik' package not installed. Skipping.")
@@ -82,47 +84,108 @@ class ClaudeService:
             self._client = client
         return self._client
 
-    def _update_opik_context(
+    def _call_with_opik_context(
         self,
+        api_fn,
+        api_params: Dict[str, Any],
+        *,
         project_id: Optional[str] = None,
         user_id: Optional[str] = None,
         chat_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
-    ) -> None:
+    ):
         """
-        Inject per-request context into the current Opik trace.
+        Call the Anthropic API, wrapping it in an Opik parent trace with metadata.
 
-        Educational Note: track_anthropic() wraps the client at init time and
-        auto-creates a trace for every API call. But it has no per-request context.
-        update_current_trace() lets us attach user_id, project_id as metadata
-        and chat_id as thread_id (groups traces into conversation threads in the
-        Opik dashboard) after the trace has already started.
+        Educational Note: track_anthropic() auto-creates a span for every
+        client.messages.create() call, but the span is finalized before we can
+        add metadata. By wrapping the call in @opik.track(), we create a parent
+        trace. update_current_trace() injects user_id, project_id, and chat_id
+        (as thread_id) into that parent. The track_anthropic span nests inside it.
 
-        No-op if Opik is disabled or not installed.
+        Falls back to a direct API call if Opik is not enabled.
         """
-        if not os.getenv('OPIK_API_KEY'):
-            return
+        if not self._opik_enabled:
+            return api_fn(**api_params)
+
         try:
+            import opik
             from opik.opik_context import update_current_trace
 
-            metadata = {}
-            if project_id:
-                metadata["project_id"] = project_id
-            if user_id:
-                metadata["user_id"] = user_id
+            @opik.track(name="noobbook_api_call")
+            def tracked_call():
+                # Inject metadata into the parent trace BEFORE the API call
+                metadata = {}
+                if project_id:
+                    metadata["project_id"] = project_id
+                if user_id:
+                    metadata["user_id"] = user_id
 
-            kwargs: Dict[str, Any] = {}
-            if metadata:
-                kwargs["metadata"] = metadata
-            if chat_id:
-                kwargs["thread_id"] = chat_id
-            if tags:
-                kwargs["tags"] = tags
+                kwargs: Dict[str, Any] = {}
+                if metadata:
+                    kwargs["metadata"] = metadata
+                if chat_id:
+                    kwargs["thread_id"] = chat_id
+                if tags:
+                    kwargs["tags"] = tags
 
-            if kwargs:
-                update_current_trace(**kwargs)
+                if kwargs:
+                    update_current_trace(**kwargs)
+
+                return api_fn(**api_params)
+
+            return tracked_call()
         except Exception:
-            pass  # Never break API calls for observability
+            # If Opik wrapping fails, fall back to direct call
+            return api_fn(**api_params)
+
+    def _stream_with_opik_context(
+        self,
+        client,
+        api_params: Dict[str, Any],
+        on_text_delta: Optional[Callable[[str], None]],
+        *,
+        project_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        chat_id: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+    ):
+        """Stream API call wrapped in Opik trace context, same pattern as _call_with_opik_context."""
+        def _do_stream():
+            with client.messages.stream(**api_params) as stream:
+                for delta in stream.text_stream:
+                    if on_text_delta:
+                        on_text_delta(delta)
+                return stream.get_final_message()
+
+        if not self._opik_enabled:
+            return _do_stream()
+
+        try:
+            import opik
+            from opik.opik_context import update_current_trace
+
+            @opik.track(name="noobbook_stream_call")
+            def tracked_stream():
+                metadata = {}
+                if project_id:
+                    metadata["project_id"] = project_id
+                if user_id:
+                    metadata["user_id"] = user_id
+                kwargs: Dict[str, Any] = {}
+                if metadata:
+                    kwargs["metadata"] = metadata
+                if chat_id:
+                    kwargs["thread_id"] = chat_id
+                if tags:
+                    kwargs["tags"] = tags
+                if kwargs:
+                    update_current_trace(**kwargs)
+                return _do_stream()
+
+            return tracked_stream()
+        except Exception:
+            return _do_stream()
 
     def send_message(
         self,
@@ -183,11 +246,11 @@ class ClaudeService:
             extra_headers=extra_headers,
         )
 
-        # Make API call
-        response = client.messages.create(**api_params)
-
-        # Attach per-request context to the Opik trace (user, project, chat thread)
-        self._update_opik_context(project_id=project_id, user_id=user_id, chat_id=chat_id, tags=tags)
+        # Make API call (wrapped in Opik trace with metadata if enabled)
+        response = self._call_with_opik_context(
+            client.messages.create, api_params,
+            project_id=project_id, user_id=user_id, chat_id=chat_id, tags=tags,
+        )
 
         # Track costs if project_id provided
         if project_id:
@@ -244,14 +307,11 @@ class ClaudeService:
             extra_headers=extra_headers,
         )
 
-        with client.messages.stream(**api_params) as stream:
-            for delta in stream.text_stream:
-                if on_text_delta:
-                    on_text_delta(delta)
-            response = stream.get_final_message()
-
-        # Attach per-request context to the Opik trace (user, project, chat thread)
-        self._update_opik_context(project_id=project_id, user_id=user_id, chat_id=chat_id, tags=tags)
+        # Wrap streaming in Opik trace context for metadata attachment
+        response = self._stream_with_opik_context(
+            client, api_params, on_text_delta,
+            project_id=project_id, user_id=user_id, chat_id=chat_id, tags=tags,
+        )
 
         if project_id:
             add_cost_usage(
