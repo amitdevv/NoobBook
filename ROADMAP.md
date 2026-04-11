@@ -1,15 +1,15 @@
 # PM-AI Bot Roadmap
 
-| # | Improvement | Notes |
-|---|-------------|-------|
-| 1 | **Haiku movement** | Migrate eligible prompts to Haiku for cost/speed |
-| 2 | **JIRA connection** | JIRA integration for querying tickets as a source |
-| 3 | **Usage credit limit for individual users** | Per-user monthly/daily credit caps |
-| 4 | **STT** | Speech-to-text improvements |
-| 5 | **4XX error fix for number of iterations** | Retry/handle 4XX errors inside agent loops instead of hard-failing |
-| 6 | **Chat download as PDF** | Currently exports markdown — should export as PDF |
-| 7 | **Chat-wise token utilisation** | Show per-chat token usage breakdown |
-| 8 | **Opik logs — thread & unique user info** | Attach thread ID and user identity to every Opik log entry |
-| 9 | **Studio Business & Product section bug** | Clicking one item (e.g. Flow Diagram) generates it, but all other active studio items stop working |
-| 10 | **Ledger DB** | Connect to ledger/accounting database as a source |
-| 11 | **Mixpanel MCP connection** | MCP server integration for Mixpanel analytics |
+| # | Status | Improvement | Notes |
+|---|--------|-------------|-------|
+| 1 | ⬜ | **Haiku movement** | Migrate eligible prompts to Haiku for cost/speed |
+| 2 | ⬜ | **JIRA connection** | JIRA integration for querying tickets as a source |
+| 3 | ⬜ | **Usage credit limit for individual users** | Per-user monthly/daily credit caps |
+| 4 | ⬜ | **STT** | Speech-to-text improvements |
+| 5 | ⬜ | **4XX error fix for number of iterations** | Retry/handle 4XX errors inside agent loops instead of hard-failing |
+| 6 | ✅ | **Chat download as PDF** | Shipped in a7c3fc8 — jspdf + html2canvas export |
+| 7 | ✅ | **Chat-wise token utilisation** | Shipped — per-chat cost badge in ChatHeader + Opus row added to project breakdown |
+| 8 | ✅ | **Opik logs — thread & unique user info** | Shipped — user_id, project_id, chat_id (thread_id), and tags attached to every trace |
+| 9 | ✅ | **Studio Business & Product section bug** | Shipped — fire-and-forget triggerGeneration + DB source fallback + mermaid sanitization |
+| 10 | ⬜ | **Ledger DB** | Connect to ledger/accounting database as a source |
+| 11 | ⬜ | **Mixpanel MCP connection** | MCP server integration for Mixpanel analytics |

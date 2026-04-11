@@ -216,13 +216,14 @@ class ClaudeService:
             trace_input=trace_input,
         )
 
-        # Track costs if project_id provided
+        # Track costs if project_id provided (also per-chat if chat_id set)
         if project_id:
             add_cost_usage(
                 project_id=project_id,
                 model=response.model,
                 input_tokens=response.usage.input_tokens,
-                output_tokens=response.usage.output_tokens
+                output_tokens=response.usage.output_tokens,
+                chat_id=chat_id,
             )
 
         # Return raw response data - all parsing happens in claude_parsing_utils
@@ -292,7 +293,8 @@ class ClaudeService:
                 project_id=project_id,
                 model=response.model,
                 input_tokens=response.usage.input_tokens,
-                output_tokens=response.usage.output_tokens
+                output_tokens=response.usage.output_tokens,
+                chat_id=chat_id,
             )
 
         return {

@@ -29,6 +29,7 @@ export interface ModelCostBreakdown {
 export interface CostTracking {
   total_cost: number;
   by_model: {
+    opus: ModelCostBreakdown;
     sonnet: ModelCostBreakdown;
     haiku: ModelCostBreakdown;
   };
