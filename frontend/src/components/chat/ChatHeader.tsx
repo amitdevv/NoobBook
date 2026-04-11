@@ -12,22 +12,38 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import { Sparkle, Plus, ChatCircle, CaretDown, Hash, Books, DownloadSimple, CircleNotch } from '@phosphor-icons/react';
+import { Sparkle, Plus, ChatCircle, CaretDown, Hash, Books, DownloadSimple, CircleNotch, CurrencyDollar } from '@phosphor-icons/react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { Button } from '../ui/button';
 import type { Chat, ChatMetadata } from '../../lib/api/chats';
+import type { CostTracking } from '../../lib/api/projects';
 
 interface ChatHeaderProps {
   activeChat: Chat | null;
   allChats: ChatMetadata[];
   activeSources: number;
   totalSources: number;
+  chatCosts: CostTracking | null;
   onSelectChat: (chatId: string) => void;
   onNewChat: () => void;
   onShowChatList: () => void;
   onExportChat: () => void;
   exportingChat: boolean;
 }
+
+// Cost formatters — mirrors ProjectHeader so the two badges look identical
+const formatCost = (cost: number): string => {
+  if (cost < 0.01) return '<$0.01';
+  return `$${cost.toFixed(2)}`;
+};
+
+const formatCostWithSymbol = (cost: number): string => `$${cost.toFixed(6)}`;
+
+const formatTokens = (count: number): string => {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(2)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+  return count.toString();
+};
 
 /**
  * Memoized to prevent re-renders when typing in ChatInput
@@ -38,6 +54,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = React.memo(({
   allChats,
   activeSources,
   totalSources,
+  chatCosts,
   onSelectChat,
   onNewChat,
   onShowChatList,
@@ -115,6 +132,76 @@ export const ChatHeader: React.FC<ChatHeaderProps> = React.memo(({
             <Books size={16} className="text-primary" />
             <span className="text-sm font-medium">{activeSources}/{totalSources}</span>
           </div>
+
+          {/* Per-chat cost badge — shows only when this chat has spent something */}
+          {chatCosts && chatCosts.total_cost > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md cursor-default">
+                    <CurrencyDollar size={14} className="text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground font-medium">
+                      {formatCost(chatCosts.total_cost)}
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="p-3">
+                  <div className="space-y-2 text-xs">
+                    <p className="font-semibold text-sm mb-2">Chat Usage Breakdown</p>
+
+                    {chatCosts.by_model.opus && (chatCosts.by_model.opus.input_tokens > 0 || chatCosts.by_model.opus.output_tokens > 0) && (
+                      <div className="space-y-1">
+                        <p className="font-medium">Opus</p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-muted-foreground">
+                          <span>Input:</span>
+                          <span>{formatTokens(chatCosts.by_model.opus.input_tokens)} tokens</span>
+                          <span>Output:</span>
+                          <span>{formatTokens(chatCosts.by_model.opus.output_tokens)} tokens</span>
+                          <span>Cost:</span>
+                          <span className="font-medium text-foreground">{formatCostWithSymbol(chatCosts.by_model.opus.cost)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {(chatCosts.by_model.sonnet.input_tokens > 0 || chatCosts.by_model.sonnet.output_tokens > 0) && (
+                      <div className="space-y-1">
+                        <p className="font-medium">Sonnet</p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-muted-foreground">
+                          <span>Input:</span>
+                          <span>{formatTokens(chatCosts.by_model.sonnet.input_tokens)} tokens</span>
+                          <span>Output:</span>
+                          <span>{formatTokens(chatCosts.by_model.sonnet.output_tokens)} tokens</span>
+                          <span>Cost:</span>
+                          <span className="font-medium text-foreground">{formatCostWithSymbol(chatCosts.by_model.sonnet.cost)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {(chatCosts.by_model.haiku.input_tokens > 0 || chatCosts.by_model.haiku.output_tokens > 0) && (
+                      <div className="space-y-1">
+                        <p className="font-medium">Haiku</p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-muted-foreground">
+                          <span>Input:</span>
+                          <span>{formatTokens(chatCosts.by_model.haiku.input_tokens)} tokens</span>
+                          <span>Output:</span>
+                          <span>{formatTokens(chatCosts.by_model.haiku.output_tokens)} tokens</span>
+                          <span>Cost:</span>
+                          <span className="font-medium text-foreground">{formatCostWithSymbol(chatCosts.by_model.haiku.cost)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="border-t pt-2 mt-2">
+                      <div className="flex justify-between font-medium">
+                        <span>Total:</span>
+                        <span>{formatCostWithSymbol(chatCosts.total_cost)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       </div>
       {/* Description - matches Sources/Studio */}

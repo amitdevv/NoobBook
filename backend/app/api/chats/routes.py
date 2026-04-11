@@ -6,11 +6,12 @@ A chat is a container for a conversation - it has metadata (title, timestamps)
 and holds messages, but the actual AI processing happens in the messages blueprint.
 
 Routes:
-- GET    /projects/<id>/chats          - List all chats
-- POST   /projects/<id>/chats          - Create new chat
-- GET    /projects/<id>/chats/<id>     - Get chat with messages
-- PUT    /projects/<id>/chats/<id>     - Update chat (rename)
-- DELETE /projects/<id>/chats/<id>     - Delete chat
+- GET    /projects/<id>/chats              - List all chats
+- POST   /projects/<id>/chats              - Create new chat
+- GET    /projects/<id>/chats/<id>         - Get chat with messages
+- PUT    /projects/<id>/chats/<id>         - Update chat (rename)
+- DELETE /projects/<id>/chats/<id>         - Delete chat
+- GET    /projects/<id>/chats/<id>/costs   - Get per-chat cost/token breakdown
 """
 from flask import jsonify, request, current_app
 from app.api.chats import chats_bp
@@ -174,6 +175,29 @@ def delete_chat(project_id, chat_id):
 
     except Exception as e:
         current_app.logger.error(f"Error deleting chat {chat_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@chats_bp.route('/projects/<project_id>/chats/<chat_id>/costs', methods=['GET'])
+def get_chat_costs(project_id, chat_id):
+    """
+    Get per-chat cost and token usage breakdown.
+
+    Educational Note: Mirrors /projects/<id>/costs but scoped to a single
+    chat. Returns the same shape: total_cost and by_model breakdown with
+    input_tokens, output_tokens, and cost for each of opus/sonnet/haiku.
+    """
+    try:
+        costs = chat_service.get_chat_costs(project_id, chat_id)
+        return jsonify({
+            'success': True,
+            'costs': costs
+        }), 200
+    except Exception as e:
+        current_app.logger.error(f"Error getting chat costs {chat_id}: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
