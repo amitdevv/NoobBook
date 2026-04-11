@@ -10,6 +10,7 @@ import { Sparkle } from '@phosphor-icons/react';
 import { Skeleton } from '../ui/skeleton';
 import { chatsAPI } from '@/lib/api/chats';
 import type { Chat, ChatMetadata, StudioSignal } from '@/lib/api/chats';
+import type { CostTracking } from '@/lib/api/projects';
 import { sourcesAPI, type Source } from '@/lib/api/sources';
 import { ToastContainer } from '../ui/toast';
 import { useToast } from '../ui/use-toast';
@@ -72,6 +73,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   // Sources state for header display
   const [sources, setSources] = useState<Source[]>([]);
+
+  // Per-chat cost tracking (shown in ChatHeader)
+  const [chatCosts, setChatCosts] = useState<CostTracking | null>(null);
 
   // Active sources count derived from per-chat selection
   const activeSources = selectedSourceIds.length;
@@ -187,6 +191,28 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   }, [activeChat, onSignalsChange]);
 
   /**
+   * Load per-chat cost/token breakdown whenever the active chat changes.
+   * Refreshed again after each message via `loadChatCosts()` in the send flow.
+   */
+  const loadChatCosts = useCallback(async (chatId: string) => {
+    try {
+      const costs = await chatsAPI.getCosts(projectId, chatId);
+      setChatCosts(costs);
+    } catch (err) {
+      log.error({ err }, 'failed to load chat costs');
+      // Silent — costs are not critical for chat function
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    if (activeChat?.id) {
+      loadChatCosts(activeChat.id);
+    } else {
+      setChatCosts(null);
+    }
+  }, [activeChat?.id, loadChatCosts]);
+
+  /**
    * Send a message and get AI response
    * Educational Note: We add the user message optimistically to the UI
    * before the API call, so users see their message immediately.
@@ -225,6 +251,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const scheduleChatRefreshes = async (chatId: string) => {
       await loadChats();
       onCostsChange?.();
+      loadChatCosts(chatId);
 
       setTimeout(async () => {
         try {
@@ -546,6 +573,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         allChats={allChats}
         activeSources={activeSources}
         totalSources={sources.length}
+        chatCosts={chatCosts}
         onSelectChat={handleSelectChat}
         onNewChat={handleNewChat}
         onShowChatList={() => setShowChatList(true)}

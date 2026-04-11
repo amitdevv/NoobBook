@@ -337,6 +337,21 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
                 <div className="space-y-2 text-xs">
                   <p className="font-semibold text-sm mb-2">API Usage Breakdown</p>
 
+                  {/* Opus breakdown */}
+                  {costs.by_model.opus && (costs.by_model.opus.input_tokens > 0 || costs.by_model.opus.output_tokens > 0) && (
+                    <div className="space-y-1">
+                      <p className="font-medium">Opus</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-muted-foreground">
+                        <span>Input:</span>
+                        <span>{formatTokens(costs.by_model.opus.input_tokens)} tokens</span>
+                        <span>Output:</span>
+                        <span>{formatTokens(costs.by_model.opus.output_tokens)} tokens</span>
+                        <span>Cost:</span>
+                        <span className="font-medium text-foreground">{formatCostWithSymbol(costs.by_model.opus.cost)}</span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Sonnet breakdown */}
                   {(costs.by_model.sonnet.input_tokens > 0 || costs.by_model.sonnet.output_tokens > 0) && (
                     <div className="space-y-1">

@@ -10,6 +10,7 @@ import type { StudioSignal } from '../../components/studio/types';
 import { API_BASE_URL } from './client';
 import { createLogger } from '@/lib/logger';
 import { getAccessToken } from '../auth/session';
+import type { CostTracking } from './projects';
 
 const log = createLogger('chats-api');
 
@@ -414,6 +415,22 @@ class ChatsAPI {
       );
     } catch (error) {
       log.error({ err: error }, 'failed to delete chat');
+      throw error;
+    }
+  }
+
+  /**
+   * Get per-chat cost and token breakdown.
+   * Educational Note: Mirrors projectsAPI.getCosts but scoped to a single chat.
+   */
+  async getCosts(projectId: string, chatId: string): Promise<CostTracking> {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/projects/${projectId}/chats/${chatId}/costs`
+      );
+      return response.data.costs;
+    } catch (error) {
+      log.error({ err: error }, 'failed to fetch chat costs');
       throw error;
     }
   }

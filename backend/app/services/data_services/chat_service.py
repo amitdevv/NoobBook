@@ -54,7 +54,7 @@ class ChatService:
         """
         response = (
             self.supabase.table(self.table)
-            .select("id, title, created_at, updated_at")
+            .select("id, title, created_at, updated_at, costs")
             .eq("project_id", project_id)
             .order("updated_at", desc=True)
             .execute()
@@ -418,6 +418,79 @@ class ChatService:
             .execute()
         )
         return bool(existing.data)
+
+    def get_chat_costs(self, project_id: str, chat_id: str) -> Dict[str, Any]:
+        """
+        Get cost tracking data for a specific chat.
+
+        Educational Note: Mirrors project_service.get_project_costs() —
+        returns the costs JSONB column, or a default structure if the chat
+        exists but has no costs yet.
+
+        Args:
+            project_id: The project UUID (for authorization scoping)
+            chat_id: The chat UUID
+
+        Returns:
+            Cost dict with total_cost and by_model breakdown
+        """
+        response = (
+            self.supabase.table(self.table)
+            .select("costs")
+            .eq("id", chat_id)
+            .eq("project_id", project_id)
+            .execute()
+        )
+
+        if not response.data:
+            return {
+                "total_cost": 0.0,
+                "by_model": {
+                    "opus": {"input_tokens": 0, "output_tokens": 0, "cost": 0.0},
+                    "sonnet": {"input_tokens": 0, "output_tokens": 0, "cost": 0.0},
+                    "haiku": {"input_tokens": 0, "output_tokens": 0, "cost": 0.0},
+                },
+            }
+
+        return response.data[0].get("costs") or {
+            "total_cost": 0.0,
+            "by_model": {
+                "opus": {"input_tokens": 0, "output_tokens": 0, "cost": 0.0},
+                "sonnet": {"input_tokens": 0, "output_tokens": 0, "cost": 0.0},
+                "haiku": {"input_tokens": 0, "output_tokens": 0, "cost": 0.0},
+            },
+        }
+
+    def get_chat_costs_raw(self, chat_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Load raw costs JSONB for a chat by chat_id only (no project scoping).
+
+        Used internally by cost_tracking._load_chat_costs. Returns None if
+        the chat doesn't exist — the cost tracker will fall back to defaults.
+        """
+        response = (
+            self.supabase.table(self.table)
+            .select("costs")
+            .eq("id", chat_id)
+            .execute()
+        )
+        if not response.data:
+            return None
+        return response.data[0].get("costs")
+
+    def update_chat_costs(self, chat_id: str, costs: Dict[str, Any]) -> bool:
+        """
+        Persist updated costs JSONB to a chat.
+
+        Used internally by cost_tracking._save_chat_costs.
+        """
+        response = (
+            self.supabase.table(self.table)
+            .update({"costs": costs})
+            .eq("id", chat_id)
+            .execute()
+        )
+        return bool(response.data)
 
 
 # Singleton instance for easy import
