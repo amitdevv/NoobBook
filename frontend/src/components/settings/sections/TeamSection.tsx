@@ -184,6 +184,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Created</TableHead>
+                <TableHead>Permissions</TableHead>
                 <TableHead className="w-[70px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -219,6 +220,17 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
                     {new Date(user.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
+                    <Button
+                      variant="soft"
+                      size="sm"
+                      className="h-7 text-xs gap-1.5"
+                      onClick={() => setEditingPermissionsUser(user)}
+                    >
+                      <Sliders size={14} />
+                      Edit
+                    </Button>
+                  </TableCell>
+                  <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -226,10 +238,6 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditingPermissionsUser(user)}>
-                          <Sliders size={16} className="mr-2" />
-                          Edit Permissions
-                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => openResetPasswordDialog(user)}>
                           <Key size={16} className="mr-2" />
                           Reset Password
