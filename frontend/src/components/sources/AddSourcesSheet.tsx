@@ -15,6 +15,7 @@ import { ResearchTab } from './ResearchTab';
 import { DatabaseTab } from './DatabaseTab';
 import { McpTab } from './McpTab';
 import { FreshdeskTab } from './FreshdeskTab';
+import { usePermissions } from '@/contexts/PermissionsContext';
 import { MAX_SOURCES } from '../../lib/api/sources';
 
 interface AddSourcesSheetProps {
@@ -49,6 +50,36 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
   uploading,
 }) => {
   const isAtLimit = sourcesCount >= MAX_SOURCES;
+  const { hasPermission } = usePermissions();
+
+  // Permission checks for each source tab
+  // Upload covers PDF, DOCX, PPTX, Image, Audio — show if any document_sources sub-type is allowed
+  const canUpload = ['pdf', 'docx', 'pptx', 'image', 'audio'].some(
+    (item) => hasPermission('document_sources', item)
+  );
+  const canLink = hasPermission('document_sources', 'url_youtube');
+  const canPaste = hasPermission('document_sources', 'text');
+  const canDrive = hasPermission('document_sources', 'google_drive');
+  const canDatabase = hasPermission('data_sources', 'database');
+  const canFreshdesk = hasPermission('data_sources', 'freshdesk');
+  // Note: CSV permission exists (hasPermission('data_sources', 'csv')) but no CSV tab yet
+
+  // Research and MCP are always shown (no dedicated permission key) — gated at category level
+  const canResearch = hasPermission('document_sources');
+  const canMcp = hasPermission('data_sources');
+
+  // Pick the first visible tab as default
+  const defaultTab = canUpload ? 'upload'
+    : canLink ? 'link'
+    : canPaste ? 'paste'
+    : canDrive ? 'drive'
+    : canResearch ? 'research'
+    : canDatabase ? 'database'
+    : canMcp ? 'mcp'
+    : canFreshdesk ? 'freshdesk'
+    : 'upload';
+
+  const tabTriggerClass = "px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -63,124 +94,132 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
             matters most to you. ({sourcesCount}/{MAX_SOURCES} used)
           </p>
 
-          <Tabs defaultValue="upload" className="w-full">
+          <Tabs defaultValue={defaultTab} className="w-full">
             <TabsList className="w-full h-auto flex flex-wrap gap-2 bg-transparent p-0">
-              <TabsTrigger
-                value="upload"
-                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
-              >
-                Upload
-              </TabsTrigger>
-              <TabsTrigger
-                value="link"
-                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
-              >
-                Link
-              </TabsTrigger>
-              <TabsTrigger
-                value="paste"
-                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
-              >
-                Paste
-              </TabsTrigger>
-              <TabsTrigger
-                value="drive"
-                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
-              >
-                Drive
-              </TabsTrigger>
-              <TabsTrigger
-                value="research"
-                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
-              >
-                Research
-              </TabsTrigger>
-              <TabsTrigger
-                value="database"
-                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
-              >
-                Database
-              </TabsTrigger>
-              <TabsTrigger
-                value="mcp"
-                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
-              >
-                MCP
-              </TabsTrigger>
-              <TabsTrigger
-                value="freshdesk"
-                className="px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
-              >
-                Freshdesk
-              </TabsTrigger>
+              {canUpload && (
+                <TabsTrigger value="upload" className={tabTriggerClass}>
+                  Upload
+                </TabsTrigger>
+              )}
+              {canLink && (
+                <TabsTrigger value="link" className={tabTriggerClass}>
+                  Link
+                </TabsTrigger>
+              )}
+              {canPaste && (
+                <TabsTrigger value="paste" className={tabTriggerClass}>
+                  Paste
+                </TabsTrigger>
+              )}
+              {canDrive && (
+                <TabsTrigger value="drive" className={tabTriggerClass}>
+                  Drive
+                </TabsTrigger>
+              )}
+              {canResearch && (
+                <TabsTrigger value="research" className={tabTriggerClass}>
+                  Research
+                </TabsTrigger>
+              )}
+              {canDatabase && (
+                <TabsTrigger value="database" className={tabTriggerClass}>
+                  Database
+                </TabsTrigger>
+              )}
+              {canMcp && (
+                <TabsTrigger value="mcp" className={tabTriggerClass}>
+                  MCP
+                </TabsTrigger>
+              )}
+              {canFreshdesk && (
+                <TabsTrigger value="freshdesk" className={tabTriggerClass}>
+                  Freshdesk
+                </TabsTrigger>
+              )}
             </TabsList>
 
-            <TabsContent value="upload" className="mt-6">
-              <UploadTab
-                onUpload={onUpload}
-                uploading={uploading}
-                isAtLimit={isAtLimit}
-              />
-            </TabsContent>
+            {canUpload && (
+              <TabsContent value="upload" className="mt-6">
+                <UploadTab
+                  onUpload={onUpload}
+                  uploading={uploading}
+                  isAtLimit={isAtLimit}
+                />
+              </TabsContent>
+            )}
 
-            <TabsContent value="link" className="mt-6">
-              <LinkTab onAddUrl={onAddUrl} isAtLimit={isAtLimit} />
-            </TabsContent>
+            {canLink && (
+              <TabsContent value="link" className="mt-6">
+                <LinkTab onAddUrl={onAddUrl} isAtLimit={isAtLimit} />
+              </TabsContent>
+            )}
 
-            <TabsContent value="paste" className="mt-6">
-              <PasteTab onAddText={onAddText} isAtLimit={isAtLimit} />
-            </TabsContent>
+            {canPaste && (
+              <TabsContent value="paste" className="mt-6">
+                <PasteTab onAddText={onAddText} isAtLimit={isAtLimit} />
+              </TabsContent>
+            )}
 
-            <TabsContent value="drive" className="mt-6">
-              <GoogleDriveTab
-                projectId={projectId}
-                onImportComplete={() => {
-                  onImportComplete();
-                  onOpenChange(false); // Close sheet after import
-                }}
-                isAtLimit={isAtLimit}
-              />
-            </TabsContent>
+            {canDrive && (
+              <TabsContent value="drive" className="mt-6">
+                <GoogleDriveTab
+                  projectId={projectId}
+                  onImportComplete={() => {
+                    onImportComplete();
+                    onOpenChange(false); // Close sheet after import
+                  }}
+                  isAtLimit={isAtLimit}
+                />
+              </TabsContent>
+            )}
 
-            <TabsContent value="research" className="mt-6">
-              <ResearchTab
-                onAddResearch={onAddResearch}
-                isAtLimit={isAtLimit}
-              />
-            </TabsContent>
+            {canResearch && (
+              <TabsContent value="research" className="mt-6">
+                <ResearchTab
+                  onAddResearch={onAddResearch}
+                  isAtLimit={isAtLimit}
+                />
+              </TabsContent>
+            )}
 
-            <TabsContent value="database" className="mt-6">
-              <DatabaseTab
-                isAtLimit={isAtLimit}
-                onAddDatabase={async (connectionId, name, description) => {
-                  await onAddDatabase(connectionId, name, description);
-                  onImportComplete();
-                  onOpenChange(false);
-                }}
-              />
-            </TabsContent>
+            {canDatabase && (
+              <TabsContent value="database" className="mt-6">
+                <DatabaseTab
+                  isAtLimit={isAtLimit}
+                  onAddDatabase={async (connectionId, name, description) => {
+                    await onAddDatabase(connectionId, name, description);
+                    onImportComplete();
+                    onOpenChange(false);
+                  }}
+                />
+              </TabsContent>
+            )}
 
-            <TabsContent value="mcp" className="mt-6">
-              <McpTab
-                isAtLimit={isAtLimit}
-                onAddMcp={async (connectionId, resourceUris, name, description) => {
-                  await onAddMcp(connectionId, resourceUris, name, description);
-                  onImportComplete();
-                  onOpenChange(false);
-                }}
-              />
-            </TabsContent>
+            {canMcp && (
+              <TabsContent value="mcp" className="mt-6">
+                <McpTab
+                  isAtLimit={isAtLimit}
+                  onAddMcp={async (connectionId, resourceUris, name, description) => {
+                    await onAddMcp(connectionId, resourceUris, name, description);
+                    onImportComplete();
+                    onOpenChange(false);
+                  }}
+                />
+              </TabsContent>
+            )}
 
-            <TabsContent value="freshdesk" className="mt-6">
-              <FreshdeskTab
-                isAtLimit={isAtLimit}
-                onAddFreshdesk={async (name, description) => {
-                  await onAddFreshdesk(name, description);
-                  onImportComplete();
-                  onOpenChange(false);
-                }}
-              />
-            </TabsContent>
+            {canFreshdesk && (
+              <TabsContent value="freshdesk" className="mt-6">
+                <FreshdeskTab
+                  isAtLimit={isAtLimit}
+                  onAddFreshdesk={async (name, description) => {
+                    await onAddFreshdesk(name, description);
+                    onImportComplete();
+                    onOpenChange(false);
+                  }}
+                />
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </SheetContent>

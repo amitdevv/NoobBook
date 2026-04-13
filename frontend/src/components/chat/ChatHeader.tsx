@@ -15,6 +15,7 @@ import {
 import { Sparkle, Plus, ChatCircle, CaretDown, Hash, Books, DownloadSimple, CircleNotch, CurrencyDollar } from '@phosphor-icons/react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { Button } from '../ui/button';
+import { usePermissions } from '@/contexts/PermissionsContext';
 import type { Chat, ChatMetadata } from '../../lib/api/chats';
 import type { CostTracking } from '../../lib/api/projects';
 
@@ -61,6 +62,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = React.memo(({
   onExportChat,
   exportingChat,
 }) => {
+  const { hasPermission } = usePermissions();
+
   return (
     <div className="border-b px-4 py-3">
       {/* Title row - matches Sources/Studio/ChatEmptyState structure */}
@@ -105,27 +108,29 @@ export const ChatHeader: React.FC<ChatHeaderProps> = React.memo(({
           </DropdownMenu>
         </div>
         <div className="flex items-center gap-2">
-          {/* Export chat button */}
-          <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onExportChat}
-                disabled={!activeChat || !activeChat.messages?.length || exportingChat}
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-              >
-                {exportingChat ? (
-                  <CircleNotch size={32} weight="bold" className="animate-spin" />
-                ) : (
-                  <DownloadSimple size={32} weight="bold" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Export as PDF</TooltipContent>
-          </Tooltip>
-          </TooltipProvider>
+          {/* Export chat button — hidden when chat_export permission is disabled */}
+          {hasPermission("chat_features", "chat_export") && (
+            <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onExportChat}
+                  disabled={!activeChat || !activeChat.messages?.length || exportingChat}
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                >
+                  {exportingChat ? (
+                    <CircleNotch size={32} weight="bold" className="animate-spin" />
+                  ) : (
+                    <DownloadSimple size={32} weight="bold" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export as PDF</TooltipContent>
+            </Tooltip>
+            </TooltipProvider>
+          )}
 
           {/* Source count indicator */}
           <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-md">

@@ -8,6 +8,7 @@
 import React from 'react';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
+import { usePermissions } from '@/contexts/PermissionsContext';
 import type { GenerationOption, StudioSignal, StudioItemId } from './types';
 
 interface StudioToolItemProps {
@@ -16,15 +17,40 @@ interface StudioToolItemProps {
   onClick: (optionId: StudioItemId, signals: StudioSignal[]) => void;
 }
 
+/**
+ * Maps studio option IDs (singular/shorthand) to permission item keys (plural/full).
+ * Only entries where the two names differ are listed — identical keys fall through.
+ */
+const STUDIO_PERMISSION_MAP: Partial<Record<StudioItemId, string>> = {
+  quiz: 'quizzes',
+  mind_map: 'mind_maps',
+  business_report: 'business_reports',
+  marketing_strategy: 'marketing_strategies',
+  ads_creative: 'ad_creative',
+  prd: 'prds',
+  flow_diagram: 'flow_diagrams',
+  presentation: 'presentations',
+  blog: 'blogs',
+  social: 'social_posts',
+  website: 'websites',
+  email_templates: 'emails',
+  video: 'videos',
+};
+
 export const StudioToolItem: React.FC<StudioToolItemProps> = ({
   option,
   signals,
   onClick,
 }) => {
+  const { hasPermission } = usePermissions();
+  const permissionKey = STUDIO_PERMISSION_MAP[option.id] ?? option.id;
+
+  // Hide the item entirely when the user lacks permission
+  if (!hasPermission('studio', permissionKey)) return null;
+
   const Icon = option.icon;
   const isActive = signals.length > 0;
 
-  
   return (
     <Button
       variant="soft"

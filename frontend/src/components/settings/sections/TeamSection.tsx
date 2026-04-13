@@ -40,6 +40,7 @@ import {
   DotsThreeVertical,
   Key,
   Trash,
+  Sliders,
 } from '@phosphor-icons/react';
 import { usersAPI } from '@/lib/api/settings';
 import type { UserSummary } from '@/lib/api/settings';
@@ -47,6 +48,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { CreateUserDialog } from '../team/CreateUserDialog';
 import { DeleteUserDialog } from '../team/DeleteUserDialog';
 import { PasswordDisplay } from '../team/PasswordDisplay';
+import { PermissionsModal } from './PermissionsModal';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('team-section');
@@ -67,6 +69,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
   const [selectedUser, setSelectedUser] = useState<UserSummary | null>(null);
   const [resetPassword, setResetPassword] = useState('');
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [editingPermissionsUser, setEditingPermissionsUser] = useState<UserSummary | null>(null);
 
   const { success, error } = useToast();
 
@@ -223,6 +226,10 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setEditingPermissionsUser(user)}>
+                          <Sliders size={16} className="mr-2" />
+                          Edit Permissions
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => openResetPasswordDialog(user)}>
                           <Key size={16} className="mr-2" />
                           Reset Password
@@ -260,6 +267,16 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
           userId={selectedUser.id}
           userEmail={selectedUser.email || selectedUser.id}
           onUserDeleted={handleUserDeleted}
+        />
+      )}
+
+      {/* Edit Permissions Modal */}
+      {editingPermissionsUser && (
+        <PermissionsModal
+          open={!!editingPermissionsUser}
+          onOpenChange={(open) => { if (!open) setEditingPermissionsUser(null); }}
+          userId={editingPermissionsUser.id}
+          userEmail={editingPermissionsUser.email || ''}
         />
       )}
 

@@ -428,6 +428,49 @@ class UsersAPI {
       throw error;
     }
   }
+
+  /**
+   * Get permissions for a specific user
+   * Educational Note: Returns the category-based permission structure that
+   * controls which features are available to this user.
+   */
+  async getUserPermissions(userId: string): Promise<UserPermissions> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/settings/users/${userId}/permissions`);
+      return response.data.permissions;
+    } catch (error) {
+      log.error({ err: error }, 'failed to fetch user permissions');
+      throw error;
+    }
+  }
+
+  /**
+   * Update permissions for a specific user
+   * Educational Note: Replaces the full permission object for the user.
+   * Only admins should be able to call this endpoint.
+   */
+  async updateUserPermissions(userId: string, permissions: UserPermissions): Promise<void> {
+    try {
+      await axios.put(`${API_BASE_URL}/settings/users/${userId}/permissions`, { permissions });
+    } catch (error) {
+      log.error({ err: error }, 'failed to update user permissions');
+      throw error;
+    }
+  }
+}
+
+// Permission types for per-user feature gating
+interface PermissionCategory {
+  enabled: boolean;
+  items: Record<string, boolean>;
+}
+
+export interface UserPermissions {
+  document_sources: PermissionCategory;
+  data_sources: PermissionCategory;
+  studio: PermissionCategory;
+  integrations: PermissionCategory;
+  chat_features: PermissionCategory;
 }
 
 export const usersAPI = new UsersAPI();

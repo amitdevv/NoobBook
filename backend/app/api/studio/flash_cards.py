@@ -31,9 +31,11 @@ from app.services.studio_services import studio_index_service
 from app.services.studio_services.flash_cards_service import flash_cards_service
 from app.services.source_services import source_index_service
 from app.services.background_services.task_service import task_service
+from app.services.auth import require_permission
 
 
 @studio_bp.route('/projects/<project_id>/studio/flash-cards', methods=['POST'])
+@require_permission("studio", "flash_cards")
 def generate_flash_cards(project_id: str):
     """
     Start flash card generation or edit as a background task.

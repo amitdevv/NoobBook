@@ -32,9 +32,11 @@ from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.component_agent_executor import component_agent_executor
 from app.services.integrations.supabase import storage_service
+from app.services.auth import require_permission
 
 
 @studio_bp.route('/projects/<project_id>/studio/components', methods=['POST'])
+@require_permission("studio", "components")
 def generate_components(project_id: str):
     """
     Start component generation via component agent.

@@ -35,9 +35,11 @@ from app.services.source_services import source_index_service
 from app.services.integrations.elevenlabs import tts_service
 from app.services.integrations.supabase import storage_service  # For downloading previous scripts during edits
 from app.services.background_services.task_service import task_service
+from app.services.auth import require_permission
 
 
 @studio_bp.route('/projects/<project_id>/studio/audio-overview', methods=['POST'])
+@require_permission("studio", "audio_overview")
 def generate_audio_overview(project_id: str):
     """
     Start audio overview generation or edit as a background task.
