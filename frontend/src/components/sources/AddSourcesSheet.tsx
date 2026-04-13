@@ -54,7 +54,9 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
 
   // Permission checks for each source tab
   // Upload covers PDF, DOCX, PPTX, Image, Audio — show if any document_sources sub-type is allowed
-  const canUpload = hasPermission('document_sources', 'pdf');
+  const canUpload = ['pdf', 'docx', 'pptx', 'image', 'audio'].some(
+    (item) => hasPermission('document_sources', item)
+  );
   const canLink = hasPermission('document_sources', 'url_youtube');
   const canPaste = hasPermission('document_sources', 'text');
   const canDrive = hasPermission('document_sources', 'google_drive');
