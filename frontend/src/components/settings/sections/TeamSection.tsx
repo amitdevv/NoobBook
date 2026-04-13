@@ -41,6 +41,9 @@ import {
   Key,
   Trash,
   Sliders,
+  CurrencyDollar,
+  Infinity as InfinityIcon,
+  PencilSimple,
 } from '@phosphor-icons/react';
 import { usersAPI } from '@/lib/api/settings';
 import type { UserSummary } from '@/lib/api/settings';
@@ -50,8 +53,117 @@ import { DeleteUserDialog } from '../team/DeleteUserDialog';
 import { PasswordDisplay } from '../team/PasswordDisplay';
 import { PermissionsModal } from './PermissionsModal';
 import { createLogger } from '@/lib/logger';
+import { cn } from '@/lib/utils';
 
 const log = createLogger('team-section');
+
+// ---------------------------------------------------------------------------
+// Inline editable spend limit cell
+// ---------------------------------------------------------------------------
+
+const SpendLimitCell: React.FC<{
+  userId: string;
+  value: number | null;
+  onSaved: (userId: string, newLimit: number | null) => void;
+}> = ({ userId, value, onSaved }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const { success: showSuccess, error: showError } = useToast();
+
+  const startEditing = () => {
+    setDraft(value != null ? String(value) : '');
+    setEditing(true);
+  };
+
+  const save = async () => {
+    const trimmed = draft.trim();
+    const newLimit = trimmed === '' ? null : parseFloat(trimmed);
+
+    if (newLimit !== null && (isNaN(newLimit) || newLimit < 0)) {
+      showError('Enter a valid dollar amount');
+      return;
+    }
+
+    // Skip save if unchanged
+    if (newLimit === value) {
+      setEditing(false);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await usersAPI.updateCostLimit(userId, newLimit);
+      onSaved(userId, newLimit);
+      showSuccess(newLimit != null ? `Limit set to $${newLimit}` : 'Limit removed');
+    } catch {
+      showError('Failed to update limit');
+    } finally {
+      setSaving(false);
+      setEditing(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') save();
+    if (e.key === 'Escape') setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <div className="relative">
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-stone-400 font-medium select-none">$</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={save}
+            onKeyDown={handleKeyDown}
+            placeholder="0"
+            className={cn(
+              'w-[80px] h-7 pl-5 pr-2 text-xs font-medium rounded-md',
+              'border border-amber-300 bg-amber-50/50 text-stone-800',
+              'outline-none ring-1 ring-amber-200',
+              'tabular-nums placeholder:text-stone-300',
+            )}
+          />
+        </div>
+        {saving && <CircleNotch size={12} className="animate-spin text-amber-500" />}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={startEditing}
+      className={cn(
+        'group/limit inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs font-medium transition-all',
+        'hover:bg-stone-100 cursor-pointer',
+        value != null
+          ? 'text-stone-700'
+          : 'text-stone-400',
+      )}
+    >
+      {value != null ? (
+        <>
+          <CurrencyDollar size={13} weight="bold" className="text-amber-600 flex-shrink-0" />
+          <span className="tabular-nums">{value}</span>
+        </>
+      ) : (
+        <>
+          <InfinityIcon size={13} className="flex-shrink-0 opacity-60" />
+          <span>Unlimited</span>
+        </>
+      )}
+      <PencilSimple size={10} className="opacity-0 group-hover/limit:opacity-50 transition-opacity flex-shrink-0" />
+    </button>
+  );
+};
 
 interface TeamSectionProps {
   currentUserId: string;
@@ -184,6 +296,7 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Created</TableHead>
+                <TableHead>Spend Limit</TableHead>
                 <TableHead>Permissions</TableHead>
                 <TableHead className="w-[70px]">Actions</TableHead>
               </TableRow>
@@ -218,6 +331,17 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {new Date(user.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <SpendLimitCell
+                      userId={user.id}
+                      value={user.cost_limit}
+                      onSaved={(uid, newLimit) => {
+                        setUsers((prev) =>
+                          prev.map((u) => (u.id === uid ? { ...u, cost_limit: newLimit } : u))
+                        );
+                      }}
+                    />
                   </TableCell>
                   <TableCell>
                     <Button

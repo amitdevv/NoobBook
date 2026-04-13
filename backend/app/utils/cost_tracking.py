@@ -247,6 +247,45 @@ def add_usage(
         return project_costs
 
 
+def check_user_spending_limit(user_id: Optional[str]) -> Optional[str]:
+    """
+    Check if a user has exceeded their spending limit.
+
+    Educational Note: Admins set per-user $ limits in Settings → Team.
+    This is called before each Claude API call to block overspending.
+
+    Args:
+        user_id: The user UUID (None = no check, e.g. single-user mode)
+
+    Returns:
+        None if OK, or an error message string if over limit.
+    """
+    if not user_id:
+        return None
+
+    try:
+        from app.services.data_services.user_service import get_user_service
+        svc = get_user_service()
+        user = svc.get_user(user_id)
+        if not user:
+            return None
+
+        cost_limit = user.get("cost_limit")
+        if cost_limit is None:
+            return None  # No limit set = unlimited
+
+        total_spend = svc.get_user_total_spend(user_id)
+        if total_spend >= cost_limit:
+            return (
+                f"You've reached your spending limit of ${cost_limit:.2f}. "
+                f"Current spend: ${total_spend:.2f}. Contact your admin to increase it."
+            )
+        return None
+    except Exception as e:
+        logger.error("Error checking spending limit for %s: %s", user_id, e)
+        return None  # Fail open — don't block on errors
+
+
 def get_project_costs(project_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Get cost tracking data for a project.

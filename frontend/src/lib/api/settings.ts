@@ -48,6 +48,7 @@ export interface UserSummary {
   id: string;
   email: string | null;
   role: 'admin' | 'user' | string;
+  cost_limit: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -454,6 +455,15 @@ class UsersAPI {
       await axios.put(`${API_BASE_URL}/settings/users/${userId}/permissions`, { permissions });
     } catch (error) {
       log.error({ err: error }, 'failed to update user permissions');
+      throw error;
+    }
+  }
+
+  async updateCostLimit(userId: string, costLimit: number | null): Promise<void> {
+    try {
+      await axios.put(`${API_BASE_URL}/settings/users/${userId}/cost-limit`, { cost_limit: costLimit });
+    } catch (error) {
+      log.error({ err: error }, 'failed to update cost limit');
       throw error;
     }
   }

@@ -164,3 +164,31 @@ def get_my_permissions():
     perms = get_user_permissions(identity.user_id)
     return jsonify({"success": True, "permissions": perms}), 200
 
+
+@settings_bp.route("/settings/users/<user_id>/cost-limit", methods=["PUT"])
+@require_admin
+def update_cost_limit(user_id: str):
+    """
+    Set or clear a user's spending limit in USD.
+
+    Body: {"cost_limit": 20.0}  — set limit to $20
+    Body: {"cost_limit": null}  — remove limit (unlimited)
+    """
+    data = request.get_json() or {}
+    cost_limit = data.get("cost_limit")
+
+    # Validate
+    if cost_limit is not None:
+        try:
+            cost_limit = float(cost_limit)
+            if cost_limit < 0:
+                return jsonify({"success": False, "error": "Cost limit must be positive"}), 400
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "Invalid cost_limit value"}), 400
+
+    success = get_user_service().update_cost_limit(user_id, cost_limit)
+    if not success:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    return jsonify({"success": True, "cost_limit": cost_limit}), 200
+

@@ -46,22 +46,82 @@ class UserService:
     def list_users(self) -> List[Dict[str, str]]:
         resp = (
             self.supabase.table(self.table)
-            .select("id, email, role, created_at, updated_at")
+            .select("id, email, role, settings, created_at, updated_at")
             .order("created_at", desc=False)
             .execute()
         )
-        return resp.data or []
+        users = resp.data or []
+        # Surface cost_limit from settings JSONB for the frontend table
+        for user in users:
+            settings = user.pop("settings", None) or {}
+            user["cost_limit"] = settings.get("cost_limit")
+        return users
 
     def get_user(self, user_id: str) -> Optional[Dict[str, str]]:
         resp = (
             self.supabase.table(self.table)
-            .select("id, email, role, created_at, updated_at")
+            .select("id, email, role, settings, created_at, updated_at")
             .eq("id", user_id)
             .execute()
         )
         if resp.data:
-            return resp.data[0]
+            user = resp.data[0]
+            settings = user.pop("settings", None) or {}
+            user["cost_limit"] = settings.get("cost_limit")
+            return user
         return None
+
+    def update_cost_limit(self, user_id: str, cost_limit: Optional[float]) -> bool:
+        """
+        Set or clear a user's spending limit (in USD).
+
+        Educational Note: Stored inside the existing settings JSONB column
+        to avoid a migration. NULL cost_limit = unlimited.
+        """
+        # Read current settings to preserve other fields
+        resp = (
+            self.supabase.table(self.table)
+            .select("settings")
+            .eq("id", user_id)
+            .execute()
+        )
+        if not resp.data:
+            return False
+
+        settings = resp.data[0].get("settings") or {}
+        if cost_limit is not None and cost_limit > 0:
+            settings["cost_limit"] = cost_limit
+        else:
+            settings.pop("cost_limit", None)
+
+        update_resp = (
+            self.supabase.table(self.table)
+            .update({"settings": settings})
+            .eq("id", user_id)
+            .execute()
+        )
+        return bool(update_resp.data)
+
+    def get_user_total_spend(self, user_id: str) -> float:
+        """
+        Sum total_cost across all projects owned by this user.
+
+        Educational Note: Each project stores a costs JSONB with total_cost.
+        We aggregate across all projects to get the user's total spend.
+        """
+        from app.services.integrations.supabase import get_supabase
+        client = get_supabase()
+        resp = (
+            client.table("projects")
+            .select("costs")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        total = 0.0
+        for project in (resp.data or []):
+            costs = project.get("costs") or {}
+            total += costs.get("total_cost", 0.0)
+        return total
 
     def count_admins(self) -> int:
         resp = (

@@ -15,7 +15,7 @@ import os
 from typing import Optional, List, Dict, Any, Callable
 import anthropic
 
-from app.utils.cost_tracking import add_usage as add_cost_usage
+from app.utils.cost_tracking import add_usage as add_cost_usage, check_user_spending_limit
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +197,11 @@ class ClaudeService:
             ValueError: If API key is not configured
             anthropic.APIError: If API call fails
         """
+        # Check spending limit before making the API call
+        limit_error = check_user_spending_limit(user_id)
+        if limit_error:
+            raise ValueError(limit_error)
+
         client = self._get_client()
         api_params = self._build_api_params(
             messages=messages,
@@ -271,6 +276,11 @@ class ClaudeService:
         surface partial assistant text in real time while still receiving a
         final response object compatible with send_message().
         """
+        # Check spending limit before making the API call
+        limit_error = check_user_spending_limit(user_id)
+        if limit_error:
+            raise ValueError(limit_error)
+
         client = self._get_client()
         api_params = self._build_api_params(
             messages=messages,
