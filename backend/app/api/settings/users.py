@@ -104,3 +104,63 @@ def reset_user_password(user_id: str):
         current_app.logger.error(f"Error resetting password: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+@settings_bp.route("/settings/users/<user_id>/permissions", methods=["GET"])
+@require_admin
+def get_user_permissions_endpoint(user_id: str):
+    """
+    Get a user's module permissions.
+
+    Educational Note: Returns the full permission structure with all
+    5 categories and their sub-items. NULL in the DB is resolved to
+    the all-enabled default before returning.
+    """
+    from app.services.auth.permissions import get_user_permissions
+    perms = get_user_permissions(user_id)
+    return jsonify({"success": True, "permissions": perms}), 200
+
+
+@settings_bp.route("/settings/users/<user_id>/permissions", methods=["PUT"])
+@require_admin
+def update_user_permissions_endpoint(user_id: str):
+    """
+    Update a user's module permissions.
+
+    Educational Note: Accepts the full permissions structure. The admin UI
+    sends all 5 categories with their current toggle states. Stored as JSONB
+    on the users table.
+    """
+    from app.services.auth.permissions import update_user_permissions
+    data = request.get_json() or {}
+    permissions = data.get("permissions")
+    if permissions is None:
+        return jsonify({"success": False, "error": "permissions field required"}), 400
+
+    success = update_user_permissions(user_id, permissions)
+    if not success:
+        return jsonify({"success": False, "error": "Failed to update permissions"}), 500
+
+    return jsonify({"success": True}), 200
+
+
+@settings_bp.route("/settings/users/me/permissions", methods=["GET"])
+def get_my_permissions():
+    """
+    Get the current user's module permissions.
+
+    Educational Note: Non-admin endpoint — any authenticated user can
+    fetch their own permissions so the frontend knows what to show/hide.
+    """
+    from app.services.auth.rbac import get_request_identity
+    from app.services.auth.permissions import get_user_permissions
+
+    identity = get_request_identity()
+
+    # Admins always get full access
+    if identity.is_admin:
+        from app.services.auth.permissions import DEFAULT_PERMISSIONS
+        return jsonify({"success": True, "permissions": DEFAULT_PERMISSIONS}), 200
+
+    perms = get_user_permissions(identity.user_id)
+    return jsonify({"success": True, "permissions": perms}), 200
+

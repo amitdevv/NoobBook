@@ -191,3 +191,49 @@ def require_auth(fn: T) -> T:
         return fn(*args, **kwargs)
 
     return wrapper  # type: ignore[return-value]
+
+
+def require_permission(category: str, item: str | None = None):
+    """
+    Decorator to enforce per-user module permissions.
+
+    Educational Note: Works alongside @require_auth / @require_admin.
+    Admins always pass (they have full access). For non-admin users,
+    checks the permissions JSONB on the users table.
+
+    Args:
+        category: Permission category (e.g., "data_sources", "studio")
+        item: Optional sub-item (e.g., "database", "flow_diagrams")
+
+    Usage:
+        @require_permission("data_sources", "database")
+        def add_database_source(project_id):
+            ...
+    """
+    def decorator(fn: T) -> T:
+        @wraps(fn)
+        def wrapper(*args: Any, **kwargs: Any):
+            identity = get_request_identity()
+
+            # Admins always have full access
+            if identity.is_admin:
+                return fn(*args, **kwargs)
+
+            # Check permission for non-admin users
+            from app.services.auth.permissions import user_has_permission
+
+            if not user_has_permission(identity.user_id, category, item):
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "This feature is not available for your account. Contact your admin.",
+                        }
+                    ),
+                    403,
+                )
+            return fn(*args, **kwargs)
+
+        return wrapper  # type: ignore[return-value]
+
+    return decorator
