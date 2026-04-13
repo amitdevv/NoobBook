@@ -30,9 +30,11 @@ from app.services.studio_services.flow_diagram_service import flow_diagram_servi
 from app.services.source_services import source_index_service
 from app.services.integrations.supabase import storage_service
 from app.services.background_services.task_service import task_service
+from app.services.auth import require_permission
 
 
 @studio_bp.route('/projects/<project_id>/studio/flow-diagram', methods=['POST'])
+@require_permission("studio", "flow_diagrams")
 def generate_flow_diagram(project_id: str):
     """
     Start flow diagram generation or edit via background task.

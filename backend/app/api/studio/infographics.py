@@ -36,9 +36,11 @@ from app.services.integrations.google.imagen_service import imagen_service
 from app.services.integrations.supabase import storage_service
 from app.services.background_services.task_service import task_service
 from app.api.studio.logo_utils import resolve_logo
+from app.services.auth import require_permission
 
 
 @studio_bp.route('/projects/<project_id>/studio/infographic', methods=['POST'])
+@require_permission("studio", "infographics")
 def generate_infographic(project_id: str):
     """
     Start infographic generation as a background task.

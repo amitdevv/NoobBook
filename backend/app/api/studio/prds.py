@@ -22,9 +22,11 @@ from flask import jsonify, request, current_app, send_file, Response
 from app.api.studio import studio_bp
 from app.services.studio_services import studio_index_service
 from app.services.integrations.supabase import storage_service
+from app.services.auth import require_permission
 
 
 @studio_bp.route('/projects/<project_id>/studio/prd', methods=['POST'])
+@require_permission("studio", "prds")
 def generate_prd(project_id: str):
     """
     Start PRD generation (background task).

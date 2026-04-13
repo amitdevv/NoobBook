@@ -31,12 +31,56 @@ Routes:
 - GET    /projects/<id>/sources/summary  - Aggregate stats
 - GET    /sources/allowed-types          - List allowed extensions
 """
+from pathlib import Path
+from typing import Optional, Tuple
+
 from flask import jsonify, request, current_app, send_file, redirect
 from app.api.sources import sources_bp
 from app.services.source_services import SourceService
+from app.services.auth.rbac import get_request_identity
+from app.services.auth.permissions import user_has_permission
 
 # Initialize service
 source_service = SourceService()
+
+
+# Map file extensions to permission (category, item) tuples.
+# Educational Note: File uploads go through a single endpoint regardless of type,
+# so we check permissions inline based on the uploaded file's extension.
+_EXT_PERMISSION_MAP = {
+    # document_sources
+    ".pdf": ("document_sources", "pdf"),
+    ".docx": ("document_sources", "docx"),
+    ".pptx": ("document_sources", "pptx"),
+    ".txt": ("document_sources", "text"),
+    ".md": ("document_sources", "text"),
+    ".json": ("document_sources", "text"),
+    ".html": ("document_sources", "text"),
+    ".xml": ("document_sources", "text"),
+    # document_sources — images
+    ".png": ("document_sources", "image"),
+    ".jpg": ("document_sources", "image"),
+    ".jpeg": ("document_sources", "image"),
+    ".gif": ("document_sources", "image"),
+    ".webp": ("document_sources", "image"),
+    # document_sources — audio
+    ".mp3": ("document_sources", "audio"),
+    ".wav": ("document_sources", "audio"),
+    ".m4a": ("document_sources", "audio"),
+    ".aac": ("document_sources", "audio"),
+    ".flac": ("document_sources", "audio"),
+    # data_sources
+    ".csv": ("data_sources", "csv"),
+}
+
+
+def _get_upload_permission(filename: str) -> Optional[Tuple[str, str]]:
+    """
+    Return the (category, item) permission tuple for a given filename,
+    or None if no specific permission is required.
+    """
+    ext = Path(filename).suffix.lower()
+    return _EXT_PERMISSION_MAP.get(ext)
 
 
 @sources_bp.route('/projects/<project_id>/sources', methods=['GET'])
@@ -112,6 +156,18 @@ def upload_source(project_id: str):
                 'success': False,
                 'error': 'No file selected'
             }), 400
+
+        # Permission check based on file type
+        # Educational Note: One upload endpoint handles all file types, so we
+        # resolve the permission from the extension and check inline.
+        perm = _get_upload_permission(file.filename)
+        if perm:
+            identity = get_request_identity()
+            if not identity.is_admin and not user_has_permission(identity.user_id, perm[0], perm[1]):
+                return jsonify({
+                    'success': False,
+                    'error': 'This file type is not available for your account. Contact your admin.'
+                }), 403
 
         # Get optional fields from form data
         name = request.form.get('name')

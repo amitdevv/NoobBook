@@ -22,9 +22,11 @@ from app.services.ai_agents.wireframe_agent_service import wireframe_agent_servi
 from app.services.source_services import source_index_service
 from app.services.integrations.supabase import storage_service
 from app.services.background_services.task_service import task_service
+from app.services.auth import require_permission
 
 
 @studio_bp.route("/projects/<project_id>/studio/wireframe", methods=["POST"])
+@require_permission("studio", "wireframes")
 def generate_wireframe(project_id: str):
     """
     Start wireframe generation or edit as a background task.

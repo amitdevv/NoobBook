@@ -36,6 +36,7 @@ from flask import has_request_context
 from app.services.auth.rbac import get_request_identity
 from app.services.data_services.project_service import DEFAULT_USER_ID
 from app.utils import claude_parsing_utils
+from app.services.auth.permissions import user_has_permission
 
 
 class ClaudeStreamError(Exception):
@@ -136,22 +137,25 @@ class MainChatService:
         Returns:
             Tuple of (tool definitions list, MCP tool registry dict)
         """
-        # Always include memory and studio_signal tools
-        tools = [
-            self._get_memory_tool(),
-            self._get_studio_signal_tool()
-        ]
+        # Include memory and studio_signal tools only if the user has permission
+        tools = []
+
+        if not user_id or user_has_permission(user_id, "chat_features", "memory"):
+            tools.append(self._get_memory_tool())
+
+        if not user_id or user_has_permission(user_id, "studio"):
+            tools.append(self._get_studio_signal_tool())
 
         if has_active_sources:
             tools.append(self._get_search_tool())
 
-        if has_csv_sources:
+        if has_csv_sources and (not user_id or user_has_permission(user_id, "data_sources", "csv")):
             tools.append(self._get_csv_analyzer_tool())
 
-        if has_database_sources:
+        if has_database_sources and (not user_id or user_has_permission(user_id, "data_sources", "database")):
             tools.append(self._get_database_analyzer_tool())
 
-        if has_freshdesk_sources:
+        if has_freshdesk_sources and (not user_id or user_has_permission(user_id, "data_sources", "freshdesk")):
             tools.append(self._get_freshdesk_analyzer_tool())
 
         # Add all configured knowledge base tools (Jira, Notion, GitHub, etc.)

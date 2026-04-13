@@ -8,6 +8,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Textarea } from '../ui/textarea';
 import { PaperPlaneTilt, Microphone, CodeBlock, StopCircle } from '@phosphor-icons/react';
+import { usePermissions } from '@/contexts/PermissionsContext';
 
 interface ChatInputProps {
   message: string;
@@ -37,6 +38,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onToggleRawMode,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { hasPermission } = usePermissions();
+  const canUseVoice = hasPermission("chat_features", "voice_input");
 
   // Display value combines typed message and partial transcript
   const displayMessage = partialTranscript
@@ -72,28 +75,30 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     <div className="p-4 pt-2">
       {/* Floating pill container - mic, textarea, send all inside */}
       <div className="flex items-center gap-2 border rounded-2xl px-3 py-2 bg-background">
-        {/* Microphone Button - seamlessly integrated */}
-        <button
-          type="button"
-          onClick={onMicClick}
-          disabled={sending || !transcriptionConfigured}
-          title={
-            !transcriptionConfigured
-              ? 'Set up ElevenLabs API key in settings'
-              : sending
-              ? 'Wait for response to complete'
-              : isRecording
-              ? 'Click to stop recording'
-              : 'Click to start recording'
-          }
-          className={`flex-shrink-0 p-1.5 rounded-full transition-colors ${
-            isRecording
-              ? 'bg-red-500 text-white animate-pulse'
-              : 'text-muted-foreground hover:text-foreground'
-          } ${sending || !transcriptionConfigured ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-        >
-          <Microphone size={18} />
-        </button>
+        {/* Microphone Button — hidden when voice_input permission is disabled */}
+        {canUseVoice && (
+          <button
+            type="button"
+            onClick={onMicClick}
+            disabled={sending || !transcriptionConfigured}
+            title={
+              !transcriptionConfigured
+                ? 'Set up ElevenLabs API key in settings'
+                : sending
+                ? 'Wait for response to complete'
+                : isRecording
+                ? 'Click to stop recording'
+                : 'Click to start recording'
+            }
+            className={`flex-shrink-0 p-1.5 rounded-full transition-colors ${
+              isRecording
+                ? 'bg-red-500 text-white animate-pulse'
+                : 'text-muted-foreground hover:text-foreground'
+            } ${sending || !transcriptionConfigured ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            <Microphone size={18} />
+          </button>
+        )}
 
         {/* Textarea - no border, blends with container */}
         <Textarea
@@ -153,7 +158,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       </div>
 
       <p className="text-xs text-muted-foreground mt-2 text-center">
-        {isRecording
+        {!canUseVoice
+          ? 'Type your message'
+          : isRecording
           ? 'Listening... Click mic to stop'
           : !transcriptionConfigured
           ? 'Voice input requires ElevenLabs API key (Admin Settings)'
