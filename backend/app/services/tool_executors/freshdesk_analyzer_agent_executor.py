@@ -6,20 +6,22 @@ Formats the agent result for display in the chat response.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from app.services.ai_agents.freshdesk_analyzer_agent import freshdesk_analyzer_agent
 
 logger = logging.getLogger(__name__)
 
 
-def execute(project_id: str, source_id: str, query: str) -> Dict[str, Any]:
+def execute(project_id: str, source_id: str, query: str, chat_id: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
     """Execute Freshdesk analysis and format result for chat."""
     try:
         result = freshdesk_analyzer_agent.run(
             project_id=project_id,
             source_id=source_id,
             query=query,
+            chat_id=chat_id,
+            user_id=user_id,
         )
 
         if not result.get("success"):

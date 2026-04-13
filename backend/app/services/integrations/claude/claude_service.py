@@ -106,7 +106,14 @@ class ClaudeService:
             kwargs["tags"] = tags
         return kwargs
 
-    def _run_tracked(self, fn, *, opik_kwargs: Dict[str, Any], trace_input: Optional[Dict[str, Any]] = None):
+    def _run_tracked(
+        self,
+        fn,
+        *,
+        opik_kwargs: Dict[str, Any],
+        trace_input: Optional[Dict[str, Any]] = None,
+        trace_name: str = "noobbook_llm_call",
+    ):
         """
         Run fn() inside an @opik.track() parent trace with metadata.
 
@@ -131,7 +138,7 @@ class ClaudeService:
         except ImportError:
             return fn()
 
-        @opik.track(name="noobbook_llm_call")
+        @opik.track(name=trace_name)
         def tracked():
             try:
                 if trace_input:
@@ -209,11 +216,15 @@ class ClaudeService:
             (m.get("content", "") for m in reversed(messages) if m.get("role") == "user"),
             "",
         )
+        # Truncate for trace name (Opik dashboard column); full text in trace_input
+        short_name = (last_user_msg[:80] + "...") if isinstance(last_user_msg, str) and len(last_user_msg) > 80 else last_user_msg
+        trace_name = str(short_name) if short_name else "noobbook_llm_call"
         trace_input = {"prompt": last_user_msg, "model": model, "message_count": len(messages)}
         response = self._run_tracked(
             lambda: client.messages.create(**api_params),
             opik_kwargs=opik_kwargs,
             trace_input=trace_input,
+            trace_name=trace_name,
         )
 
         # Track costs if project_id provided (also per-chat if chat_id set)
@@ -285,8 +296,10 @@ class ClaudeService:
             (m.get("content", "") for m in reversed(messages) if m.get("role") == "user"),
             "",
         )
+        short_name = (last_user_msg[:80] + "...") if isinstance(last_user_msg, str) and len(last_user_msg) > 80 else last_user_msg
+        trace_name = str(short_name) if short_name else "noobbook_llm_call"
         trace_input = {"prompt": last_user_msg, "model": model, "message_count": len(messages)}
-        response = self._run_tracked(_do_stream, opik_kwargs=opik_kwargs, trace_input=trace_input)
+        response = self._run_tracked(_do_stream, opik_kwargs=opik_kwargs, trace_input=trace_input, trace_name=trace_name)
 
         if project_id:
             add_cost_usage(

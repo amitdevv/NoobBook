@@ -14,7 +14,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from app.services.integrations.claude import claude_service
 from app.config import prompt_loader, tool_loader
@@ -49,7 +49,7 @@ class DatabaseAnalyzerAgent:
             self._tools = tools_config["all_tools"]
         return self._tools or []
 
-    def run(self, project_id: str, source_id: str, query: str) -> Dict[str, Any]:
+    def run(self, project_id: str, source_id: str, query: str, chat_id: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
         config = self._load_config()
         tools = self._load_tools()
 
@@ -134,6 +134,8 @@ class DatabaseAnalyzerAgent:
                     extra_headers={"anthropic-beta": "context-1m-2025-08-07"},
                     project_id=project_id,
                     tags=["query"],
+                    chat_id=chat_id,
+                    user_id=user_id,
                 )
 
                 total_input_tokens += response["usage"]["input_tokens"]

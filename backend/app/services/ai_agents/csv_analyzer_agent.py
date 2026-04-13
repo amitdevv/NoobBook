@@ -13,7 +13,7 @@ Results (including any generated plots) are returned to main_chat.
 
 import logging
 import uuid
-from typing import Dict, Any, List
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -65,7 +65,9 @@ class CSVAnalyzerAgent:
         self,
         project_id: str,
         source_id: str,
-        query: str
+        query: str,
+        chat_id: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Run the agent to answer a question about CSV data.
@@ -115,6 +117,8 @@ class CSVAnalyzerAgent:
                 tool_choice={"type": "any"},
                 project_id=project_id,
                 tags=["query"],
+                chat_id=chat_id,
+                user_id=user_id,
             )
 
             total_input_tokens += response["usage"]["input_tokens"]

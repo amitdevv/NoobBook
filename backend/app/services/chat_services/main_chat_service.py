@@ -248,7 +248,9 @@ class MainChatService:
             result = csv_analyzer_agent_executor.execute(
                 project_id=project_id,
                 source_id=tool_input.get("source_id", ""),
-                query=tool_input.get("query", "")
+                query=tool_input.get("query", ""),
+                chat_id=chat_id,
+                user_id=user_id,
             )
             if result.get("success"):
                 content = result.get("content", "No analysis result")
@@ -268,7 +270,9 @@ class MainChatService:
             result = database_analyzer_agent_executor.execute(
                 project_id=project_id,
                 source_id=tool_input.get("source_id", ""),
-                query=tool_input.get("query", "")
+                query=tool_input.get("query", ""),
+                chat_id=chat_id,
+                user_id=user_id,
             )
             if result.get("success"):
                 return result.get("content", "No analysis result")
@@ -280,7 +284,9 @@ class MainChatService:
             result = freshdesk_analyzer_agent_executor.execute(
                 project_id=project_id,
                 source_id=tool_input.get("source_id", ""),
-                query=tool_input.get("query", "")
+                query=tool_input.get("query", ""),
+                chat_id=chat_id,
+                user_id=user_id,
             )
             if result.get("success"):
                 return result.get("content", "No analysis result")

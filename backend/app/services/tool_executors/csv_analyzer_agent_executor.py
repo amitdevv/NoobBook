@@ -8,7 +8,7 @@ When main chat calls analyze_csv_agent tool, this executor:
 3. Formats and returns the result for main chat
 """
 
-from typing import Dict, Any
+from typing import Any, Dict, Optional
 
 from app.services.ai_agents.csv_analyzer_agent import csv_analyzer_agent
 
@@ -16,7 +16,9 @@ from app.services.ai_agents.csv_analyzer_agent import csv_analyzer_agent
 def execute(
     project_id: str,
     source_id: str,
-    query: str
+    query: str,
+    chat_id: Optional[str] = None,
+    user_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Execute CSV analyzer agent for a user query.
@@ -47,7 +49,9 @@ def execute(
     result = csv_analyzer_agent.run(
         project_id=project_id,
         source_id=source_id,
-        query=query
+        query=query,
+        chat_id=chat_id,
+        user_id=user_id,
     )
 
     if result.get("success"):

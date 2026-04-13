@@ -31,7 +31,7 @@ class FreshdeskAnalyzerAgent:
             self._tools = tool_loader.load_tools_from_category("freshdesk_agent")
         return self._tools
 
-    def run(self, project_id: str, source_id: str, query: str) -> Dict[str, Any]:
+    def run(self, project_id: str, source_id: str, query: str, chat_id: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Run the Freshdesk analysis agentic loop.
         Always closes the DB connection on exit to prevent leaks."""
         execution_id = str(uuid.uuid4())[:8]
@@ -69,6 +69,8 @@ class FreshdeskAnalyzerAgent:
                     tools=tools,
                     project_id=project_id,
                     tags=["query"],
+                    chat_id=chat_id,
+                    user_id=user_id,
                 )
 
                 # Track usage
