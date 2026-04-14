@@ -115,22 +115,32 @@ def get_user_permissions_endpoint(user_id: str):
     5 categories and their sub-items. NULL in the DB is resolved to
     the all-enabled default before returning.
     """
-    from app.services.auth.permissions import get_user_permissions
+    from app.services.auth.permissions import (
+        get_user_permissions, get_all_connections, get_user_connection_access,
+    )
     perms = get_user_permissions(user_id)
-    return jsonify({"success": True, "permissions": perms}), 200
+    connections = get_all_connections()
+    user_access = get_user_connection_access(user_id)
+    return jsonify({
+        "success": True,
+        "permissions": perms,
+        "connections": connections,
+        "connection_access": user_access,
+    }), 200
 
 
 @settings_bp.route("/settings/users/<user_id>/permissions", methods=["PUT"])
 @require_admin
 def update_user_permissions_endpoint(user_id: str):
     """
-    Update a user's module permissions.
+    Update a user's module permissions AND per-connection access.
 
-    Educational Note: Accepts the full permissions structure. The admin UI
-    sends all 5 categories with their current toggle states. Stored as JSONB
-    on the users table.
+    Educational Note: Accepts the full permissions structure plus optional
+    connection_access with database_ids and mcp_ids arrays.
     """
-    from app.services.auth.permissions import update_user_permissions
+    from app.services.auth.permissions import (
+        update_user_permissions, update_user_connection_access,
+    )
     data = request.get_json() or {}
     permissions = data.get("permissions")
     if permissions is None:
@@ -139,6 +149,15 @@ def update_user_permissions_endpoint(user_id: str):
     success = update_user_permissions(user_id, permissions)
     if not success:
         return jsonify({"success": False, "error": "Failed to update permissions"}), 500
+
+    # Update per-connection access if provided
+    conn_access = data.get("connection_access")
+    if conn_access:
+        update_user_connection_access(
+            user_id,
+            database_ids=conn_access.get("database_ids"),
+            mcp_ids=conn_access.get("mcp_ids"),
+        )
 
     return jsonify({"success": True}), 200
 

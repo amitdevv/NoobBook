@@ -178,14 +178,26 @@ export const PermissionsModal: React.FC<PermissionsModalProps> = ({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Per-connection access state (databases + MCP)
+  const [allConnections, setAllConnections] = useState<{
+    databases: { id: string; name: string }[];
+    mcp: { id: string; name: string }[];
+  }>({ databases: [], mcp: [] });
+  const [connectionAccess, setConnectionAccess] = useState<{
+    database_ids: string[];
+    mcp_ids: string[];
+  }>({ database_ids: [], mcp_ids: [] });
+
   const { success, error } = useToast();
 
   // Fetch on open
   const loadPermissions = useCallback(async () => {
     setLoading(true);
     try {
-      const perms = await usersAPI.getUserPermissions(userId);
-      setPermissions(perms);
+      const data = await usersAPI.getUserPermissions(userId);
+      setPermissions(data.permissions);
+      setAllConnections(data.connections);
+      setConnectionAccess(data.connection_access);
     } catch (err) {
       log.error({ err }, 'failed to load permissions');
       setPermissions(buildDefaultPermissions());
@@ -233,10 +245,18 @@ export const PermissionsModal: React.FC<PermissionsModalProps> = ({
   // Save
   // --------------------------------------------------
 
+  const toggleConnection = (type: 'database_ids' | 'mcp_ids', connId: string) => {
+    setConnectionAccess((prev) => {
+      const ids = prev[type];
+      const next = ids.includes(connId) ? ids.filter((id) => id !== connId) : [...ids, connId];
+      return { ...prev, [type]: next };
+    });
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      await usersAPI.updateUserPermissions(userId, permissions);
+      await usersAPI.updateUserPermissions(userId, permissions, connectionAccess);
       success('Permissions updated');
       onOpenChange(false);
     } catch (err) {
@@ -379,6 +399,72 @@ export const PermissionsModal: React.FC<PermissionsModalProps> = ({
                           );
                         })}
                       </div>
+
+                      {/* Per-connection access: nested under Database */}
+                      {catKey === 'data_sources' && cat.items.database && allConnections.databases.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-dotted border-stone-200">
+                          <p className="text-[11px] text-stone-400 font-medium mb-1.5 uppercase tracking-wider">Database Connections</p>
+                          <div className="flex flex-wrap gap-1">
+                            {allConnections.databases.map((conn) => {
+                              const hasAccess = connectionAccess.database_ids.includes(conn.id);
+                              return (
+                                <button
+                                  key={conn.id}
+                                  type="button"
+                                  onClick={() => toggleConnection('database_ids', conn.id)}
+                                  className={cn(
+                                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all',
+                                    'border cursor-pointer select-none',
+                                    hasAccess
+                                      ? 'bg-emerald-700 text-white border-emerald-700 hover:bg-emerald-600'
+                                      : 'bg-white text-stone-400 border-stone-200 hover:border-stone-300 line-through decoration-stone-300',
+                                  )}
+                                >
+                                  {hasAccess ? (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 flex-shrink-0" />
+                                  ) : (
+                                    <Minus size={10} className="flex-shrink-0 opacity-50" />
+                                  )}
+                                  {conn.name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Per-connection access: nested under MCP */}
+                      {catKey === 'integrations' && cat.items.mcp && allConnections.mcp.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-dotted border-stone-200">
+                          <p className="text-[11px] text-stone-400 font-medium mb-1.5 uppercase tracking-wider">MCP Connections</p>
+                          <div className="flex flex-wrap gap-1">
+                            {allConnections.mcp.map((conn) => {
+                              const hasAccess = connectionAccess.mcp_ids.includes(conn.id);
+                              return (
+                                <button
+                                  key={conn.id}
+                                  type="button"
+                                  onClick={() => toggleConnection('mcp_ids', conn.id)}
+                                  className={cn(
+                                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all',
+                                    'border cursor-pointer select-none',
+                                    hasAccess
+                                      ? 'bg-emerald-700 text-white border-emerald-700 hover:bg-emerald-600'
+                                      : 'bg-white text-stone-400 border-stone-200 hover:border-stone-300 line-through decoration-stone-300',
+                                  )}
+                                >
+                                  {hasAccess ? (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 flex-shrink-0" />
+                                  ) : (
+                                    <Minus size={10} className="flex-shrink-0 opacity-50" />
+                                  )}
+                                  {conn.name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -435,10 +435,18 @@ class UsersAPI {
    * Educational Note: Returns the category-based permission structure that
    * controls which features are available to this user.
    */
-  async getUserPermissions(userId: string): Promise<UserPermissions> {
+  async getUserPermissions(userId: string): Promise<{
+    permissions: UserPermissions;
+    connections: { databases: { id: string; name: string }[]; mcp: { id: string; name: string }[] };
+    connection_access: { database_ids: string[]; mcp_ids: string[] };
+  }> {
     try {
       const response = await axios.get(`${API_BASE_URL}/settings/users/${userId}/permissions`);
-      return response.data.permissions;
+      return {
+        permissions: response.data.permissions,
+        connections: response.data.connections || { databases: [], mcp: [] },
+        connection_access: response.data.connection_access || { database_ids: [], mcp_ids: [] },
+      };
     } catch (error) {
       log.error({ err: error }, 'failed to fetch user permissions');
       throw error;
@@ -446,13 +454,18 @@ class UsersAPI {
   }
 
   /**
-   * Update permissions for a specific user
-   * Educational Note: Replaces the full permission object for the user.
-   * Only admins should be able to call this endpoint.
+   * Update permissions for a specific user (including per-connection access)
    */
-  async updateUserPermissions(userId: string, permissions: UserPermissions): Promise<void> {
+  async updateUserPermissions(
+    userId: string,
+    permissions: UserPermissions,
+    connectionAccess?: { database_ids?: string[]; mcp_ids?: string[] },
+  ): Promise<void> {
     try {
-      await axios.put(`${API_BASE_URL}/settings/users/${userId}/permissions`, { permissions });
+      await axios.put(`${API_BASE_URL}/settings/users/${userId}/permissions`, {
+        permissions,
+        connection_access: connectionAccess,
+      });
     } catch (error) {
       log.error({ err: error }, 'failed to update user permissions');
       throw error;

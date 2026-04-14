@@ -215,4 +215,130 @@ def user_has_permission(user_id: str, category: str, item: Optional[str] = None)
     if item is None:
         return True  # Category-level check passed
 
+    # For database/mcp: also check per-connection access
+    # (handled separately via connection_users tables, not here)
+
     return cat.get("items", {}).get(item, True)
+
+
+# ---------------------------------------------------------------------------
+# Per-connection access control (Database & MCP)
+# ---------------------------------------------------------------------------
+
+def get_all_connections() -> Dict[str, Any]:
+    """
+    Return all database and MCP connections for the admin permissions modal.
+
+    Returns:
+        {"databases": [{"id": "...", "name": "..."}], "mcp": [{"id": "...", "name": "..."}]}
+    """
+    try:
+        client = _get_supabase()
+        db_resp = client.table("database_connections").select("id, name").order("name").execute()
+        mcp_resp = client.table("mcp_connections").select("id, name").order("name").execute()
+        return {
+            "databases": db_resp.data or [],
+            "mcp": mcp_resp.data or [],
+        }
+    except Exception as e:
+        logger.error("Failed to list connections: %s", e)
+        return {"databases": [], "mcp": []}
+
+
+def get_user_connection_access(user_id: str) -> Dict[str, list]:
+    """
+    Return which database and MCP connection IDs a user has access to.
+
+    Educational Note: A user has access if:
+    1. The connection has visible_to_all=true, OR
+    2. The user is in the connection_users junction table
+
+    For the permissions modal we simplify: return which connection IDs
+    are in the junction table. The admin toggles add/remove from there.
+    Connections with visible_to_all=true are shown as enabled by default.
+
+    Returns:
+        {"database_ids": ["uuid1", ...], "mcp_ids": ["uuid2", ...]}
+    """
+    try:
+        client = _get_supabase()
+
+        db_resp = (
+            client.table("database_connection_users")
+            .select("connection_id")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        mcp_resp = (
+            client.table("mcp_connection_users")
+            .select("connection_id")
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        # Also include connections that are visible_to_all
+        db_visible = (
+            client.table("database_connections")
+            .select("id")
+            .eq("visible_to_all", True)
+            .execute()
+        )
+        mcp_visible = (
+            client.table("mcp_connections")
+            .select("id")
+            .eq("visible_to_all", True)
+            .execute()
+        )
+
+        db_ids = set(r["connection_id"] for r in (db_resp.data or []))
+        db_ids.update(r["id"] for r in (db_visible.data or []))
+
+        mcp_ids = set(r["connection_id"] for r in (mcp_resp.data or []))
+        mcp_ids.update(r["id"] for r in (mcp_visible.data or []))
+
+        return {
+            "database_ids": list(db_ids),
+            "mcp_ids": list(mcp_ids),
+        }
+    except Exception as e:
+        logger.error("Failed to get connection access for %s: %s", user_id, e)
+        return {"database_ids": [], "mcp_ids": []}
+
+
+def update_user_connection_access(
+    user_id: str,
+    database_ids: Optional[list] = None,
+    mcp_ids: Optional[list] = None,
+) -> bool:
+    """
+    Set which database and MCP connections a user can access.
+
+    Educational Note: This replaces the user's entries in the junction tables.
+    Connections with visible_to_all=true remain accessible regardless.
+    The admin uses this to restrict access to specific connections.
+    """
+    try:
+        client = _get_supabase()
+
+        if database_ids is not None:
+            # Clear existing entries
+            client.table("database_connection_users").delete().eq("user_id", user_id).execute()
+            # Insert new entries
+            for conn_id in database_ids:
+                client.table("database_connection_users").insert({
+                    "connection_id": conn_id,
+                    "user_id": user_id,
+                }).execute()
+
+        if mcp_ids is not None:
+            client.table("mcp_connection_users").delete().eq("user_id", user_id).execute()
+            for conn_id in mcp_ids:
+                client.table("mcp_connection_users").insert({
+                    "connection_id": conn_id,
+                    "user_id": user_id,
+                }).execute()
+
+        return True
+    except Exception as e:
+        logger.error("Failed to update connection access for %s: %s", user_id, e)
+        return False
