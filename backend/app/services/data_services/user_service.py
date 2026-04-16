@@ -51,10 +51,13 @@ class UserService:
             .execute()
         )
         users = resp.data or []
-        # Surface cost_limit from settings JSONB for the frontend table
+        # Surface spending fields from settings JSONB for the frontend table
         for user in users:
             settings = user.pop("settings", None) or {}
             user["cost_limit"] = settings.get("cost_limit")
+            user["reset_frequency"] = settings.get("reset_frequency")  # daily/weekly/monthly/null
+            user["period_spend"] = settings.get("period_spend", 0.0)
+            user["period_start"] = settings.get("period_start")
         return users
 
     def get_user(self, user_id: str) -> Optional[Dict[str, str]]:
@@ -68,17 +71,14 @@ class UserService:
             user = resp.data[0]
             settings = user.pop("settings", None) or {}
             user["cost_limit"] = settings.get("cost_limit")
+            user["reset_frequency"] = settings.get("reset_frequency")
+            user["period_spend"] = settings.get("period_spend", 0.0)
+            user["period_start"] = settings.get("period_start")
             return user
         return None
 
-    def update_cost_limit(self, user_id: str, cost_limit: Optional[float]) -> bool:
-        """
-        Set or clear a user's spending limit (in USD).
-
-        Educational Note: Stored inside the existing settings JSONB column
-        to avoid a migration. NULL cost_limit = unlimited.
-        """
-        # Read current settings to preserve other fields
+    def get_user_settings_raw(self, user_id: str) -> Dict[str, Any]:
+        """Read the raw settings JSONB for a user."""
         resp = (
             self.supabase.table(self.table)
             .select("settings")
@@ -86,21 +86,78 @@ class UserService:
             .execute()
         )
         if not resp.data:
-            return False
+            return {}
+        return resp.data[0].get("settings") or {}
 
-        settings = resp.data[0].get("settings") or {}
-        if cost_limit is not None and cost_limit > 0:
-            settings["cost_limit"] = cost_limit
-        else:
-            settings.pop("cost_limit", None)
-
-        update_resp = (
+    def save_user_settings(self, user_id: str, settings: Dict[str, Any]) -> bool:
+        """Write the full settings JSONB for a user."""
+        resp = (
             self.supabase.table(self.table)
             .update({"settings": settings})
             .eq("id", user_id)
             .execute()
         )
-        return bool(update_resp.data)
+        return bool(resp.data)
+
+    def update_spending_config(
+        self,
+        user_id: str,
+        cost_limit: Optional[float] = None,
+        reset_frequency: Optional[str] = None,
+    ) -> bool:
+        """
+        Update a user's spending limit and reset frequency.
+
+        Educational Note: Stored in users.settings JSONB.
+        - cost_limit: Max USD per period (null = unlimited)
+        - reset_frequency: "daily" | "weekly" | "monthly" | null (null = lifetime/no reset)
+        - When reset_frequency changes, period_spend resets to 0 with a new period_start
+        """
+        settings = self.get_user_settings_raw(user_id)
+        if settings is None:
+            return False
+
+        old_freq = settings.get("reset_frequency")
+
+        # Update limit
+        if cost_limit is not None and cost_limit > 0:
+            settings["cost_limit"] = cost_limit
+        elif cost_limit is None or cost_limit == 0:
+            settings.pop("cost_limit", None)
+            settings.pop("reset_frequency", None)
+            settings.pop("period_spend", None)
+            settings.pop("period_start", None)
+            return self.save_user_settings(user_id, settings)
+
+        # Update reset frequency
+        if reset_frequency in ("daily", "weekly", "monthly"):
+            settings["reset_frequency"] = reset_frequency
+            # Reset period if frequency changed
+            if reset_frequency != old_freq:
+                from datetime import datetime
+                settings["period_spend"] = 0.0
+                settings["period_start"] = datetime.utcnow().isoformat() + "Z"
+        else:
+            settings.pop("reset_frequency", None)
+            settings.pop("period_spend", None)
+            settings.pop("period_start", None)
+
+        return self.save_user_settings(user_id, settings)
+
+    def increment_period_spend(self, user_id: str, amount: float) -> None:
+        """
+        Add to the user's period_spend after a successful API call.
+
+        Educational Note: Called from cost_tracking.add_usage() alongside
+        project and chat cost updates. Only increments if the user has
+        a cost_limit with a reset_frequency configured.
+        """
+        settings = self.get_user_settings_raw(user_id)
+        if not settings.get("cost_limit") or not settings.get("reset_frequency"):
+            return  # No period tracking configured
+
+        settings["period_spend"] = settings.get("period_spend", 0.0) + amount
+        self.save_user_settings(user_id, settings)
 
     def get_user_total_spend(self, user_id: str) -> float:
         """

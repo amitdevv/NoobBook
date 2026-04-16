@@ -188,15 +188,18 @@ def get_my_permissions():
 @require_admin
 def update_cost_limit(user_id: str):
     """
-    Set or clear a user's spending limit in USD.
+    Set or clear a user's spending limit and reset frequency.
 
-    Body: {"cost_limit": 20.0}  — set limit to $20
+    Body: {"cost_limit": 20.0, "reset_frequency": "monthly"}
     Body: {"cost_limit": null}  — remove limit (unlimited)
+
+    reset_frequency: "daily" | "weekly" | "monthly" | null
     """
     data = request.get_json() or {}
     cost_limit = data.get("cost_limit")
+    reset_frequency = data.get("reset_frequency")
 
-    # Validate
+    # Validate cost_limit
     if cost_limit is not None:
         try:
             cost_limit = float(cost_limit)
@@ -205,9 +208,60 @@ def update_cost_limit(user_id: str):
         except (TypeError, ValueError):
             return jsonify({"success": False, "error": "Invalid cost_limit value"}), 400
 
-    success = get_user_service().update_cost_limit(user_id, cost_limit)
+    # Validate reset_frequency
+    valid_frequencies = ("daily", "weekly", "monthly", None)
+    if reset_frequency not in valid_frequencies:
+        return jsonify({"success": False, "error": f"Invalid reset_frequency. Use: daily, weekly, monthly, or null"}), 400
+
+    svc = get_user_service()
+    success = svc.update_spending_config(user_id, cost_limit, reset_frequency)
     if not success:
         return jsonify({"success": False, "error": "User not found"}), 404
 
-    return jsonify({"success": True, "cost_limit": cost_limit}), 200
+    return jsonify({"success": True, "cost_limit": cost_limit, "reset_frequency": reset_frequency}), 200
+
+
+@settings_bp.route("/settings/users/me/usage", methods=["GET"])
+def get_my_usage():
+    """
+    Get the current user's spending usage vs their limit.
+
+    Educational Note: Non-admin endpoint — any authenticated user can
+    see their own usage. Returns limit, period spend, reset info, and
+    lifetime total for the usage card in Profile settings.
+    """
+    identity = get_request_identity()
+    svc = get_user_service()
+
+    user = svc.get_user(identity.user_id)
+    if not user:
+        return jsonify({"success": True, "usage": None}), 200
+
+    cost_limit = user.get("cost_limit")
+    reset_frequency = user.get("reset_frequency")
+    period_spend = user.get("period_spend", 0.0)
+    period_start = user.get("period_start")
+    total_spend = svc.get_user_total_spend(identity.user_id)
+
+    # Calculate effective current spend based on whether period tracking is active
+    if reset_frequency and cost_limit:
+        current_spend = period_spend
+    elif cost_limit:
+        current_spend = total_spend
+    else:
+        current_spend = total_spend
+
+    usage_pct = (current_spend / cost_limit * 100) if cost_limit and cost_limit > 0 else 0
+
+    return jsonify({
+        "success": True,
+        "usage": {
+            "cost_limit": cost_limit,
+            "reset_frequency": reset_frequency,
+            "current_spend": round(current_spend, 6),
+            "total_spend": round(total_spend, 6),
+            "period_start": period_start,
+            "usage_percent": round(usage_pct, 1),
+        },
+    }), 200
 

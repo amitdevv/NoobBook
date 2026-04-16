@@ -44,13 +44,27 @@ export interface DatabaseConnection {
   updated_at: string;
 }
 
+export type ResetFrequency = 'daily' | 'weekly' | 'monthly' | null;
+
 export interface UserSummary {
   id: string;
   email: string | null;
   role: 'admin' | 'user' | string;
   cost_limit: number | null;
+  reset_frequency: ResetFrequency;
+  period_spend: number;
+  period_start: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface UserUsage {
+  cost_limit: number | null;
+  reset_frequency: ResetFrequency;
+  current_spend: number;
+  total_spend: number;
+  period_start: string | null;
+  usage_percent: number;
 }
 
 class SettingsAPI {
@@ -472,12 +486,29 @@ class UsersAPI {
     }
   }
 
-  async updateCostLimit(userId: string, costLimit: number | null): Promise<void> {
+  async updateCostLimit(
+    userId: string,
+    costLimit: number | null,
+    resetFrequency?: ResetFrequency,
+  ): Promise<void> {
     try {
-      await axios.put(`${API_BASE_URL}/settings/users/${userId}/cost-limit`, { cost_limit: costLimit });
+      await axios.put(`${API_BASE_URL}/settings/users/${userId}/cost-limit`, {
+        cost_limit: costLimit,
+        reset_frequency: resetFrequency ?? null,
+      });
     } catch (error) {
       log.error({ err: error }, 'failed to update cost limit');
       throw error;
+    }
+  }
+
+  async getMyUsage(): Promise<UserUsage | null> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/settings/users/me/usage`);
+      return response.data.usage;
+    } catch (error) {
+      log.error({ err: error }, 'failed to fetch usage');
+      return null;
     }
   }
 }

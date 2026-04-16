@@ -41,12 +41,16 @@ import {
   Key,
   Trash,
   Sliders,
-  CurrencyDollar,
   Infinity as InfinityIcon,
   PencilSimple,
 } from '@phosphor-icons/react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { usersAPI } from '@/lib/api/settings';
-import type { UserSummary } from '@/lib/api/settings';
+import type { UserSummary, ResetFrequency } from '@/lib/api/settings';
 import { useToast } from '@/components/ui/use-toast';
 import { CreateUserDialog } from '../team/CreateUserDialog';
 import { DeleteUserDialog } from '../team/DeleteUserDialog';
@@ -58,110 +62,175 @@ import { cn } from '@/lib/utils';
 const log = createLogger('team-section');
 
 // ---------------------------------------------------------------------------
-// Inline editable spend limit cell
+// Spend limit cell — OpenRouter-inspired with progress bar + popover editor
 // ---------------------------------------------------------------------------
+
+const FREQ_LABELS: Record<string, string> = {
+  daily: 'Daily',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+};
 
 const SpendLimitCell: React.FC<{
   userId: string;
   value: number | null;
-  onSaved: (userId: string, newLimit: number | null) => void;
-}> = ({ userId, value, onSaved }) => {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
+  resetFrequency: ResetFrequency;
+  periodSpend: number;
+  onSaved: (userId: string, updates: Partial<UserSummary>) => void;
+}> = ({ userId, value, resetFrequency, periodSpend, onSaved }) => {
+  const [open, setOpen] = useState(false);
+  const [draftLimit, setDraftLimit] = useState('');
+  const [draftFreq, setDraftFreq] = useState<string>('none');
   const [saving, setSaving] = useState(false);
   const { success: showSuccess, error: showError } = useToast();
 
-  const startEditing = () => {
-    setDraft(value != null ? String(value) : '');
-    setEditing(true);
+  // Sync draft when popover opens
+  const handleOpen = (isOpen: boolean) => {
+    if (isOpen) {
+      setDraftLimit(value != null ? String(value) : '');
+      setDraftFreq(resetFrequency || 'none');
+    }
+    setOpen(isOpen);
   };
 
-  const save = async () => {
-    const trimmed = draft.trim();
-    const newLimit = trimmed === '' ? null : parseFloat(trimmed);
-
+  const handleSave = async () => {
+    const newLimit = draftLimit.trim() === '' ? null : parseFloat(draftLimit);
     if (newLimit !== null && (isNaN(newLimit) || newLimit < 0)) {
       showError('Enter a valid dollar amount');
       return;
     }
-
-    // Skip save if unchanged
-    if (newLimit === value) {
-      setEditing(false);
-      return;
-    }
+    const newFreq: ResetFrequency = draftFreq === 'none' ? null : (draftFreq as ResetFrequency);
 
     setSaving(true);
     try {
-      await usersAPI.updateCostLimit(userId, newLimit);
-      onSaved(userId, newLimit);
+      await usersAPI.updateCostLimit(userId, newLimit, newFreq);
+      onSaved(userId, {
+        cost_limit: newLimit,
+        reset_frequency: newFreq,
+        period_spend: newFreq !== resetFrequency ? 0 : periodSpend,
+      });
       showSuccess(newLimit != null ? `Limit set to $${newLimit}` : 'Limit removed');
+      setOpen(false);
     } catch {
-      showError('Failed to update limit');
+      showError('Failed to update');
     } finally {
       setSaving(false);
-      setEditing(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') save();
-    if (e.key === 'Escape') setEditing(false);
-  };
+  // Calculate progress
+  const currentSpend = resetFrequency ? periodSpend : periodSpend;
+  const pct = value && value > 0 ? Math.min((currentSpend / value) * 100, 100) : 0;
+  const barColor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500';
 
-  if (editing) {
+  if (value == null) {
     return (
-      <div className="flex items-center gap-1">
-        <div className="relative">
-          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-stone-400 font-medium select-none">$</span>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={save}
-            onKeyDown={handleKeyDown}
-            placeholder="0"
-            className={cn(
-              'w-[80px] h-7 pl-5 pr-2 text-xs font-medium rounded-md',
-              'border border-amber-300 bg-amber-50/50 text-stone-800',
-              'outline-none ring-1 ring-amber-200',
-              'tabular-nums placeholder:text-stone-300',
-            )}
-          />
-        </div>
-        {saving && <CircleNotch size={12} className="animate-spin text-amber-500" />}
-      </div>
+      <Popover open={open} onOpenChange={handleOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="group/limit inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs font-medium text-stone-400 hover:bg-stone-100 cursor-pointer transition-all"
+          >
+            <InfinityIcon size={13} className="flex-shrink-0 opacity-60" />
+            <span>Unlimited</span>
+            <PencilSimple size={10} className="opacity-0 group-hover/limit:opacity-50 transition-opacity" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[240px] p-3 space-y-3">
+          <p className="text-xs font-semibold text-stone-700">Set Spending Limit</p>
+          <div className="relative">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-stone-400 select-none">$</span>
+            <input
+              type="number" min="0" step="1" autoFocus
+              value={draftLimit} onChange={(e) => setDraftLimit(e.target.value)}
+              placeholder="e.g. 20"
+              className="w-full h-8 pl-6 pr-2 text-sm rounded-md border border-stone-200 bg-white text-stone-800 tabular-nums outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200"
+            />
+          </div>
+          <div>
+            <label className="text-[11px] text-stone-500 font-medium">Reset every...</label>
+            <select
+              value={draftFreq} onChange={(e) => setDraftFreq(e.target.value)}
+              className="mt-1 w-full h-8 px-2 text-sm rounded-md border border-stone-200 bg-white text-stone-800 outline-none focus:border-amber-400"
+            >
+              <option value="none">N/A (lifetime)</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+          <Button size="sm" className="w-full h-7 text-xs" onClick={handleSave} disabled={saving}>
+            {saving ? <CircleNotch size={12} className="animate-spin mr-1" /> : null}
+            Save
+          </Button>
+        </PopoverContent>
+      </Popover>
     );
   }
 
   return (
-    <button
-      type="button"
-      onClick={startEditing}
-      className={cn(
-        'group/limit inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs font-medium transition-all',
-        'hover:bg-stone-100 cursor-pointer',
-        value != null
-          ? 'text-stone-700'
-          : 'text-stone-400',
-      )}
-    >
-      {value != null ? (
-        <>
-          <CurrencyDollar size={13} weight="bold" className="text-amber-600 flex-shrink-0" />
-          <span className="tabular-nums">{value}</span>
-        </>
-      ) : (
-        <>
-          <InfinityIcon size={13} className="flex-shrink-0 opacity-60" />
-          <span>Unlimited</span>
-        </>
-      )}
-      <PencilSimple size={10} className="opacity-0 group-hover/limit:opacity-50 transition-opacity flex-shrink-0" />
-    </button>
+    <Popover open={open} onOpenChange={handleOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" className="group/limit text-left cursor-pointer hover:bg-stone-50 rounded-md px-2 py-1.5 -mx-2 transition-colors">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-stone-700 tabular-nums">
+              ${currentSpend.toFixed(2)}
+            </span>
+            <span className="text-[10px] text-stone-400">/</span>
+            <span className="text-xs font-semibold text-stone-800 tabular-nums">${value}</span>
+            <span className={cn(
+              'text-[10px] font-medium px-1 py-0.5 rounded tabular-nums',
+              pct >= 90 ? 'bg-red-50 text-red-600' : pct >= 70 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-600',
+            )}>
+              {pct.toFixed(0)}%
+            </span>
+            <PencilSimple size={9} className="opacity-0 group-hover/limit:opacity-40 transition-opacity ml-auto" />
+          </div>
+          <div className="mt-1 h-1 w-full bg-stone-100 rounded-full overflow-hidden">
+            <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pct}%` }} />
+          </div>
+          <p className="mt-0.5 text-[10px] text-stone-400">
+            {resetFrequency ? `Resets ${FREQ_LABELS[resetFrequency]?.toLowerCase()}` : 'Lifetime'}
+          </p>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[240px] p-3 space-y-3">
+        <p className="text-xs font-semibold text-stone-700">Edit Spending Limit</p>
+        <div className="relative">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-stone-400 select-none">$</span>
+          <input
+            type="number" min="0" step="1" autoFocus
+            value={draftLimit} onChange={(e) => setDraftLimit(e.target.value)}
+            placeholder="e.g. 20"
+            className="w-full h-8 pl-6 pr-2 text-sm rounded-md border border-stone-200 bg-white text-stone-800 tabular-nums outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200"
+          />
+        </div>
+        <div>
+          <label className="text-[11px] text-stone-500 font-medium">Reset every...</label>
+          <select
+            value={draftFreq} onChange={(e) => setDraftFreq(e.target.value)}
+            className="mt-1 w-full h-8 px-2 text-sm rounded-md border border-stone-200 bg-white text-stone-800 outline-none focus:border-amber-400"
+          >
+            <option value="none">N/A (lifetime)</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="soft" className="flex-1 h-7 text-xs" onClick={() => {
+            setDraftLimit('');
+            setDraftFreq('none');
+          }}>
+            Clear
+          </Button>
+          <Button size="sm" className="flex-1 h-7 text-xs" onClick={handleSave} disabled={saving}>
+            {saving ? <CircleNotch size={12} className="animate-spin mr-1" /> : null}
+            Save
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 };
 
@@ -336,9 +405,11 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
                     <SpendLimitCell
                       userId={user.id}
                       value={user.cost_limit}
-                      onSaved={(uid, newLimit) => {
+                      resetFrequency={user.reset_frequency}
+                      periodSpend={user.period_spend ?? 0}
+                      onSaved={(uid, updates) => {
                         setUsers((prev) =>
-                          prev.map((u) => (u.id === uid ? { ...u, cost_limit: newLimit } : u))
+                          prev.map((u) => (u.id === uid ? { ...u, ...updates } : u))
                         );
                       }}
                     />

@@ -244,15 +244,48 @@ def add_usage(
             if not _save_chat_costs(chat_id, chat_costs):
                 logger.warning("Failed to save costs for chat %s", chat_id)
 
+        # --- User period spend tracking (for per-user spending limits) ---
+        resolved_user_id = user_id
+        if not resolved_user_id:
+            try:
+                ps = _get_project_service()
+                resolved_user_id = ps.get_project_owner_id(project_id)
+            except Exception:
+                pass
+        if resolved_user_id:
+            model_key = _get_model_key(model)
+            call_cost = _calculate_cost(model_key, input_tokens, output_tokens)
+            record_user_period_spend(resolved_user_id, call_cost)
+
         return project_costs
+
+
+def _is_period_expired(period_start: Optional[str], frequency: Optional[str]) -> bool:
+    """Check if a spending period has expired based on the reset frequency."""
+    if not period_start or not frequency:
+        return False
+    from datetime import datetime, timedelta
+    try:
+        start = datetime.fromisoformat(period_start.replace("Z", "+00:00"))
+        now = datetime.now(start.tzinfo) if start.tzinfo else datetime.utcnow()
+        if frequency == "daily":
+            return now >= start + timedelta(days=1)
+        elif frequency == "weekly":
+            return now >= start + timedelta(weeks=1)
+        elif frequency == "monthly":
+            return now >= start + timedelta(days=30)
+        return False
+    except Exception:
+        return False
 
 
 def check_user_spending_limit(user_id: Optional[str]) -> Optional[str]:
     """
     Check if a user has exceeded their spending limit.
 
-    Educational Note: Admins set per-user $ limits in Settings → Team.
-    This is called before each Claude API call to block overspending.
+    Educational Note: Supports period-based resets (daily/weekly/monthly).
+    When a reset_frequency is configured, checks period_spend instead of
+    lifetime total. Auto-resets the period if expired.
 
     Args:
         user_id: The user UUID (None = no check, e.g. single-user mode)
@@ -265,25 +298,67 @@ def check_user_spending_limit(user_id: Optional[str]) -> Optional[str]:
 
     try:
         from app.services.data_services.user_service import get_user_service
+        from datetime import datetime
         svc = get_user_service()
-        user = svc.get_user(user_id)
-        if not user:
+        settings = svc.get_user_settings_raw(user_id)
+        if not settings:
             return None
 
-        cost_limit = user.get("cost_limit")
+        cost_limit = settings.get("cost_limit")
         if cost_limit is None:
             return None  # No limit set = unlimited
 
-        total_spend = svc.get_user_total_spend(user_id)
-        if total_spend >= cost_limit:
-            return (
-                f"You've reached your spending limit of ${cost_limit:.2f}. "
-                f"Current spend: ${total_spend:.2f}. Contact your admin to increase it."
-            )
+        reset_frequency = settings.get("reset_frequency")
+
+        if reset_frequency:
+            # Period-based checking
+            period_start = settings.get("period_start")
+            period_spend = settings.get("period_spend", 0.0)
+
+            # Auto-reset if period expired
+            if _is_period_expired(period_start, reset_frequency):
+                settings["period_spend"] = 0.0
+                settings["period_start"] = datetime.utcnow().isoformat() + "Z"
+                svc.save_user_settings(user_id, settings)
+                period_spend = 0.0
+
+            if period_spend >= cost_limit:
+                return (
+                    f"You've reached your {reset_frequency} spending limit of ${cost_limit:.2f}. "
+                    f"Current period spend: ${period_spend:.2f}. "
+                    f"Contact your admin to increase it."
+                )
+        else:
+            # Lifetime checking (no reset frequency)
+            total_spend = svc.get_user_total_spend(user_id)
+            if total_spend >= cost_limit:
+                return (
+                    f"You've reached your spending limit of ${cost_limit:.2f}. "
+                    f"Current spend: ${total_spend:.2f}. Contact your admin to increase it."
+                )
+
         return None
     except Exception as e:
         logger.error("Error checking spending limit for %s: %s", user_id, e)
         return None  # Fail open — don't block on errors
+
+
+def record_user_period_spend(user_id: Optional[str], call_cost: float) -> None:
+    """
+    Increment the user's period_spend after a successful API call.
+
+    Educational Note: Only fires when the user has a cost_limit with
+    a reset_frequency. Called from add_usage() alongside project/chat
+    cost updates.
+    """
+    if not user_id or call_cost <= 0:
+        return
+    try:
+        from app.services.data_services.user_service import get_user_service
+        svc = get_user_service()
+        svc.increment_period_spend(user_id, call_cost)
+    except Exception as e:
+        logger.error("Error recording period spend for %s: %s", user_id, e)
 
 
 def get_project_costs(project_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
