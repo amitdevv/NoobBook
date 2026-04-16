@@ -4,7 +4,7 @@
 |---|--------|-------------|-------|
 | 1 | ⬜ | **Haiku movement** | Migrate eligible prompts to Haiku for cost/speed |
 | 2 | ⬜ | **JIRA connection** | JIRA integration for querying tickets as a source |
-| 3 | ⬜ | **Usage credit limit for individual users** | Per-user monthly/daily credit caps |
+| 3 | ✅ | **Usage credit limit for individual users** | Shipped — per-user $ limits with daily/weekly/monthly reset, progress bars in Team table + Chat header + Profile |
 | 4 | ⬜ | **STT** | Speech-to-text improvements |
 | 5 | ⬜ | **4XX error fix for number of iterations** | Retry/handle 4XX errors inside agent loops instead of hard-failing |
 | 6 | ✅ | **Chat download as PDF** | Shipped in a7c3fc8 — jspdf + html2canvas export |

@@ -18,6 +18,8 @@ import { Button } from '../ui/button';
 import { usePermissions } from '@/contexts/PermissionsContext';
 import type { Chat, ChatMetadata } from '../../lib/api/chats';
 import type { CostTracking } from '../../lib/api/projects';
+import type { UserUsage } from '../../lib/api/settings';
+import { cn } from '../../lib/utils';
 
 interface ChatHeaderProps {
   activeChat: Chat | null;
@@ -25,6 +27,7 @@ interface ChatHeaderProps {
   activeSources: number;
   totalSources: number;
   chatCosts: CostTracking | null;
+  userUsage: UserUsage | null;
   onSelectChat: (chatId: string) => void;
   onNewChat: () => void;
   onShowChatList: () => void;
@@ -56,6 +59,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = React.memo(({
   activeSources,
   totalSources,
   chatCosts,
+  userUsage,
   onSelectChat,
   onNewChat,
   onShowChatList,
@@ -137,6 +141,40 @@ export const ChatHeader: React.FC<ChatHeaderProps> = React.memo(({
             <Books size={16} className="text-primary" />
             <span className="text-sm font-medium">{activeSources}/{totalSources}</span>
           </div>
+
+          {/* User spending limit progress — compact bar */}
+          {userUsage && userUsage.cost_limit && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2 px-2 py-1 bg-muted/50 rounded-md cursor-default min-w-[90px]">
+                    <div className="flex-1 space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-medium text-muted-foreground tabular-nums">
+                          ${userUsage.current_spend.toFixed(2)}/${userUsage.cost_limit}
+                        </span>
+                      </div>
+                      <div className="h-1 w-full bg-stone-200 rounded-full overflow-hidden">
+                        <div
+                          className={cn(
+                            'h-full rounded-full transition-all',
+                            userUsage.usage_percent >= 90 ? 'bg-red-500'
+                              : userUsage.usage_percent >= 70 ? 'bg-amber-500'
+                              : 'bg-emerald-500',
+                          )}
+                          style={{ width: `${Math.min(userUsage.usage_percent, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  <p>Budget: ${userUsage.current_spend.toFixed(2)} of ${userUsage.cost_limit.toFixed(2)} ({userUsage.usage_percent.toFixed(1)}%)</p>
+                  {userUsage.reset_frequency && <p className="text-muted-foreground">Resets {userUsage.reset_frequency}</p>}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
 
           {/* Per-chat cost badge — shows only when this chat has spent something */}
           {chatCosts && chatCosts.total_cost > 0 && (

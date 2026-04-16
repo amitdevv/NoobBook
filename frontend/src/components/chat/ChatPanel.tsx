@@ -11,6 +11,7 @@ import { Skeleton } from '../ui/skeleton';
 import { chatsAPI } from '@/lib/api/chats';
 import type { Chat, ChatMetadata, StudioSignal } from '@/lib/api/chats';
 import type { CostTracking } from '@/lib/api/projects';
+import { usersAPI, type UserUsage } from '@/lib/api/settings';
 import { sourcesAPI, type Source } from '@/lib/api/sources';
 import { ToastContainer } from '../ui/toast';
 import { useToast } from '../ui/use-toast';
@@ -76,6 +77,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   // Per-chat cost tracking (shown in ChatHeader)
   const [chatCosts, setChatCosts] = useState<CostTracking | null>(null);
+
+  // User spending limit usage (compact progress bar in ChatHeader)
+  const [userUsage, setUserUsage] = useState<UserUsage | null>(null);
 
   // Active sources count derived from per-chat selection
   const activeSources = selectedSourceIds.length;
@@ -200,9 +204,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       setChatCosts(costs);
     } catch (err) {
       log.error({ err }, 'failed to load chat costs');
-      // Silent — costs are not critical for chat function
     }
   }, [projectId]);
+
+  const loadUserUsage = useCallback(async () => {
+    try {
+      const data = await usersAPI.getMyUsage();
+      setUserUsage(data);
+    } catch {
+      // Silent — usage is not critical
+    }
+  }, []);
 
   useEffect(() => {
     if (activeChat?.id) {
@@ -211,6 +223,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       setChatCosts(null);
     }
   }, [activeChat?.id, loadChatCosts]);
+
+  // Load user usage on mount
+  useEffect(() => {
+    loadUserUsage();
+  }, [loadUserUsage]);
 
   /**
    * Send a message and get AI response
@@ -252,6 +269,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       await loadChats();
       onCostsChange?.();
       loadChatCosts(chatId);
+      loadUserUsage();
 
       setTimeout(async () => {
         try {
@@ -574,6 +592,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         activeSources={activeSources}
         totalSources={sources.length}
         chatCosts={chatCosts}
+        userUsage={userUsage}
         onSelectChat={handleSelectChat}
         onNewChat={handleNewChat}
         onShowChatList={() => setShowChatList(true)}
