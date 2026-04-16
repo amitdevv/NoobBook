@@ -12,12 +12,19 @@ Key Design Decisions:
 """
 import logging
 import os
+import time
 from typing import Optional, List, Dict, Any, Callable
 import anthropic
+from anthropic import APIStatusError, APITimeoutError, APIConnectionError
 
 from app.utils.cost_tracking import add_usage as add_cost_usage, check_user_spending_limit
 
 logger = logging.getLogger(__name__)
+
+# Retryable HTTP status codes
+_RATE_LIMIT_CODES = (429, 529)  # rate limit + overloaded
+_SERVER_ERROR_CODES = (500, 502, 503)
+_MAX_RETRIES = 3
 
 
 class ClaudeService:
@@ -83,6 +90,54 @@ class ClaudeService:
 
             self._client = client
         return self._client
+
+    def _call_with_retry(self, api_fn: Callable, max_retries: int = _MAX_RETRIES):
+        """
+        Retry transient Claude API errors with exponential backoff.
+
+        Educational Note: The Claude API can return transient errors:
+        - 429 (rate limit) / 529 (overloaded) → wait 30s per attempt
+        - 500/502/503 (server error) → wait 2^attempt * 2 seconds
+        - Timeout / connection errors → same short backoff
+
+        Non-retryable errors (400, 401, 403, 413) raise immediately.
+        This is called centrally so all callers — chat, agents,
+        extraction, studio — get retries for free.
+        """
+        for attempt in range(max_retries + 1):
+            try:
+                return api_fn()
+            except (APITimeoutError, APIConnectionError) as e:
+                if attempt >= max_retries:
+                    raise
+                wait = (2 ** attempt) * 2
+                logger.warning(
+                    "API timeout/connection error (attempt %d/%d), retrying in %ds: %s",
+                    attempt + 1, max_retries, wait, e,
+                )
+                time.sleep(wait)
+            except APIStatusError as e:
+                status = e.status_code
+                if status in _RATE_LIMIT_CODES:
+                    if attempt >= max_retries:
+                        raise
+                    wait = (attempt + 1) * 30
+                    logger.warning(
+                        "Rate limit/overloaded %d (attempt %d/%d), retrying in %ds",
+                        status, attempt + 1, max_retries, wait,
+                    )
+                    time.sleep(wait)
+                elif status in _SERVER_ERROR_CODES:
+                    if attempt >= max_retries:
+                        raise
+                    wait = (2 ** attempt) * 2
+                    logger.warning(
+                        "Server error %d (attempt %d/%d), retrying in %ds",
+                        status, attempt + 1, max_retries, wait,
+                    )
+                    time.sleep(wait)
+                else:
+                    raise  # 400, 401, 403, 413 — don't retry
 
     def _build_opik_kwargs(
         self,
@@ -226,7 +281,7 @@ class ClaudeService:
         trace_name = str(short_name) if short_name else "noobbook_llm_call"
         trace_input = {"prompt": last_user_msg, "model": model, "message_count": len(messages)}
         response = self._run_tracked(
-            lambda: client.messages.create(**api_params),
+            lambda: self._call_with_retry(lambda: client.messages.create(**api_params)),
             opik_kwargs=opik_kwargs,
             trace_input=trace_input,
             trace_name=trace_name,
@@ -293,13 +348,15 @@ class ClaudeService:
             extra_headers=extra_headers,
         )
 
-        # Wrap streaming in Opik parent trace with metadata
+        # Wrap streaming in Opik parent trace with metadata + retry
         def _do_stream():
-            with client.messages.stream(**api_params) as stream:
-                for delta in stream.text_stream:
-                    if on_text_delta:
-                        on_text_delta(delta)
-                return stream.get_final_message()
+            def _stream_once():
+                with client.messages.stream(**api_params) as stream:
+                    for delta in stream.text_stream:
+                        if on_text_delta:
+                            on_text_delta(delta)
+                    return stream.get_final_message()
+            return self._call_with_retry(_stream_once)
 
         opik_kwargs = self._build_opik_kwargs(project_id=project_id, user_id=user_id, chat_id=chat_id, tags=tags)
         last_user_msg = next(

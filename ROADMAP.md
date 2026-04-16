@@ -6,7 +6,7 @@
 | 2 | ✅ | **JIRA connection** | Shipped — 4 live chat tools (list_projects, search_issues, get_issue, get_project) + API key settings UI |
 | 3 | ✅ | **Usage credit limit for individual users** | Shipped — per-user $ limits with daily/weekly/monthly reset, progress bars in Team table + Chat header + Profile |
 | 4 | ✅ | **STT** | Shipped — ElevenLabs real-time speech-to-text integrated in chat input |
-| 5 | ⬜ | **4XX error fix for number of iterations** | Retry/handle 4XX errors inside agent loops instead of hard-failing |
+| 5 | ✅ | **4XX error fix for number of iterations** | Shipped — centralized retry in claude_service with exponential backoff (429/529: 30s×attempt, 500s: 2^attempt×2s) |
 | 6 | ✅ | **Chat download as PDF** | Shipped in a7c3fc8 — jspdf + html2canvas export |
 | 7 | ✅ | **Chat-wise token utilisation** | Shipped — per-chat cost badge in ChatHeader + Opus row added to project breakdown |
 | 8 | ✅ | **Opik logs — thread & unique user info** | Shipped — user_id, project_id, chat_id (thread_id), and tags attached to every trace |
