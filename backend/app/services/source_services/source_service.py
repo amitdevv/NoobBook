@@ -25,6 +25,7 @@ from app.services.source_services.source_upload import (
     upload_research,
     add_database_source,
     add_freshdesk_source,
+    add_jira_source,
     add_mcp_source,
 )
 # Local path utils used for temp file staging during source processing

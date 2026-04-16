@@ -507,6 +507,32 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   };
 
   /**
+   * Handle adding a Jira source
+   */
+  const handleAddJira = async (name?: string, description?: string) => {
+    if (sources.length >= MAX_SOURCES) {
+      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
+      return;
+    }
+
+    try {
+      await sourcesAPI.addJiraSource(projectId, name, description);
+      success('Jira source added — processing issues. Check the status bar for progress.');
+      await loadSources();
+      setSheetOpen(false);
+    } catch (err: unknown) {
+      log.error({ err }, 'failed to add Jira source');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add Jira source';
+      if (typeof err === 'object' && err !== null && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { error?: string } } };
+        error(axiosErr.response?.data?.error || errorMessage);
+      } else {
+        error(errorMessage);
+      }
+    }
+  };
+
+  /**
    * Handle Freshdesk sync
    */
   const handleSyncFreshdesk = async (sourceId: string) => {
@@ -803,6 +829,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         onAddDatabase={handleAddDatabase}
         onAddMcp={handleAddMcp}
         onAddFreshdesk={handleAddFreshdesk}
+        onAddJira={handleAddJira}
         onImportComplete={loadSources}
         uploading={uploading}
       />

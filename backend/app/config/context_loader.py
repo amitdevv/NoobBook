@@ -108,6 +108,7 @@ class ContextLoader:
             "- For CSV sources, use analyze_csv_agent when the user asks questions that require calculations/plots from the CSV data.",
             "- For DATABASE sources, use analyze_database_agent when the user asks questions that require LIVE data from the database (counts, metrics, lists, trends).",
             "- For FRESHDESK sources, use analyze_freshdesk_agent when the user asks questions about support ticket data (trends, metrics, SLA, agent performance, etc.).",
+            "- For JIRA sources, use jira_list_projects, jira_search_issues, jira_get_issue, jira_get_project for live Jira queries.",
             "",
         ]
 
@@ -139,6 +140,8 @@ class ContextLoader:
                 lines.append("  - Chat tool: analyze_database_agent (for live SQL queries)")
             if file_ext == ".freshdesk":
                 lines.append("  - Chat tool: analyze_freshdesk_agent (for ticket analytics)")
+            if file_ext == ".jira":
+                lines.append("  - Chat tools: jira_list_projects, jira_search_issues, jira_get_issue, jira_get_project (live API)")
             if file_ext == ".mcp":
                 lines.append("  - Chat tool: search_sources (RAG search over MCP resources)")
             if summary_text:
@@ -181,6 +184,7 @@ class ContextLoader:
             ".research": "Research Document",
             ".database": "Database (Postgres/MySQL)",
             ".freshdesk": "Freshdesk Tickets",
+            ".jira": "Jira Projects",
             ".mcp": "MCP Server Resources",
         }
 

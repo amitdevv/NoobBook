@@ -16,6 +16,7 @@ from app.services.source_services.source_upload.text_upload import upload_text
 from app.services.source_services.source_upload.research_upload import upload_research
 from app.services.source_services.source_upload.database_upload import add_database_source
 from app.services.source_services.source_upload.freshdesk_upload import add_freshdesk_source
+from app.services.source_services.source_upload.jira_upload import add_jira_source
 from app.services.source_services.source_upload.mcp_upload import add_mcp_source
 
 __all__ = [
@@ -26,5 +27,6 @@ __all__ = [
     "upload_research",
     "add_database_source",
     "add_freshdesk_source",
+    "add_jira_source",
     "add_mcp_source",
 ]

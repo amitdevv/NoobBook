@@ -15,6 +15,7 @@ import { ResearchTab } from './ResearchTab';
 import { DatabaseTab } from './DatabaseTab';
 import { McpTab } from './McpTab';
 import { FreshdeskTab } from './FreshdeskTab';
+import { JiraTab } from './JiraTab';
 import { usePermissions } from '@/contexts/PermissionsContext';
 import { MAX_SOURCES } from '../../lib/api/sources';
 
@@ -30,6 +31,7 @@ interface AddSourcesSheetProps {
   onAddDatabase: (connectionId: string, name?: string, description?: string) => Promise<void>;
   onAddMcp: (connectionId: string, resourceUris: string[], name?: string, description?: string) => Promise<void>;
   onAddFreshdesk: (name?: string, description?: string) => Promise<void>;
+  onAddJira: (name?: string, description?: string) => Promise<void>;
   onImportComplete: () => void;
   uploading: boolean;
 }
@@ -46,6 +48,7 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
   onAddDatabase,
   onAddMcp,
   onAddFreshdesk,
+  onAddJira,
   onImportComplete,
   uploading,
 }) => {
@@ -62,6 +65,7 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
   const canDrive = hasPermission('document_sources', 'google_drive');
   const canDatabase = hasPermission('data_sources', 'database');
   const canFreshdesk = hasPermission('data_sources', 'freshdesk');
+  const canJira = hasPermission('integrations', 'jira');
   // Note: CSV permission exists (hasPermission('data_sources', 'csv')) but no CSV tab yet
 
   // Research and MCP are always shown (no dedicated permission key) — gated at category level
@@ -77,6 +81,7 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
     : canDatabase ? 'database'
     : canMcp ? 'mcp'
     : canFreshdesk ? 'freshdesk'
+    : canJira ? 'jira'
     : 'upload';
 
   const tabTriggerClass = "px-4 py-2 rounded-md border border-stone-300 bg-stone-100 text-stone-700 cursor-pointer transition-all hover:bg-stone-200 data-[state=active]:border-amber-600 data-[state=active]:bg-amber-600 data-[state=active]:text-white";
@@ -134,6 +139,11 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
               {canFreshdesk && (
                 <TabsTrigger value="freshdesk" className={tabTriggerClass}>
                   Freshdesk
+                </TabsTrigger>
+              )}
+              {canJira && (
+                <TabsTrigger value="jira" className={tabTriggerClass}>
+                  Jira
                 </TabsTrigger>
               )}
             </TabsList>
@@ -214,6 +224,19 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
                   isAtLimit={isAtLimit}
                   onAddFreshdesk={async (name, description) => {
                     await onAddFreshdesk(name, description);
+                    onImportComplete();
+                    onOpenChange(false);
+                  }}
+                />
+              </TabsContent>
+            )}
+
+            {canJira && (
+              <TabsContent value="jira" className="mt-6">
+                <JiraTab
+                  isAtLimit={isAtLimit}
+                  onAddJira={async (name, description) => {
+                    await onAddJira(name, description);
                     onImportComplete();
                     onOpenChange(false);
                   }}

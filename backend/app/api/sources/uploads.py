@@ -464,6 +464,44 @@ def backfill_freshdesk_source(project_id: str, source_id: str):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@sources_bp.route('/projects/<project_id>/sources/jira', methods=['POST'])
+@require_permission("data_sources", "jira")
+def add_jira_source_endpoint(project_id: str):
+    """
+    Add a Jira source (live API flag) to a project.
+
+    Educational Note: Jira sources are lightweight flags that enable the
+    existing Jira API tools (jira_list_projects, jira_search_issues, etc.)
+    per-project. No data is synced locally — all queries go to the live API.
+
+    Request Body:
+        {
+            "name": "Jira Projects",    # optional display name
+            "description": "Our Jira"   # optional
+        }
+    """
+    try:
+        data = request.get_json() or {}
+
+        source = source_service.add_jira_source(
+            project_id=project_id,
+            name=data.get('name'),
+            description=data.get('description', ''),
+        )
+
+        return jsonify({
+            'success': True,
+            'source': source,
+            'message': 'Jira source added successfully'
+        }), 201
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error adding Jira source: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @sources_bp.route('/projects/<project_id>/sources/mcp', methods=['POST'])
 def add_mcp_source(project_id: str):
     """

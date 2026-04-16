@@ -114,6 +114,7 @@ class MainChatService:
         has_csv_sources: bool = False,
         has_database_sources: bool = False,
         has_freshdesk_sources: bool = False,
+        has_jira_sources: bool = False,
         user_id: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], Dict]:
         """
@@ -124,7 +125,8 @@ class MainChatService:
         CSV analyzer tool is available when there are CSV sources.
         Database analyzer tool is available when there are DATABASE sources.
         Freshdesk analyzer tool is available when there are FRESHDESK sources.
-        Knowledge base tools (Jira, Notion, GitHub) are added if configured.
+        Jira tools are available when the project has a .jira source (project-scoped).
+        Non-Jira knowledge base tools (Notion, GitHub) are added if configured.
         MCP tools are added if the user has tool-enabled MCP connections.
 
         Args:
@@ -132,6 +134,7 @@ class MainChatService:
             has_csv_sources: Whether project has active CSV sources
             has_database_sources: Whether project has active DATABASE sources
             has_freshdesk_sources: Whether project has active FRESHDESK sources
+            has_jira_sources: Whether project has active JIRA sources
             user_id: The requesting user's ID (for MCP tool access)
 
         Returns:
@@ -158,7 +161,11 @@ class MainChatService:
         if has_freshdesk_sources and (not user_id or user_has_permission(user_id, "data_sources", "freshdesk")):
             tools.append(self._get_freshdesk_analyzer_tool())
 
-        # Add all configured knowledge base tools (Jira, Notion, GitHub, etc.)
+        # Add Jira tools only when the project has a .jira source (project-scoped)
+        if has_jira_sources and (not user_id or user_has_permission(user_id, "data_sources", "jira")):
+            tools.extend(knowledge_base_service.get_jira_tools())
+
+        # Add non-Jira knowledge base tools (Notion, GitHub, etc.) — always global
         tools.extend(knowledge_base_service.get_available_tools())
 
         # Add MCP tools if user has tool-enabled connections
@@ -427,12 +434,14 @@ class MainChatService:
         csv_sources = [s for s in active_sources if _file_ext(s) == ".csv"]
         database_sources = [s for s in active_sources if _file_ext(s) == ".database"]
         freshdesk_sources = [s for s in active_sources if _file_ext(s) == ".freshdesk"]
-        non_csv_sources = [s for s in active_sources if _file_ext(s) not in (".csv", ".database", ".freshdesk")]
+        jira_sources = [s for s in active_sources if _file_ext(s) == ".jira"]
+        non_csv_sources = [s for s in active_sources if _file_ext(s) not in (".csv", ".database", ".freshdesk", ".jira")]
         tools, mcp_registry = self._get_tools(
             has_active_sources=bool(non_csv_sources),
             has_csv_sources=bool(csv_sources),
             has_database_sources=bool(database_sources),
             has_freshdesk_sources=bool(freshdesk_sources),
+            has_jira_sources=bool(jira_sources),
             user_id=resolved_user_id,
         )
 

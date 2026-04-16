@@ -409,6 +409,31 @@ class SourcesAPI {
     }
   }
 
+  /**
+   * Add a Jira source for live issue queries in chat
+   * Educational Note: Jira credentials are configured globally in API Keys settings.
+   * The backend uses these to connect to the Jira Cloud API.
+   */
+  async addJiraSource(
+    projectId: string,
+    name?: string,
+    description?: string
+  ): Promise<Source> {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/projects/${projectId}/sources/jira`,
+        {
+          name: name || undefined,
+          description: description || undefined,
+        }
+      );
+      return response.data.source;
+    } catch (error) {
+      log.error({ err: error }, 'failed to add Jira source');
+      throw error;
+    }
+  }
+
   async syncFreshdesk(projectId: string, sourceId: string): Promise<void> {
     try {
       await axios.post(`${API_BASE_URL}/projects/${projectId}/sources/${sourceId}/freshdesk-sync`);

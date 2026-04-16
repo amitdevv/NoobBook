@@ -67,20 +67,19 @@ class KnowledgeBaseService:
 
     def get_available_tools(self) -> List[Dict[str, Any]]:
         """
-        Get all configured knowledge base tools.
+        Get non-Jira knowledge base tools (Notion, GitHub, etc.).
 
-        Educational Note: Only returns tools for configured integrations.
-        This prevents Claude from seeing unavailable tools and ensures
-        clean error messages when integrations aren't set up.
+        Educational Note: Jira tools are now project-scoped — they are only
+        added when a project has a .jira source. Use get_jira_tools() for
+        Jira-specific tools. This method returns everything else.
 
         Returns:
             List of tool definitions ready for Claude API
         """
         tools = []
 
-        # Add Jira tools if configured
-        if jira_service.is_configured():
-            tools.extend([self._get_tool(name) for name in self.JIRA_TOOLS])
+        # Jira tools are intentionally excluded here — they are project-scoped
+        # and added via get_jira_tools() only when the project has a .jira source.
 
         # Add Notion tools if configured
         if notion_service.is_configured():
@@ -91,6 +90,21 @@ class KnowledgeBaseService:
         #     tools.extend([self._get_tool(name) for name in self.GITHUB_TOOLS])
 
         return tools
+
+    def get_jira_tools(self) -> List[Dict[str, Any]]:
+        """
+        Get Jira-specific tools if Jira is configured.
+
+        Educational Note: Jira tools are project-scoped — they are only added
+        to the chat tool list when the project has an active .jira source.
+        This allows per-project access control via the source flag pattern.
+
+        Returns:
+            List of Jira tool definitions, or empty list if not configured
+        """
+        if jira_service.is_configured():
+            return [self._get_tool(name) for name in self.JIRA_TOOLS]
+        return []
 
     def can_handle(self, tool_name: str) -> bool:
         """
