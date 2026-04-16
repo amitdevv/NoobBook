@@ -412,6 +412,21 @@ class SourceService:
         """
         return add_freshdesk_source(project_id, name, description, days_back)
 
+    def add_jira_source(
+        self,
+        project_id: str,
+        name: Optional[str] = None,
+        description: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Add a Jira source flag to a project.
+
+        Educational Note: Lightweight source that enables the existing Jira
+        API tools (jira_list_projects, jira_search_issues, etc.) for this
+        specific project. No data sync — tools query Jira live.
+        """
+        return add_jira_source(project_id, name, description)
+
     def add_mcp_source(
         self,
         project_id: str,
