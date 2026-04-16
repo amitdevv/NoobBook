@@ -9,7 +9,7 @@ operations always use the service_role key.
 """
 import logging
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from supabase import create_client
 
