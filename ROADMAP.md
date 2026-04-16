@@ -3,7 +3,7 @@
 | # | Status | Improvement | Notes |
 |---|--------|-------------|-------|
 | 1 | ✅ | **Haiku movement** | Shipped — admin model selector lets you switch any category (chat/studio/query/extraction) to Haiku globally |
-| 2 | ⬜ | **JIRA connection** | JIRA integration for querying tickets as a source |
+| 2 | ✅ | **JIRA connection** | Shipped — 4 live chat tools (list_projects, search_issues, get_issue, get_project) + API key settings UI |
 | 3 | ✅ | **Usage credit limit for individual users** | Shipped — per-user $ limits with daily/weekly/monthly reset, progress bars in Team table + Chat header + Profile |
 | 4 | ✅ | **STT** | Shipped — ElevenLabs real-time speech-to-text integrated in chat input |
 | 5 | ⬜ | **4XX error fix for number of iterations** | Retry/handle 4XX errors inside agent loops instead of hard-failing |
