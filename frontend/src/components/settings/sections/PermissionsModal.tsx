@@ -73,6 +73,8 @@ const CATEGORY_CONFIG: Record<
       database: 'Database (PostgreSQL / MySQL)',
       csv: 'CSV Files',
       freshdesk: 'Freshdesk Tickets',
+      jira: 'Jira Issues',
+      mixpanel: 'Mixpanel Analytics',
     },
   },
   studio: {
@@ -108,6 +110,7 @@ const CATEGORY_CONFIG: Record<
     iconColor: 'text-amber-600 bg-amber-50',
     items: {
       jira: 'Jira',
+      mixpanel: 'Mixpanel',
       notion: 'Notion',
       mcp: 'MCP Connections',
       elevenlabs: 'ElevenLabs (Voice)',

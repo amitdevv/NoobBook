@@ -502,6 +502,45 @@ def add_jira_source_endpoint(project_id: str):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@sources_bp.route('/projects/<project_id>/sources/mixpanel', methods=['POST'])
+@require_permission("data_sources", "mixpanel")
+def add_mixpanel_source_endpoint(project_id: str):
+    """
+    Add a Mixpanel source (live API flag) to a project.
+
+    Educational Note: Mixpanel sources are lightweight flags that enable the
+    Mixpanel chat tools (mixpanel_list_events, mixpanel_query_events, etc.)
+    for this specific project. No data is synced locally — all queries hit
+    the Mixpanel Query API live using the globally-configured Service Account.
+
+    Request Body:
+        {
+            "name": "Mixpanel Analytics",   # optional display name
+            "description": "Our Mixpanel"   # optional
+        }
+    """
+    try:
+        data = request.get_json() or {}
+
+        source = source_service.add_mixpanel_source(
+            project_id=project_id,
+            name=data.get('name'),
+            description=data.get('description', ''),
+        )
+
+        return jsonify({
+            'success': True,
+            'source': source,
+            'message': 'Mixpanel source added successfully'
+        }), 201
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error adding Mixpanel source: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @sources_bp.route('/projects/<project_id>/sources/mcp', methods=['POST'])
 def add_mcp_source(project_id: str):
     """

@@ -18,6 +18,7 @@ from app.services.source_services.source_upload.database_upload import add_datab
 from app.services.source_services.source_upload.freshdesk_upload import add_freshdesk_source
 from app.services.source_services.source_upload.jira_upload import add_jira_source
 from app.services.source_services.source_upload.mcp_upload import add_mcp_source
+from app.services.source_services.source_upload.mixpanel_upload import add_mixpanel_source
 
 __all__ = [
     "upload_file",
@@ -29,4 +30,5 @@ __all__ = [
     "add_freshdesk_source",
     "add_jira_source",
     "add_mcp_source",
+    "add_mixpanel_source",
 ]

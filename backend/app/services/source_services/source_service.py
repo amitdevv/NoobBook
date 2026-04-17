@@ -27,6 +27,7 @@ from app.services.source_services.source_upload import (
     add_freshdesk_source,
     add_jira_source,
     add_mcp_source,
+    add_mixpanel_source,
 )
 # Local path utils used for temp file staging during source processing
 from app.utils.path_utils import (
@@ -426,6 +427,21 @@ class SourceService:
         specific project. No data sync — tools query Jira live.
         """
         return add_jira_source(project_id, name, description)
+
+    def add_mixpanel_source(
+        self,
+        project_id: str,
+        name: Optional[str] = None,
+        description: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Add a Mixpanel source flag to a project.
+
+        Educational Note: Same lightweight pattern as Jira — enables Mixpanel
+        chat tools (mixpanel_list_events, mixpanel_query_events, etc.) for
+        this specific project. Queries Mixpanel's Query API live.
+        """
+        return add_mixpanel_source(project_id, name, description)
 
     def add_mcp_source(
         self,

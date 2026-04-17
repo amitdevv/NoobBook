@@ -1,0 +1,27 @@
+{
+  "name": "mixpanel_query_funnel",
+  "description": "Get conversion data for a specific funnel over a date range. Call mixpanel_list_funnels first to find the funnel_id.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "funnel_id": {
+        "type": "integer",
+        "description": "Numeric funnel ID (from mixpanel_list_funnels)"
+      },
+      "from_date": {
+        "type": "string",
+        "description": "Start date inclusive (YYYY-MM-DD)"
+      },
+      "to_date": {
+        "type": "string",
+        "description": "End date inclusive (YYYY-MM-DD)"
+      },
+      "unit": {
+        "type": "string",
+        "enum": ["day", "week", "month"],
+        "description": "Time bucket size (default: day)"
+      }
+    },
+    "required": ["funnel_id", "from_date", "to_date"]
+  }
+}

@@ -12,4 +12,4 @@
 | 8 | ✅ | **Opik logs — thread & unique user info** | Shipped — user_id, project_id, chat_id (thread_id), and tags attached to every trace |
 | 9 | ✅ | **Studio Business & Product section bug** | Shipped — fire-and-forget triggerGeneration + DB source fallback + mermaid sanitization |
 | 10 | ✅ | **Ledger DB** | Shipped — database connections support PostgreSQL/MySQL as sources with live SQL query agent |
-| 11 | ⬜ | **Mixpanel MCP connection** | MCP server integration for Mixpanel analytics |
+| 11 | ✅ | **Mixpanel MCP connection** | Shipped — Mixpanel as a project-scoped source with live Query API tools (list_events, query_events, segmentation, funnels, retention, JQL) |

@@ -533,6 +533,32 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   };
 
   /**
+   * Handle adding a Mixpanel source
+   */
+  const handleAddMixpanel = async (name?: string, description?: string) => {
+    if (sources.length >= MAX_SOURCES) {
+      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
+      return;
+    }
+
+    try {
+      await sourcesAPI.addMixpanelSource(projectId, name, description);
+      success('Mixpanel source added — verifying connection. Check the status bar for progress.');
+      await loadSources();
+      setSheetOpen(false);
+    } catch (err: unknown) {
+      log.error({ err }, 'failed to add Mixpanel source');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add Mixpanel source';
+      if (typeof err === 'object' && err !== null && 'response' in err) {
+        const axiosErr = err as { response?: { data?: { error?: string } } };
+        error(axiosErr.response?.data?.error || errorMessage);
+      } else {
+        error(errorMessage);
+      }
+    }
+  };
+
+  /**
    * Handle Freshdesk sync
    */
   const handleSyncFreshdesk = async (sourceId: string) => {
@@ -830,6 +856,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         onAddMcp={handleAddMcp}
         onAddFreshdesk={handleAddFreshdesk}
         onAddJira={handleAddJira}
+        onAddMixpanel={handleAddMixpanel}
         onImportComplete={loadSources}
         uploading={uploading}
       />
