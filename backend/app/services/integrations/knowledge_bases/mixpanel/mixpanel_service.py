@@ -264,7 +264,7 @@ class MixpanelService:
 
         Endpoint: GET /funnels?funnel_id=N&from_date=Y&to_date=Z&unit=day
         """
-        if not funnel_id:
+        if funnel_id is None:
             return {"success": False, "error": "funnel_id is required (integer)."}
         if not from_date or not to_date:
             return {"success": False, "error": "from_date and to_date are required (YYYY-MM-DD)."}
