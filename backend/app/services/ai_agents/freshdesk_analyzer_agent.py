@@ -45,7 +45,11 @@ class FreshdeskAnalyzerAgent:
         prompt_config = prompt_loader.get_prompt_config(self.AGENT_NAME)
         tools = self._load_tools()
 
-        system_prompt = prompt_config.get("system_prompt", "")
+        # Ground the agent in today's date so "yesterday", "last 7 days", etc.
+        # map to concrete timestamp filters on ticket_created_at.
+        from datetime import date
+        today_line = f"Today's date: {date.today().isoformat()}"
+        system_prompt = f"{today_line}\n\n{prompt_config.get('system_prompt', '')}"
         model = prompt_config.get("model", "claude-sonnet-4-6")
         max_tokens = prompt_config.get("max_tokens", 4096)
         temperature = prompt_config.get("temperature", 0.0)

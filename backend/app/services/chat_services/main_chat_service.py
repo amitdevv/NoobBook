@@ -195,7 +195,11 @@ class MainChatService:
         current state (memory updates, per-chat source selections).
         Includes both memory context (personalization) and source context (tools).
         """
-        parts = [base_prompt]
+        # Prepend today's date so Claude can compute "yesterday", "last week",
+        # etc. accurately when users ask for analytics without explicit dates.
+        from datetime import date
+        today_line = f"Today's date: {date.today().isoformat()}"
+        parts = [today_line, base_prompt]
 
         full_context = context_loader.build_full_context(
             project_id, user_id=user_id, selected_source_ids=selected_source_ids

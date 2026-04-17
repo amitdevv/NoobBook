@@ -65,7 +65,11 @@ class DatabaseAnalyzerAgent:
         temperature = config.get("temperature")
         if not isinstance(temperature, (int, float)):
             temperature = 0.0
-        system_prompt = config.get("system_prompt") or ""
+        # Ground the agent in today's date so "yesterday", "last 7 days", etc.
+        # in the user's question map to concrete YYYY-MM-DD values.
+        from datetime import date
+        today_line = f"Today's date: {date.today().isoformat()}"
+        system_prompt = f"{today_line}\n\n{config.get('system_prompt') or ''}"
 
         user_message_template = config.get("user_message") or "Database source ID: {source_id}\n\nUser question: {query}"
         user_message = user_message_template.format(

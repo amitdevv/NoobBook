@@ -102,7 +102,10 @@ def add_database_source(
         "status": "uploaded",
         "raw_file_path": storage_path,
         "file_size": len(raw_bytes),
-        "is_active": False,
+        # Live-connection sources are usable immediately — no extraction/embedding
+        # required. Default checked so users don't have to toggle the eye icon
+        # after adding the source.
+        "is_active": True,
         "embedding_info": {
             "original_filename": stored_filename,
             "mime_type": "application/json",
