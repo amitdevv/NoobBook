@@ -115,6 +115,7 @@ class MainChatService:
         has_database_sources: bool = False,
         has_freshdesk_sources: bool = False,
         has_jira_sources: bool = False,
+        has_mixpanel_sources: bool = False,
         user_id: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], Dict]:
         """
@@ -135,6 +136,7 @@ class MainChatService:
             has_database_sources: Whether project has active DATABASE sources
             has_freshdesk_sources: Whether project has active FRESHDESK sources
             has_jira_sources: Whether project has active JIRA sources
+            has_mixpanel_sources: Whether project has active MIXPANEL sources
             user_id: The requesting user's ID (for MCP tool access)
 
         Returns:
@@ -164,6 +166,10 @@ class MainChatService:
         # Add Jira tools only when the project has a .jira source (project-scoped)
         if has_jira_sources and (not user_id or user_has_permission(user_id, "data_sources", "jira")):
             tools.extend(knowledge_base_service.get_jira_tools())
+
+        # Add Mixpanel tools only when the project has a .mixpanel source (project-scoped)
+        if has_mixpanel_sources and (not user_id or user_has_permission(user_id, "data_sources", "mixpanel")):
+            tools.extend(knowledge_base_service.get_mixpanel_tools())
 
         # Add non-Jira knowledge base tools (Notion, GitHub, etc.) — always global
         tools.extend(knowledge_base_service.get_available_tools())
@@ -439,13 +445,18 @@ class MainChatService:
         database_sources = [s for s in active_sources if _file_ext(s) == ".database"]
         freshdesk_sources = [s for s in active_sources if _file_ext(s) == ".freshdesk"]
         jira_sources = [s for s in active_sources if _file_ext(s) == ".jira"]
-        non_csv_sources = [s for s in active_sources if _file_ext(s) not in (".csv", ".database", ".freshdesk", ".jira")]
+        mixpanel_sources = [s for s in active_sources if _file_ext(s) == ".mixpanel"]
+        non_csv_sources = [
+            s for s in active_sources
+            if _file_ext(s) not in (".csv", ".database", ".freshdesk", ".jira", ".mixpanel")
+        ]
         tools, mcp_registry = self._get_tools(
             has_active_sources=bool(non_csv_sources),
             has_csv_sources=bool(csv_sources),
             has_database_sources=bool(database_sources),
             has_freshdesk_sources=bool(freshdesk_sources),
             has_jira_sources=bool(jira_sources),
+            has_mixpanel_sources=bool(mixpanel_sources),
             user_id=resolved_user_id,
         )
 

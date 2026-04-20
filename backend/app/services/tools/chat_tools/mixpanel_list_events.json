@@ -1,0 +1,14 @@
+{
+  "name": "mixpanel_list_events",
+  "description": "List event names being tracked in the connected Mixpanel project. Use this first to discover what events are available before running queries. Returns up to `limit` event name strings sorted by recency.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "limit": {
+        "type": "integer",
+        "description": "Maximum number of event names to return (default: 100, max: 255)"
+      }
+    },
+    "required": []
+  }
+}

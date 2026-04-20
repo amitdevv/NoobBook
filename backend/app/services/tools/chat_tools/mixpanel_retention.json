@@ -1,0 +1,36 @@
+{
+  "name": "mixpanel_retention",
+  "description": "Compute retention: given a cohort of users who did `born_event`, how many came back and did `event` in subsequent buckets. Use for questions like 'what's our weekly retention for new signups?'",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "born_event": {
+        "type": "string",
+        "description": "Cohort-defining event (e.g. \"Signed Up\")"
+      },
+      "event": {
+        "type": "string",
+        "description": "Return event to measure (e.g. \"App Opened\"). Omit to use any activity."
+      },
+      "from_date": {
+        "type": "string",
+        "description": "Start date inclusive (YYYY-MM-DD)"
+      },
+      "to_date": {
+        "type": "string",
+        "description": "End date inclusive (YYYY-MM-DD)"
+      },
+      "retention_type": {
+        "type": "string",
+        "enum": ["birth", "compounded"],
+        "description": "birth = first-time cohort (default), compounded = recurring cohort"
+      },
+      "unit": {
+        "type": "string",
+        "enum": ["day", "week", "month"],
+        "description": "Retention bucket size (default: day)"
+      }
+    },
+    "required": ["born_event", "from_date", "to_date"]
+  }
+}

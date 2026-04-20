@@ -50,6 +50,8 @@ def _get_default_permissions() -> Dict[str, Any]:
                 "database": True,
                 "csv": True,
                 "freshdesk": True,
+                "jira": True,
+                "mixpanel": True,
             },
         },
         "studio": {
@@ -79,6 +81,7 @@ def _get_default_permissions() -> Dict[str, Any]:
             "enabled": True,
             "items": {
                 "jira": True,
+                "mixpanel": True,
                 "notion": True,
                 "mcp": True,
                 "elevenlabs": True,

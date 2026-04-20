@@ -1,0 +1,35 @@
+{
+  "name": "mixpanel_segmentation",
+  "description": "Segment a single event by a property over a time range. Use this for questions like 'Signups by country in Jan 2026' or 'Purchases by plan over last 30 days'. The `on` expression must use Mixpanel's property-expression syntax (e.g. properties[\"$country_code\"]).",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "event": {
+        "type": "string",
+        "description": "Event name to segment (e.g. \"Signed Up\")"
+      },
+      "from_date": {
+        "type": "string",
+        "description": "Start date inclusive (YYYY-MM-DD)"
+      },
+      "to_date": {
+        "type": "string",
+        "description": "End date inclusive (YYYY-MM-DD)"
+      },
+      "on": {
+        "type": "string",
+        "description": "Property expression to segment on, e.g. 'properties[\"$country_code\"]' or 'properties[\"plan\"]'"
+      },
+      "where": {
+        "type": "string",
+        "description": "Optional filter expression, e.g. 'properties[\"$country_code\"] == \"US\"'"
+      },
+      "unit": {
+        "type": "string",
+        "enum": ["minute", "hour", "day", "week", "month"],
+        "description": "Time bucket size (default: day)"
+      }
+    },
+    "required": ["event", "from_date", "to_date"]
+  }
+}

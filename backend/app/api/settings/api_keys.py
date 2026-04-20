@@ -168,6 +168,30 @@ API_KEYS_CONFIG = [
         'category': 'integrations'
     },
     {
+        'id': 'MIXPANEL_SERVICE_ACCOUNT_USERNAME',
+        'name': 'Mixpanel Service Account Username',
+        'description': 'Service account username (Mixpanel → Project settings → Service Accounts)',
+        'category': 'integrations'
+    },
+    {
+        'id': 'MIXPANEL_SERVICE_ACCOUNT_SECRET',
+        'name': 'Mixpanel Service Account Secret',
+        'description': 'Service account secret (shown only at creation time)',
+        'category': 'integrations'
+    },
+    {
+        'id': 'MIXPANEL_PROJECT_ID',
+        'name': 'Mixpanel Project ID',
+        'description': 'Numeric project ID (Mixpanel → Project settings → Overview)',
+        'category': 'integrations'
+    },
+    {
+        'id': 'MIXPANEL_REGION',
+        'name': 'Mixpanel Region',
+        'description': 'Data residency region: us (default), eu, or in',
+        'category': 'integrations'
+    },
+    {
         'id': 'OPIK_API_KEY',
         'name': 'Opik API Key',
         'description': 'Opik LLM observability — auto-traces all Claude calls (comet.com/opik)',
@@ -327,6 +351,14 @@ def update_api_keys():
                 elif key_id in ('FRESHDESK_API_KEY', 'FRESHDESK_DOMAIN'):
                     from app.services.integrations.freshdesk.freshdesk_service import freshdesk_service
                     freshdesk_service.reload_config()
+                elif key_id in (
+                    'MIXPANEL_SERVICE_ACCOUNT_USERNAME',
+                    'MIXPANEL_SERVICE_ACCOUNT_SECRET',
+                    'MIXPANEL_PROJECT_ID',
+                    'MIXPANEL_REGION',
+                ):
+                    from app.services.integrations.knowledge_bases.mixpanel.mixpanel_service import mixpanel_service
+                    mixpanel_service.reload_config()
                 elif key_id in ('OPIK_API_KEY', 'OPIK_WORKSPACE', 'OPIK_PROJECT_NAME', 'OPIK_URL_OVERRIDE'):
                     # Reset Claude client so it re-initializes with/without Opik wrapping
                     from app.services.integrations.claude.claude_service import claude_service
@@ -530,6 +562,21 @@ def _validate_key(key_id: str, value: str) -> tuple[bool, str]:
 
     elif key_id == 'FRESHDESK_DOMAIN':
         # Supporting field — just accept it
+        is_valid = bool(value)
+        message = 'Value accepted' if is_valid else 'Value is empty'
+        return is_valid, message
+
+    elif key_id == 'MIXPANEL_SERVICE_ACCOUNT_SECRET':
+        # Mixpanel validation needs username + project_id from env (must be saved first)
+        mixpanel_username = env_service.get_key('MIXPANEL_SERVICE_ACCOUNT_USERNAME')
+        mixpanel_project_id = env_service.get_key('MIXPANEL_PROJECT_ID')
+        mixpanel_region = env_service.get_key('MIXPANEL_REGION') or 'us'
+        return validation_service.validate_mixpanel_key(
+            value, mixpanel_username, mixpanel_project_id, mixpanel_region
+        )
+
+    elif key_id in ('MIXPANEL_SERVICE_ACCOUNT_USERNAME', 'MIXPANEL_PROJECT_ID', 'MIXPANEL_REGION'):
+        # Supporting fields for Mixpanel — just accept them
         is_valid = bool(value)
         message = 'Value accepted' if is_valid else 'Value is empty'
         return is_valid, message

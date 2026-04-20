@@ -71,6 +71,7 @@ class SourceProcessingService:
         ".database": "database",  # Database sources (Postgres/MySQL)
         ".freshdesk": "freshdesk",  # Freshdesk ticket sources
         ".jira": "jira",  # Jira project sources (live API flag)
+        ".mixpanel": "mixpanel",  # Mixpanel analytics sources (live API flag)
         ".mcp": "mcp",  # MCP server resources
         ".research": "research",  # Deep research source
     }
@@ -186,6 +187,10 @@ class SourceProcessingService:
             elif processor_type == "jira":
                 from app.services.source_services.source_processing.jira_processor import process_jira
                 return process_jira(project_id, source_id, source, raw_file_path, source_service)
+
+            elif processor_type == "mixpanel":
+                from app.services.source_services.source_processing.mixpanel_processor import process_mixpanel
+                return process_mixpanel(project_id, source_id, source, raw_file_path, source_service)
 
             elif processor_type == "mcp":
                 from app.services.source_services.source_processing.mcp_processor import process_mcp

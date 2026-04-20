@@ -1,0 +1,9 @@
+{
+  "name": "mixpanel_list_funnels",
+  "description": "List funnels configured in the Mixpanel project. Use this to discover funnel IDs before querying a specific funnel's conversion data.",
+  "input_schema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  }
+}

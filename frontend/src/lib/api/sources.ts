@@ -434,6 +434,32 @@ class SourcesAPI {
     }
   }
 
+  /**
+   * Add a Mixpanel source for live analytics queries in chat
+   * Educational Note: Mixpanel Service Account credentials are configured
+   * globally in API Keys settings. The backend uses these to query the
+   * Mixpanel Query API live — no data is synced locally.
+   */
+  async addMixpanelSource(
+    projectId: string,
+    name?: string,
+    description?: string
+  ): Promise<Source> {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/projects/${projectId}/sources/mixpanel`,
+        {
+          name: name || undefined,
+          description: description || undefined,
+        }
+      );
+      return response.data.source;
+    } catch (error) {
+      log.error({ err: error }, 'failed to add Mixpanel source');
+      throw error;
+    }
+  }
+
   async syncFreshdesk(projectId: string, sourceId: string): Promise<void> {
     try {
       await axios.post(`${API_BASE_URL}/projects/${projectId}/sources/${sourceId}/freshdesk-sync`);

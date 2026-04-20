@@ -98,6 +98,10 @@ JIRA_API_KEY=...                # Jira API token
 # OR (legacy format):
 # JIRA_DOMAIN=...               # Jira domain (https://your-company.atlassian.net)
 NOTION_API_KEY=...              # Notion integration
+MIXPANEL_SERVICE_ACCOUNT_USERNAME=...  # Mixpanel service account username
+MIXPANEL_SERVICE_ACCOUNT_SECRET=...    # Mixpanel service account secret
+MIXPANEL_PROJECT_ID=...                # Mixpanel numeric project ID
+MIXPANEL_REGION=us                     # us (default) | eu | in
 ANTHROPIC_TIER=1                # 1-4, controls rate limits
 ```
 

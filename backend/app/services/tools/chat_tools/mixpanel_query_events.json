@@ -1,0 +1,28 @@
+{
+  "name": "mixpanel_query_events",
+  "description": "Get time-bucketed counts for one or more events from Mixpanel. Use this to answer questions like 'how many Signups happened last week?' Returns a per-date count per event. Dates must be in YYYY-MM-DD format.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "event_names": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "List of event names to query (e.g. [\"Signed Up\", \"Purchase\"])"
+      },
+      "from_date": {
+        "type": "string",
+        "description": "Start date inclusive (YYYY-MM-DD)"
+      },
+      "to_date": {
+        "type": "string",
+        "description": "End date inclusive (YYYY-MM-DD)"
+      },
+      "unit": {
+        "type": "string",
+        "enum": ["minute", "hour", "day", "week", "month"],
+        "description": "Time bucket size (default: day)"
+      }
+    },
+    "required": ["event_names", "from_date", "to_date"]
+  }
+}
