@@ -352,6 +352,10 @@ class KnowledgeBaseService:
         yesterday = today - timedelta(days=1)
         from_date = tool_input.get("from_date") or yesterday.isoformat()
         to_date = tool_input.get("to_date") or today.isoformat()
+        # Guard against an inverted window when only one side is user-supplied
+        # (e.g. to_date="2025-01-01" + default from_date=yesterday).
+        if from_date > to_date:
+            from_date = to_date
         return from_date, to_date
 
     def _execute_mixpanel_list_events(self, tool_input: Dict[str, Any]) -> str:
