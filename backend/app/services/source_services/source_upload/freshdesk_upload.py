@@ -85,7 +85,7 @@ def add_freshdesk_source(
         "status": "uploaded",
         "raw_file_path": storage_path,
         "file_size": len(raw_bytes),
-        "is_active": False,
+        "is_active": True,
         "embedding_info": {
             "original_filename": stored_filename,
             "mime_type": "application/json",
