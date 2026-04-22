@@ -9,6 +9,7 @@ base tools (Jira, Notion, GitHub, etc.). It handles:
 
 This keeps main_chat_service.py clean by centralizing all KB integration logic.
 """
+from datetime import date, timedelta
 from typing import Dict, Any, List, Callable, Tuple
 
 from app.config import tool_loader
@@ -343,6 +344,20 @@ class KnowledgeBaseService:
 
     # --- Mixpanel formatters ---
 
+    @staticmethod
+    def _default_date_window(tool_input: Dict[str, Any]) -> Tuple[str, str]:
+        # Mixpanel Query API requires from_date/to_date. Fall back to yesterday→today
+        # so a call still succeeds if the user (and Claude) didn't specify a window.
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        from_date = tool_input.get("from_date") or yesterday.isoformat()
+        to_date = tool_input.get("to_date") or today.isoformat()
+        # Guard against an inverted window when only one side is user-supplied
+        # (e.g. to_date="2025-01-01" + default from_date=yesterday).
+        if from_date > to_date:
+            from_date = to_date
+        return from_date, to_date
+
     def _execute_mixpanel_list_events(self, tool_input: Dict[str, Any]) -> str:
         """List tracked event names."""
         limit = tool_input.get("limit", 100)
@@ -362,8 +377,7 @@ class KnowledgeBaseService:
     def _execute_mixpanel_query_events(self, tool_input: Dict[str, Any]) -> str:
         """Event counts over time."""
         event_names = tool_input.get("event_names") or []
-        from_date = tool_input.get("from_date")
-        to_date = tool_input.get("to_date")
+        from_date, to_date = self._default_date_window(tool_input)
         unit = tool_input.get("unit", "day")
 
         result = mixpanel_service.query_events(
@@ -379,8 +393,7 @@ class KnowledgeBaseService:
     def _execute_mixpanel_segmentation(self, tool_input: Dict[str, Any]) -> str:
         """Segmented event counts."""
         event = tool_input.get("event")
-        from_date = tool_input.get("from_date")
-        to_date = tool_input.get("to_date")
+        from_date, to_date = self._default_date_window(tool_input)
         on = tool_input.get("on")
         where = tool_input.get("where")
         unit = tool_input.get("unit", "day")
@@ -414,8 +427,7 @@ class KnowledgeBaseService:
     def _execute_mixpanel_query_funnel(self, tool_input: Dict[str, Any]) -> str:
         """Funnel conversion."""
         funnel_id = tool_input.get("funnel_id")
-        from_date = tool_input.get("from_date")
-        to_date = tool_input.get("to_date")
+        from_date, to_date = self._default_date_window(tool_input)
         unit = tool_input.get("unit", "day")
 
         result = mixpanel_service.query_funnel(
@@ -432,8 +444,7 @@ class KnowledgeBaseService:
         """Retention analysis."""
         born_event = tool_input.get("born_event")
         event = tool_input.get("event")
-        from_date = tool_input.get("from_date")
-        to_date = tool_input.get("to_date")
+        from_date, to_date = self._default_date_window(tool_input)
         retention_type = tool_input.get("retention_type", "birth")
         unit = tool_input.get("unit", "day")
 
