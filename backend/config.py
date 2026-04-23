@@ -35,7 +35,7 @@ class Config:
     TEMP_DIR = DATA_DIR / "temp"
 
     # File upload settings
-    MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB max file size
+    MAX_CONTENT_LENGTH = 1024 * 1024 * 1024  # 1GB max file size
     ALLOWED_EXTENSIONS = {'pdf', 'txt', 'md', 'docx', 'json', 'png', 'jpg', 'jpeg'}
 
     # API settings

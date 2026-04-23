@@ -64,8 +64,8 @@ export interface AllowedTypes {
 // Maximum number of sources allowed per project
 export const MAX_SOURCES = 100;
 
-// Maximum image file size (5MB) - API constraint
-export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+// Maximum image file size (1GB) - matches global upload limit
+export const MAX_IMAGE_SIZE = 1024 * 1024 * 1024;
 
 // Allowed file extensions by category
 export const ALLOWED_EXTENSIONS = {

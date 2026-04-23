@@ -10,7 +10,7 @@ from typing import Dict, Tuple, Optional
 
 
 # Size limits (in bytes)
-MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB per image
+MAX_IMAGE_SIZE = 1024 * 1024 * 1024  # 1GB per image (matches global upload limit)
 
 
 # Allowed file extensions and their categories
@@ -129,8 +129,9 @@ def validate_file_size(filename: str, file_size: int) -> Optional[str]:
     """
     Validate file size based on file type.
 
-    Educational Note: Different file types have different size limits.
-    Images are limited to 5MB per file (API constraint).
+    Educational Note: All uploads share a single 1GB ceiling. Individual
+    types may still fail at downstream processing (e.g. Claude vision has
+    its own per-image limit), but the upload itself is accepted.
 
     Args:
         filename: The filename to check
