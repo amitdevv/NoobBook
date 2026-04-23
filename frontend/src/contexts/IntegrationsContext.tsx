@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   databasesAPI,
   googleDriveAPI,
@@ -53,17 +53,34 @@ export const IntegrationsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [mcpLoaded, setMcpLoaded] = useState(false);
   const [mcpLoading, setMcpLoading] = useState(false);
 
+  // Refs mirror the current values so each ensure* callback can short-circuit
+  // without listing live state in its dep array. Without this, every local
+  // mutation (upsert/remove/patch) would recreate the callback and cascade
+  // effect re-runs through every consumer.
+  const googleStatusRef = useRef<GoogleStatus>(DEFAULT_GOOGLE_STATUS);
+  const googleLoadedRef = useRef(false);
+  const dbConnectionsRef = useRef<DatabaseConnection[]>([]);
+  const dbLoadedRef = useRef(false);
+  const mcpConnectionsRef = useRef<McpConnection[]>([]);
+  const mcpLoadedRef = useRef(false);
+
+  useEffect(() => { googleStatusRef.current = googleStatus; }, [googleStatus]);
+  useEffect(() => { dbConnectionsRef.current = dbConnections; }, [dbConnections]);
+  useEffect(() => { mcpConnectionsRef.current = mcpConnections; }, [mcpConnections]);
+
   const ensureGoogleStatus = useCallback(async (options?: { force?: boolean; silent?: boolean }) => {
     const { force = false, silent = false } = options ?? {};
-    if (googleLoaded && !force) {
-      return googleStatus;
+    if (googleLoadedRef.current && !force) {
+      return googleStatusRef.current;
     }
 
     if (!silent) setGoogleLoading(true);
     try {
       const status = await googleDriveAPI.getStatus();
       setGoogleStatus(status);
+      googleStatusRef.current = status;
       setGoogleLoaded(true);
+      googleLoadedRef.current = true;
       return status;
     } catch (err) {
       log.error({ err }, 'failed to load Google status');
@@ -71,19 +88,21 @@ export const IntegrationsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } finally {
       if (!silent) setGoogleLoading(false);
     }
-  }, [googleLoaded, googleStatus]);
+  }, []);
 
   const ensureDatabases = useCallback(async (options?: { force?: boolean; silent?: boolean }) => {
     const { force = false, silent = false } = options ?? {};
-    if (dbLoaded && !force) {
-      return dbConnections;
+    if (dbLoadedRef.current && !force) {
+      return dbConnectionsRef.current;
     }
 
     if (!silent) setDbLoading(true);
     try {
       const databases = await databasesAPI.listDatabases();
       setDbConnections(databases);
+      dbConnectionsRef.current = databases;
       setDbLoaded(true);
+      dbLoadedRef.current = true;
       return databases;
     } catch (err) {
       log.error({ err }, 'failed to load databases');
@@ -91,19 +110,21 @@ export const IntegrationsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } finally {
       if (!silent) setDbLoading(false);
     }
-  }, [dbConnections, dbLoaded]);
+  }, []);
 
   const ensureMcpConnections = useCallback(async (options?: { force?: boolean; silent?: boolean }) => {
     const { force = false, silent = false } = options ?? {};
-    if (mcpLoaded && !force) {
-      return mcpConnections;
+    if (mcpLoadedRef.current && !force) {
+      return mcpConnectionsRef.current;
     }
 
     if (!silent) setMcpLoading(true);
     try {
       const connections = await mcpAPI.listConnections();
       setMcpConnections(connections);
+      mcpConnectionsRef.current = connections;
       setMcpLoaded(true);
+      mcpLoadedRef.current = true;
       return connections;
     } catch (err) {
       log.error({ err }, 'failed to load MCP connections');
@@ -111,7 +132,7 @@ export const IntegrationsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } finally {
       if (!silent) setMcpLoading(false);
     }
-  }, [mcpConnections, mcpLoaded]);
+  }, []);
 
   const value = useMemo<IntegrationsContextValue>(() => ({
     googleStatus,

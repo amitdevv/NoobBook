@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { brandAPI, type BrandConfig } from '@/lib/api/brand';
 import { createLogger } from '@/lib/logger';
 
@@ -16,12 +16,19 @@ const BrandConfigContext = createContext<BrandConfigContextValue | null>(null);
 export const BrandConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [config, setConfig] = useState<BrandConfig | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [loaded, setLoaded] = useState(false);
+  const configRef = useRef<BrandConfig | null>(null);
+  const loadedRef = useRef(false);
+
+  // Keep refs in sync so the callbacks can read current state without listing
+  // it in their dep arrays (which would recreate them on every patchConfig).
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
 
   const refreshConfig = useCallback(async (options?: { silent?: boolean; force?: boolean }) => {
     const { silent = false, force = false } = options ?? {};
-    if (loaded && !force) {
-      return config;
+    if (loadedRef.current && !force) {
+      return configRef.current;
     }
 
     if (!silent) {
@@ -32,7 +39,8 @@ export const BrandConfigProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const response = await brandAPI.getConfig();
       const nextConfig = response.data.success ? response.data.config : null;
       setConfig(nextConfig);
-      setLoaded(true);
+      configRef.current = nextConfig;
+      loadedRef.current = true;
       return nextConfig;
     } catch (err) {
       log.error({ err }, 'failed to load brand config');
@@ -42,7 +50,7 @@ export const BrandConfigProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setInitialLoading(false);
       }
     }
-  }, [config, loaded]);
+  }, []);
 
   useEffect(() => {
     refreshConfig().catch(() => {

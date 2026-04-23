@@ -120,27 +120,41 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
     setGoogleMutating(true);
     try {
       const authUrl = await googleDriveAPI.getAuthUrl();
-      if (authUrl) {
-        window.open(authUrl, '_blank', 'width=500,height=600');
-        info('Complete authentication in the new window');
-        const pollInterval = setInterval(async () => {
+      if (!authUrl) {
+        error('Failed to get Google auth URL. Check your credentials.');
+        setGoogleMutating(false);
+        return;
+      }
+
+      window.open(authUrl, '_blank', 'width=500,height=600');
+      info('Complete authentication in the new window');
+      // Keep the button disabled while polling runs so a second click cannot
+      // spawn a parallel interval. Button re-enables on success, timeout, or
+      // any poll error.
+      const pollInterval = setInterval(async () => {
+        try {
           const status = await googleDriveAPI.getStatus();
           if (status.connected) {
             clearInterval(pollInterval);
+            clearTimeout(timeoutId);
             setGoogleStatus(status);
+            setGoogleMutating(false);
             success(`Connected as ${status.email}`);
           }
-        }, 2000);
-        setTimeout(() => {
+        } catch (pollErr) {
+          log.error({ err: pollErr }, 'google poll failed');
           clearInterval(pollInterval);
-        }, 120000);
-      } else {
-        error('Failed to get Google auth URL. Check your credentials.');
-      }
+          clearTimeout(timeoutId);
+          setGoogleMutating(false);
+        }
+      }, 2000);
+      const timeoutId = setTimeout(() => {
+        clearInterval(pollInterval);
+        setGoogleMutating(false);
+      }, 120000);
     } catch (err) {
       log.error({ err }, 'failed to Lconnecting GoogleE');
       error('Failed to connect Google Drive');
-    } finally {
       setGoogleMutating(false);
     }
   };
