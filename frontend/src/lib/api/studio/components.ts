@@ -7,6 +7,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { listStudioJobsByType } from './jobGroups';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('studio-components-api');
@@ -146,20 +147,7 @@ export const componentsAPI = {
    * List all component generation jobs for a project
    */
   async listJobs(projectId: string, sourceId?: string): Promise<ListComponentJobsResponse> {
-    try {
-      const params = sourceId ? { source_id: sourceId } : {};
-      const response = await axios.get(
-        `${API_BASE_URL}/projects/${projectId}/studio/component-jobs`,
-        { params }
-      );
-      return response.data;
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        return error.response.data;
-      }
-      log.error({ err: error }, 'failed to list component jobs');
-      throw error;
-    }
+    return listStudioJobsByType<ComponentJob>(projectId, 'component', sourceId);
   },
 
   /**

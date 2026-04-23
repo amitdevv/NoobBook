@@ -6,6 +6,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { listStudioJobsByType } from './jobGroups';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('studio-flash-cards-api');
@@ -130,20 +131,7 @@ export const flashCardsAPI = {
    * List all flash card jobs for a project
    */
   async listJobs(projectId: string, sourceId?: string): Promise<ListFlashCardJobsResponse> {
-    try {
-      const params = sourceId ? { source_id: sourceId } : {};
-      const response = await axios.get(
-        `${API_BASE_URL}/projects/${projectId}/studio/flash-card-jobs`,
-        { params }
-      );
-      return response.data;
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        return error.response.data;
-      }
-      log.error({ err: error }, 'failed to list flash card jobs');
-      throw error;
-    }
+    return listStudioJobsByType<FlashCardJob>(projectId, 'flash_card', sourceId);
   },
 
   /**

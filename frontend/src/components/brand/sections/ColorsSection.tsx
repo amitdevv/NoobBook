@@ -14,6 +14,7 @@ import { brandAPI, type ColorPalette, type CustomColor, type ColorEnabled, getDe
 import { ColorPicker } from '../ColorPicker';
 import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
+import { useBrandConfig } from '../BrandConfigContext';
 
 const log = createLogger('brand-colors');
 
@@ -29,38 +30,26 @@ const COLOR_FIELDS: { key: keyof Omit<ColorPalette, 'custom' | 'enabled'>; label
 export const ColorsSection: React.FC = () => {
   const [colors, setColors] = useState<ColorPalette>(getDefaultColors());
   const [enabled, setEnabled] = useState<ColorEnabled>(getDefaultColorEnabled());
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [newColorName, setNewColorName] = useState('');
   const [newColorValue, setNewColorValue] = useState('#000000');
   const { success: showSuccess, error: showError } = useToast();
-
-  const loadColors = async () => {
-    try {
-      setLoading(true);
-      const response = await brandAPI.getConfig();
-      if (response.data.success) {
-        const loaded = response.data.config.colors;
-        setColors({ ...loaded, custom: loaded.custom ?? [] });
-        setEnabled(loaded.enabled ?? getDefaultColorEnabled());
-      }
-    } catch (error) {
-      log.error({ err: error }, 'failed to load colors');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { config, initialLoading, patchConfig } = useBrandConfig();
 
   useEffect(() => {
-    loadColors();
-  }, []);
+    if (!config) return;
+    const loaded = config.colors;
+    setColors({ ...loaded, custom: loaded.custom ?? [] });
+    setEnabled(loaded.enabled ?? getDefaultColorEnabled());
+  }, [config]);
 
   const handleSave = async () => {
     try {
       setSaving(true);
       const response = await brandAPI.updateColors({ ...colors, enabled });
       if (response.data.success) {
+        patchConfig({ colors: response.data.config.colors });
         setSaved(true);
         showSuccess('Colors saved');
         setTimeout(() => setSaved(false), 2000);
@@ -108,7 +97,7 @@ export const ColorsSection: React.FC = () => {
     }));
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <CircleNotch size={24} className="animate-spin text-muted-foreground" />

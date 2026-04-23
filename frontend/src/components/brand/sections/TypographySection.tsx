@@ -27,6 +27,7 @@ import {
 } from '../../../lib/api/brand';
 import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
+import { useBrandConfig } from '../BrandConfigContext';
 
 const log = createLogger('brand-typography');
 
@@ -34,44 +35,31 @@ type HeadingLevel = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 
 export const TypographySection: React.FC = () => {
   const [typography, setTypography] = useState<Typography>(getDefaultTypography());
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const { success: showSuccess, error: showError } = useToast();
-
-  const loadTypography = async () => {
-    try {
-      setLoading(true);
-      const response = await brandAPI.getConfig();
-      if (response.data.success) {
-        // Merge with defaults to handle missing h4, h5, h6 from older configs
-        const loadedTypography = response.data.config.typography;
-        const defaults = getDefaultTypography();
-        setTypography({
-          ...defaults,
-          ...loadedTypography,
-          heading_sizes: {
-            ...defaults.heading_sizes,
-            ...loadedTypography.heading_sizes,
-          },
-        });
-      }
-    } catch (error) {
-      log.error({ err: error }, 'failed to load typography');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { config, initialLoading, patchConfig } = useBrandConfig();
 
   useEffect(() => {
-    loadTypography();
-  }, []);
+    if (!config) return;
+    const loadedTypography = config.typography;
+    const defaults = getDefaultTypography();
+    setTypography({
+      ...defaults,
+      ...loadedTypography,
+      heading_sizes: {
+        ...defaults.heading_sizes,
+        ...loadedTypography.heading_sizes,
+      },
+    });
+  }, [config]);
 
   const handleSave = async () => {
     try {
       setSaving(true);
       const response = await brandAPI.updateTypography(typography);
       if (response.data.success) {
+        patchConfig({ typography: response.data.config.typography });
         setSaved(true);
         showSuccess('Typography saved');
         setTimeout(() => setSaved(false), 2000);
@@ -104,7 +92,7 @@ export const TypographySection: React.FC = () => {
     return acc;
   }, {} as Record<string, string[]>);
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <CircleNotch size={24} className="animate-spin text-muted-foreground" />

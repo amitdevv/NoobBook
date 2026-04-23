@@ -10,7 +10,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Checkbox } from '../ui/checkbox';
 import { CircleNotch, Plus, ArrowsClockwise, Plug } from '@phosphor-icons/react';
-import { mcpAPI, type McpConnection, type McpResource } from '@/lib/api/settings';
+import { mcpAPI, type McpResource } from '@/lib/api/settings';
 import {
   Select,
   SelectContent,
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '../ui/select';
 import { ScrollArea } from '../ui/scroll-area';
+import { useIntegrations } from '@/contexts/IntegrationsContext';
 
 interface McpTabProps {
   isAtLimit: boolean;
@@ -26,8 +27,6 @@ interface McpTabProps {
 }
 
 export const McpTab: React.FC<McpTabProps> = ({ isAtLimit, onAddMcp }) => {
-  const [connections, setConnections] = useState<McpConnection[]>([]);
-  const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string>('');
   const [name, setName] = useState('');
@@ -40,27 +39,39 @@ export const McpTab: React.FC<McpTabProps> = ({ isAtLimit, onAddMcp }) => {
   const [selectedUris, setSelectedUris] = useState<Set<string>>(new Set());
 
   const [loadError, setLoadError] = useState('');
+  const {
+    mcpConnections: connections,
+    mcpLoading: loading,
+    ensureMcpConnections,
+  } = useIntegrations();
 
   const loadConnections = async () => {
-    setLoading(true);
     setLoadError('');
     try {
-      const conns = await mcpAPI.listConnections();
-      setConnections(conns);
+      const conns = await ensureMcpConnections({ force: true });
       if (!selectedConnectionId && conns.length > 0) {
         setSelectedConnectionId(conns[0].id);
       }
     } catch {
       setLoadError('Failed to load MCP connections. Check your network.');
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadConnections();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    ensureMcpConnections().then((conns) => {
+      if (!selectedConnectionId && conns.length > 0) {
+        setSelectedConnectionId(conns[0].id);
+      }
+    }).catch(() => {
+      setLoadError('Failed to load MCP connections. Check your network.');
+    });
+  }, [ensureMcpConnections, selectedConnectionId]);
+
+  useEffect(() => {
+    if (!selectedConnectionId && connections.length > 0) {
+      setSelectedConnectionId(connections[0].id);
+    }
+  }, [connections, selectedConnectionId]);
 
   // Reset resources when connection changes
   useEffect(() => {

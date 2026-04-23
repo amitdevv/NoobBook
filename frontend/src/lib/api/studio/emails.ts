@@ -7,6 +7,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { listStudioJobsByType } from './jobGroups';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('studio-emails-api');
@@ -166,20 +167,7 @@ export const emailsAPI = {
    * List all email template jobs for a project
    */
   async listJobs(projectId: string, sourceId?: string): Promise<ListEmailJobsResponse> {
-    try {
-      const params = sourceId ? { source_id: sourceId } : {};
-      const response = await axios.get(
-        `${API_BASE_URL}/projects/${projectId}/studio/email-jobs`,
-        { params }
-      );
-      return response.data;
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        return error.response.data;
-      }
-      log.error({ err: error }, 'failed to list email jobs');
-      throw error;
-    }
+    return listStudioJobsByType<EmailJob>(projectId, 'email', sourceId);
   },
 
   /**

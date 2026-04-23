@@ -22,6 +22,7 @@ import {
   GuidelinesSection,
   FeatureSettingsSection,
 } from '../../brand/sections';
+import { BrandConfigProvider } from '@/components/brand/BrandConfigContext';
 
 type DesignTab = 'colors' | 'typography' | 'logos' | 'icons' | 'guidelines' | 'features';
 
@@ -42,58 +43,75 @@ const tabs: TabItem[] = [
 
 export const DesignSection: React.FC = () => {
   const [activeTab, setActiveTab] = useState<DesignTab>('colors');
+  const [mountedTabs, setMountedTabs] = useState<Set<DesignTab>>(() => new Set(['colors']));
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'colors':
-        return <ColorsSection />;
-      case 'typography':
-        return <TypographySection />;
-      case 'logos':
-        return <LogosSection />;
-      case 'icons':
-        return <IconsSection />;
-      case 'guidelines':
-        return <GuidelinesSection />;
-      case 'features':
-        return <FeatureSettingsSection />;
-      default:
-        return null;
-    }
+  const handleTabChange = (tab: DesignTab) => {
+    setActiveTab(tab);
+    setMountedTabs((prev) => {
+      if (prev.has(tab)) return prev;
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
   };
 
   return (
-    <div className="flex flex-col h-full -m-6">
-      <div className="flex-shrink-0 px-6 pt-4 pb-1">
-        <h2 className="text-lg font-semibold text-stone-900">Design</h2>
-        <p className="text-sm text-muted-foreground">
-          Brand kit applied across all projects' studio-generated content.
-        </p>
-      </div>
+    <BrandConfigProvider>
+      <div className="flex flex-col h-full -m-6">
+        <div className="flex-shrink-0 px-6 pt-4 pb-1">
+          <h2 className="text-lg font-semibold text-stone-900">Design</h2>
+          <p className="text-sm text-muted-foreground">
+            Brand kit applied across all projects' studio-generated content.
+          </p>
+        </div>
 
-      {/* Horizontal tab bar */}
-      <div className="flex-shrink-0 border-b border-stone-200 px-6">
-        <div className="flex gap-1 -mb-px">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors',
-                activeTab === tab.id
-                  ? 'border-amber-600 text-amber-700'
-                  : 'border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300'
-              )}
-            >
-              {tab.icon}
-              <span>{tab.label}</span>
-            </button>
+        {/* Horizontal tab bar */}
+        <div className="flex-shrink-0 border-b border-stone-200 px-6">
+          <div className="flex gap-1 -mb-px">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors',
+                  activeTab === tab.id
+                    ? 'border-amber-600 text-amber-700'
+                    : 'border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300'
+                )}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tab content — scrolls independently */}
+        <div className="flex-1 overflow-y-auto px-6 pb-6">
+          {Array.from(mountedTabs).map((tab) => (
+            <div key={tab} className={tab === activeTab ? 'h-full' : 'hidden'}>
+              {(() => {
+                switch (tab) {
+                  case 'colors':
+                    return <ColorsSection />;
+                  case 'typography':
+                    return <TypographySection />;
+                  case 'logos':
+                    return <LogosSection />;
+                  case 'icons':
+                    return <IconsSection />;
+                  case 'guidelines':
+                    return <GuidelinesSection />;
+                  case 'features':
+                    return <FeatureSettingsSection />;
+                  default:
+                    return null;
+                }
+              })()}
+            </div>
           ))}
         </div>
       </div>
-
-      {/* Tab content — scrolls independently */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6">{renderContent()}</div>
-    </div>
+    </BrandConfigProvider>
   );
 };

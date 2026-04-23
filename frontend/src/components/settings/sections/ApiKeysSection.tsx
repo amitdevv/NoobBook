@@ -91,7 +91,7 @@ export const ApiKeysSection: React.FC = () => {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [modifiedKeys, setModifiedKeys] = useState<{ [key: string]: string }>({});
   const [showApiKeys, setShowApiKeys] = useState<{ [key: string]: boolean }>({});
-  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(false);
   const [validationState, setValidationState] = useState<ValidationState>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -102,7 +102,7 @@ export const ApiKeysSection: React.FC = () => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadApiKeys = async () => {
-    setLoading(true);
+    setInitialLoading(true);
     try {
       const keys = await settingsAPI.getApiKeys();
       setApiKeys(keys);
@@ -111,7 +111,7 @@ export const ApiKeysSection: React.FC = () => {
       log.error({ err }, 'failed to load API keys');
       error('Failed to load API keys');
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
   };
 
@@ -177,8 +177,12 @@ export const ApiKeysSection: React.FC = () => {
               message: result.message
             }
           }));
+          setApiKeys(prev => prev.map(key => (
+            key.id === id
+              ? { ...key, is_set: true }
+              : key
+          )));
           success(`${keyName} validated and saved successfully!`);
-          await loadApiKeys();
         } catch (saveErr) {
           const saveErrorMessage = saveErr instanceof Error ? saveErr.message : 'Failed to save';
           setValidationState(prev => ({
@@ -351,7 +355,7 @@ export const ApiKeysSection: React.FC = () => {
     );
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="flex flex-col items-center gap-3">

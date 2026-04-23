@@ -6,7 +6,6 @@ status bar to poll. Aggregates sources being processed, studio jobs in progress,
 and background tasks into a unified list.
 """
 
-from datetime import datetime
 from flask import jsonify, current_app
 
 from app.api.projects import projects_bp
@@ -58,6 +57,7 @@ def get_active_tasks(project_id: str):
                         "label": src.get("name", "Source"),
                         "detail": detail,
                         "status": status,
+                        "target_id": src.get("id"),
                         "created_at": src.get("created_at"),
                     })
         except Exception as e:
@@ -88,6 +88,7 @@ def get_active_tasks(project_id: str):
                     "detail": detail,
                     "status": job.get("status"),
                     "progress": job.get("progress"),
+                    "target_id": job.get("id"),
                     "created_at": job.get("created_at"),
                 })
         except Exception as e:
@@ -98,7 +99,7 @@ def get_active_tasks(project_id: str):
             supabase = get_supabase()
             bg_response = (
                 supabase.table("background_tasks")
-                .select("id, task_type, target_type, status, message, created_at, started_at")
+                .select("id, task_type, target_id, target_type, status, message, created_at, started_at")
                 .in_("status", ["pending", "running"])
                 .order("created_at", desc=False)
                 .execute()
@@ -112,9 +113,12 @@ def get_active_tasks(project_id: str):
                 tasks.append({
                     "id": task.get("id"),
                     "type": "background",
+                    "task_type": task_type,
                     "label": _format_task_type(task_type),
                     "detail": task.get("message") or "Processing...",
                     "status": task.get("status"),
+                    "target_id": task.get("target_id"),
+                    "target_type": task.get("target_type"),
                     "created_at": task.get("started_at") or task.get("created_at"),
                 })
         except Exception as e:

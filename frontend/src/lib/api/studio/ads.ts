@@ -6,6 +6,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { listStudioJobsByType } from './jobGroups';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('studio-ads-api');
@@ -130,18 +131,7 @@ export const adsAPI = {
    * List all ad jobs for a project
    */
   async listJobs(projectId: string): Promise<ListAdJobsResponse> {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/projects/${projectId}/studio/ad-jobs`
-      );
-      return response.data;
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        return error.response.data;
-      }
-      log.error({ err: error }, 'failed to list ad jobs');
-      throw error;
-    }
+    return listStudioJobsByType<AdJob>(projectId, 'ad');
   },
 
   /**

@@ -7,7 +7,6 @@ import React, { useEffect, useState } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { CircleNotch, Plus } from '@phosphor-icons/react';
-import { databasesAPI, type DatabaseConnection } from '@/lib/api/settings';
 import {
   Select,
   SelectContent,
@@ -15,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
+import { useIntegrations } from '@/contexts/IntegrationsContext';
 
 interface DatabaseTabProps {
   isAtLimit: boolean;
@@ -22,30 +22,40 @@ interface DatabaseTabProps {
 }
 
 export const DatabaseTab: React.FC<DatabaseTabProps> = ({ isAtLimit, onAddDatabase }) => {
-  const [connections, setConnections] = useState<DatabaseConnection[]>([]);
-  const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string>('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const {
+    dbConnections: connections,
+    dbLoading: loading,
+    ensureDatabases,
+  } = useIntegrations();
 
   const loadConnections = async () => {
-    setLoading(true);
     try {
-      const dbs = await databasesAPI.listDatabases();
-      setConnections(dbs);
+      const dbs = await ensureDatabases({ force: true });
       if (!selectedConnectionId && dbs.length > 0) {
         setSelectedConnectionId(dbs[0].id);
       }
-    } finally {
-      setLoading(false);
+    } catch {
+      // Handled by shared integrations state
     }
   };
 
   useEffect(() => {
-    loadConnections();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    ensureDatabases().then((dbs) => {
+      if (!selectedConnectionId && dbs.length > 0) {
+        setSelectedConnectionId(dbs[0].id);
+      }
+    }).catch(() => {});
+  }, [ensureDatabases, selectedConnectionId]);
+
+  useEffect(() => {
+    if (!selectedConnectionId && connections.length > 0) {
+      setSelectedConnectionId(connections[0].id);
+    }
+  }, [connections, selectedConnectionId]);
 
   const selected = connections.find((c) => c.id === selectedConnectionId);
 
@@ -161,4 +171,3 @@ export const DatabaseTab: React.FC<DatabaseTabProps> = ({ isAtLimit, onAddDataba
     </div>
   );
 };
-

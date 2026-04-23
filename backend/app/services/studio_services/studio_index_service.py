@@ -256,6 +256,38 @@ def list_jobs(
         return []
 
 
+def list_jobs_grouped(project_id: str) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    List all studio jobs for a project, grouped by job_type.
+
+    Educational Note: This supports Studio bootstrap without issuing one
+    request per section. Callers can filter by source client-side.
+    """
+    try:
+        client = _get_client()
+        response = (
+            client.table("studio_jobs")
+            .select("*")
+            .eq("project_id", project_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+        grouped: Dict[str, List[Dict[str, Any]]] = {}
+        for row in (response.data or []):
+            mapped = _map_job(row)
+            if not mapped:
+                continue
+            job_type = mapped.get("job_type")
+            if not job_type:
+                continue
+            grouped.setdefault(job_type, []).append(mapped)
+        return grouped
+    except Exception as e:
+        logger.error("Failed to list grouped studio jobs (project=%s): %s", project_id, e)
+        return {}
+
+
 def delete_job(
     project_id: str,
     job_id: str

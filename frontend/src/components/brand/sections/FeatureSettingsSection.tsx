@@ -10,6 +10,7 @@ import { CircleNotch, Check } from '@phosphor-icons/react';
 import { brandAPI, type FeatureSettings, getDefaultFeatureSettings } from '../../../lib/api/brand';
 import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
+import { useBrandConfig } from '../BrandConfigContext';
 
 const log = createLogger('brand-feature-settings');
 
@@ -74,34 +75,22 @@ const features: FeatureConfig[] = [
 
 export const FeatureSettingsSection: React.FC = () => {
   const [settings, setSettings] = useState<FeatureSettings>(getDefaultFeatureSettings());
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const { success: showSuccess, error: showError } = useToast();
-
-  const loadSettings = async () => {
-    try {
-      setLoading(true);
-      const response = await brandAPI.getConfig();
-      if (response.data.success) {
-        setSettings(response.data.config.feature_settings);
-      }
-    } catch (error) {
-      log.error({ err: error }, 'failed to load settings');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { config, initialLoading, patchConfig } = useBrandConfig();
 
   useEffect(() => {
-    loadSettings();
-  }, []);
+    if (!config) return;
+    setSettings(config.feature_settings);
+  }, [config]);
 
   const handleSave = async () => {
     try {
       setSaving(true);
       const response = await brandAPI.updateFeatureSettings(settings);
       if (response.data.success) {
+        patchConfig({ feature_settings: response.data.config.feature_settings });
         setSaved(true);
         showSuccess('Feature settings saved');
         setTimeout(() => setSaved(false), 2000);
@@ -137,7 +126,7 @@ export const FeatureSettingsSection: React.FC = () => {
     setSettings(disabled as FeatureSettings);
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <CircleNotch size={24} className="animate-spin text-muted-foreground" />

@@ -6,6 +6,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { listStudioJobsByType } from './jobGroups';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('studio-infographics-api');
@@ -142,20 +143,7 @@ export const infographicsAPI = {
    * List all infographic jobs for a project
    */
   async listJobs(projectId: string, sourceId?: string): Promise<ListInfographicJobsResponse> {
-    try {
-      const params = sourceId ? { source_id: sourceId } : {};
-      const response = await axios.get(
-        `${API_BASE_URL}/projects/${projectId}/studio/infographic-jobs`,
-        { params }
-      );
-      return response.data;
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        return error.response.data;
-      }
-      log.error({ err: error }, 'failed to list infographic jobs');
-      throw error;
-    }
+    return listStudioJobsByType<InfographicJob>(projectId, 'infographic', sourceId);
   },
 
   /**

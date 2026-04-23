@@ -39,6 +39,7 @@ const PermissionsContext = createContext<PermissionsContextValue>({
   refreshPermissions: async () => {},
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const usePermissions = () => useContext(PermissionsContext);
 
 export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

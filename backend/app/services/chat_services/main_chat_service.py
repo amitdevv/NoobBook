@@ -17,6 +17,7 @@ import logging
 from typing import Dict, Any, Tuple, List, Optional, Callable
 
 from app.services.data_services import chat_service
+from app.services.data_services.user_service import get_user_service
 
 logger = logging.getLogger(__name__)
 from app.services.integrations.claude import claude_service
@@ -363,6 +364,23 @@ class MainChatService:
         if on_event:
             on_event(event_name, payload or {})
 
+    def _build_sync_payload(
+        self,
+        project_id: str,
+        chat_id: str,
+        user_id: Optional[str],
+    ) -> Dict[str, Any]:
+        sync = chat_service.get_chat_sync_state(project_id, chat_id) or {}
+        if user_id:
+            try:
+                sync["user_usage"] = get_user_service().get_usage_summary(user_id)
+            except Exception as exc:
+                logger.warning("Failed to build usage summary for %s: %s", user_id, exc)
+                sync["user_usage"] = None
+        else:
+            sync["user_usage"] = None
+        return sync
+
     def _call_claude(
         self,
         *,
@@ -584,7 +602,11 @@ class MainChatService:
                 model=response.get("model"),
                 tokens=response.get("usage")
             )
-            self._emit_event(on_event, "assistant_done", assistant_msg)
+            sync_payload = self._build_sync_payload(project_id, chat_id, resolved_user_id)
+            self._emit_event(on_event, "assistant_done", {
+                "assistant_message": assistant_msg,
+                "sync": sync_payload,
+            })
 
         except Exception as api_error:
             partial_text = api_error.partial_text if isinstance(api_error, ClaudeStreamError) else ""
@@ -620,6 +642,7 @@ class MainChatService:
                 {
                     "message": str(api_error),
                     "assistant_message": assistant_msg,
+                    "sync": self._build_sync_payload(project_id, chat_id, resolved_user_id),
                 },
             )
 
@@ -637,12 +660,14 @@ class MainChatService:
                 self._generate_and_update_chat_title,
                 project_id,
                 chat_id,
-                user_message_text
+                user_message_text,
+                target_type="chat",
             )
 
         return {
             "user_message": user_msg,
             "assistant_message": assistant_msg,
+            "sync": self._build_sync_payload(project_id, chat_id, resolved_user_id),
         }
 
     def send_message(
@@ -650,15 +675,14 @@ class MainChatService:
         project_id: str,
         chat_id: str,
         user_message_text: str
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        """Process a user message and return the saved user + assistant messages."""
-        result = self._run_message_flow(
+    ) -> Dict[str, Any]:
+        """Process a user message and return saved messages plus sync metadata."""
+        return self._run_message_flow(
             project_id=project_id,
             chat_id=chat_id,
             user_message_text=user_message_text,
             stream_text=False,
         )
-        return result["user_message"], result["assistant_message"]
 
     def stream_message(
         self,

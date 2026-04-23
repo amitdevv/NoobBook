@@ -7,6 +7,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { listStudioJobsByType } from './jobGroups';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('studio-flow-diagrams-api');
@@ -137,20 +138,7 @@ export const flowDiagramsAPI = {
    * List all flow diagram jobs for a project
    */
   async listJobs(projectId: string, sourceId?: string): Promise<ListFlowDiagramJobsResponse> {
-    try {
-      const params = sourceId ? { source_id: sourceId } : {};
-      const response = await axios.get(
-        `${API_BASE_URL}/projects/${projectId}/studio/flow-diagram-jobs`,
-        { params }
-      );
-      return response.data;
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        return error.response.data;
-      }
-      log.error({ err: error }, 'failed to list flow diagram jobs');
-      throw error;
-    }
+    return listStudioJobsByType<FlowDiagramJob>(projectId, 'flow_diagram', sourceId);
   },
 
   /**

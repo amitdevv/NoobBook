@@ -6,6 +6,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { listStudioJobsByType } from './jobGroups';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('studio-mind-maps-api');
@@ -132,20 +133,7 @@ export const mindMapsAPI = {
    * List all mind map jobs for a project
    */
   async listJobs(projectId: string, sourceId?: string): Promise<ListMindMapJobsResponse> {
-    try {
-      const params = sourceId ? { source_id: sourceId } : {};
-      const response = await axios.get(
-        `${API_BASE_URL}/projects/${projectId}/studio/mind-map-jobs`,
-        { params }
-      );
-      return response.data;
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        return error.response.data;
-      }
-      log.error({ err: error }, 'failed to list mind map jobs');
-      throw error;
-    }
+    return listStudioJobsByType<MindMapJob>(projectId, 'mind_map', sourceId);
   },
 
   /**
