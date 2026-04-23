@@ -11,6 +11,7 @@ import { API_BASE_URL } from './client';
 import { createLogger } from '@/lib/logger';
 import { getAccessToken } from '../auth/session';
 import type { CostTracking } from './projects';
+import type { UserUsage } from './settings';
 
 const log = createLogger('chats-api');
 
@@ -63,6 +64,22 @@ export interface Chat {
   };
 }
 
+export interface ChatSyncChatMetadata {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  selected_source_ids: string[] | null;
+}
+
+export interface ChatSyncPayload {
+  chat: ChatSyncChatMetadata;
+  studio_signals: StudioSignal[];
+  chat_costs: CostTracking;
+  user_usage: UserUsage | null;
+}
+
 /**
  * Educational Note: Raw message for debug/raw view.
  * Includes the original content blocks (tool_use, tool_result, etc.)
@@ -85,26 +102,28 @@ export interface RawMessage {
 export interface SendMessageResponse {
   user_message: Message;
   assistant_message: Message;
+  sync?: ChatSyncPayload | null;
 }
 
 export type ChatStreamEvent =
   | { type: 'user_message'; payload: Message }
   | { type: 'assistant_delta'; payload: { delta: string } }
-  | { type: 'assistant_done'; payload: Message }
-  | { type: 'error'; payload: { message: string; assistant_message?: Message | null } };
+  | { type: 'assistant_done'; payload: { assistant_message: Message; sync?: ChatSyncPayload | null } }
+  | { type: 'error'; payload: { message: string; assistant_message?: Message | null; sync?: ChatSyncPayload | null } };
 
 export interface StreamMessageCallbacks {
   onEvent?: (event: ChatStreamEvent) => void;
   onUserMessage?: (message: Message) => void;
   onAssistantDelta?: (delta: string) => void;
-  onAssistantDone?: (message: Message) => void;
-  onErrorEvent?: (payload: { message: string; assistant_message?: Message | null }) => void;
+  onAssistantDone?: (payload: { assistant_message: Message; sync?: ChatSyncPayload | null }) => void;
+  onErrorEvent?: (payload: { message: string; assistant_message?: Message | null; sync?: ChatSyncPayload | null }) => void;
 }
 
 export interface StreamMessageResult {
   hadUserMessage: boolean;
   hadAssistantDelta: boolean;
   terminalEvent: 'assistant_done' | 'error' | null;
+  terminalSync?: ChatSyncPayload | null;
 }
 
 /**
@@ -184,10 +203,12 @@ class ChatsAPI {
         break;
       case 'assistant_done':
         state.terminalEvent = 'assistant_done';
+        state.terminalSync = payload.sync ?? null;
         this.notifyStreamEvent({ type: 'assistant_done', payload }, callbacks);
         break;
       case 'error':
         state.terminalEvent = 'error';
+        state.terminalSync = payload.sync ?? null;
         this.notifyStreamEvent({ type: 'error', payload }, callbacks);
         break;
       case 'ping':
@@ -282,7 +303,8 @@ class ChatsAPI {
       );
       return {
         user_message: response.data.user_message,
-        assistant_message: response.data.assistant_message
+        assistant_message: response.data.assistant_message,
+        sync: response.data.sync,
       };
     } catch (error) {
       log.error({ err: error }, 'failed to send message');
@@ -326,6 +348,7 @@ class ChatsAPI {
       hadUserMessage: false,
       hadAssistantDelta: false,
       terminalEvent: null,
+      terminalSync: null,
     };
     let buffer = '';
 

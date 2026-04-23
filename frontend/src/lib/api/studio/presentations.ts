@@ -7,6 +7,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { listStudioJobsByType } from './jobGroups';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('studio-presentations-api');
@@ -201,20 +202,7 @@ export const presentationsAPI = {
    * List all presentation jobs for a project, optionally filtered by source
    */
   async listJobs(projectId: string, sourceId?: string): Promise<ListPresentationJobsResponse> {
-    try {
-      const params = sourceId ? { source_id: sourceId } : {};
-      const response = await axios.get(
-        `${API_BASE_URL}/projects/${projectId}/studio/presentation-jobs`,
-        { params }
-      );
-      return response.data;
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        return error.response.data;
-      }
-      log.error({ err: error }, 'failed to list presentation jobs');
-      throw error;
-    }
+    return listStudioJobsByType<PresentationJob>(projectId, 'presentation', sourceId);
   },
 
   /**

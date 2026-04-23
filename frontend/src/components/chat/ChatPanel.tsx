@@ -7,9 +7,10 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sparkle } from '@phosphor-icons/react';
+import axios from 'axios';
 import { Skeleton } from '../ui/skeleton';
 import { chatsAPI } from '@/lib/api/chats';
-import type { Chat, ChatMetadata, StudioSignal } from '@/lib/api/chats';
+import type { Chat, ChatMetadata, ChatSyncPayload, StudioSignal } from '@/lib/api/chats';
 import type { CostTracking } from '@/lib/api/projects';
 import { usersAPI, type UserUsage } from '@/lib/api/settings';
 import { sourcesAPI, type Source } from '@/lib/api/sources';
@@ -24,6 +25,7 @@ import { ChatEmptyState } from './ChatEmptyState';
 import { RawMessageView } from './RawMessageView';
 import { exportChatAsPdf } from '@/lib/exportChatPdf';
 import { createLogger } from '@/lib/logger';
+import { API_BASE_URL } from '@/lib/api/client';
 
 const log = createLogger('chat-panel');
 
@@ -67,10 +69,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [exportingChat, setExportingChat] = useState(false);
   const [rawMode, setRawMode] = useState(false);
   const [streamingAssistantContent, setStreamingAssistantContent] = useState('');
+  const [titleSyncPollKey, setTitleSyncPollKey] = useState(0);
   // AbortController for cancelling in-flight chat requests
   const abortControllerRef = useRef<AbortController | null>(null);
   const canonicalUserMessageReceivedRef = useRef(false);
   const assistantDeltaReceivedRef = useRef(false);
+  const pendingTitleSyncRef = useRef<{ chatId: string; hasSeenNamingTask: boolean } | null>(null);
 
   // Sources state for header display
   const [sources, setSources] = useState<Source[]>([]);
@@ -216,6 +220,105 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   }, []);
 
+  const applyChatSync = useCallback((sync?: ChatSyncPayload | null): boolean => {
+    if (!sync?.chat) {
+      return false;
+    }
+
+    const syncedChat = sync.chat;
+
+    setAllChats((prev) => {
+      const existing = prev.find((chat) => chat.id === syncedChat.id);
+      const nextChat: ChatMetadata = {
+        id: syncedChat.id,
+        title: syncedChat.title,
+        created_at: syncedChat.created_at,
+        updated_at: syncedChat.updated_at,
+        message_count: syncedChat.message_count,
+      };
+
+      if (existing &&
+          existing.title === nextChat.title &&
+          existing.updated_at === nextChat.updated_at &&
+          existing.message_count === nextChat.message_count) {
+        return prev;
+      }
+
+      return [nextChat, ...prev.filter((chat) => chat.id !== syncedChat.id)];
+    });
+
+    setActiveChat((prev) => {
+      if (!prev || prev.id !== syncedChat.id) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        title: syncedChat.title,
+        updated_at: syncedChat.updated_at,
+        selected_source_ids: syncedChat.selected_source_ids,
+        studio_signals: sync.studio_signals ?? prev.studio_signals,
+      };
+    });
+
+    if (sync.chat_costs) {
+      setChatCosts(sync.chat_costs);
+    }
+
+    if (sync.user_usage) {
+      setUserUsage(sync.user_usage);
+    }
+
+    onCostsChange?.();
+    return true;
+  }, [onCostsChange]);
+
+  const reconcileChatMetadata = useCallback(async (chatId: string) => {
+    try {
+      const [chat] = await Promise.all([
+        chatsAPI.getChat(projectId, chatId),
+        loadChatCosts(chatId),
+        loadUserUsage(),
+      ]);
+
+      setAllChats((prev) => {
+        const existing = prev.find((item) => item.id === chat.id);
+        const nextChat: ChatMetadata = existing
+          ? {
+              ...existing,
+              title: chat.title,
+              updated_at: chat.updated_at,
+              message_count: chat.messages.length,
+            }
+          : {
+              id: chat.id,
+              title: chat.title,
+              created_at: chat.created_at,
+              updated_at: chat.updated_at,
+              message_count: chat.messages.length,
+            };
+
+        return [nextChat, ...prev.filter((item) => item.id !== chat.id)];
+      });
+
+      setActiveChat((prev) => {
+        if (!prev || prev.id !== chat.id) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          title: chat.title,
+          updated_at: chat.updated_at,
+          selected_source_ids: chat.selected_source_ids,
+          studio_signals: chat.studio_signals || prev.studio_signals,
+        };
+      });
+    } catch (err) {
+      log.error({ err, chatId }, 'failed to reconcile chat metadata');
+    }
+  }, [loadChatCosts, loadUserUsage, projectId]);
+
   useEffect(() => {
     if (activeChat?.id) {
       loadChatCosts(activeChat.id);
@@ -228,6 +331,81 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   useEffect(() => {
     loadUserUsage();
   }, [loadUserUsage]);
+
+  useEffect(() => {
+    if (!pendingTitleSyncRef.current) {
+      return undefined;
+    }
+
+    const pending = pendingTitleSyncRef.current;
+    const startedAt = Date.now();
+    // Ceiling so a fast-completing name task that we never observe in
+    // /active-tasks still triggers a reconcile. Haiku often returns in
+    // 1-3s, so anything past 8s means either we missed the window or the
+    // task failed silently — either way, pull fresh metadata.
+    const MAX_WAIT_MS = 8000;
+    let cancelled = false;
+
+    const finishAndReconcile = async () => {
+      pendingTitleSyncRef.current = null;
+      await reconcileChatMetadata(pending.chatId);
+      if (!cancelled) {
+        setTitleSyncPollKey((prev) => prev + 1);
+      }
+    };
+
+    const checkForCompletedNaming = async () => {
+      if (cancelled || pendingTitleSyncRef.current !== pending) {
+        return;
+      }
+
+      const elapsed = Date.now() - startedAt;
+
+      try {
+        const response = await axios.get(`${API_BASE_URL}/projects/${projectId}/active-tasks`);
+        if (cancelled || pendingTitleSyncRef.current !== pending) {
+          return;
+        }
+
+        const namingTask = response.data.success
+          ? (response.data.tasks || []).find((task: {
+              type?: string;
+              target_id?: string;
+              target_type?: string;
+              task_type?: string;
+            }) => (
+              task.type === 'background' &&
+              task.target_type === 'chat' &&
+              task.target_id === pending.chatId &&
+              task.task_type === 'chat_naming'
+            ))
+          : undefined;
+
+        if (namingTask) {
+          pending.hasSeenNamingTask = true;
+          return;
+        }
+
+        if (pending.hasSeenNamingTask || elapsed >= MAX_WAIT_MS) {
+          await finishAndReconcile();
+        }
+      } catch {
+        if (elapsed >= MAX_WAIT_MS && !cancelled && pendingTitleSyncRef.current === pending) {
+          await finishAndReconcile();
+        }
+      }
+    };
+
+    void checkForCompletedNaming();
+    const intervalId = window.setInterval(() => {
+      void checkForCompletedNaming();
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [projectId, reconcileChatMetadata, titleSyncPollKey]);
 
   /**
    * Send a message and get AI response
@@ -265,40 +443,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       };
     });
 
-    const scheduleChatRefreshes = async (chatId: string) => {
-      await loadChats();
-      onCostsChange?.();
-      loadChatCosts(chatId);
-      loadUserUsage();
-
-      setTimeout(async () => {
-        try {
-          const updatedChat = await chatsAPI.getChat(projectId, chatId);
-          setActiveChat(prev => prev && prev.id === chatId
-            ? { ...prev, studio_signals: updatedChat.studio_signals || [] }
-            : prev
-          );
-        } catch {
-          // Silently ignore - signal update is non-critical
-        }
-      }, 1000);
-
-      setTimeout(async () => {
-        try {
-          const updatedChat = await chatsAPI.getChat(projectId, chatId);
-          setActiveChat(prev => prev && prev.id === chatId
-            ? { ...prev, title: updatedChat.title, studio_signals: updatedChat.studio_signals || [] }
-            : prev
-          );
-          setAllChats(prev => prev.map(c =>
-            c.id === chatId ? { ...c, title: updatedChat.title } : c
-          ));
-        } catch {
-          // Silently ignore - title update is non-critical
-        }
-      }, 4000);
-    };
-
     const replaceTempWithCanonicalUser = (canonicalUserMessage: Chat['messages'][number]) => {
       canonicalUserMessageReceivedRef.current = true;
       setActiveChat((prev) => {
@@ -333,7 +477,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       setStreamingAssistantContent('');
     };
 
-    const applyFallbackResponse = (result: { user_message: Chat['messages'][number]; assistant_message: Chat['messages'][number] }) => {
+    const applyFallbackResponse = (result: {
+      user_message: Chat['messages'][number];
+      assistant_message: Chat['messages'][number];
+      sync?: ChatSyncPayload | null;
+    }) => {
       canonicalUserMessageReceivedRef.current = true;
       setStreamingAssistantContent('');
       setActiveChat((prev) => {
@@ -347,6 +495,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       });
     };
 
+    const shouldWatchForTitleUpdate = currentChat.messages.length === 0;
+    if (shouldWatchForTitleUpdate) {
+      pendingTitleSyncRef.current = {
+        chatId: currentChat.id,
+        hasSeenNamingTask: false,
+      };
+      setTitleSyncPollKey((prev) => prev + 1);
+    }
+
+    let receivedTerminalSync = false;
+
     try {
       const streamResult = await chatsAPI.streamMessage(
         projectId,
@@ -358,19 +517,29 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             assistantDeltaReceivedRef.current = true;
             setStreamingAssistantContent((prev) => prev + delta);
           },
-          onAssistantDone: appendAssistantMessage,
+          onAssistantDone: (payload) => {
+            appendAssistantMessage(payload.assistant_message);
+            receivedTerminalSync = applyChatSync(payload.sync);
+          },
           onErrorEvent: (payload) => {
             setStreamingAssistantContent('');
             if (payload.assistant_message) {
               appendAssistantMessage(payload.assistant_message);
             }
+            receivedTerminalSync = applyChatSync(payload.sync);
           },
         },
         controller.signal
       );
 
       if (streamResult.terminalEvent) {
-        await scheduleChatRefreshes(currentChat.id);
+        if (!receivedTerminalSync && streamResult.terminalSync) {
+          receivedTerminalSync = applyChatSync(streamResult.terminalSync);
+        }
+        if (!receivedTerminalSync) {
+          onCostsChange?.();
+          await reconcileChatMetadata(currentChat.id);
+        }
       }
     } catch (err) {
       // Don't show error toast if user intentionally stopped
@@ -384,7 +553,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           try {
             const fallbackResult = await chatsAPI.sendMessage(projectId, currentChat.id, userMessage);
             applyFallbackResponse(fallbackResult);
-            await scheduleChatRefreshes(currentChat.id);
+            if (!applyChatSync(fallbackResult.sync)) {
+              onCostsChange?.();
+              await reconcileChatMetadata(currentChat.id);
+            }
           } catch (fallbackError) {
             log.error({ err: fallbackError }, 'failed to send message via fallback');
             error('Failed to send message');
@@ -427,7 +599,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const handleNewChat = async () => {
     try {
       const newChat = await chatsAPI.createChat(projectId, 'New Chat');
-      await loadChats();
+      setAllChats((prev) => [newChat, ...prev]);
       await loadFullChat(newChat.id);
       // New chats start with no sources selected (loadFullChat will call onActiveChatChange)
       setShowChatList(false);
@@ -452,14 +624,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const handleDeleteChat = async (chatId: string) => {
     try {
       await chatsAPI.deleteChat(projectId, chatId);
+      const remainingChats = allChats.filter((chat) => chat.id !== chatId);
+      setAllChats(remainingChats);
 
       // If the deleted chat was active, clear it and reset source selection
       if (activeChat?.id === chatId) {
         setActiveChat(null);
         onActiveChatChange(null, []);
-      }
 
-      await loadChats();
+        if (remainingChats.length > 0) {
+          await loadFullChat(remainingChats[0].id);
+        }
+      }
       success('Chat deleted');
     } catch (err) {
       log.error({ err }, 'failed to Ldeleting chatE');
@@ -472,12 +648,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
    */
   const handleRenameChat = async (chatId: string, newTitle: string) => {
     try {
-      await chatsAPI.updateChat(projectId, chatId, newTitle);
-      await loadChats();
+      const updatedChat = await chatsAPI.updateChat(projectId, chatId, newTitle);
+      setAllChats((prev) => prev.map((chat) => (
+        chat.id === chatId
+          ? {
+              ...chat,
+              title: updatedChat.title,
+              updated_at: updatedChat.updated_at,
+              message_count: updatedChat.message_count,
+            }
+          : chat
+      )));
 
       // Update active chat if it was renamed
       if (activeChat?.id === chatId) {
-        setActiveChat(prev => prev ? { ...prev, title: newTitle } : null);
+        setActiveChat(prev => prev ? { ...prev, title: updatedChat.title } : null);
       }
 
       success('Chat renamed');

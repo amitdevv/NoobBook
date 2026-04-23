@@ -3,7 +3,7 @@
  * Manages Google Drive and Database connections.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,9 +35,10 @@ import {
   Warning,
 } from '@phosphor-icons/react';
 import { googleDriveAPI, databasesAPI, mcpAPI } from '@/lib/api/settings';
-import type { GoogleStatus, DatabaseConnection, DatabaseType, McpConnection, McpAuthType, McpTransport } from '@/lib/api/settings';
+import type { DatabaseType, McpAuthType, McpTransport } from '@/lib/api/settings';
 import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
+import { useIntegrations } from '@/contexts/IntegrationsContext';
 
 const log = createLogger('integrations-section');
 
@@ -46,19 +47,27 @@ interface IntegrationsSectionProps {
 }
 
 export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmin = false }) => {
-  // Google Drive State
-  const [googleStatus, setGoogleStatus] = useState<GoogleStatus>({
-    configured: false,
-    connected: false,
-    email: null,
-  });
-  const [googleLoading, setGoogleLoading] = useState(false);
-
-  // Database State
-  const [dbConnections, setDbConnections] = useState<DatabaseConnection[]>([]);
-  const [dbLoading, setDbLoading] = useState(false);
+  const {
+    googleStatus,
+    googleLoading,
+    dbConnections,
+    dbLoading,
+    mcpConnections,
+    mcpLoading,
+    ensureGoogleStatus,
+    ensureDatabases,
+    ensureMcpConnections,
+    setGoogleStatus,
+    upsertDatabase,
+    removeDatabase,
+    patchDatabase,
+    upsertMcpConnection,
+    removeMcpConnection,
+    patchMcpConnection,
+  } = useIntegrations();
   const [dbCreating, setDbCreating] = useState(false);
   const [dbValidating, setDbValidating] = useState(false);
+  const [googleMutating, setGoogleMutating] = useState(false);
   const [showDbUri, setShowDbUri] = useState(false);
   const [dbValidation, setDbValidation] = useState<{ valid?: boolean; message?: string }>({});
   const [dbForm, setDbForm] = useState<{
@@ -72,10 +81,6 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
     connection_uri: '',
     description: '',
   });
-
-  // MCP State
-  const [mcpConnections, setMcpConnections] = useState<McpConnection[]>([]);
-  const [mcpLoading, setMcpLoading] = useState(false);
   const [mcpCreating, setMcpCreating] = useState(false);
   const [mcpValidating, setMcpValidating] = useState(false);
   const [showMcpToken, setShowMcpToken] = useState(false);
@@ -111,17 +116,8 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
 
   const { success, error, info } = useToast();
 
-  const loadGoogleStatus = useCallback(async () => {
-    try {
-      const status = await googleDriveAPI.getStatus();
-      setGoogleStatus(status);
-    } catch (err) {
-      log.error({ err }, 'failed to load Google status');
-    }
-  }, []);
-
   const handleGoogleConnect = async () => {
-    setGoogleLoading(true);
+    setGoogleMutating(true);
     try {
       const authUrl = await googleDriveAPI.getAuthUrl();
       if (authUrl) {
@@ -132,27 +128,25 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
           if (status.connected) {
             clearInterval(pollInterval);
             setGoogleStatus(status);
-            setGoogleLoading(false);
             success(`Connected as ${status.email}`);
           }
         }, 2000);
         setTimeout(() => {
           clearInterval(pollInterval);
-          setGoogleLoading(false);
         }, 120000);
       } else {
         error('Failed to get Google auth URL. Check your credentials.');
-        setGoogleLoading(false);
       }
     } catch (err) {
       log.error({ err }, 'failed to Lconnecting GoogleE');
       error('Failed to connect Google Drive');
-      setGoogleLoading(false);
+    } finally {
+      setGoogleMutating(false);
     }
   };
 
   const handleGoogleDisconnect = async () => {
-    setGoogleLoading(true);
+    setGoogleMutating(true);
     try {
       const disconnected = await googleDriveAPI.disconnect();
       if (disconnected) {
@@ -165,21 +159,9 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
       log.error({ err }, 'failed to Ldisconnecting GoogleE');
       error('Failed to disconnect Google Drive');
     } finally {
-      setGoogleLoading(false);
+      setGoogleMutating(false);
     }
   };
-
-  const loadDatabases = useCallback(async () => {
-    setDbLoading(true);
-    try {
-      const dbs = await databasesAPI.listDatabases();
-      setDbConnections(dbs);
-    } catch (err) {
-      log.error({ err }, 'failed to load databases');
-    } finally {
-      setDbLoading(false);
-    }
-  }, []);
 
   const handleValidateDatabase = async () => {
     setDbValidating(true);
@@ -199,16 +181,16 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
   const handleCreateDatabase = async () => {
     setDbCreating(true);
     try {
-      await databasesAPI.createDatabase({
+      const created = await databasesAPI.createDatabase({
         name: dbForm.name.trim(),
         db_type: dbForm.db_type,
         connection_uri: dbForm.connection_uri.trim(),
         description: dbForm.description.trim() || undefined,
       });
+      upsertDatabase(created);
       success('Database connection saved');
       setDbForm({ name: '', db_type: 'postgresql', connection_uri: '', description: '' });
       setDbValidation({});
-      await loadDatabases();
     } catch (err) {
       log.error({ err }, 'failed to create database');
       const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -221,8 +203,8 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
   const handleDeleteDatabase = async (connectionId: string) => {
     try {
       await databasesAPI.deleteDatabase(connectionId);
+      removeDatabase(connectionId);
       success('Database connection deleted');
-      await loadDatabases();
     } catch (err) {
       log.error({ err }, 'failed to delete database');
       const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -230,25 +212,11 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
     }
   };
 
-  // MCP Handlers
-  const loadMcpConnections = useCallback(async () => {
-    setMcpLoading(true);
-    try {
-      const conns = await mcpAPI.listConnections();
-      setMcpConnections(conns);
-    } catch (err) {
-      log.error({ err }, 'failed to load MCP connections');
-      error('Failed to load MCP connections');
-    } finally {
-      setMcpLoading(false);
-    }
-  }, [error]);
-
   useEffect(() => {
-    loadGoogleStatus();
-    loadDatabases();
-    loadMcpConnections();
-  }, [loadGoogleStatus, loadDatabases, loadMcpConnections]);
+    ensureGoogleStatus().catch(() => {});
+    ensureDatabases().catch(() => {});
+    ensureMcpConnections().catch(() => {});
+  }, [ensureDatabases, ensureGoogleStatus, ensureMcpConnections]);
 
   const buildMcpAuthConfig = (): Record<string, string> => {
     const token = mcpForm.auth_token.trim();
@@ -312,7 +280,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
   const handleCreateMcp = async () => {
     setMcpCreating(true);
     try {
-      await mcpAPI.createConnection({
+      const created = await mcpAPI.createConnection({
         name: mcpForm.name.trim(),
         transport: mcpForm.transport,
         server_url: mcpForm.transport === 'sse' ? mcpForm.server_url.trim() : undefined,
@@ -322,6 +290,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
         description: mcpForm.description.trim() || undefined,
         tools_enabled: mcpForm.tools_enabled,
       });
+      upsertMcpConnection(created);
       success('MCP connection saved');
       setMcpForm({
         name: '', transport: 'stdio', server_url: '', auth_type: 'none',
@@ -329,7 +298,6 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
         description: '', tools_enabled: true,
       });
       setMcpValidation({});
-      await loadMcpConnections();
     } catch (err) {
       log.error({ err }, 'failed to create MCP connection');
       const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -340,16 +308,13 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
   };
 
   const handleToggleMcpToolsEnabled = async (connectionId: string, enabled: boolean) => {
-    setMcpConnections((prev) =>
-      prev.map((c) => (c.id === connectionId ? { ...c, tools_enabled: enabled } : c))
-    );
+    patchMcpConnection(connectionId, { tools_enabled: enabled });
     try {
-      await mcpAPI.updateToolsEnabled(connectionId, enabled);
+      const updated = await mcpAPI.updateToolsEnabled(connectionId, enabled);
+      upsertMcpConnection(updated);
       success(enabled ? 'Tools enabled in chat' : 'Tools disabled');
     } catch (err) {
-      setMcpConnections((prev) =>
-        prev.map((c) => (c.id === connectionId ? { ...c, tools_enabled: !enabled } : c))
-      );
+      patchMcpConnection(connectionId, { tools_enabled: !enabled });
       log.error({ err }, 'failed to toggle MCP tools');
       const axiosErr = err as { response?: { data?: { error?: string } } };
       error(axiosErr.response?.data?.error || 'Failed to update tools setting');
@@ -359,8 +324,8 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
   const handleDeleteMcp = async (connectionId: string) => {
     try {
       await mcpAPI.deleteConnection(connectionId);
+      removeMcpConnection(connectionId);
       success('MCP connection deleted');
-      await loadMcpConnections();
     } catch (err) {
       log.error({ err }, 'failed to delete MCP connection');
       const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -369,16 +334,13 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
   };
 
   const handleToggleMcpVisibility = async (connectionId: string, visibleToAll: boolean) => {
-    setMcpConnections((prev) =>
-      prev.map((c) => (c.id === connectionId ? { ...c, visible_to_all: visibleToAll } : c))
-    );
+    patchMcpConnection(connectionId, { visible_to_all: visibleToAll });
     try {
-      await mcpAPI.updateVisibility(connectionId, visibleToAll);
+      const updated = await mcpAPI.updateVisibility(connectionId, visibleToAll);
+      upsertMcpConnection(updated);
       success(visibleToAll ? 'Visible to all users' : 'Admin only');
     } catch (err) {
-      setMcpConnections((prev) =>
-        prev.map((c) => (c.id === connectionId ? { ...c, visible_to_all: !visibleToAll } : c))
-      );
+      patchMcpConnection(connectionId, { visible_to_all: !visibleToAll });
       log.error({ err }, 'failed to update MCP visibility');
       const axiosErr = err as { response?: { data?: { error?: string } } };
       error(axiosErr.response?.data?.error || 'Failed to update visibility');
@@ -387,17 +349,14 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
 
   const handleToggleVisibility = async (connectionId: string, visibleToAll: boolean) => {
     // Optimistic update
-    setDbConnections((prev) =>
-      prev.map((db) => (db.id === connectionId ? { ...db, visible_to_all: visibleToAll } : db))
-    );
+    patchDatabase(connectionId, { visible_to_all: visibleToAll });
     try {
-      await databasesAPI.updateVisibility(connectionId, visibleToAll);
+      const updated = await databasesAPI.updateVisibility(connectionId, visibleToAll);
+      upsertDatabase(updated);
       success(visibleToAll ? 'Visible to all users' : 'Admin only');
     } catch (err) {
       // Revert on failure
-      setDbConnections((prev) =>
-        prev.map((db) => (db.id === connectionId ? { ...db, visible_to_all: !visibleToAll } : db))
-      );
+      patchDatabase(connectionId, { visible_to_all: !visibleToAll });
       log.error({ err }, 'failed to update visibility');
       const axiosErr = err as { response?: { data?: { error?: string } } };
       error(axiosErr.response?.data?.error || 'Failed to update visibility');
@@ -442,9 +401,9 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
                 variant="soft"
                 size="sm"
                 onClick={() => setDisconnectGoogleOpen(true)}
-                disabled={googleLoading}
+                disabled={googleLoading || googleMutating}
               >
-                {googleLoading ? (
+                {googleLoading || googleMutating ? (
                   <CircleNotch size={16} className="animate-spin" />
                 ) : (
                   <>
@@ -458,9 +417,9 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
                 variant="default"
                 size="sm"
                 onClick={handleGoogleConnect}
-                disabled={googleLoading || !googleStatus.configured}
+                disabled={googleLoading || googleMutating || !googleStatus.configured}
               >
-                {googleLoading ? (
+                {googleLoading || googleMutating ? (
                   <CircleNotch size={16} className="animate-spin" />
                 ) : (
                   <>
@@ -492,7 +451,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
       <div>
         <h3 className="text-sm font-semibold mb-3">Database Connections</h3>
         <div className="space-y-4">
-          {dbLoading ? (
+          {dbLoading && dbConnections.length === 0 ? (
             <div className="flex items-center justify-center py-6">
               <CircleNotch size={20} className="animate-spin" />
             </div>
@@ -663,7 +622,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
       <div>
         <h3 className="text-sm font-semibold mb-3">MCP Connections</h3>
         <div className="space-y-4">
-          {mcpLoading ? (
+          {mcpLoading && mcpConnections.length === 0 ? (
             <div className="flex items-center justify-center py-6">
               <CircleNotch size={20} className="animate-spin" />
             </div>

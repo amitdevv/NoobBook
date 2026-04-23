@@ -12,6 +12,7 @@ import { Plus, X, CircleNotch, Check, PencilSimple, Trash } from '@phosphor-icon
 import { brandAPI, type BrandVoice, type BestPractices } from '../../../lib/api/brand';
 import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
+import { useBrandConfig } from '../BrandConfigContext';
 
 const log = createLogger('brand-guidelines');
 
@@ -26,9 +27,9 @@ export const GuidelinesSection: React.FC = () => {
     dos: [],
     donts: [],
   });
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const { config, initialLoading, patchConfig } = useBrandConfig();
 
   const { success: showSuccess, error: showError } = useToast();
 
@@ -44,26 +45,12 @@ export const GuidelinesSection: React.FC = () => {
   const [editDoValue, setEditDoValue] = useState('');
   const [editDontValue, setEditDontValue] = useState('');
 
-  const loadConfig = async () => {
-    try {
-      setLoading(true);
-      const response = await brandAPI.getConfig();
-      if (response.data.success) {
-        const config = response.data.config;
-        setGuidelines(config.guidelines || '');
-        setVoice(config.voice);
-        setBestPractices(config.best_practices);
-      }
-    } catch (error) {
-      log.error({ err: error }, 'failed to load config');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadConfig();
-  }, []);
+    if (!config) return;
+    setGuidelines(config.guidelines || '');
+    setVoice(config.voice);
+    setBestPractices(config.best_practices);
+  }, [config]);
 
   const handleSave = async () => {
     try {
@@ -74,6 +61,11 @@ export const GuidelinesSection: React.FC = () => {
         best_practices: bestPractices,
       });
       if (response.data.success) {
+        patchConfig({
+          guidelines: response.data.config.guidelines,
+          voice: response.data.config.voice,
+          best_practices: response.data.config.best_practices,
+        });
         setSaved(true);
         showSuccess('Guidelines saved');
         setTimeout(() => setSaved(false), 2000);
@@ -191,7 +183,7 @@ export const GuidelinesSection: React.FC = () => {
     setEditDontValue('');
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <CircleNotch size={24} className="animate-spin text-muted-foreground" />

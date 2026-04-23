@@ -41,6 +41,9 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
 }) => {
   const isAdmin = userRole === 'admin';
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
+  const [mountedSections, setMountedSections] = useState<Set<SettingsSection>>(
+    () => new Set(['profile'])
+  );
 
   // Handle section change with admin check
   const handleSectionChange = (section: SettingsSection) => {
@@ -48,6 +51,12 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
     if (!isAdmin && adminOnlySections.includes(section)) {
       return; // Prevent non-admins from switching to admin sections
     }
+    setMountedSections((prev) => {
+      if (prev.has(section)) return prev;
+      const next = new Set(prev);
+      next.add(section);
+      return next;
+    });
     setActiveSection(section);
   };
 
@@ -59,8 +68,8 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
     onOpenChange(isOpen);
   };
 
-  const renderSection = () => {
-    switch (activeSection) {
+  const renderSection = (section: SettingsSection) => {
+    switch (section) {
       case 'profile':
         return <ProfileSection userEmail={userEmail} userRole={userRole} onSignOut={onSignOut} />;
       case 'team':
@@ -79,6 +88,11 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
         return null;
     }
   };
+
+  const visibleSections = Array.from(mountedSections).filter((section) => {
+    const adminOnlySections: SettingsSection[] = ['team', 'api-keys', 'models', 'design', 'system'];
+    return isAdmin || !adminOnlySections.includes(section);
+  });
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -99,7 +113,16 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
 
           {/* Content area */}
           <div className="flex-1 overflow-y-auto p-6 bg-white">
-            <div className="h-full">{renderSection()}</div>
+            <div className="h-full">
+              {visibleSections.map((section) => (
+                <div
+                  key={section}
+                  className={section === activeSection ? 'h-full' : 'hidden'}
+                >
+                  {renderSection(section)}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </DialogContent>

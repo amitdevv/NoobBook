@@ -9,6 +9,7 @@ operations always use the service_role key.
 """
 import logging
 import os
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from supabase import create_client
@@ -180,6 +181,36 @@ class UserService:
             total += costs.get("total_cost", 0.0)
         return total
 
+    def get_usage_summary(self, user_id: str) -> Optional[Dict[str, Any]]:
+        user = self.get_user(user_id)
+        if not user:
+            return None
+
+        cost_limit = user.get("cost_limit")
+        reset_frequency = user.get("reset_frequency")
+        period_spend = user.get("period_spend", 0.0)
+        period_start = user.get("period_start")
+        total_spend = self.get_user_total_spend(user_id)
+
+        if reset_frequency and cost_limit:
+            current_spend = period_spend
+        elif cost_limit:
+            current_spend = total_spend
+        else:
+            current_spend = total_spend
+
+        usage_pct = (current_spend / cost_limit * 100) if cost_limit and cost_limit > 0 else 0
+
+        return {
+            "cost_limit": cost_limit,
+            "reset_frequency": reset_frequency,
+            "current_spend": current_spend,
+            "total_spend": total_spend,
+            "period_start": period_start,
+            "usage_percent": usage_pct,
+            "snapshot_at": datetime.utcnow().isoformat() + "Z",
+        }
+
     def count_admins(self) -> int:
         resp = (
             self.supabase.table(self.table)
@@ -337,4 +368,3 @@ def get_user_service() -> UserService:
     if _user_service is None:
         _user_service = UserService()
     return _user_service
-

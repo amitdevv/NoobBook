@@ -60,6 +60,7 @@ import {
   Plug,
 } from '@phosphor-icons/react';
 import { createLogger } from '@/lib/logger';
+import { patchOne, removeOne, upsertOne } from '@/lib/resourceState';
 
 const log = createLogger('sources-panel');
 
@@ -137,7 +138,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   // State
   const [sources, setSources] = useState<Source[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -181,7 +182,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
    */
   const loadSources = useCallback(async () => {
     try {
-      setLoading(true);
       const data = await sourcesAPI.listSources(projectId);
       // Override active flag with per-chat selection
       const ids = selectedSourceIdsRef.current;
@@ -190,7 +190,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       log.error({ err }, 'failed to load sources');
       errorRef.current('Failed to load sources');
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
   }, [projectId]);
 
@@ -238,7 +238,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       for (const src of freshdeskSources) {
         try {
           await sourcesAPI.syncFreshdesk(projectId, src.id);
-          await loadSources();
+          await refreshSources();
         } catch {
           // Silent — don't spam errors for background sync
         }
@@ -328,12 +328,12 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
         setUploadProgress({ current: i + 1, total: fileArray.length, pct: 0, fileName: file.name });
-        await sourcesAPI.uploadSource(projectId, file, undefined, undefined, (pct) => {
+        const created = await sourcesAPI.uploadSource(projectId, file, undefined, undefined, (pct) => {
           setUploadProgress((prev) => prev ? { ...prev, pct } : prev);
         });
+        setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
       }
       success(`Uploaded ${fileArray.length} file(s) successfully`);
-      await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
       log.error({ err }, 'failed to Luploading filesE');
@@ -362,9 +362,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }
 
     try {
-      await sourcesAPI.addUrlSource(projectId, url);
+      const created = await sourcesAPI.addUrlSource(projectId, url);
+      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
       success('URL source added successfully');
-      await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
       log.error({ err }, 'failed to Ladding URL sourceE');
@@ -389,9 +389,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }
 
     try {
-      await sourcesAPI.addTextSource(projectId, content, name);
+      const created = await sourcesAPI.addTextSource(projectId, content, name);
+      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
       success('Text source added successfully');
-      await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
       log.error({ err }, 'failed to Ladding text sourceE');
@@ -418,9 +418,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }
 
     try {
-      await sourcesAPI.addResearchSource(projectId, topic, description, links);
+      const created = await sourcesAPI.addResearchSource(projectId, topic, description, links);
+      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
       success('Deep research started - this may take a few minutes');
-      await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
       log.error({ err }, 'failed to Lstarting researchE');
@@ -444,9 +444,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }
 
     try {
-      await sourcesAPI.addDatabaseSource(projectId, connectionId, name, description);
+      const created = await sourcesAPI.addDatabaseSource(projectId, connectionId, name, description);
+      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
       success('Database source added successfully');
-      await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
       log.error({ err }, 'failed to Ladding database sourceE');
@@ -470,9 +470,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }
 
     try {
-      await sourcesAPI.addMcpSource(projectId, connectionId, resourceUris, name, description);
+      const created = await sourcesAPI.addMcpSource(projectId, connectionId, resourceUris, name, description);
+      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
       success('MCP source added successfully');
-      await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
       log.error({ err }, 'failed to add MCP source');
@@ -496,9 +496,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }
 
     try {
-      await sourcesAPI.addFreshdeskSource(projectId, name, description);
+      const created = await sourcesAPI.addFreshdeskSource(projectId, name, description);
+      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
       success('Freshdesk sync started — fetching last 30 days of tickets. Check the status bar for progress.');
-      await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
       log.error({ err }, 'failed to add Freshdesk source');
@@ -522,9 +522,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }
 
     try {
-      await sourcesAPI.addJiraSource(projectId, name, description);
+      const created = await sourcesAPI.addJiraSource(projectId, name, description);
+      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
       success('Jira source added — processing issues. Check the status bar for progress.');
-      await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
       log.error({ err }, 'failed to add Jira source');
@@ -548,9 +548,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }
 
     try {
-      await sourcesAPI.addMixpanelSource(projectId, name, description);
+      const created = await sourcesAPI.addMixpanelSource(projectId, name, description);
+      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
       success('Mixpanel source added — verifying connection. Check the status bar for progress.');
-      await loadSources();
       setSheetOpen(false);
     } catch (err: unknown) {
       log.error({ err }, 'failed to add Mixpanel source');
@@ -570,8 +570,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const handleSyncFreshdesk = async (sourceId: string) => {
     try {
       await sourcesAPI.syncFreshdesk(projectId, sourceId);
+      setSources((prev) => patchOne(prev, sourceId, { status: 'processing' }));
       success('Freshdesk sync started — check status bar for progress');
-      await loadSources();
     } catch (err: unknown) {
       log.error({ err }, 'failed to sync Freshdesk');
       error('Failed to sync Freshdesk tickets');
@@ -581,8 +581,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const handleBackfillFreshdesk = async (sourceId: string) => {
     try {
       await sourcesAPI.backfillFreshdesk(projectId, sourceId);
+      setSources((prev) => patchOne(prev, sourceId, { status: 'processing' }));
       success('Freshdesk backfill started — check status bar for progress');
-      await loadSources();
     } catch (err: unknown) {
       log.error({ err }, 'failed to backfill Freshdesk');
       error('Failed to backfill Freshdesk tickets');
@@ -595,8 +595,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const handleDeleteSource = async (sourceId: string, sourceName: string) => {
     try {
       await sourcesAPI.deleteSource(projectId, sourceId);
+      setSources((prev) => removeOne(prev, sourceId));
       success(`Deleted "${sourceName}"`);
-      await loadSources();
       // Notify parent that sources changed (triggers ChatPanel refresh)
       onSourcesChange?.();
     } catch (err) {
@@ -629,12 +629,12 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     if (!renameSourceId || !renameValue.trim()) return;
 
     try {
-      await sourcesAPI.updateSource(projectId, renameSourceId, {
+      const updated = await sourcesAPI.updateSource(projectId, renameSourceId, {
         name: renameValue.trim(),
       });
+      setSources((prev) => upsertOne(prev, { ...updated, active: selectedSourceIdsRef.current.includes(updated.id) }));
       success('Source renamed successfully');
       setRenameDialogOpen(false);
-      await loadSources();
     } catch (err) {
       log.error({ err }, 'failed to Lrenaming sourceE');
       error('Failed to rename source');
@@ -694,8 +694,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const handleCancelProcessing = async (sourceId: string) => {
     try {
       await sourcesAPI.cancelProcessing(projectId, sourceId);
+      setSources((prev) => patchOne(prev, sourceId, { status: 'uploaded' }));
       success('Processing cancelled');
-      await loadSources();
     } catch (err) {
       log.error({ err }, 'failed to Lcancelling processingE');
       error('Failed to cancel processing');
@@ -708,8 +708,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const handleRetryProcessing = async (sourceId: string) => {
     try {
       await sourcesAPI.retryProcessing(projectId, sourceId);
+      setSources((prev) => patchOne(prev, sourceId, { status: 'processing', error_message: null }));
       success('Processing restarted');
-      await loadSources();
     } catch (err) {
       log.error({ err }, 'failed to Lretrying processingE');
       error('Failed to retry processing');
@@ -832,7 +832,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
           <SourcesList
             sources={sources}
-            loading={loading}
+            loading={initialLoading}
             searchQuery={searchQuery}
             onDownload={handleDownloadSource}
             onDelete={handleDeleteSource}
@@ -864,7 +864,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         onAddJira={handleAddJira}
         onAddMixpanel={handleAddMixpanel}
         uploadProgress={uploadProgress}
-        onImportComplete={loadSources}
+        onImportComplete={refreshSources}
         uploading={uploading}
       />
 

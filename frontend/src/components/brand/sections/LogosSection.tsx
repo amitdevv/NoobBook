@@ -1,6 +1,7 @@
 /**
  * LogosSection Component
- * Educational Note: Manages brand logos with upload and primary selection.
+ * Manages brand logos with upload and primary selection. Assets are fetched
+ * once on mount; subsequent delete/setPrimary/upload update local state only.
  */
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../ui/button';
@@ -9,37 +10,40 @@ import { brandAPI, type BrandAsset } from '../../../lib/api/brand';
 import { BrandAssetCard } from '../BrandAssetCard';
 import { BrandAssetUploader } from '../BrandAssetUploader';
 import { createLogger } from '@/lib/logger';
+import { removeOne, upsertOne } from '@/lib/resourceState';
 
 const log = createLogger('brand-logos');
 
 export const LogosSection: React.FC = () => {
   const [assets, setAssets] = useState<BrandAsset[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [uploaderOpen, setUploaderOpen] = useState(false);
 
-  const loadAssets = async () => {
-    try {
-      setLoading(true);
-      const response = await brandAPI.listAssets('logo');
-      if (response.data.success) {
-        setAssets(response.data.assets);
-      }
-    } catch (error) {
-      log.error({ err: error }, 'failed to load logos');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadAssets();
+    let cancelled = false;
+    brandAPI.listAssets('logo')
+      .then((response) => {
+        if (cancelled) return;
+        if (response.data.success) {
+          setAssets(response.data.assets);
+        }
+      })
+      .catch((error) => {
+        log.error({ err: error }, 'failed to load logos');
+      })
+      .finally(() => {
+        if (!cancelled) setInitialLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleDelete = async (assetId: string) => {
     try {
       const response = await brandAPI.deleteAsset(assetId);
       if (response.data.success) {
-        loadAssets();
+        setAssets((prev) => removeOne(prev, assetId));
       }
     } catch (error) {
       log.error({ err: error }, 'failed to delete asset');
@@ -50,11 +54,24 @@ export const LogosSection: React.FC = () => {
     try {
       const response = await brandAPI.setAssetPrimary(assetId);
       if (response.data.success) {
-        loadAssets();
+        setAssets((prev) => prev.map((asset) => ({
+          ...asset,
+          is_primary: asset.id === assetId,
+        })));
       }
     } catch (error) {
       log.error({ err: error }, 'failed to set primary');
     }
+  };
+
+  const handleUploaded = (asset: BrandAsset) => {
+    setAssets((prev) => {
+      // If the new asset is primary, strip primary from siblings before upsert.
+      const normalized = asset.is_primary
+        ? prev.map((existing) => ({ ...existing, is_primary: false }))
+        : prev;
+      return upsertOne(normalized, asset, { prepend: true });
+    });
   };
 
   return (
@@ -72,7 +89,7 @@ export const LogosSection: React.FC = () => {
         </Button>
       </div>
 
-      {loading ? (
+      {initialLoading ? (
         <div className="flex items-center justify-center py-12">
           <CircleNotch size={24} className="animate-spin text-muted-foreground" />
         </div>
@@ -101,7 +118,7 @@ export const LogosSection: React.FC = () => {
         assetType="logo"
         open={uploaderOpen}
         onOpenChange={setUploaderOpen}
-        onUploaded={loadAssets}
+        onUploaded={handleUploaded}
         acceptedTypes="image/svg+xml,image/png,image/jpeg,image/webp"
       />
     </div>

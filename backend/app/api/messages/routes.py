@@ -82,7 +82,7 @@ def send_message(project_id, chat_id):
 
         # Delegate all processing to main_chat_service
         # This is the RAG + agentic loop entry point
-        user_msg, assistant_msg = main_chat_service.send_message(
+        result = main_chat_service.send_message(
             project_id=project_id,
             chat_id=chat_id,
             user_message_text=user_message_text
@@ -90,8 +90,9 @@ def send_message(project_id, chat_id):
 
         return jsonify({
             'success': True,
-            'user_message': user_msg,
-            'assistant_message': assistant_msg
+            'user_message': result['user_message'],
+            'assistant_message': result['assistant_message'],
+            'sync': result.get('sync'),
         }), 200
 
     except ValueError as e:

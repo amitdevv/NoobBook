@@ -461,6 +461,24 @@ class ChatService:
             },
         }
 
+    def get_chat_sync_state(self, project_id: str, chat_id: str) -> Optional[Dict[str, Any]]:
+        chat = self.get_chat(project_id, chat_id)
+        if not chat:
+            return None
+
+        return {
+            "chat": {
+                "id": chat["id"],
+                "title": chat["title"],
+                "created_at": chat["created_at"],
+                "updated_at": chat["updated_at"],
+                "message_count": chat["message_count"],
+                "selected_source_ids": chat.get("selected_source_ids"),
+            },
+            "studio_signals": chat.get("studio_signals", []),
+            "chat_costs": self.get_chat_costs(project_id, chat_id),
+        }
+
     def get_chat_costs_raw(self, chat_id: str) -> Optional[Dict[str, Any]]:
         """
         Load raw costs JSONB for a chat by chat_id only (no project scoping).

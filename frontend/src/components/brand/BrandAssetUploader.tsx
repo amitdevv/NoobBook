@@ -18,7 +18,7 @@ import {
 } from '../ui/dialog';
 import { UploadSimple, CircleNotch, X } from '@phosphor-icons/react';
 import { cn } from '../../lib/utils';
-import { brandAPI, createAssetFormData, type BrandAssetType } from '../../lib/api/brand';
+import { brandAPI, createAssetFormData, type BrandAsset, type BrandAssetType } from '../../lib/api/brand';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('brand-asset-uploader');
@@ -27,7 +27,7 @@ interface BrandAssetUploaderProps {
   assetType: BrandAssetType;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUploaded: () => void;
+  onUploaded: (asset: BrandAsset) => void;
   acceptedTypes?: string;
 }
 
@@ -114,7 +114,7 @@ export const BrandAssetUploader: React.FC<BrandAssetUploaderProps> = ({
       const response = await brandAPI.uploadAsset(formData);
 
       if (response.data.success) {
-        onUploaded();
+        onUploaded(response.data.asset);
         handleClose();
       } else {
         setError(response.data.error || 'Upload failed');

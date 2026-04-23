@@ -1,106 +1,68 @@
-# Mixpanel Integration: What Next?
+## Smooth UX Refactor for Refresh Churn
 
-## Where we are today
+### Summary
+Refactor the app’s async state flow so mutations patch existing UI state instead of blanking and reloading whole sections. Keep the current layouts, routes, and user-facing behavior unchanged; the work is internal and aimed at removing full-section spinners, post-action remounts, redundant refetches, and delayed “catch-up” refreshes.
 
-Option A is built and sitting in an open PR, not yet merged or deployed. It adds Mixpanel as a project-scoped source with seven tools for querying events, funnels, retention, etc. Under the hood, it uses a single Mixpanel Service Account that an admin configures once in the settings page, shared by every user.
+### Implementation Changes
+- **Settings and brand areas: stop remount-driven fetch churn**
+  - Convert settings tabs in [AppSettings.tsx](/Users/adityagarud/Developer/NoobBook/frontend/src/components/dashboard/AppSettings.tsx) to a keep-alive pattern: once a section is opened, keep it mounted and hide it instead of unmounting it. Do the same for `DesignSection` sub-tabs.
+  - Split each section’s loading into `initialLoad` vs `mutationInFlight`; only show skeleton/spinner on first hydrate. After that, keep existing content rendered and show row/button-level pending states.
+  - Replace mutation-time full refetches with local reconciliation wherever APIs already return updated entities:
+    - `ApiKeysSection`: keep the edited field rendered after save/delete; do not call `loadApiKeys()` after each key save. Update only the affected key locally and silently refresh once after the batch if needed.
+    - `IntegrationsSection`: for DB/MCP create/delete/toggle, insert/remove/patch the returned item in local arrays instead of re-running `loadDatabases()` / `loadMcpConnections()` with section-wide spinners.
+    - Brand sections (`Colors`, `Typography`, `Guidelines`, `Features`, asset sections): hydrate brand config once per settings session and reuse it across sub-tabs; saves update local state and success indicators only.
+  - Reuse account-level integration data between Settings and Add Sources flows so `DatabaseTab`, `McpTab`, and Google status do not refetch separate copies of the same connection state.
 
-Mixpanel also runs a hosted MCP server (Option B) that does more and scales better. Since nothing is deployed yet, either approach is still on the table. This doc is the decision, not a retroactive justification.
+- **Chat response flow: remove broad post-send refreshes**
+  - Refactor [ChatPanel.tsx](/Users/adityagarud/Developer/NoobBook/frontend/src/components/chat/ChatPanel.tsx) so a completed AI response updates only the active chat, chat list entry, costs, usage, and studio signals that actually changed.
+  - Remove the current post-send cascade of `loadChats()`, `loadUserUsage()`, and the two delayed `getChat()` calls. Replace it with:
+    - immediate local patch from the streamed canonical user message and final assistant message,
+    - one silent metadata reconciliation only if the stream did not provide enough state,
+    - no component-level `loading` flip after a send.
+  - Extend the stream contract from [routes.py](/Users/adityagarud/Developer/NoobBook/backend/app/api/messages/routes.py) / [main_chat_service.py](/Users/adityagarud/Developer/NoobBook/backend/app/services/chat_services/main_chat_service.py) so the terminal event includes the assistant message plus sync payload needed by the UI:
+    - updated chat metadata,
+    - current studio signals,
+    - chat cost snapshot,
+    - current user usage snapshot.
+  - Keep chat auto-naming asynchronous, but stop the fixed `1s`/`4s` timeout fetches. Use a silent metadata reconciliation tied to task completion instead of hardcoded timers.
 
-## Option A: Service Account + REST (open in a PR, not yet merged)
+- **Workspace lists: mutate rows, not sections**
+  - In [SourcesPanel.tsx](/Users/adityagarud/Developer/NoobBook/frontend/src/components/sources/SourcesPanel.tsx), keep `loadSources()` for first load only. For upload/add/delete/rename/retry/cancel:
+    - use returned `source` objects to insert/update rows locally,
+    - use silent polling only for processing-state transitions,
+    - never flip the whole panel back to `loading=true` after a single row action.
+  - Preserve the existing optimistic per-chat source selection flow, but make every other source mutation follow the same pattern.
+  - Keep `refreshSources()` as the only polling path; do not reuse the initial-load spinner path for background updates.
 
-One admin adds one secret. Everyone in NoobBook can query Mixpanel.
+- **Studio: remove N-per-section bootstrap fetches**
+  - Replace the current “every section fetches its own saved jobs on mount” pattern with one shared studio jobs store.
+  - Add one grouped backend read endpoint over `studio_jobs` and hydrate Studio once when the panel first expands; existing per-tool generate/poll/delete endpoints stay unchanged.
+  - Refactor Studio sections/hooks to read/write the shared store instead of each calling `listJobs()` on mount. Generating a new job should append/update only that job type in the shared store, not trigger unrelated section work.
+  - Preserve current polling behavior for in-progress jobs, but scope it to the active job type only.
 
-```mermaid
-flowchart LR
-    A[Admin] -->|one time| B[Paste service account<br/>into API Keys]
-    U[Any user] -->|asks question in chat| C[Claude]
-    C -->|uses one of 7 tools| D[NoobBook backend]
-    D -->|Basic Auth, shared secret| E[(Mixpanel Query API)]
-    E -->|JSON result| D --> C --> U
-```
+- **Cross-cutting async rules**
+  - Standardize on one repo-wide rule: initial view loads may block, mutations may not. Mutations use optimistic or in-place updates plus silent reconciliation.
+  - Introduce small shared helpers/hooks for resource state (`hydrate`, `patchOne`, `insertOne`, `removeOne`, `silentRefresh`) instead of hand-written `load*()` loops in each section.
+  - Keep all existing public routes and visible UI unchanged; no schema migrations.
 
-**What we get:**
-- Simple. No per-user onboarding.
-- Works for users who don't have Mixpanel accounts themselves.
-- Portable. Doesn't lock us to Anthropic's API. If we swap models later, the integration keeps working.
-- Ships the minute an admin pastes a secret.
+### Internal Interface Changes
+- Extend chat stream terminal payload to carry sync metadata needed by the current view.
+- Add a grouped studio jobs read endpoint so Studio can hydrate once instead of fan-out fetching per section.
+- Add task target metadata to the active-tasks payload if needed so chat-title reconciliation can key off completed `chat_naming` work without polling arbitrary chat records.
 
-**What we give up:**
-- Shared 60 queries/hour across the whole app. Fine for a small team. Breaks down once 20+ people are using it.
-- Mixpanel's audit log shows every query as coming from the same service account. You can't tell who did what.
-- Seven handpicked tools. No dashboard creation, no session replays, no writes. If Mixpanel adds new capabilities, we have to add them by hand.
-- If a user in NoobBook shouldn't see certain Mixpanel data, we can't enforce that. The service account sees everything.
+### Test Plan
+- `frontend`: `npm run lint` and `npm run build`.
+- `backend`: `pytest`.
+- Manual regression matrix:
+  - API Keys: save 3 keys in sequence without the section blanking or losing field state.
+  - Integrations: create/delete DB and MCP connections without section-wide spinner resets.
+  - Design tabs: switch between Colors/Typography/Guidelines/Features without reloading or losing unsaved drafts.
+  - Chat: send a message and verify only message/cost/usage/title metadata updates, with no full chat skeleton flash and no delayed “catch-up” reloads.
+  - Sources: upload/add/delete/rename/retry/cancel while keeping the list visible and stable.
+  - Studio: expanding the panel should hydrate once; generating content should update only the relevant tool section.
+  - Auth/RBAC: token refresh, admin-only sections, and permissions-gated tools still behave exactly as before.
 
-## Option B: Hosted MCP + per-user OAuth
-
-Each user clicks "Connect Mixpanel" once, logs in with their Mixpanel account (or SSO), and their personal token is stored. When they ask a question in chat, Claude talks to Mixpanel's hosted MCP server using that user's token.
-
-```mermaid
-flowchart LR
-    subgraph Setup[One time per user]
-        U1[User] -->|click Connect| B1[NoobBook backend]
-        B1 -->|OAuth redirect| M1[Mixpanel login + consent]
-        M1 -->|user token| B1
-        B1 -->|store per user| DB[(users.mixpanel_tokens)]
-    end
-
-    subgraph Query[Every chat message]
-        U2[User] -->|asks question| C[Claude]
-        C -->|talks directly to MCP,<br/>using that user's token| MCP[(Mixpanel hosted MCP<br/>26 tools)]
-        MCP -->|result| C --> U2
-    end
-```
-
-**What we get:**
-- 600 queries/hour per user. A 50-person team has roughly 500x more headroom than today.
-- 26 tools instead of 7. Dashboards, tags, issues, session replays, and more.
-- Real per-user audit trail. Mixpanel sees Daisy's query as Daisy's query.
-- Permissions enforced by Mixpanel itself. If a user's Mixpanel role restricts them, the chat respects that automatically.
-- Mixpanel maintains the tools. When they add features, we get them for free.
-
-**What we give up:**
-- Every user needs a Mixpanel account. If your PMs do but your support team doesn't, the support team is out.
-- Each user goes through a one-time connect flow. Friction we don't have today.
-- Tied to Anthropic's Messages API. If we ever want to run a non-Anthropic model in chat, we'd have to wrap the MCP server ourselves.
-- Real engineering work. Roughly 2 to 3 days to build the OAuth flow, token refresh, and plumb it through the chat service. Most of the code we shipped for Option A is still reusable (source flag, processor, permissions, tab), but the query layer gets rewritten.
-
-## How to think about it
-
-Option A is correct when:
-- Only a handful of people use it
-- Everyone on the team shares the same view of Mixpanel data
-- Some NoobBook users don't have Mixpanel accounts and shouldn't need them
-
-Option B is correct when:
-- Usage grows past roughly 10 active people per day (we'll hit the rate limit)
-- Security or compliance cares about who queried what
-- Users ask for features we didn't build (dashboards, session replay, cohorts)
-- We want the integration to stay current without ongoing maintenance from us
-
-## Side by side
-
-| Dimension | Option A (in PR) | Option B (hosted MCP) |
-|---|---|---|
-| Setup burden | 1 admin, 2 minutes | 1 admin + every user, 30 seconds each |
-| Rate limit | 60/hr shared | 600/hr per user |
-| Tools available | 7 | 26 |
-| Audit trail | Shared account | Per user |
-| Works without Mixpanel accounts | Yes | No |
-| LLM provider lock-in | None | Anthropic only |
-| Dev effort from here | Merge the PR | Roughly 3 days on top of the PR |
-
-## Recommendation
-
-Merge Option A as is. It unblocks anyone who wants to try Mixpanel in chat right now, and the structural pieces (source flag, permissions, tab, processor) are the same pieces Option B would need anyway. If the team decides later to move to Option B, we keep all of that and only swap the query layer.
-
-Revisit when any of these happen:
-1. The 60/hr rate limit actually bites (users see "try again later" messages)
-2. Someone asks "who ran that query?" and we can't answer
-3. A user wants to do something in Mixpanel our seven tools don't cover
-4. Security or legal raises the shared-service-account pattern as a concern
-
-Budget roughly 3 days for the Option B migration when we commit to it.
-
-## Open question for the team
-
-Is anyone expecting heavy Mixpanel use in the next quarter? If yes, it's probably worth doing Option B proactively rather than scrambling when limits start hitting. If not, we're fine to let usage tell us.
+### Assumptions
+- “No front-end or back-end changes” means no visible UX redesign and no product behavior change; internal state-management and API-plumbing changes are allowed.
+- The refactor is a single broad pass, but acceptance is based on eliminating blocking refresh behavior, not on introducing a new state-management library.
+- Existing REST endpoints remain the source of truth; only narrow internal payload additions are allowed where the current frontend cannot avoid redundant refetching.

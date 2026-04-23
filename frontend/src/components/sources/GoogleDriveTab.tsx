@@ -26,10 +26,11 @@ import {
   Gear,
   MagnifyingGlass,
 } from '@phosphor-icons/react';
-import { googleDriveAPI, type GoogleFile, type GoogleStatus } from '@/lib/api/settings';
+import { googleDriveAPI, type GoogleFile } from '@/lib/api/settings';
 import { useToast } from '../ui/use-toast';
 import { DriveItem } from './drive';
 import { createLogger } from '@/lib/logger';
+import { useIntegrations } from '@/contexts/IntegrationsContext';
 
 const log = createLogger('google-drive-tab');
 
@@ -44,13 +45,6 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
   onImportComplete,
   isAtLimit,
 }) => {
-  // Connection status
-  const [status, setStatus] = useState<GoogleStatus>({
-    configured: false,
-    connected: false,
-    email: null,
-  });
-
   // Files state
   const [files, setFiles] = useState<GoogleFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,18 +65,23 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
   const [selectedFile, setSelectedFile] = useState<GoogleFile | null>(null);
 
   const { success, error } = useToast();
+  const {
+    googleStatus: status,
+    ensureGoogleStatus,
+    setGoogleStatus,
+  } = useIntegrations();
 
   const loadStatus = useCallback(async () => {
     setLoading(true);
     try {
-      const googleStatus = await googleDriveAPI.getStatus();
-      setStatus(googleStatus);
+      const googleStatus = await ensureGoogleStatus({ force: true });
+      setGoogleStatus(googleStatus);
     } catch (err) {
       log.error({ err }, 'failed to Lloading Google statusE');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ensureGoogleStatus, setGoogleStatus]);
 
   /**
    * Load files from Google Drive

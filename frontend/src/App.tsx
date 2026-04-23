@@ -8,6 +8,7 @@ import { AuthPage } from './components/auth/AuthPage';
 import { authAPI } from './lib/api/auth';
 import { createLogger } from '@/lib/logger';
 import { PermissionsProvider } from './contexts/PermissionsContext';
+import { IntegrationsProvider } from './contexts/IntegrationsContext';
 
 const log = createLogger('app');
 
@@ -238,40 +239,42 @@ function App() {
 
   return (
     <PermissionsProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Project Workspace - URL-based routing */}
-          <Route
-            path="/projects/:projectId"
-            element={
-              <ProjectWorkspaceRoute
-                setRefreshTrigger={setRefreshTrigger}
-                isAuthenticated={isAuthenticated}
-                onSignOut={handleSignOut}
-              />
-            }
-          />
+      <IntegrationsProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Project Workspace - URL-based routing */}
+            <Route
+              path="/projects/:projectId"
+              element={
+                <ProjectWorkspaceRoute
+                  setRefreshTrigger={setRefreshTrigger}
+                  isAuthenticated={isAuthenticated}
+                  onSignOut={handleSignOut}
+                />
+              }
+            />
 
-          {/* Dashboard - Home/root route */}
-          <Route
-            path="*"
-            element={
-              <AppContent
-                showCreateDialog={showCreateDialog}
-                setShowCreateDialog={setShowCreateDialog}
-                refreshTrigger={refreshTrigger}
-                setRefreshTrigger={setRefreshTrigger}
-                isAdmin={isAdmin}
-                isAuthenticated={isAuthenticated}
-                onSignOut={handleSignOut}
-                userId={userId}
-                userEmail={userEmail}
-                userRole={userRole}
-              />
-            }
-          />
-        </Routes>
-      </BrowserRouter>
+            {/* Dashboard - Home/root route */}
+            <Route
+              path="*"
+              element={
+                <AppContent
+                  showCreateDialog={showCreateDialog}
+                  setShowCreateDialog={setShowCreateDialog}
+                  refreshTrigger={refreshTrigger}
+                  setRefreshTrigger={setRefreshTrigger}
+                  isAdmin={isAdmin}
+                  isAuthenticated={isAuthenticated}
+                  onSignOut={handleSignOut}
+                  userId={userId}
+                  userEmail={userEmail}
+                  userRole={userRole}
+                />
+              }
+            />
+          </Routes>
+        </BrowserRouter>
+      </IntegrationsProvider>
     </PermissionsProvider>
   );
 }

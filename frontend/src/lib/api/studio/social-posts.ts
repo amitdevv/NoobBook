@@ -6,6 +6,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../client';
 import type { JobStatus } from './index';
+import { listStudioJobsByType } from './jobGroups';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('studio-social-posts-api');
@@ -150,18 +151,7 @@ export const socialPostsAPI = {
    * List all social post jobs for a project
    */
   async listJobs(projectId: string): Promise<ListSocialPostJobsResponse> {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/projects/${projectId}/studio/social-post-jobs`
-      );
-      return response.data;
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        return error.response.data;
-      }
-      log.error({ err: error }, 'failed to list social post jobs');
-      throw error;
-    }
+    return listStudioJobsByType<SocialPostJob>(projectId, 'social_post');
   },
 
   /**
