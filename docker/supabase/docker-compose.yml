@@ -71,6 +71,8 @@ services:
       KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth,request-termination,ip-restriction
       KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
       KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      # Allow uploads up to 1GB (matches Flask MAX_CONTENT_LENGTH and storage FILE_SIZE_LIMIT)
+      KONG_NGINX_HTTP_CLIENT_MAX_BODY_SIZE: 1g
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       DASHBOARD_USERNAME: ${DASHBOARD_USERNAME}
@@ -229,7 +231,7 @@ services:
       PGRST_JWT_SECRET: ${JWT_SECRET}
       DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       REQUEST_ALLOW_X_FORWARDED_PATH: "true"
-      FILE_SIZE_LIMIT: 52428800
+      FILE_SIZE_LIMIT: 1073741824  # 1GB, matches Flask MAX_CONTENT_LENGTH
       # Use the file backend for local dev to avoid S3 DeleteObjects Content-MD5 issues.
       # Note: file backend relies on extended attributes (xattr), so we use a named volume.
       STORAGE_BACKEND: file

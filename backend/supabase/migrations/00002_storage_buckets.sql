@@ -12,7 +12,7 @@ VALUES (
   'raw-files',
   'raw-files',
   false, -- Not public, requires authentication
-  104857600, -- 100MB limit
+  1073741824, -- 1GB limit
   ARRAY[
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document', -- DOCX
@@ -36,7 +36,7 @@ VALUES (
   'processed-files',
   'processed-files',
   false,
-  104857600 -- 100MB limit
+  1073741824 -- 1GB limit
 );
 
 -- Bucket for chunk files (optional - can also store in DB)
