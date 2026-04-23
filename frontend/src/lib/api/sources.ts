@@ -161,13 +161,16 @@ class SourcesAPI {
 
   /**
    * Upload a new source file
-   * Educational Note: Uses FormData for multipart file upload
+   * Educational Note: Uses FormData for multipart file upload.
+   * Optional onProgress callback gets a 0-100 percentage during upload —
+   * important for gigabyte files where a plain spinner is misleading.
    */
   async uploadSource(
     projectId: string,
     file: File,
     name?: string,
-    description?: string
+    description?: string,
+    onProgress?: (percent: number) => void
   ): Promise<Source> {
     try {
       const formData = new FormData();
@@ -181,6 +184,11 @@ class SourcesAPI {
         {
           headers: {
             'Content-Type': 'multipart/form-data',
+          },
+          onUploadProgress: (evt) => {
+            if (!onProgress || !evt.total) return;
+            const pct = Math.round((evt.loaded / evt.total) * 100);
+            onProgress(Math.min(pct, 100));
           },
         }
       );

@@ -141,6 +141,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; pct: number; fileName: string } | null>(null);
 
   // Rename dialog state
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
@@ -324,8 +325,12 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     setUploading(true);
 
     try {
-      for (const file of fileArray) {
-        await sourcesAPI.uploadSource(projectId, file);
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        setUploadProgress({ current: i + 1, total: fileArray.length, pct: 0, fileName: file.name });
+        await sourcesAPI.uploadSource(projectId, file, undefined, undefined, (pct) => {
+          setUploadProgress((prev) => prev ? { ...prev, pct } : prev);
+        });
       }
       success(`Uploaded ${fileArray.length} file(s) successfully`);
       await loadSources();
@@ -342,6 +347,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       }
     } finally {
       setUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -857,6 +863,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         onAddFreshdesk={handleAddFreshdesk}
         onAddJira={handleAddJira}
         onAddMixpanel={handleAddMixpanel}
+        uploadProgress={uploadProgress}
         onImportComplete={loadSources}
         uploading={uploading}
       />

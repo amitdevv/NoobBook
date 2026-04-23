@@ -29,9 +29,9 @@ workers = 1
 worker_class = "geventwebsocket.gunicorn.workers.GeventWebSocketWorker"
 
 # Request timeout: if a worker doesn't respond within this time, Gunicorn
-# kills and restarts it. Set to 300s to match nginx proxy_read_timeout
-# and allow for long Claude API calls with tool loops.
-timeout = 300
+# kills and restarts it. 600s gives long Claude tool loops AND gigabyte
+# uploads on slow connections enough headroom (1GB at 2MB/s is ~9min).
+timeout = 600
 
 # Time to finish serving requests after receiving SIGTERM
 graceful_timeout = 30

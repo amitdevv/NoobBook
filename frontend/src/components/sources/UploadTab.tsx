@@ -10,9 +10,17 @@ import { Alert, AlertDescription } from '../ui/alert';
 import { UploadSimple, CircleNotch, Warning } from '@phosphor-icons/react';
 import { ALLOWED_EXTENSIONS, MAX_IMAGE_SIZE } from '../../lib/api/sources';
 
+interface UploadProgress {
+  current: number;
+  total: number;
+  pct: number;
+  fileName: string;
+}
+
 interface UploadTabProps {
   onUpload: (files: FileList | File[]) => Promise<void>;
   uploading: boolean;
+  uploadProgress?: UploadProgress | null;
   isAtLimit: boolean;
 }
 
@@ -25,6 +33,7 @@ const ACCEPTED_FILE_TYPES = Object.values(ALLOWED_EXTENSIONS).flat().join(',');
 export const UploadTab: React.FC<UploadTabProps> = ({
   onUpload,
   uploading,
+  uploadProgress,
   isAtLimit,
 }) => {
   const [dragActive, setDragActive] = useState(false);
@@ -41,10 +50,10 @@ export const UploadTab: React.FC<UploadTabProps> = ({
     for (const file of fileArray) {
       const ext = '.' + file.name.split('.').pop()?.toLowerCase();
 
-      // Check image file size
+      // Check file size (1GB ceiling applies to all types)
       if (ALLOWED_EXTENSIONS.image.includes(ext) && file.size > MAX_IMAGE_SIZE) {
         const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-        return `Image "${file.name}" is too large (${sizeMB}MB). Maximum 5MB per image.`;
+        return `File "${file.name}" is too large (${sizeMB}MB). Maximum 1GB per file.`;
       }
     }
 
@@ -128,7 +137,24 @@ export const UploadTab: React.FC<UploadTabProps> = ({
         {uploading ? (
           <>
             <CircleNotch size={40} className="mx-auto mb-4 text-primary animate-spin" />
-            <p className="text-sm font-medium mb-1">Uploading...</p>
+            <p className="text-sm font-medium mb-1">
+              {uploadProgress
+                ? `Uploading ${uploadProgress.current} of ${uploadProgress.total}: ${uploadProgress.pct}%`
+                : 'Uploading...'}
+            </p>
+            {uploadProgress && (
+              <>
+                <div className="mt-2 h-2 w-full max-w-xs mx-auto rounded-full bg-stone-200 overflow-hidden">
+                  <div
+                    className="h-full bg-amber-600 transition-all"
+                    style={{ width: `${uploadProgress.pct}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground truncate max-w-xs mx-auto">
+                  {uploadProgress.fileName}
+                </p>
+              </>
+            )}
           </>
         ) : (
           <>
@@ -151,7 +177,7 @@ export const UploadTab: React.FC<UploadTabProps> = ({
           Supported: PDF, TXT, DOCX, PPTX, MD, JSON, HTML, XML, Audio (MP3, WAV, M4A, AAC, FLAC), Images, CSV
         </p>
         <p className="text-xs text-muted-foreground">
-          Images: max 5MB each
+          Max 1GB per file
         </p>
       </div>
 

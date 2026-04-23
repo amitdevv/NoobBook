@@ -71,21 +71,28 @@ def upload_file(
     source_id = str(uuid.uuid4())
     stored_filename = f"{source_id}{ext}"
 
-    # Read file data
-    file_data = file.read()
-    file_size = len(file_data)
+    # Determine size WITHOUT reading the whole file into memory.
+    # Werkzeug's FileStorage.stream is a SpooledTemporaryFile that rolls
+    # over to disk after 500KB, so multi-GB uploads stay off the heap as
+    # long as we don't call .read().
+    import os
+    file.stream.seek(0, os.SEEK_END)
+    file_size = file.stream.tell()
+    file.stream.seek(0)
 
     # Validate file size (e.g., images have 5MB limit)
     size_error = validate_file_size(original_filename, file_size)
     if size_error:
         raise ValueError(size_error)
 
-    # Upload to Supabase Storage
+    # Upload to Supabase Storage by streaming the file handle directly.
+    # Passing the file-like object (not bytes) keeps the request body out of
+    # Python's heap — storage3 hands it to httpx which streams over the wire.
     storage_path = storage_service.upload_raw_file(
         project_id=project_id,
         source_id=source_id,
         filename=stored_filename,
-        file_data=file_data,
+        file_data=file.stream,
         content_type=mime_type
     )
 

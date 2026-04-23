@@ -11,7 +11,7 @@ Files are organized in buckets:
 File paths follow the pattern: {project_id}/{source_id}/{filename}
 """
 import logging
-from typing import Optional, BinaryIO, List, Dict, Any
+from typing import Optional, BinaryIO, List, Dict, Any, Union
 from pathlib import Path
 
 from app.services.integrations.supabase import get_supabase, is_supabase_enabled
@@ -88,7 +88,7 @@ def upload_raw_file(
     project_id: str,
     source_id: str,
     filename: str,
-    file_data: bytes,
+    file_data: Union[bytes, BinaryIO],
     content_type: str = "application/octet-stream"
 ) -> Optional[str]:
     """
@@ -98,7 +98,8 @@ def upload_raw_file(
         project_id: The project UUID
         source_id: The source UUID
         filename: Original filename
-        file_data: File bytes
+        file_data: File bytes OR a file-like object (preferred for large uploads
+                   to avoid loading the whole file into memory)
         content_type: MIME type
 
     Returns:

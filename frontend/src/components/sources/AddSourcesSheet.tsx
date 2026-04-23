@@ -36,6 +36,7 @@ interface AddSourcesSheetProps {
   onAddMixpanel: (name?: string, description?: string) => Promise<void>;
   onImportComplete: () => void;
   uploading: boolean;
+  uploadProgress?: { current: number; total: number; pct: number; fileName: string } | null;
 }
 
 export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
@@ -54,6 +55,7 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
   onAddMixpanel,
   onImportComplete,
   uploading,
+  uploadProgress,
 }) => {
   const isAtLimit = sourcesCount >= MAX_SOURCES;
   const { hasPermission } = usePermissions();
@@ -163,6 +165,7 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
                 <UploadTab
                   onUpload={onUpload}
                   uploading={uploading}
+                  uploadProgress={uploadProgress}
                   isAtLimit={isAtLimit}
                 />
               </TabsContent>
