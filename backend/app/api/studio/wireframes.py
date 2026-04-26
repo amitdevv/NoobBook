@@ -141,7 +141,7 @@ def generate_wireframe(project_id: str):
         task_service.submit_task(
             task_type="wireframe",
             target_id=job_id,
-            callable_func=wireframe_agent_service.generate_wireframe,
+            callable_func=studio_index_service.with_failure_guard(wireframe_agent_service.generate_wireframe),
             project_id=project_id,
             source_id=source_id,
             job_id=job_id,

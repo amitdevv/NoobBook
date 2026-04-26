@@ -120,7 +120,7 @@ def generate_flow_diagram(project_id: str):
         task_service.submit_task(
             task_type="flow_diagram",
             target_id=job_id,
-            callable_func=flow_diagram_service.generate_flow_diagram,
+            callable_func=studio_index_service.with_failure_guard(flow_diagram_service.generate_flow_diagram),
             project_id=project_id,
             source_id=source_id,
             job_id=job_id,

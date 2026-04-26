@@ -142,7 +142,7 @@ def generate_social_posts(project_id: str):
         task_service.submit_task(
             task_type="social_posts",
             target_id=job_id,
-            callable_func=social_posts_service.generate_social_posts,
+            callable_func=studio_index_service.with_failure_guard(social_posts_service.generate_social_posts),
             project_id=project_id,
             job_id=job_id,
             topic=topic,

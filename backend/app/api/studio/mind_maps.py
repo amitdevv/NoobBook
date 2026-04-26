@@ -134,7 +134,7 @@ def generate_mind_map(project_id: str):
         task_service.submit_task(
             task_type="mind_map",
             target_id=job_id,
-            callable_func=mind_map_service.generate_mind_map,
+            callable_func=studio_index_service.with_failure_guard(mind_map_service.generate_mind_map),
             project_id=project_id,
             source_id=source_id,
             job_id=job_id,

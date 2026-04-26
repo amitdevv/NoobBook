@@ -134,7 +134,7 @@ def generate_infographic(project_id: str):
         task_service.submit_task(
             task_type="infographic",
             target_id=job_id,
-            callable_func=infographic_service.generate_infographic,
+            callable_func=studio_index_service.with_failure_guard(infographic_service.generate_infographic),
             project_id=project_id,
             source_id=source_id,
             job_id=job_id,

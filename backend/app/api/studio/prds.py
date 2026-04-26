@@ -112,7 +112,7 @@ def generate_prd(project_id: str):
         task_service.submit_task(
             task_type="prd",
             target_id=job_id,
-            callable_func=prd_agent_service.prd_agent_service.generate_prd,
+            callable_func=studio_index_service.with_failure_guard(prd_agent_service.prd_agent_service.generate_prd),
             project_id=project_id,
             source_id=source_id,
             job_id=job_id,

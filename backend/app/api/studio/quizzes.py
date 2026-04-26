@@ -133,7 +133,7 @@ def generate_quiz(project_id: str):
         task_service.submit_task(
             task_type="quiz",
             target_id=job_id,
-            callable_func=quiz_service.generate_quiz,
+            callable_func=studio_index_service.with_failure_guard(quiz_service.generate_quiz),
             project_id=project_id,
             source_id=source_id,
             job_id=job_id,

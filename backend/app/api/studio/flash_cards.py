@@ -133,7 +133,7 @@ def generate_flash_cards(project_id: str):
         task_service.submit_task(
             task_type="flash_cards",
             target_id=job_id,
-            callable_func=flash_cards_service.generate_flash_cards,
+            callable_func=studio_index_service.with_failure_guard(flash_cards_service.generate_flash_cards),
             project_id=project_id,
             source_id=source_id,
             job_id=job_id,

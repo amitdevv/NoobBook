@@ -156,7 +156,7 @@ def generate_audio_overview(project_id: str):
         task_service.submit_task(
             task_type="audio_overview",
             target_id=job_id,
-            callable_func=audio_overview_service.generate_audio_overview,
+            callable_func=studio_index_service.with_failure_guard(audio_overview_service.generate_audio_overview),
             project_id=project_id,
             source_id=source_id,
             job_id=job_id,

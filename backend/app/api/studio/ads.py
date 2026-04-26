@@ -112,7 +112,7 @@ def generate_ad_creative(project_id: str):
         task_service.submit_task(
             task_type="ad_creative",
             target_id=job_id,
-            callable_func=ad_creative_service.generate_ad_creatives,
+            callable_func=studio_index_service.with_failure_guard(ad_creative_service.generate_ad_creatives),
             project_id=project_id,
             job_id=job_id,
             product_name=product_name,

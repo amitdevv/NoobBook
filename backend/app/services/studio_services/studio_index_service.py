@@ -192,6 +192,56 @@ def update_job(
         return None
 
 
+_TERMINAL_STATUSES = {"ready", "error", "cancelled"}
+
+
+def with_failure_guard(callable_func):
+    """
+    Wrap a studio-job entry function with an exception safety net.
+
+    Studio services run in background threads (task_service.submit_task).
+    If an unhandled exception escapes the entry function, the studio_jobs
+    row stays in `status="processing"` forever and the frontend polls it
+    until pollJobStatus times out (~10 min) — that's the "stuck spinner"
+    bug. This wrapper catches any exception, flips the row to
+    `status="error"` so the frontend stops polling immediately, then
+    re-raises so task_service still marks the background_tasks row failed
+    for observability.
+
+    Expects `project_id` and `job_id` to be present in kwargs (the
+    convention every `submit_task` call uses for studio jobs).
+    """
+    from datetime import datetime
+
+    def wrapped(*args, **kwargs):
+        project_id = kwargs.get("project_id")
+        job_id = kwargs.get("job_id")
+        try:
+            return callable_func(*args, **kwargs)
+        except Exception as exc:  # noqa: BLE001 — re-raised below
+            logger.exception(
+                "Studio job %s (%s) crashed: %s",
+                job_id, getattr(callable_func, "__name__", "unknown"), exc,
+            )
+            if project_id and job_id:
+                try:
+                    update_job(
+                        project_id, job_id,
+                        status="error",
+                        error=f"Generation failed: {exc}",
+                        completed_at=datetime.now().isoformat(),
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to mark studio job %s as error after crash", job_id,
+                    )
+            raise
+
+    wrapped.__name__ = getattr(callable_func, "__name__", "wrapped_studio_job")
+    wrapped.__qualname__ = getattr(callable_func, "__qualname__", wrapped.__name__)
+    return wrapped
+
+
 def append_partial_image(
     project_id: str,
     job_id: str,
@@ -205,14 +255,19 @@ def append_partial_image(
     record and renders the partial frames as a live preview while the
     final image is still rendering.
 
-    Sequential within a single job (one image-gen call streams partials
-    in order), so the read-modify-write here doesn't race with itself.
+    Bails out without writing when the job has already reached a terminal
+    status. update_job's job_data path is fetch-merge-update of the entire
+    JSONB column, so a late stream event can otherwise overwrite the
+    finalized `images` array. Once the job is done, partial UX is
+    irrelevant — drop the write.
     """
     if not url:
         return None
     current = get_job(project_id, job_id)
     if not current:
         return None
+    if current.get("status") in _TERMINAL_STATUSES:
+        return current
     partials = list(current.get("partial_images") or [])
     partials.append(url)
     return update_job(project_id, job_id, partial_images=partials)
