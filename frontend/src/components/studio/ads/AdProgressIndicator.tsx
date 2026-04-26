@@ -6,6 +6,7 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { AdJob } from '@/lib/api/studio';
+import { PartialImagesPreview } from '../shared/PartialImagesPreview';
 
 interface AdProgressIndicatorProps {
   currentAdJob: AdJob | null;
@@ -29,6 +30,7 @@ export const AdProgressIndicator: React.FC<AdProgressIndicatorProps> = ({
           </p>
         </div>
       </div>
+      <PartialImagesPreview urls={currentAdJob.partial_images} />
     </div>
   );
 };

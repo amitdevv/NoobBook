@@ -7,6 +7,7 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { WebsiteJob } from '@/lib/api/studio';
+import { PartialImagesPreview } from '../shared/PartialImagesPreview';
 
 interface WebsiteProgressIndicatorProps {
   currentWebsiteJob: WebsiteJob | null;
@@ -30,6 +31,7 @@ export const WebsiteProgressIndicator: React.FC<WebsiteProgressIndicatorProps> =
           </p>
         </div>
       </div>
+      <PartialImagesPreview urls={currentWebsiteJob.partial_images} />
     </div>
   );
 };

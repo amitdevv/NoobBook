@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 from app.services.integrations.google.imagen_service import imagen_service
 from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
+from app.services.studio_services.partial_image_utils import make_partial_callback
 from app.config import prompt_loader, brand_context_loader
 
 
@@ -160,6 +161,17 @@ class SocialPostsService:
                 "storage_path": None
             }
 
+            _safe_platform = "".join(c if c.isalnum() else "_" for c in str(platform))
+            on_partial = make_partial_callback(
+                project_id=project_id,
+                job_id=job_id,
+                storage_kind="social_posts",
+                filename_builder=lambda idx, p=_safe_platform: f"partial_{p}_{idx}.png",
+                url_builder=lambda fn, pid=project_id, jid=job_id: (
+                    f"/api/v1/projects/{pid}/studio/social/{jid}/{fn}"
+                ),
+            )
+
             # Generate image — use multimodal method if logo is available
             if logo_image_bytes:
                 enhanced_prompt = (
@@ -171,13 +183,17 @@ class SocialPostsService:
                     reference_image_bytes=logo_image_bytes,
                     reference_mime_type=logo_mime_type,
                     filename_prefix=f"social_{job_id[:8]}_{platform}",
-                    aspect_ratio=aspect_ratio
+                    aspect_ratio=aspect_ratio,
+                    project_id=project_id,
+                    on_partial=on_partial,
                 )
             else:
                 result = imagen_service.generate_image_bytes(
                     prompt=image_prompt,
                     filename_prefix=f"social_{job_id[:8]}_{platform}",
-                    aspect_ratio=aspect_ratio
+                    aspect_ratio=aspect_ratio,
+                    project_id=project_id,
+                    on_partial=on_partial,
                 )
 
             if result.get("success"):

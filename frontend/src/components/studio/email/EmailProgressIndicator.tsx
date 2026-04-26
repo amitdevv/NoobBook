@@ -6,6 +6,7 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { EmailJob } from '@/lib/api/studio';
+import { PartialImagesPreview } from '../shared/PartialImagesPreview';
 
 interface EmailProgressIndicatorProps {
   currentEmailJob: EmailJob | null;
@@ -29,6 +30,7 @@ export const EmailProgressIndicator: React.FC<EmailProgressIndicatorProps> = ({
           </p>
         </div>
       </div>
+      <PartialImagesPreview urls={currentEmailJob.partial_images} />
     </div>
   );
 };

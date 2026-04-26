@@ -26,7 +26,7 @@ This module demonstrates several security patterns:
 Supported API Keys:
 - ANTHROPIC_API_KEY: Claude AI models
 - ELEVENLABS_API_KEY: Speech-to-text
-- OPENAI_API_KEY: Embeddings
+- OPENAI_API_KEY: Embeddings + GPT Image 2 (image generation)
 - PINECONE_API_KEY: Vector database (+ auto-creates index)
 - TAVILY_API_KEY: Web search
 - GOOGLE_CLIENT_ID/SECRET: Google Drive OAuth
@@ -68,7 +68,7 @@ API_KEYS_CONFIG = [
     {
         'id': 'OPENAI_API_KEY',
         'name': 'OpenAI API',
-        'description': 'OpenAI models for embeddings (text-embedding-3-small)',
+        'description': 'Embeddings (text-embedding-3-small) + GPT Image 2 image generation. Default provider for all studio images; falls back to Gemini if unavailable.',
         'category': 'ai'
     },
     {

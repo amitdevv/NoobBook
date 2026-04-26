@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 from app.services.integrations.google.imagen_service import imagen_service
 from app.services.source_services import source_index_service
 from app.services.studio_services import studio_index_service
+from app.services.studio_services.partial_image_utils import make_partial_callback
 from app.config import prompt_loader, brand_context_loader
 from app.services.integrations.supabase import storage_service
 
@@ -183,6 +184,16 @@ class InfographicService:
 
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
+            on_partial = make_partial_callback(
+                project_id=project_id,
+                job_id=job_id,
+                storage_kind="infographics",
+                filename_builder=lambda idx, ts=timestamp: f"partial_{idx}_{ts}.png",
+                url_builder=lambda fn, pid=project_id, jid=job_id: (
+                    f"/api/v1/projects/{pid}/studio/infographics/{jid}/{fn}"
+                ),
+            )
+
             # Use multimodal method if logo is available (same pattern as social posts)
             if effective_logo:
                 enhanced_prompt = (
@@ -194,13 +205,17 @@ class InfographicService:
                     reference_image_bytes=effective_logo,
                     reference_mime_type=logo_mime_type,
                     filename_prefix=f"infographic_{job_id[:8]}_{timestamp}",
-                    aspect_ratio=INFOGRAPHIC_ASPECT_RATIO
+                    aspect_ratio=INFOGRAPHIC_ASPECT_RATIO,
+                    project_id=project_id,
+                    on_partial=on_partial,
                 )
             else:
                 image_result = imagen_service.generate_image_bytes(
                     prompt=image_prompt,
                     filename_prefix=f"infographic_{job_id[:8]}_{timestamp}",
-                    aspect_ratio=INFOGRAPHIC_ASPECT_RATIO
+                    aspect_ratio=INFOGRAPHIC_ASPECT_RATIO,
+                    project_id=project_id,
+                    on_partial=on_partial,
                 )
 
             if not image_result.get("success"):

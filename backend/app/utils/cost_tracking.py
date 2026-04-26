@@ -161,6 +161,8 @@ def _ensure_cost_structure(costs: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         costs["total_cost"] = 0.0
     if "by_model" not in costs:
         costs["by_model"] = {}
+    if "images" not in costs:
+        costs["images"] = {}
 
     for model in _MODEL_KEYS:
         if model not in costs["by_model"]:
@@ -255,6 +257,69 @@ def add_usage(
         if resolved_user_id:
             model_key = _get_model_key(model)
             call_cost = _calculate_cost(model_key, input_tokens, output_tokens)
+            record_user_period_spend(resolved_user_id, call_cost)
+
+        return project_costs
+
+
+def add_image_usage(
+    project_id: str,
+    model: str,
+    size: str,
+    quality: str,
+    n: int,
+    unit_cost: float,
+    user_id: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Add image generation usage to project cost tracking.
+
+    Image-gen costs are kept in a separate `images` bucket from Claude's
+    `by_model` so the Claude breakdown stays clean. The bucket shape is:
+
+        costs["images"][model] = {
+            "count": int,
+            "cost": float,
+            "by_size_quality": {
+                f"{size}-{quality}": {"count": int, "cost": float}
+            }
+        }
+
+    The top-level `total_cost` rolls up everything (Claude + images).
+    """
+    call_cost = unit_cost * n
+    bucket_key = f"{size}-{quality}"
+
+    with _lock:
+        project_costs = _load_costs(project_id, user_id=user_id)
+        if project_costs is None:
+            project_costs = _get_default_costs()
+        project_costs = _ensure_cost_structure(project_costs)
+
+        images = project_costs.setdefault("images", {})
+        bucket = images.setdefault(model, {"count": 0, "cost": 0.0, "by_size_quality": {}})
+        bucket["count"] += n
+        bucket["cost"] += call_cost
+
+        sq_bucket = bucket["by_size_quality"].setdefault(bucket_key, {"count": 0, "cost": 0.0})
+        sq_bucket["count"] += n
+        sq_bucket["cost"] += call_cost
+
+        project_costs["total_cost"] += call_cost
+
+        if not _save_costs(project_id, project_costs, user_id=user_id):
+            logger.warning("Failed to save image-gen costs for project %s", project_id)
+            return None
+
+        # Roll into per-user period spend so spending limits cover image gen too.
+        resolved_user_id = user_id
+        if not resolved_user_id:
+            try:
+                ps = _get_project_service()
+                resolved_user_id = ps.get_project_owner_id(project_id)
+            except Exception:
+                pass
+        if resolved_user_id:
             record_user_period_spend(resolved_user_id, call_cost)
 
         return project_costs

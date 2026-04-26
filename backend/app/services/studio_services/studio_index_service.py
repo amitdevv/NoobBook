@@ -192,6 +192,32 @@ def update_job(
         return None
 
 
+def append_partial_image(
+    project_id: str,
+    job_id: str,
+    url: str,
+) -> Optional[Dict[str, Any]]:
+    """
+    Append a partial-image URL to a studio job's `partial_images` list.
+
+    Used by the GPT Image 2 streaming path: each partial frame is uploaded
+    to Supabase storage and its URL appended here. Frontend polls the job
+    record and renders the partial frames as a live preview while the
+    final image is still rendering.
+
+    Sequential within a single job (one image-gen call streams partials
+    in order), so the read-modify-write here doesn't race with itself.
+    """
+    if not url:
+        return None
+    current = get_job(project_id, job_id)
+    if not current:
+        return None
+    partials = list(current.get("partial_images") or [])
+    partials.append(url)
+    return update_job(project_id, job_id, partial_images=partials)
+
+
 def get_job(
     project_id: str,
     job_id: str

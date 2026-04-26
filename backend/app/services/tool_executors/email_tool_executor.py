@@ -12,6 +12,7 @@ from datetime import datetime
 
 from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
+from app.services.studio_services.partial_image_utils import make_partial_callback
 from app.services.integrations.google import imagen_service
 
 logger = logging.getLogger(__name__)
@@ -170,11 +171,28 @@ class EmailToolExecutor:
             image_index = len(generated_images) + 1
             filename_prefix = f"{job_id}_image_{image_index}"
 
+            _safe_section = "".join(c if c.isalnum() else "_" for c in str(section_name))
+            # Email serve route extracts job_id from the filename, splitting on
+            # `_image_`, so partials must embed job_id and the `_image_` token.
+            on_partial = make_partial_callback(
+                project_id=project_id,
+                job_id=job_id,
+                storage_kind="emails",
+                filename_builder=lambda idx, jid=job_id, s=_safe_section, n=image_index: (
+                    f"{jid}_image_{n}_partial_{s}_{idx}.png"
+                ),
+                url_builder=lambda fn, pid=project_id: (
+                    f"/api/v1/projects/{pid}/studio/email-templates/{fn}"
+                ),
+            )
+
             # Generate image and get bytes (not saved to disk)
             image_result = imagen_service.generate_image_bytes(
                 prompt=image_prompt,
                 filename_prefix=filename_prefix,
-                aspect_ratio=aspect_ratio
+                aspect_ratio=aspect_ratio,
+                project_id=project_id,
+                on_partial=on_partial,
             )
 
             if not image_result.get("success"):

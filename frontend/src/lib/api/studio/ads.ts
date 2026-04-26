@@ -34,6 +34,7 @@ export interface AdJob {
   progress: string;
   error: string | null;
   images: AdImage[];
+  partial_images?: string[];
   created_at: string;
   started_at: string | null;
   completed_at: string | null;

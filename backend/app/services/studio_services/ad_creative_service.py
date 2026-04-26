@@ -21,6 +21,7 @@ from app.services.integrations.claude import claude_service
 logger = logging.getLogger(__name__)
 from app.services.integrations.google.imagen_service import imagen_service
 from app.services.studio_services import studio_index_service
+from app.services.studio_services.partial_image_utils import make_partial_callback
 from app.config import prompt_loader, brand_context_loader
 from app.services.integrations.supabase import storage_service
 
@@ -131,6 +132,17 @@ class AdCreativeService:
                 progress=f"Generating {prompt_type} image ({i+1}/{len(prompts)})..."
             )
 
+            _safe_type = "".join(c if c.isalnum() else "_" for c in prompt_type)
+            on_partial = make_partial_callback(
+                project_id=project_id,
+                job_id=job_id,
+                storage_kind="creatives",
+                filename_builder=lambda idx, t=_safe_type, ts=timestamp: f"partial_{t}_{idx}_{ts}.png",
+                url_builder=lambda fn, pid=project_id, jid=job_id: (
+                    f"/api/v1/projects/{pid}/studio/creatives/{jid}/{fn}"
+                ),
+            )
+
             # Generate image — use multimodal method if logo is available
             if logo_image_bytes:
                 enhanced_prompt = (
@@ -141,12 +153,16 @@ class AdCreativeService:
                     prompt=enhanced_prompt,
                     reference_image_bytes=logo_image_bytes,
                     reference_mime_type=logo_mime_type,
-                    filename_prefix=f"ad_{job_id[:8]}_{prompt_type}_{timestamp}"
+                    filename_prefix=f"ad_{job_id[:8]}_{prompt_type}_{timestamp}",
+                    project_id=project_id,
+                    on_partial=on_partial,
                 )
             else:
                 result = imagen_service.generate_image_bytes(
                     prompt=prompt_text,
-                    filename_prefix=f"ad_{job_id[:8]}_{prompt_type}_{timestamp}"
+                    filename_prefix=f"ad_{job_id[:8]}_{prompt_type}_{timestamp}",
+                    project_id=project_id,
+                    on_partial=on_partial,
                 )
 
             if result.get("success"):

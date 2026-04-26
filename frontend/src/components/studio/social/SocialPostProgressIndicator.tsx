@@ -7,6 +7,7 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { SocialPostJob } from '@/lib/api/studio';
+import { PartialImagesPreview } from '../shared/PartialImagesPreview';
 
 interface SocialPostProgressIndicatorProps {
   currentSocialPostJob: SocialPostJob | null;
@@ -30,6 +31,7 @@ export const SocialPostProgressIndicator: React.FC<SocialPostProgressIndicatorPr
           </p>
         </div>
       </div>
+      <PartialImagesPreview urls={currentSocialPostJob.partial_images} />
     </div>
   );
 };

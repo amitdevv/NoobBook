@@ -54,6 +54,7 @@ export interface WebsiteJob {
   status: JobStatus;
   status_message: string;
   error_message: string | null;
+  partial_images?: string[];
   // Edit lineage
   parent_job_id: string | null;
   edit_instructions: string | null;

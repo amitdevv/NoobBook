@@ -13,6 +13,7 @@ from datetime import datetime
 from app.services.integrations.google import imagen_service
 from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
+from app.services.studio_services.partial_image_utils import make_partial_callback
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,19 @@ class BlogToolExecutor:
             image_index = len(generated_images) + 1
             filename_prefix = f"{job_id}_image_{image_index}"
 
+            _safe_purpose = "".join(c if c.isalnum() else "_" for c in str(purpose))
+            on_partial = make_partial_callback(
+                project_id=project_id,
+                job_id=job_id,
+                storage_kind="blogs",
+                filename_builder=lambda idx, p=_safe_purpose, n=image_index: (
+                    f"partial_{n}_{p}_{idx}.png"
+                ),
+                url_builder=lambda fn, pid=project_id, jid=job_id: (
+                    f"/api/v1/projects/{pid}/studio/blogs/{jid}/{fn}"
+                ),
+            )
+
             # Use multimodal method if logo is available (same pattern as social posts)
             if logo_image_bytes:
                 enhanced_prompt = (
@@ -129,14 +143,18 @@ class BlogToolExecutor:
                     reference_image_bytes=logo_image_bytes,
                     reference_mime_type=logo_mime_type,
                     filename_prefix=filename_prefix,
-                    aspect_ratio=aspect_ratio
+                    aspect_ratio=aspect_ratio,
+                    project_id=project_id,
+                    on_partial=on_partial,
                 )
             else:
                 # Generate image and get bytes (not saved to disk)
                 image_result = imagen_service.generate_image_bytes(
                     prompt=image_prompt,
                     filename_prefix=filename_prefix,
-                    aspect_ratio=aspect_ratio
+                    aspect_ratio=aspect_ratio,
+                    project_id=project_id,
+                    on_partial=on_partial,
                 )
 
             if not image_result.get("success"):

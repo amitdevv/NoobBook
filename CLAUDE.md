@@ -108,6 +108,9 @@ ANTHROPIC_TIER=1                # 1-4, controls rate limits
 ### Claude Model
 Always use `claude-sonnet-4-5-20250929` as the default model for Claude API calls.
 
+### Image Generation
+Default provider is **OpenAI GPT Image 2** (`gpt-image-2-2026-04-21`) via `OPENAI_API_KEY`. Streams partial frames (`partial_images=2`) so studio surfaces show a live preview while the final image renders. If the model returns model-not-found / unauthorized / verification-required (the model is brand-new and may need API Org Verification at platform.openai.com/settings/organization/general), `imagen_service` transparently falls back to Gemini (`gemini-3-pro-image-preview` via `NANO_BANANA_API_KEY`). Brand-logo flows use `client.images.edit(...)` with the logo as a reference image. Per-image costs are tracked under `projects.costs.images`.
+
 ## PROJECT PURPOSE
 
 **NoobBook is an open-source NotebookLM alternative. NotebookLM, but smarter.**

@@ -7,6 +7,7 @@
 import React from 'react';
 import { Article, Spinner } from '@phosphor-icons/react';
 import type { BlogJob } from '@/lib/api/studio';
+import { PartialImagesPreview } from '../shared/PartialImagesPreview';
 
 interface BlogProgressIndicatorProps {
   currentBlogJob: BlogJob | null;
@@ -29,21 +30,24 @@ export const BlogProgressIndicator: React.FC<BlogProgressIndicatorProps> = ({ cu
   };
 
   return (
-    <div className="flex items-center gap-2 p-1.5 bg-indigo-50 dark:bg-indigo-950/30 rounded border border-indigo-200 dark:border-indigo-800/50">
-      <div className="p-1 bg-indigo-500/10 rounded">
-        <Spinner size={12} className="text-indigo-600 animate-spin" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-medium text-indigo-700 dark:text-indigo-400 truncate">
-          {getProgressMessage()}
-        </p>
-        {currentBlogJob?.title && (
-          <p className="text-[9px] text-indigo-600/70 dark:text-indigo-400/70 truncate">
-            {currentBlogJob.title}
+    <div className="flex flex-col gap-1.5 p-1.5 bg-indigo-50 dark:bg-indigo-950/30 rounded border border-indigo-200 dark:border-indigo-800/50">
+      <div className="flex items-center gap-2">
+        <div className="p-1 bg-indigo-500/10 rounded">
+          <Spinner size={12} className="text-indigo-600 animate-spin" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-medium text-indigo-700 dark:text-indigo-400 truncate">
+            {getProgressMessage()}
           </p>
-        )}
+          {currentBlogJob?.title && (
+            <p className="text-[9px] text-indigo-600/70 dark:text-indigo-400/70 truncate">
+              {currentBlogJob.title}
+            </p>
+          )}
+        </div>
+        <Article size={12} className="text-indigo-500 flex-shrink-0" />
       </div>
-      <Article size={12} className="text-indigo-500 flex-shrink-0" />
+      <PartialImagesPreview urls={currentBlogJob?.partial_images} className="mt-0" />
     </div>
   );
 };

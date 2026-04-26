@@ -12,6 +12,7 @@ from datetime import datetime
 from app.services.integrations.google import imagen_service
 from app.services.integrations.supabase import storage_service
 from app.services.studio_services import studio_index_service
+from app.services.studio_services.partial_image_utils import make_partial_callback
 
 logger = logging.getLogger(__name__)
 
@@ -135,11 +136,29 @@ class WebsiteToolExecutor:
             image_index = len(generated_images) + 1
             filename_prefix = f"{job_id}_image_{image_index}"
 
+            _safe_purpose = "".join(c if c.isalnum() else "_" for c in str(purpose))
+            # Website assets live under an `assets/` storage subfolder, served
+            # through `/studio/websites/{job_id}/assets/{filename}`. Apply the
+            # same prefix to partials so the existing route still resolves.
+            on_partial = make_partial_callback(
+                project_id=project_id,
+                job_id=job_id,
+                storage_kind="websites",
+                filename_builder=lambda idx, p=_safe_purpose, n=image_index: (
+                    f"assets/partial_{n}_{p}_{idx}.png"
+                ),
+                url_builder=lambda fn, pid=project_id, jid=job_id: (
+                    f"/api/v1/projects/{pid}/studio/websites/{jid}/{fn}"
+                ),
+            )
+
             # Generate image and get bytes (not saved to disk)
             image_result = imagen_service.generate_image_bytes(
                 prompt=image_prompt,
                 filename_prefix=filename_prefix,
-                aspect_ratio=aspect_ratio
+                aspect_ratio=aspect_ratio,
+                project_id=project_id,
+                on_partial=on_partial,
             )
 
             if not image_result.get("success"):
