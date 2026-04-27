@@ -153,6 +153,28 @@ export const ShareWorkspace: React.FC = () => {
     };
   }, [token]);
 
+  // PDF export — declared before any early return so the hook order stays
+  // stable across loading / error / ready states (React error #310 guard).
+  // We dereference state.root inside via a guard rather than at hook setup.
+  const readyRoot = state.kind === 'ready' ? state.root : null;
+  const activeChatRef = state.kind === 'ready' ? activeChat : null;
+  const handleExport = useCallback(async () => {
+    if (!activeChatRef || !readyRoot) return;
+    try {
+      setExportingChat(true);
+      await exportChatAsPdf({
+        chat: activeChatRef,
+        projectId: readyRoot.project.id,
+        projectName: readyRoot.project.name,
+      });
+    } catch (err) {
+      log.error({ err }, 'export failed');
+      error('PDF export failed');
+    } finally {
+      setExportingChat(false);
+    }
+  }, [activeChatRef, readyRoot, error]);
+
   // ── Branches ────────────────────────────────────────────────
   if (state.kind === 'loading') {
     return <SplashLoading />;
@@ -182,23 +204,6 @@ export const ShareWorkspace: React.FC = () => {
   const { root } = state;
   const chats = root.chats;
   const isAuthed = root.viewer.is_authenticated;
-
-  const handleExport = useCallback(async () => {
-    if (!activeChat) return;
-    try {
-      setExportingChat(true);
-      await exportChatAsPdf({
-        chat: activeChat,
-        projectId: root.project.id,
-        projectName: root.project.name,
-      });
-    } catch (err) {
-      log.error({ err }, 'export failed');
-      error('PDF export failed');
-    } finally {
-      setExportingChat(false);
-    }
-  }, [activeChat, root.project.id, root.project.name, error]);
 
   return (
     <div className="min-h-screen bg-stone-50/40">
