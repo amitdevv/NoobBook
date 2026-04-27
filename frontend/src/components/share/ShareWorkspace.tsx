@@ -516,6 +516,25 @@ interface SplashErrorProps {
 const SplashError: React.FC<SplashErrorProps> = ({ status, message, code, onSignIn, onHome }) => {
   const wantsSignIn = status === 401 || code === 'auth_required' || code === 'not_invited';
   const isGone = status === 410 || status === 404;
+  const isNotInvited = code === 'not_invited';
+
+  // For not_invited: the viewer IS signed in, just with the wrong email.
+  // Sign them out first so AuthPage actually renders on /auth — otherwise
+  // the App-level auth gate (`!isAuthenticated`) sees they're already
+  // logged in and falls through to the dashboard catch-all route.
+  const handleSignIn = async () => {
+    if (isNotInvited) {
+      try {
+        const { authAPI } = await import('@/lib/api/auth');
+        await authAPI.signOut();
+      } catch {
+        // Even if the network call fails, clear local session and proceed.
+        const { clearSession } = await import('@/lib/auth/session');
+        clearSession();
+      }
+    }
+    onSignIn();
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-stone-50/60 px-6">
@@ -535,8 +554,8 @@ const SplashError: React.FC<SplashErrorProps> = ({ status, message, code, onSign
         </p>
         <div className="mt-6 flex items-center justify-center gap-2">
           {wantsSignIn && (
-            <Button onClick={onSignIn} size="sm">
-              Sign in
+            <Button onClick={handleSignIn} size="sm">
+              {isNotInvited ? 'Use a different account' : 'Sign in'}
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={onHome}>
