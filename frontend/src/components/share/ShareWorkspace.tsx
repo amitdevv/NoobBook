@@ -165,7 +165,15 @@ export const ShareWorkspace: React.FC = () => {
         message={state.message}
         code={state.code}
         token={token}
-        onSignIn={() => navigate(`/auth?redirect=${encodeURIComponent(window.location.pathname + window.location.hash)}`)}
+        onSignIn={() => {
+          // Full navigation (not react-router navigate) so App.tsx re-evaluates
+          // the top-level auth gate on a fresh mount and renders <AuthPage />.
+          // /auth isn't a route in BrowserRouter; client-side navigate to it
+          // would fall through to the dashboard catch-all.
+          window.location.assign(
+            `/auth?redirect=${encodeURIComponent(window.location.pathname + window.location.hash)}`,
+          );
+        }}
         onHome={() => navigate('/')}
       />
     );
@@ -200,7 +208,15 @@ export const ShareWorkspace: React.FC = () => {
         canExport={!!activeChat}
         exportingChat={exportingChat}
         onExport={handleExport}
-        onSignIn={() => navigate(`/auth?redirect=${encodeURIComponent(window.location.pathname + window.location.hash)}`)}
+        onSignIn={() => {
+          // Full navigation (not react-router navigate) so App.tsx re-evaluates
+          // the top-level auth gate on a fresh mount and renders <AuthPage />.
+          // /auth isn't a route in BrowserRouter; client-side navigate to it
+          // would fall through to the dashboard catch-all.
+          window.location.assign(
+            `/auth?redirect=${encodeURIComponent(window.location.pathname + window.location.hash)}`,
+          );
+        }}
       />
 
       <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 pb-10">

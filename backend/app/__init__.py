@@ -80,6 +80,12 @@ def create_app(config_name='development'):
         if path.startswith(f"{api_prefix}/auth") or path == f"{api_prefix}/health":
             return None
 
+        # Share viewer routes are token-gated by @require_share_token. Public-mode
+        # links must be reachable without a JWT — let the per-route decorator
+        # validate the token and (for invited mode) require sign-in itself.
+        if path.startswith(f"{api_prefix}/share/"):
+            return None
+
         identity = get_request_identity()
         if not identity.is_authenticated:
             return {"success": False, "error": "Authentication required"}, 401
