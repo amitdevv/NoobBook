@@ -24,6 +24,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
   const [showPassword, setShowPassword] = useState(false);
   const { success, error } = useToast();
 
+  /**
+   * Pull a same-origin redirect target out of the URL.
+   *
+   * Share links bounce logged-out viewers here as `/auth?redirect=/share/...`
+   * — without this, sign-in lands them on the dashboard (which then shows
+   * "no projects" for brand-new accounts created via the share flow).
+   *
+   * Only relative paths are honoured to avoid open-redirect abuse.
+   */
+  const getRedirectTarget = (): string | null => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('redirect');
+    if (!raw) return null;
+    if (!raw.startsWith('/') || raw.startsWith('//')) return null;
+    return raw;
+  };
+
   const handleSubmit = async () => {
     if (!email || !password) {
       error('Email and password are required');
@@ -43,6 +61,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
       }
 
       success(mode === 'signin' ? 'Signed in' : 'Account created');
+
+      // If the user came from a share link, send them back to it.
+      // Use a full navigation so the share viewer remounts with the
+      // freshly-issued JWT (avoids stale `is_authenticated=false` state).
+      const redirect = getRedirectTarget();
+      if (redirect) {
+        window.location.assign(redirect);
+        return;
+      }
+
       await onAuthenticated();
     } catch (err) {
       log.error({ err }, 'authentication failed');
