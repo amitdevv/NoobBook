@@ -13,7 +13,7 @@ Brand config is now user-level (workspace setting). Studio agents pass
 project_id, which is resolved to user_id here — so agents need zero changes.
 """
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 
 from app.services.data_services.brand_config_service import brand_config_service
 from app.services.data_services.brand_asset_service import brand_asset_service
@@ -343,6 +343,68 @@ class BrandContextLoader:
             lines.append("")
 
         return "\n".join(lines)
+
+    def build_image_prompt_prefix(
+        self,
+        user_id: Optional[str],
+        feature_name: str,
+    ) -> str:
+        """
+        Compact brand block tuned for image-generation prompts.
+
+        The full `load_brand_context` builds a multi-section markdown block
+        meant for Claude system prompts (~2-3k chars). GPT Image 2 image
+        prompts work better with one tight sentence, so this returns
+        something like:
+
+            "Brand style: amber/cream palette (primary #D97706, accent
+            #F59E0B), warm friendly tone."
+
+        Returns "" when brand isn't configured or the feature has brand
+        disabled — callers should pass the user's direction unprefixed in
+        that case.
+        """
+        if not user_id:
+            return ""
+        if not brand_config_service.is_feature_enabled(user_id, feature_name):
+            return ""
+
+        config = brand_config_service.get_config(user_id) or {}
+        colors = config.get("colors", {}) or {}
+        typography = config.get("typography", {}) or {}
+        voice = config.get("voice", {}) or {}
+
+        bits: List[str] = []
+
+        # Color palette — only the primary + accent. Listing every color
+        # tends to over-constrain the model and produces muddy outputs.
+        primary = colors.get("primary")
+        accent = colors.get("accent")
+        if primary or accent:
+            color_parts = []
+            if primary:
+                color_parts.append(f"primary {primary}")
+            if accent:
+                color_parts.append(f"accent {accent}")
+            bits.append("colors " + ", ".join(color_parts))
+
+        # Tone — single descriptor only. Long voice descriptions confuse
+        # the image model far more than they help.
+        tone = (voice.get("tone") or "").strip()
+        if tone:
+            bits.append(f"{tone} tone")
+
+        # Heading font — useful when the image contains text (ads,
+        # infographics with labels). Body font almost never appears in
+        # images so we skip it.
+        heading_font = (typography.get("heading_font") or "").strip()
+        if heading_font:
+            bits.append(f"{heading_font} headings")
+
+        if not bits:
+            return ""
+
+        return f"Brand style: {'; '.join(bits)}."
 
     def get_brand_summary(self, user_id: str) -> Optional[Dict[str, Any]]:
         """

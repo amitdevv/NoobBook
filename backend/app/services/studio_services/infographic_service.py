@@ -171,10 +171,28 @@ class InfographicService:
             if not prompt_result.get("success"):
                 raise ValueError(prompt_result.get("error", "Failed to generate image prompt"))
 
-            image_prompt = prompt_result.get("image_prompt", "")
+            # We keep Claude's structural pass for the UI metadata —
+            # topic_title, topic_summary, key_sections drive the
+            # infographic detail panel's text. But the image prompt
+            # itself uses the user's direction verbatim (with a compact
+            # brand prefix) so GPT Image 2 renders what the user
+            # actually asked for, not Claude's paraphrase.
             topic_title = prompt_result.get("topic_title", "Infographic")
             topic_summary = prompt_result.get("topic_summary", "")
             key_sections = prompt_result.get("key_sections", [])
+
+            image_brand_prefix = brand_context_loader.build_image_prompt_prefix(
+                user_id, "infographic"
+            )
+            user_image_text = (direction or topic_title or "").strip()
+            image_prompt = (
+                f"{image_brand_prefix} {user_image_text}".strip()
+                if image_brand_prefix else user_image_text
+            )
+            if not image_prompt:
+                # Fall back to Claude's prompt if the user gave no
+                # direction at all and Claude couldn't infer a title.
+                image_prompt = prompt_result.get("image_prompt", "")
 
             # Step 2: Generate image with Gemini
             studio_index_service.update_infographic_job(

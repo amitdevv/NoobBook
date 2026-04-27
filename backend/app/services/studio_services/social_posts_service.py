@@ -133,12 +133,27 @@ class SocialPostsService:
             progress="Generating images..."
         )
 
+        # The image prompt is the user's chat direction with a compact
+        # brand prefix prepended. Claude still writes captions and
+        # hashtags per platform (those benefit from the platform-specific
+        # voice), but image generation goes directly off the user's
+        # words. Same prompt for every platform — only the aspect ratio
+        # differs.
+        image_brand_prefix = brand_context_loader.build_image_prompt_prefix(
+            user_id, "social"
+        )
+        image_user_text = (direction or topic or "").strip()
+        shared_image_prompt = (
+            f"{image_brand_prefix} {image_user_text}".strip()
+            if image_brand_prefix else image_user_text
+        )
+
         # Step 2: Generate images for each platform and upload to Supabase
         all_posts = []
 
         for i, post_data in enumerate(posts_data):
             platform = post_data.get("platform", f"platform_{i+1}")
-            image_prompt = post_data.get("image_prompt", "")
+            image_prompt = shared_image_prompt
             aspect_ratio = PLATFORM_ASPECT_RATIOS.get(platform, "1:1")
 
             if not image_prompt:

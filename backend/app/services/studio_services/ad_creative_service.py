@@ -11,18 +11,15 @@ Flow:
 - Step 2: Gemini generates images for each prompt
 - Output: 3 ad creative images saved to disk
 """
-import json
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
-
-from app.services.integrations.claude import claude_service
 
 logger = logging.getLogger(__name__)
 from app.services.integrations.google.imagen_service import imagen_service
 from app.services.studio_services import studio_index_service
 from app.services.studio_services.partial_image_utils import make_partial_callback
-from app.config import prompt_loader, brand_context_loader
+from app.config import brand_context_loader
 from app.services.integrations.supabase import storage_service
 
 
@@ -30,20 +27,12 @@ class AdCreativeService:
     """
     Service for generating ad creatives.
 
-    Educational Note: This service orchestrates the full pipeline:
-    1. Haiku generates image prompts from product info
-    2. Gemini generates images from each prompt
+    The user's chat prompt (stored as the studio_signal `direction`) is
+    sent verbatim to GPT Image 2 — once per variation, with a compact
+    brand prefix prepended. We no longer ask Haiku to fan the prompt out
+    into hero/lifestyle/aspirational angles; that step rephrased the
+    user's intent and lost specifics.
     """
-
-    def __init__(self):
-        """Initialize service with lazy-loaded config."""
-        self._prompt_config = None
-
-    def _load_config(self) -> Dict[str, Any]:
-        """Lazy load prompt configuration."""
-        if self._prompt_config is None:
-            self._prompt_config = prompt_loader.get_prompt_config("ad_creative")
-        return self._prompt_config
 
     def generate_ad_creatives(
         self,
@@ -82,32 +71,37 @@ class AdCreativeService:
         studio_index_service.update_ad_job(
             project_id, job_id,
             status="processing",
-            progress="Generating image prompts...",
+            progress="Preparing ad creative prompts...",
             started_at=datetime.now().isoformat()
         )
 
-        # Step 1: Generate image prompts with Claude
-        prompts_result = self._generate_prompts(
-            project_id=project_id,
-            product_name=product_name,
-            direction=direction,
-            job_id=job_id,
-            has_logo=logo_image_bytes is not None,
-            user_id=user_id,
-            previous_prompts=previous_prompts,
-            edit_instructions=edit_instructions
+        # Step 1: Build image prompts from the user's direction directly.
+        # We used to ask Haiku to fan the user prompt out into three
+        # different angles (hero / lifestyle / aspirational), but that
+        # introduced drift — the AI added style notes, color choices, and
+        # framing the user never asked for. Now: same user prompt, three
+        # variations from GPT Image 2's stochastic output, with a compact
+        # brand block prepended so brand identity stays consistent.
+        brand_prefix = brand_context_loader.build_image_prompt_prefix(
+            user_id, "ads_creative"
         )
-
-        if not prompts_result.get("success"):
+        user_direction = (direction or product_name or "").strip()
+        if not user_direction:
             studio_index_service.update_ad_job(
                 project_id, job_id,
                 status="error",
-                error=prompts_result.get("error", "Failed to generate prompts"),
+                error="No direction provided for the ad",
                 completed_at=datetime.now().isoformat()
             )
-            return prompts_result
+            return {"success": False, "error": "No direction provided for the ad"}
 
-        prompts = prompts_result.get("prompts", [])
+        final_prompt = (
+            f"{brand_prefix} {user_direction}".strip() if brand_prefix else user_direction
+        )
+        prompts = [
+            {"type": f"variation_{i+1}", "prompt": final_prompt}
+            for i in range(3)
+        ]
 
         # Update progress
         studio_index_service.update_ad_job(
@@ -219,127 +213,8 @@ class AdCreativeService:
             "images": all_images,
             "count": len(all_images),
             "duration_seconds": duration,
-            "usage": prompts_result.get("usage", {})
+            "usage": {},
         }
-
-    def _generate_prompts(
-        self,
-        project_id: str,
-        product_name: str,
-        direction: str,
-        job_id: str,
-        has_logo: bool = False,
-        user_id: Optional[str] = None,
-        previous_prompts: Optional[list] = None,
-        edit_instructions: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Generate image prompts using Claude.
-
-        Educational Note: Claude reads the product info and generates
-        optimized prompts for the image generation model.
-        In edit mode, previous prompts are included as context so Claude
-        refines rather than starts from scratch.
-        """
-        config = self._load_config()
-
-        # Logo context — tells Claude to write prompts that reference the logo
-        logo_context = ""
-        if has_logo:
-            logo_context = (
-                "\nNOTE: A brand logo/icon will be provided to the image generator. "
-                "Write image prompts that describe incorporating it naturally into "
-                "the design — mention logo placement (corner, centered, as part of "
-                "the composition) and how design elements should complement it."
-            )
-
-        # Edit mode: append previous prompts and edit instructions to direction
-        effective_direction = direction or "Create compelling ad creatives for Facebook and Instagram."
-        if previous_prompts and edit_instructions:
-            edit_context = "\n\nPREVIOUS IMAGE PROMPTS (refine these based on the edit instructions):\n"
-            for p in previous_prompts:
-                edit_context += f"- {p['type']}: {p['prompt']}\n"
-            edit_context += f"\nEDIT INSTRUCTIONS: {edit_instructions}"
-            effective_direction = effective_direction + edit_context
-        elif edit_instructions:
-            # Parent job not found or has no images, but user still provided edit instructions
-            effective_direction = effective_direction + f"\n\nADDITIONAL INSTRUCTIONS: {edit_instructions}"
-
-        # Build user message
-        user_message = config["user_message"].format(
-            product_name=product_name,
-            direction=effective_direction,
-            logo_context=logo_context
-        )
-
-        messages = [{"role": "user", "content": user_message}]
-
-        # Load brand context so Claude knows brand name, colors, voice, etc.
-        brand_context = brand_context_loader.load_brand_context(
-            project_id, "ads_creative", user_id=user_id
-        )
-        system_prompt = config["system_prompt"]
-        if brand_context:
-            system_prompt = f"{system_prompt}\n\n{brand_context}"
-
-        try:
-            response = claude_service.send_message(
-                messages=messages,
-                system_prompt=system_prompt,
-                model=config["model"],
-                max_tokens=config["max_tokens"],
-                temperature=config["temperature"],
-                project_id=project_id
-            )
-
-            # Extract text from response
-            content_blocks = response.get("content_blocks", [])
-            text_content = ""
-            for block in content_blocks:
-                if hasattr(block, "text"):
-                    text_content = block.text
-                    break
-                elif isinstance(block, dict) and block.get("type") == "text":
-                    text_content = block.get("text", "")
-                    break
-
-            if not text_content:
-                return {
-                    "success": False,
-                    "error": "No text response from Claude"
-                }
-
-            # Parse JSON from response
-            # Find JSON in the response (might be wrapped in markdown code blocks)
-            json_start = text_content.find("{")
-            json_end = text_content.rfind("}") + 1
-
-            if json_start == -1 or json_end == 0:
-                return {
-                    "success": False,
-                    "error": "No JSON found in Claude response"
-                }
-
-            json_str = text_content[json_start:json_end]
-            parsed = json.loads(json_str)
-            prompts = parsed.get("prompts", [])
-
-            return {
-                "success": True,
-                "prompts": prompts,
-                "usage": response.get("usage", {})
-            }
-
-        except json.JSONDecodeError as e:
-            return {
-                "success": False,
-                "error": f"Failed to parse Claude response as JSON: {str(e)}"
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Failed to generate prompts: {str(e)}"
-            }
 
 
 # Singleton instance
