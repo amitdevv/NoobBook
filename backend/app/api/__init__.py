@@ -54,6 +54,14 @@ def authenticate_request():
     if request.path.startswith('/api/v1/auth/') or request.path == '/api/v1/health':
         return None
 
+    # Share viewer routes are token-gated, not JWT-gated. The
+    # @require_share_token decorator validates the URL token and (for
+    # invited mode) requires a JWT separately. Skipping the global JWT
+    # check here is what makes public-mode share links work without a
+    # logged-in viewer.
+    if request.path.startswith('/api/v1/share/'):
+        return None
+
     user_id = validate_token()
 
     if not user_id:
@@ -80,6 +88,7 @@ from app.api.settings import settings_bp
 from app.api.sources import sources_bp
 from app.api.studio import studio_bp
 from app.api.brand import brand_bp
+from app.api.share import share_bp
 
 # Register nested blueprints with the main api blueprint
 # No url_prefix needed - routes already have full paths
@@ -94,3 +103,4 @@ api_bp.register_blueprint(settings_bp)
 api_bp.register_blueprint(sources_bp)
 api_bp.register_blueprint(studio_bp)
 api_bp.register_blueprint(brand_bp)
+api_bp.register_blueprint(share_bp)

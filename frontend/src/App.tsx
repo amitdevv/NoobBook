@@ -10,6 +10,7 @@ import { createLogger } from '@/lib/logger';
 import { PermissionsProvider } from './contexts/PermissionsContext';
 import { IntegrationsProvider } from './contexts/IntegrationsContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ShareWorkspace } from './components/share/ShareWorkspace';
 
 const log = createLogger('app');
 
@@ -240,7 +241,14 @@ function App() {
     );
   }
 
-  if (authRequired && !isAuthenticated) {
+  // Share viewer routes are reachable without a JWT (public share links).
+  // Render them BEFORE the auth gate so anonymous viewers don't get
+  // bounced to the AuthPage. Invited-mode shares still surface a
+  // sign-in prompt inside ShareWorkspace when the backend returns 401.
+  const isShareRoute =
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/share/');
+
+  if (authRequired && !isAuthenticated && !isShareRoute) {
     return <AuthPage onAuthenticated={refreshAuth} />;
   }
 
@@ -250,6 +258,10 @@ function App() {
         <IntegrationsProvider>
           <BrowserRouter>
             <Routes>
+            {/* Shared project (read-only). Mounted before /projects so
+                public-link viewers don't need a JWT to reach it. */}
+            <Route path="/share/:token" element={<ShareWorkspace />} />
+
             {/* Project Workspace - URL-based routing */}
             <Route
               path="/projects/:projectId"

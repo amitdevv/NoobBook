@@ -33,6 +33,21 @@ interface ChatMessagesProps {
   sending: boolean;
   projectId: string;
   streamingAssistantContent?: string;
+  /**
+   * Render in read-only mode (used by the shared-project view). Currently
+   * a no-op for write affordances inside this component (the input + stop
+   * live in ChatPanel), but accepted for API symmetry and reserved for
+   * future hide-actions toggles.
+   */
+  readOnly?: boolean;
+  /**
+   * Rewrites image / asset URLs before they reach the markdown renderer.
+   * The shared-project view uses this to swap owner-only studio asset
+   * URLs (`/api/v1/projects/:pid/studio/...`) for share-token proxy URLs
+   * (`/api/v1/share/:token/studio/...`) so anonymous viewers can load the
+   * artifacts.
+   */
+  studioAssetRewriter?: (url: string) => string;
 }
 
 /**
@@ -184,6 +199,7 @@ const UserMessage: React.FC<{ content: string }> = ({ content }) => (
 interface AIMessageProps {
   content: string;
   projectId: string;
+  studioAssetRewriter?: (url: string) => string;
 }
 
 /**
@@ -290,7 +306,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({ content }) => {
   );
 };
 
-const AIMessage: React.FC<AIMessageProps> = ({ content, projectId }) => {
+const AIMessage: React.FC<AIMessageProps> = ({ content, projectId, studioAssetRewriter }) => {
   // Parse citations from content to get citation numbers
   const { uniqueCitations, markerToNumber } = useMemo(
     () => parseCitations(content),
@@ -329,6 +345,16 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, projectId }) => {
   // Create markdown components with citation-aware link handler
   const componentsWithCitations = useMemo(() => ({
     ...markdownComponents,
+    // Rewrite asset URLs (studio outputs etc.) when a rewriter is supplied —
+    // used by the shared-project view to redirect owner-only paths through
+    // the share-token proxy.
+    img: ({ src, alt }: { src?: string; alt?: string }) => (
+      <img
+        src={src ? (studioAssetRewriter ? studioAssetRewriter(src) : src) : src}
+        alt={alt || ''}
+        className="max-w-full h-auto rounded-lg my-2"
+      />
+    ),
     // Override 'a' to handle citation links
     a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
       // Check if this is a citation link (#cite-CHUNK_ID)
@@ -365,7 +391,7 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, projectId }) => {
         </a>
       );
     },
-  }), [projectId]);
+  }), [projectId, studioAssetRewriter]);
 
   return (
     <div className="flex justify-start w-full max-w-full overflow-hidden">
@@ -452,7 +478,12 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
   sending,
   projectId,
   streamingAssistantContent = '',
+  readOnly: _readOnly,
+  studioAssetRewriter,
 }) => {
+  // _readOnly is reserved for future use; ChatMessages currently has no
+  // write affordances of its own (input + stop live in ChatPanel).
+  void _readOnly;
   const containerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -516,6 +547,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
               <AIMessage
                 content={msg.content}
                 projectId={projectId}
+                studioAssetRewriter={studioAssetRewriter}
               />
             )}
             {msg.error && (
@@ -530,6 +562,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
           <AIMessage
             content={streamingAssistantContent}
             projectId={projectId}
+            studioAssetRewriter={studioAssetRewriter}
           />
         )}
 

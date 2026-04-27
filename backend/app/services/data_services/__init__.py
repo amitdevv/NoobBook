@@ -24,6 +24,7 @@ from app.services.data_services.brand_asset_service import brand_asset_service
 from app.services.data_services.brand_config_service import brand_config_service
 from app.services.data_services.database_connection_service import database_connection_service
 from app.services.data_services.user_service import get_user_service
+from app.services.data_services import share_service
 
 # ProjectService needs to be instantiated fresh due to directory initialization
 project_service = ProjectService()
@@ -36,4 +37,5 @@ __all__ = [
     "brand_config_service",
     "database_connection_service",
     "get_user_service",
+    "share_service",
 ]

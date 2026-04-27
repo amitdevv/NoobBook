@@ -125,6 +125,79 @@ class ProjectService:
 
         raise RuntimeError("Failed to create project")
 
+    def ensure_shared_with_me_project(
+        self, user_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Find or create the user's "Shared with me" auto-project.
+
+        Used by the share-fork flow (Roadmap #15): when a viewer of a
+        shared chat clicks "Continue in your workspace", the new chat
+        lands in this project. Per-user, created lazily on the first
+        fork.
+
+        Distinguished from regular projects by the literal name
+        "Shared with me" — case-sensitive match keeps the lookup
+        deterministic.
+
+        Race-safe: two concurrent forks from the same viewer would both
+        pass a naive check-then-insert. Migration ``00021`` adds a
+        partial unique index ``(user_id) WHERE name = 'Shared with me'``
+        so the second insert raises a uniqueness violation; we catch
+        that and re-fetch the row that the first insert created.
+        """
+        uid = _resolve_user_id(user_id)
+
+        def _fetch_existing() -> Optional[Dict[str, Any]]:
+            response = (
+                self.supabase.table(self.table)
+                .select("*")
+                .eq("user_id", uid)
+                .eq("name", "Shared with me")
+                .limit(1)
+                .execute()
+            )
+            if response.data:
+                return self._format_project_metadata(response.data[0])
+            return None
+
+        existing = _fetch_existing()
+        if existing:
+            return existing
+
+        project_data = {
+            "user_id": uid,
+            "name": "Shared with me",
+            "description": "Chats forked from projects shared with you.",
+            "custom_prompt": None,
+            "memory": {},
+            "costs": {
+                "total_input_tokens": 0,
+                "total_output_tokens": 0,
+                "total_cost_usd": 0,
+                "by_model": {},
+            },
+        }
+        try:
+            response = self.supabase.table(self.table).insert(project_data).execute()
+            if response.data:
+                return self._format_project_metadata(response.data[0])
+        except Exception as exc:
+            # Race: a concurrent fork inserted first. Re-fetch and return
+            # that row so both callers converge on the same project.
+            msg = str(exc).lower()
+            if "duplicate" in msg or "unique" in msg or "23505" in msg:
+                logger.info(
+                    "ensure_shared_with_me_project lost the race for user %s; re-fetching",
+                    uid,
+                )
+                fallback = _fetch_existing()
+                if fallback:
+                    return fallback
+            raise
+        # Insert returned no data and no exception — fall back one last time.
+        return _fetch_existing()
+
     def get_project(self, project_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Get full project data by ID.
