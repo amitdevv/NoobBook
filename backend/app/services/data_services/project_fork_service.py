@@ -371,10 +371,32 @@ def fork_project(
     base_name = (src.get("name") or "Shared project").strip() or "Shared project"
     new_name = _unique_project_name(client, target_user_id, f"{base_name} (copy)")
 
+    # Resolve the owner's email so the viewer can see who they cloned from.
+    # Fetched best-effort: a deleted owner row shouldn't block the fork.
+    owner_email: Optional[str] = None
+    try:
+        owner_resp = (
+            client.table("users")
+            .select("email")
+            .eq("id", source_owner_user_id)
+            .limit(1)
+            .execute()
+        )
+        if owner_resp.data:
+            owner_email = owner_resp.data[0].get("email")
+    except Exception as exc:
+        logger.warning("Fork: failed to look up owner email for %s: %s", source_owner_user_id, exc)
+
+    original_description = (src.get("description") or "").strip()
+    attribution = f"Copied from {owner_email}." if owner_email else "Copied from a shared project."
+    new_description = (
+        f"{attribution}\n\n{original_description}" if original_description else attribution
+    )
+
     project_row = {
         "user_id": target_user_id,
         "name": new_name,
-        "description": src.get("description") or "",
+        "description": new_description,
         # Carry custom_prompt — it's a project-level instruction, not
         # owner-private state. Memory + costs are reset.
         "custom_prompt": src.get("custom_prompt"),
