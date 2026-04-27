@@ -126,6 +126,33 @@ def get_share_citation(token: str, chat_id: str, chunk_id: str):  # noqa: ARG001
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
+# Allowlisted studio job-type segments. Mirrors the values used by
+# studio_services / tool_executors when they call
+# storage_service.upload_studio_binary(...). Anything outside this set is
+# rejected at the route layer so a malformed `kind` can never reach the
+# storage path builder, regardless of how that helper evolves.
+_ALLOWED_STUDIO_KINDS = frozenset({
+    "creatives",         # ad creatives
+    "social_posts",      # social media posts
+    "infographics",      # infographic images
+    "blogs",             # blog post images
+    "emails",            # email template assets
+    "websites",          # website assets (under /assets/ subpath)
+    "audio",             # audio overviews
+    "video",             # video overviews
+    "presentations",     # presentation decks
+    "business_reports",  # business reports
+    "prds",              # PRD documents
+    "components",        # UI components
+    "wireframes",        # wireframe screens
+    "mind_maps",         # mind maps
+    "flow_diagrams",     # flow diagrams
+    "flash_cards",       # flash cards
+    "quizzes",           # quizzes
+    "marketing_strategies",  # marketing strategy docs
+})
+
+
 @share_bp.route('/share/<token>/studio/<kind>/<job_id>/<path:filename>', methods=['GET'])
 @require_share_token()
 def get_share_studio_artifact(token: str, kind: str, job_id: str, filename: str):  # noqa: ARG001
@@ -135,10 +162,14 @@ def get_share_studio_artifact(token: str, kind: str, job_id: str, filename: str)
     The viewer doesn't have a JWT in public mode, so they can't hit the
     owner-only studio routes directly. We download from Supabase Storage
     here and stream it back. Scoped to the share's project_id — files
-    outside the project are unreachable.
+    outside the project are unreachable. The `kind` segment is checked
+    against an allowlist so the URL can't synthesize unexpected storage
+    paths.
     """
     try:
         ctx = get_share_context()
+        if kind not in _ALLOWED_STUDIO_KINDS:
+            return jsonify({"success": False, "error": "Unknown studio kind"}), 404
         # Walk the Supabase Storage path the studio uploads use.
         # storage_service.upload_studio_binary writes to:
         #   project_id/{kind}/{job_id}/{filename}
