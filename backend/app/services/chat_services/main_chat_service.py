@@ -426,6 +426,7 @@ class MainChatService:
         user_id: Optional[str] = None,
         on_text_delta: Optional[Callable[[str], None]] = None,
         on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        cancel_event: Optional["object"] = None,
     ) -> Dict[str, Any]:
         """
         Shared chat runner for both non-streaming and streaming flows.
@@ -513,6 +514,13 @@ class MainChatService:
             while claude_parsing_utils.is_tool_use(response) and iteration < self.MAX_TOOL_ITERATIONS:
                 iteration += 1
 
+                # Bail out of the agent loop if the SSE client disconnected
+                # (user clicked Stop). Skips further tool executions and the
+                # final persist so we don't write a half-baked assistant
+                # message — that was the "2 responses on resend" bug.
+                if cancel_event is not None and cancel_event.is_set():
+                    break
+
                 # Get tool_use blocks from response (can be multiple for parallel tool calls)
                 tool_use_blocks = claude_parsing_utils.extract_tool_use_blocks(response)
 
@@ -595,18 +603,42 @@ class MainChatService:
             # We combine all text parts to show the complete response to the user.
             final_text = "\n\n".join(accumulated_text_parts) if accumulated_text_parts else ""
 
-            assistant_msg = message_service.add_assistant_message(
-                project_id=project_id,
-                chat_id=chat_id,
-                content=final_text if final_text.strip() else "I've processed your request.",
-                model=response.get("model"),
-                tokens=response.get("usage")
-            )
-            sync_payload = self._build_sync_payload(project_id, chat_id, resolved_user_id)
-            self._emit_event(on_event, "assistant_done", {
-                "assistant_message": assistant_msg,
-                "sync": sync_payload,
-            })
+            # If the user clicked Stop while we were generating, persist a
+            # stub assistant message marked as interrupted instead of the
+            # full response. The chat history then reads as
+            # "question → (stopped) → next question → answer", which is the
+            # intuitive narrative for the user. Without this guard the
+            # half-finished stream still landed in DB and showed up alongside
+            # the user's revised answer (the "2 responses" symptom).
+            cancelled = cancel_event is not None and cancel_event.is_set()
+
+            if cancelled:
+                stopped_content = (
+                    final_text + "\n\n_(stopped by user)_"
+                    if final_text.strip()
+                    else "_(stopped by user)_"
+                )
+                assistant_msg = message_service.add_assistant_message(
+                    project_id=project_id,
+                    chat_id=chat_id,
+                    content=stopped_content,
+                    model=response.get("model"),
+                    tokens=response.get("usage"),
+                )
+                # No on_event emit — the SSE generator is already closed.
+            else:
+                assistant_msg = message_service.add_assistant_message(
+                    project_id=project_id,
+                    chat_id=chat_id,
+                    content=final_text if final_text.strip() else "I've processed your request.",
+                    model=response.get("model"),
+                    tokens=response.get("usage")
+                )
+                sync_payload = self._build_sync_payload(project_id, chat_id, resolved_user_id)
+                self._emit_event(on_event, "assistant_done", {
+                    "assistant_message": assistant_msg,
+                    "sync": sync_payload,
+                })
 
         except Exception as api_error:
             partial_text = api_error.partial_text if isinstance(api_error, ClaudeStreamError) else ""
@@ -692,6 +724,7 @@ class MainChatService:
         *,
         user_id: Optional[str] = None,
         on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        cancel_event: Optional["object"] = None,
     ) -> Dict[str, Any]:
         """Process a user message while streaming assistant text deltas."""
         return self._run_message_flow(
@@ -706,6 +739,7 @@ class MainChatService:
                 {"delta": delta},
             ),
             on_event=on_event,
+            cancel_event=cancel_event,
         )
 
     def _generate_and_update_chat_title(

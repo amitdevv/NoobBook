@@ -129,6 +129,13 @@ def stream_message(project_id, chat_id):
     user_id = identity.user_id
     app = current_app._get_current_object()
     event_queue: "queue.Queue[object]" = queue.Queue()
+    # Cancel flag — set when the SSE generator is closed (client disconnect /
+    # frontend AbortController). Plumbed into the chat service so the
+    # assistant message isn't persisted after the user clicks Stop. Without
+    # this, Flask's stream_with_context keeps the worker thread running and
+    # we'd write the half-baked response to DB, producing the "two answers
+    # on resend" symptom Neel reported.
+    cancel_event = threading.Event()
 
     def emit(event_name: str, payload: dict) -> None:
         event_queue.put(_format_sse(event_name, payload))
@@ -141,6 +148,7 @@ def stream_message(project_id, chat_id):
                 user_message_text=user_message_text,
                 user_id=user_id,
                 on_event=emit,
+                cancel_event=cancel_event,
             )
         except ValueError as exc:
             emit("error", {"message": str(exc)})
@@ -154,11 +162,18 @@ def stream_message(project_id, chat_id):
     thread.start()
 
     def generate():
-        while True:
-            item = event_queue.get()
-            if item is _STREAM_SENTINEL:
-                break
-            yield item
+        try:
+            while True:
+                item = event_queue.get()
+                if item is _STREAM_SENTINEL:
+                    break
+                yield item
+        except GeneratorExit:
+            # Client disconnected (browser navigation, AbortController, etc.).
+            # Tell the worker to stop persisting before re-raising so Flask
+            # can clean up the response.
+            cancel_event.set()
+            raise
 
     headers = {
         "Content-Type": "text/event-stream",

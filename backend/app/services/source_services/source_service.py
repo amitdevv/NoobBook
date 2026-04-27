@@ -296,6 +296,27 @@ class SourceService:
     # Source Upload/Creation (delegates to source_upload module)
     # =========================================================================
 
+    def _shape_for_frontend(
+        self, project_id: str, raw: Optional[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Re-fetch the source through the index read path so the response has
+        the same shape as `GET /sources/{id}` — `active` instead of
+        `is_active`, flattened `file_extension` / `category`, populated
+        `created_at` / `updated_at`. Without this the upload helpers return
+        the raw insert dict (missing those fields), which the smooth-UX
+        SourcesPanel.upsertOne pushes straight into React state and renders
+        broken. Falls back to the raw dict so we never lose the source if
+        the re-fetch round-trips slowly.
+        """
+        if not raw:
+            return raw
+        source_id = raw.get("id")
+        if not source_id:
+            return raw
+        fresh = source_index_service.get_source_from_index(project_id, source_id)
+        return fresh or raw
+
     def upload_source(
         self,
         project_id: str,
@@ -308,7 +329,7 @@ class SourceService:
 
         Delegates to source_upload.file_upload module.
         """
-        return upload_file(project_id, file, name, description)
+        return self._shape_for_frontend(project_id, upload_file(project_id, file, name, description))
 
     def create_source_from_file(
         self,
@@ -325,9 +346,12 @@ class SourceService:
 
         Delegates to source_upload.file_upload module.
         """
-        return create_from_existing_file(
-            project_id, file_path, name, original_filename,
-            category, mime_type, description
+        return self._shape_for_frontend(
+            project_id,
+            create_from_existing_file(
+                project_id, file_path, name, original_filename,
+                category, mime_type, description,
+            ),
         )
 
     def add_url_source(
@@ -342,7 +366,7 @@ class SourceService:
 
         Delegates to source_upload.url_upload module.
         """
-        return upload_url(project_id, url, name, description)
+        return self._shape_for_frontend(project_id, upload_url(project_id, url, name, description))
 
     def add_text_source(
         self,
@@ -356,7 +380,7 @@ class SourceService:
 
         Delegates to source_upload.text_upload module.
         """
-        return upload_text(project_id, content, name, description)
+        return self._shape_for_frontend(project_id, upload_text(project_id, content, name, description))
 
     def add_research_source(
         self,
@@ -370,7 +394,7 @@ class SourceService:
 
         Delegates to source_upload.research_upload module.
         """
-        return upload_research(project_id, topic, description, links)
+        return self._shape_for_frontend(project_id, upload_research(project_id, topic, description, links))
 
     def add_database_source(
         self,
@@ -388,14 +412,16 @@ class SourceService:
         to fetch a schema snapshot + embeddings.
         """
         if user_id:
-            return add_database_source(
+            raw = add_database_source(
                 project_id,
                 connection_id,
                 name,
                 description,
                 user_id=user_id,
             )
-        return add_database_source(project_id, connection_id, name, description)
+        else:
+            raw = add_database_source(project_id, connection_id, name, description)
+        return self._shape_for_frontend(project_id, raw)
 
     def add_freshdesk_source(
         self,
@@ -411,7 +437,9 @@ class SourceService:
         `.freshdesk` metadata file in Supabase Storage and triggers processing
         to sync tickets and make them queryable via the analysis agent.
         """
-        return add_freshdesk_source(project_id, name, description, days_back)
+        return self._shape_for_frontend(
+            project_id, add_freshdesk_source(project_id, name, description, days_back)
+        )
 
     def add_jira_source(
         self,
@@ -426,7 +454,7 @@ class SourceService:
         API tools (jira_list_projects, jira_search_issues, etc.) for this
         specific project. No data sync — tools query Jira live.
         """
-        return add_jira_source(project_id, name, description)
+        return self._shape_for_frontend(project_id, add_jira_source(project_id, name, description))
 
     def add_mixpanel_source(
         self,
@@ -441,7 +469,7 @@ class SourceService:
         chat tools (mixpanel_list_events, mixpanel_query_events, etc.) for
         this specific project. Queries Mixpanel's Query API live.
         """
-        return add_mixpanel_source(project_id, name, description)
+        return self._shape_for_frontend(project_id, add_mixpanel_source(project_id, name, description))
 
     def add_mcp_source(
         self,
@@ -460,7 +488,7 @@ class SourceService:
         to snapshot selected resources, embed them, and make them searchable.
         """
         if user_id:
-            return add_mcp_source(
+            raw = add_mcp_source(
                 project_id,
                 connection_id,
                 resource_uris,
@@ -468,7 +496,9 @@ class SourceService:
                 description,
                 user_id=user_id,
             )
-        return add_mcp_source(project_id, connection_id, resource_uris, name, description)
+        else:
+            raw = add_mcp_source(project_id, connection_id, resource_uris, name, description)
+        return self._shape_for_frontend(project_id, raw)
 
     # =========================================================================
     # Processing Delegation (thin wrappers)

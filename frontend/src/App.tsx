@@ -9,6 +9,7 @@ import { authAPI } from './lib/api/auth';
 import { createLogger } from '@/lib/logger';
 import { PermissionsProvider } from './contexts/PermissionsContext';
 import { IntegrationsProvider } from './contexts/IntegrationsContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const log = createLogger('app');
 
@@ -168,14 +169,20 @@ function ProjectWorkspaceRoute({
     return null;
   }
 
+  // Wrap the workspace in an ErrorBoundary so a single bad render
+  // (malformed citation, missing message field, etc.) doesn't blank the
+  // entire page — that was Neel's "screen goes blank, refresh fixes it" bug.
+  // resetKey=projectId so navigating to a different project recovers cleanly.
   return (
-    <ProjectWorkspace
-      project={project}
-      onBack={() => navigate('/')}
-      onDeleteProject={handleDeleteProject}
-      onRenameProject={handleRenameProject}
-      onSignOut={isAuthenticated ? onSignOut : undefined}
-    />
+    <ErrorBoundary resetKey={projectId}>
+      <ProjectWorkspace
+        project={project}
+        onBack={() => navigate('/')}
+        onDeleteProject={handleDeleteProject}
+        onRenameProject={handleRenameProject}
+        onSignOut={isAuthenticated ? onSignOut : undefined}
+      />
+    </ErrorBoundary>
   );
 }
 
@@ -238,10 +245,11 @@ function App() {
   }
 
   return (
-    <PermissionsProvider>
-      <IntegrationsProvider>
-        <BrowserRouter>
-          <Routes>
+    <ErrorBoundary>
+      <PermissionsProvider>
+        <IntegrationsProvider>
+          <BrowserRouter>
+            <Routes>
             {/* Project Workspace - URL-based routing */}
             <Route
               path="/projects/:projectId"
@@ -272,10 +280,11 @@ function App() {
                 />
               }
             />
-          </Routes>
-        </BrowserRouter>
-      </IntegrationsProvider>
-    </PermissionsProvider>
+            </Routes>
+          </BrowserRouter>
+        </IntegrationsProvider>
+      </PermissionsProvider>
+    </ErrorBoundary>
   );
 }
 
