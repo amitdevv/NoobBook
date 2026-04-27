@@ -84,7 +84,8 @@ export const adsAPI = {
     logoSource?: 'auto' | 'brand_icon' | 'source' | 'none',
     logoSourceId?: string,
     parentJobId?: string,
-    editInstructions?: string
+    editInstructions?: string,
+    sourceIds?: string[]
   ): Promise<StartAdResponse> {
     try {
       const body: Record<string, unknown> = {
@@ -95,6 +96,7 @@ export const adsAPI = {
       if (logoSourceId) body.logo_source_id = logoSourceId;
       if (parentJobId) body.parent_job_id = parentJobId;
       if (editInstructions) body.edit_instructions = editInstructions;
+      if (sourceIds && sourceIds.length > 0) body.source_ids = sourceIds;
 
       const response = await axios.post(
         `${API_BASE_URL}/projects/${projectId}/studio/ad-creative`,

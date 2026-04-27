@@ -124,12 +124,34 @@ def resolve_source_logo(project_id: str, source_id: str) -> Tuple[Optional[bytes
     return None, "image/png"
 
 
+def _first_image_source_id(project_id: str, source_ids: list) -> Optional[str]:
+    """
+    Scan a list of source ids and return the first one of type IMAGE.
+
+    Used to auto-detect a user-uploaded logo when no brand icon is set.
+    """
+    from app.services.source_services.source_service import source_service
+
+    for sid in source_ids or []:
+        try:
+            src = source_service.get_source(project_id, sid)
+            if src and src.get('type') == 'IMAGE':
+                return sid
+        except Exception as e:
+            logger.warning("Failed to inspect source %s while auto-detecting logo: %s", sid, e)
+    return None
+
+
 def resolve_logo(data: dict, project_id: str) -> Tuple[Optional[bytes], str]:
     """
     Resolve logo bytes from request data.
 
     Reads logo_source and logo_source_id from the request body and
     resolves the logo image accordingly.
+
+    Resolution order for 'auto':
+      1. Brand icon / logo (from brand assets)
+      2. First IMAGE-type source in `data['source_ids']` (chat-supplied context)
 
     Args:
         data: Request JSON body
@@ -140,10 +162,19 @@ def resolve_logo(data: dict, project_id: str) -> Tuple[Optional[bytes], str]:
     """
     logo_source = data.get('logo_source', 'auto')
 
-    if logo_source in ('brand_icon', 'auto'):
-        return resolve_brand_logo()
-
     if logo_source == 'source' and data.get('logo_source_id'):
         return resolve_source_logo(project_id, data['logo_source_id'])
+
+    if logo_source in ('brand_icon', 'auto'):
+        image_bytes, mime_type = resolve_brand_logo()
+        if image_bytes:
+            return image_bytes, mime_type
+
+        # Fallback: when 'auto' and no brand asset, look for an image source
+        # the user attached to the project (e.g. uploaded their logo as a source).
+        if logo_source == 'auto':
+            fallback_id = _first_image_source_id(project_id, data.get('source_ids') or [])
+            if fallback_id:
+                return resolve_source_logo(project_id, fallback_id)
 
     return None, "image/png"

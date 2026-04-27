@@ -150,13 +150,7 @@ export const SharingModal: React.FC<SharingModalProps> = ({
       });
       const created = res.data.share;
       setShares((prev) => upsertOne(prev, created, { prepend: true }));
-      // Auto-copy + toast — the moment of joy when sharing.
-      try {
-        await navigator.clipboard.writeText(created.url);
-        success('Link copied');
-      } catch {
-        success('Link created');
-      }
+      success('Link created — use the copy button to share it');
       resetForm();
     } catch (err) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
@@ -197,12 +191,12 @@ export const SharingModal: React.FC<SharingModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[540px] p-0 overflow-hidden">
-        <div className="px-7 pt-6 pb-4 border-b">
+      <DialogContent className="max-w-[540px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
+        <div className="px-7 pt-6 pb-4 border-b flex-shrink-0">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-              <Share size={18} className="text-primary" />
-              Share &ldquo;{projectName}&rdquo;
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold pr-8">
+              <Share size={18} className="text-primary flex-shrink-0" />
+              <span className="truncate">Share &ldquo;{projectName}&rdquo;</span>
             </DialogTitle>
             <DialogDescription className="text-xs leading-relaxed text-muted-foreground mt-1">
               Anyone with the link gets <strong>read-only</strong> access to this project&apos;s chats.
@@ -211,6 +205,7 @@ export const SharingModal: React.FC<SharingModalProps> = ({
           </DialogHeader>
         </div>
 
+        <div className="flex-1 overflow-y-auto">
         {/* ── CREATE ─────────────────────────────────────────── */}
         <div className="px-7 py-5 space-y-4">
           <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
@@ -350,7 +345,7 @@ export const SharingModal: React.FC<SharingModalProps> = ({
           ) : shares.length === 0 ? (
             <EmptyState />
           ) : (
-            <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 -mr-1">
+            <div className="space-y-2">
               {shares.map((share, idx) => (
                 <ShareRow
                   key={share.id}
@@ -363,6 +358,7 @@ export const SharingModal: React.FC<SharingModalProps> = ({
               ))}
             </div>
           )}
+        </div>
         </div>
 
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
@@ -463,30 +459,29 @@ const ShareRow: React.FC<ShareRowProps> = ({ share, copied, onCopy, onRevoke, st
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-0.5 flex-shrink-0">
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onCopy(share)}
-                  disabled={inactive}
-                  className="h-7 w-7"
-                  aria-label="Copy link"
-                >
-                  {copied ? (
-                    <CheckCircle size={14} weight="fill" className="text-primary" />
-                  ) : (
-                    <Copy size={14} />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">
-                {copied ? 'Copied' : 'Copy link'}
-              </TooltipContent>
-            </Tooltip>
-            {!inactive && (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Button
+            variant={copied ? 'secondary' : 'outline'}
+            size="sm"
+            onClick={() => onCopy(share)}
+            disabled={inactive}
+            className="h-7 px-2.5 gap-1.5 text-xs"
+            aria-label="Copy link"
+          >
+            {copied ? (
+              <>
+                <CheckCircle size={13} weight="fill" className="text-primary" />
+                Copied
+              </>
+            ) : (
+              <>
+                <Copy size={13} />
+                Copy
+              </>
+            )}
+          </Button>
+          {!inactive && (
+            <TooltipProvider delayDuration={300}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -503,8 +498,8 @@ const ShareRow: React.FC<ShareRowProps> = ({ share, copied, onCopy, onRevoke, st
                   Revoke
                 </TooltipContent>
               </Tooltip>
-            )}
-          </TooltipProvider>
+            </TooltipProvider>
+          )}
         </div>
       </div>
     </div>

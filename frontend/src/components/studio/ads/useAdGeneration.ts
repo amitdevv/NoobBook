@@ -89,12 +89,19 @@ export const useAdGeneration = (projectId: string) => {
         return;
       }
 
-      // Logo source defaults to 'auto' — backend auto-detects brand icon/logo
+      // Logo source defaults to 'auto' — backend tries brand icon first, then
+      // falls back to any IMAGE-type source the chat AI flagged for this signal
+      // (e.g. a logo the user uploaded as a data source).
+      const sourceIds = (signal.sources || []).map((s) => s.source_id);
       const startResponse = await adsAPI.startGeneration(
         projectId,
         productName,
         signal.direction,
-        'auto'
+        'auto',
+        undefined,
+        undefined,
+        undefined,
+        sourceIds
       );
 
       if (!startResponse.success || !startResponse.job_id) {
@@ -154,6 +161,9 @@ export const useAdGeneration = (projectId: string) => {
         undefined,
         parentJob.id,
         editInstructions
+        // sourceIds: not retained on parent job; brand-asset path still works,
+        // and if the user originally relied on a source-as-logo they can re-trigger
+        // from the chat signal to re-supply context.
       );
 
       if (!startResponse.success || !startResponse.job_id) {
