@@ -88,6 +88,8 @@ def upload_file(
     # Upload to Supabase Storage by streaming the file handle directly.
     # Passing the file-like object (not bytes) keeps the request body out of
     # Python's heap — storage3 hands it to httpx which streams over the wire.
+    # upload_raw_file falls back to a buffered bytes upload internally if
+    # the streaming path fails, so we don't need to retry here.
     storage_path = storage_service.upload_raw_file(
         project_id=project_id,
         source_id=source_id,
@@ -97,7 +99,16 @@ def upload_file(
     )
 
     if not storage_path:
-        raise ValueError("Failed to upload file to storage")
+        # The actual storage3 / httpx exception was logged inside
+        # upload_raw_file. Mention that here so a user reporting
+        # "Failed to upload file to storage" can be pointed at the
+        # backend logs instead of guessing.
+        raise ValueError(
+            "Failed to upload file to storage. "
+            "Check backend logs for the underlying Supabase Storage error "
+            "(common causes: bucket missing, RLS policy mismatch, "
+            "expired SUPABASE_SERVICE_KEY, or file exceeds 1GB limit)."
+        )
 
     # Create source metadata
     timestamp = datetime.now().isoformat()
@@ -182,7 +193,12 @@ def create_from_existing_file(
     )
 
     if not storage_path:
-        raise ValueError("Failed to upload file to storage")
+        raise ValueError(
+            "Failed to upload file to storage. "
+            "Check backend logs for the underlying Supabase Storage error "
+            "(common causes: bucket missing, RLS policy mismatch, "
+            "expired SUPABASE_SERVICE_KEY, or file exceeds 1GB limit)."
+        )
 
     # Delete temporary local file
     try:

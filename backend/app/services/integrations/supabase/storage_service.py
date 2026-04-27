@@ -94,6 +94,20 @@ def upload_raw_file(
     """
     Upload a raw file to storage.
 
+    Robustness layers (in order):
+      1. Streaming upload (preferred — keeps multi-GB files off the heap).
+      2. On failure, fall back to a buffered bytes upload. SpooledTemporaryFile
+         streams can break storage3/httpx for some file shapes (no
+         Content-Length, partial reads, weird encodings); reading into bytes
+         sidesteps the SDK quirks at the cost of memory for that one file.
+      3. On Duplicate / "already exists" errors, remove the existing object
+         then retry, mirroring the studio uploader's _upsert_file pattern.
+         This recovers retries that hit the same source_id path.
+
+    Returns the storage path on success. Returns None **only** after every
+    fallback fails — and the underlying exception is logged with full
+    context so the API layer can surface a useful error to the user.
+
     Args:
         project_id: The project UUID
         source_id: The source UUID
@@ -103,20 +117,81 @@ def upload_raw_file(
         content_type: MIME type
 
     Returns:
-        Storage path if successful, None otherwise
+        Storage path if successful, None otherwise.
     """
     client = _get_client()
     path = _build_path(project_id, source_id, filename)
+    file_options = {"content-type": content_type}
 
+    def _do_upload(payload):
+        try:
+            client.storage.from_(BUCKET_RAW).upload(
+                path=path,
+                file=payload,
+                file_options=file_options,
+            )
+            return None
+        except Exception as exc:
+            msg = str(exc).lower()
+            if "duplicate" in msg or "already exists" in msg or "resource already exists" in msg:
+                # Remove the orphaned object then retry once. Don't recurse —
+                # if the retry also fails we want to surface that error.
+                try:
+                    client.storage.from_(BUCKET_RAW).remove([path])
+                except Exception as remove_exc:
+                    logger.warning("Could not remove existing raw file %s: %s", path, remove_exc)
+                client.storage.from_(BUCKET_RAW).upload(
+                    path=path,
+                    file=payload,
+                    file_options=file_options,
+                )
+                return None
+            return exc
+
+    # Attempt 1: streaming upload (file-like objects only — bytes go straight
+    # to attempt 2's payload regardless).
+    streaming_error: Optional[Exception] = None
+    if not isinstance(file_data, (bytes, bytearray)):
+        try:
+            err = _do_upload(file_data)
+            if err is None:
+                return path
+            streaming_error = err
+        except Exception as exc:
+            streaming_error = exc
+
+        if streaming_error is not None:
+            logger.warning(
+                "Streaming upload of %s failed (%s) — retrying as buffered bytes",
+                path, streaming_error,
+            )
+            # Rewind the stream before re-reading. Some streams may not be
+            # seekable; if so we'll surface the failure on the bytes attempt.
+            try:
+                file_data.seek(0)
+            except Exception:
+                pass
+
+    # Attempt 2: buffered bytes. Works for both retries (file-like that we
+    # just rewound) and the original bytes-input path.
     try:
-        client.storage.from_(BUCKET_RAW).upload(
-            path=path,
-            file=file_data,
-            file_options={"content-type": content_type}
+        if isinstance(file_data, (bytes, bytearray)):
+            payload = bytes(file_data)
+        else:
+            payload = file_data.read()
+        err = _do_upload(payload)
+        if err is None:
+            return path
+        logger.error(
+            "Buffered upload of %s failed: %s (size=%d, content_type=%s)",
+            path, err, len(payload), content_type,
         )
-        return path
-    except Exception as e:
-        logger.error("Failed to upload raw file %s: %s", path, e)
+        return None
+    except Exception as exc:
+        logger.error(
+            "Failed to upload raw file %s: %s (streaming_error=%s)",
+            path, exc, streaming_error,
+        )
         return None
 
 
