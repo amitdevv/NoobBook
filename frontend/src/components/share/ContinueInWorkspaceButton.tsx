@@ -25,13 +25,13 @@ interface ContinueInWorkspaceButtonProps {
  * ContinueInWorkspaceButton
  *
  * Pinned to the bottom of the chat detail pane in share mode, in place
- * of the input area. Soft amber ring, generous padding, friendly tone:
- * "Want to continue this conversation?" — not "Limited access".
+ * of the input area. Soft amber ring, generous padding, friendly tone.
  *
- * For logged-in viewers: forks the shared chat into their "Shared with
- * me" workspace and navigates them straight into the writable copy.
- * For anonymous viewers: changes the CTA to a sign-in link that
- * round-trips back to the share URL after auth.
+ * For logged-in viewers: clones the entire shared project — sources,
+ * chunks, Pinecone vectors, all chats — into the viewer's account and
+ * deep-links them straight to the cloned chat they were reading.
+ * For anonymous viewers: shows a sign-in link that round-trips back to
+ * the share URL after auth.
  */
 export const ContinueInWorkspaceButton: React.FC<ContinueInWorkspaceButtonProps> = ({
   token,
@@ -51,11 +51,14 @@ export const ContinueInWorkspaceButton: React.FC<ContinueInWorkspaceButtonProps>
       setForking(true);
       const res = await shareAPI.fork(token, chatId);
       const result = res.data;
-      navigate(`/projects/${result.project.id}/chats/${result.chat.id}`);
+      // Project workspace doesn't deep-link to chats yet, so always
+      // navigate to the project root — the cloned chats are visible in
+      // the chat list and tagged with their fork lineage.
+      navigate(`/projects/${result.project.id}`);
     } catch (err) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
       log.error({ err }, 'fork failed');
-      error(msg || 'Could not continue this chat. Try again?');
+      error(msg || 'Could not copy this project. Try again?');
       setForking(false);
     }
   };
@@ -81,10 +84,10 @@ export const ContinueInWorkspaceButton: React.FC<ContinueInWorkspaceButtonProps>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground leading-snug">
-              Want to continue this conversation?
+              Make this project yours
             </p>
             <p className="text-[12.5px] text-muted-foreground leading-relaxed mt-1">
-              We&apos;ll create a copy in your workspace where you can keep chatting with your own sources.
+              We&apos;ll copy the sources, chats, and citations into a new project in your workspace so you can keep working.
             </p>
             <div className="mt-3">
               {isAuthenticated ? (
@@ -97,11 +100,11 @@ export const ContinueInWorkspaceButton: React.FC<ContinueInWorkspaceButtonProps>
                   {forking ? (
                     <>
                       <CircleNotch size={14} className="animate-spin" />
-                      Creating your copy…
+                      Copying project…
                     </>
                   ) : (
                     <>
-                      Continue in your workspace
+                      Make a copy in your workspace
                       <ArrowSquareOut size={14} weight="bold" />
                     </>
                   )}
@@ -109,7 +112,7 @@ export const ContinueInWorkspaceButton: React.FC<ContinueInWorkspaceButtonProps>
               ) : (
                 <Button asChild size="sm" className="gap-2 h-8">
                   <a href={fallbackSignIn}>
-                    Sign in to continue
+                    Sign in to make a copy
                     <ArrowSquareOut size={14} weight="bold" />
                   </a>
                 </Button>

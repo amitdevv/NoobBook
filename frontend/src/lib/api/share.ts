@@ -44,14 +44,22 @@ export interface SharedCitationChunk {
   chunk_index: number;
 }
 
+/**
+ * Returned by `POST /share/{token}/chats/{chat_id}/fork`. The fork now
+ * clones the entire project (sources + chunks + chats + Pinecone vectors),
+ * so `project` is always present. `chat` is the cloned counterpart of the
+ * chat the viewer was reading — null in the unlikely case it didn't survive
+ * the clone, in which case the UI should fall back to `/projects/{id}`.
+ */
 export interface ForkResult {
   project: { id: string; name: string };
   chat: {
     id: string;
-    title: string;
     project_id: string;
-    forked_from_chat_id: string;
-    forked_from_project_id: string;
+  } | null;
+  stats?: {
+    source_count: number;
+    chat_count: number;
   };
 }
 

@@ -200,9 +200,12 @@ def get_share_studio_artifact(token: str, kind: str, job_id: str, filename: str)
 @require_share_token(require_jwt=True)
 def fork_share_chat(token: str, chat_id: str):  # noqa: ARG001
     """
-    Copy a shared chat into the viewer's own workspace ("Shared with me"
-    auto-project). Returns the new project + chat IDs so the frontend
-    can navigate to the viewer's writable copy.
+    Clone the shared project into the viewer's workspace.
+
+    The fork includes sources, chunks, Pinecone vectors, and every chat
+    + messages — see ``project_fork_service`` for the precise scope.
+    Returns the new project id and the cloned counterpart of the chat
+    the viewer was reading so the frontend can deep-link straight to it.
     """
     try:
         ctx = get_share_context()
@@ -210,29 +213,41 @@ def fork_share_chat(token: str, chat_id: str):  # noqa: ARG001
             # Decorator guarantees this with require_jwt=True, but stay defensive.
             return jsonify({"success": False, "error": "Sign in required"}), 401
 
-        # Fetch the source chat under the SHARE's project_id (not the
-        # viewer's). This is the cross-project read the share grants.
-        source_chat = chat_service.get_chat(ctx.project_id, chat_id, include_raw=True)
+        # Confirm the chat exists under the share's project before kicking
+        # off a multi-second clone. The decorator already authorized
+        # access to the project; we just want a clean 404 if the chat id
+        # is wrong (e.g. stale link).
+        source_chat = chat_service.get_chat(ctx.project_id, chat_id)
         if not source_chat:
             return jsonify({"success": False, "error": "Chat not found"}), 404
 
-        target_project = project_service.ensure_shared_with_me_project(ctx.viewer_user_id)
-        if not target_project:
-            return jsonify({"success": False, "error": "Could not create destination project"}), 500
+        from app.services.data_services.project_fork_service import fork_project
 
-        new_chat = chat_service.fork_chat(
+        result = fork_project(
             source_project_id=ctx.project_id,
-            source_chat_id=chat_id,
-            target_project_id=target_project["id"],
+            source_owner_user_id=ctx.owner_user_id,
             target_user_id=ctx.viewer_user_id,
+            seed_chat_id=chat_id,
         )
-        if not new_chat:
+        if not result:
             return jsonify({"success": False, "error": "Fork failed"}), 500
 
         return jsonify({
             "success": True,
-            "project": target_project,
-            "chat": new_chat,
+            "project": {
+                "id": result["project_id"],
+                "name": result["project_name"],
+            },
+            # Keep the legacy `chat` shape so the frontend's existing
+            # parser doesn't have to change as much.
+            "chat": {
+                "id": result.get("chat_id"),
+                "project_id": result["project_id"],
+            } if result.get("chat_id") else None,
+            "stats": {
+                "source_count": result.get("source_count", 0),
+                "chat_count": result.get("chat_count", 0),
+            },
         }), 201
     except Exception as exc:
         current_app.logger.error("Share fork failed (%s): %s", chat_id, exc)

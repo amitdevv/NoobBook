@@ -178,6 +178,72 @@ class PineconeService:
 
         return results
 
+    def fetch_vectors_by_ids(
+        self,
+        ids: List[str],
+        namespace: str,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Fetch vectors by id from a namespace.
+
+        Used by the project-fork flow: we need to copy existing vectors
+        from the source project's namespace into the new project's
+        namespace under remapped ids. Re-fetching avoids re-embedding
+        (which would cost OpenAI tokens for content we already paid for).
+
+        Args:
+            ids: List of vector ids to fetch.
+            namespace: The Pinecone namespace (project_id).
+
+        Returns:
+            Dict mapping id → {id, values, metadata}. Missing ids are
+            simply absent from the result; the caller should treat that
+            as "nothing to copy" rather than an error.
+        """
+        if not ids:
+            return {}
+
+        index = self._get_index()
+        result: Dict[str, Dict[str, Any]] = {}
+
+        # Pinecone fetch supports ~100 ids per call. Batch to stay safe.
+        batch_size = 100
+        for i in range(0, len(ids), batch_size):
+            batch = ids[i:i + batch_size]
+            try:
+                resp = index.fetch(ids=batch, namespace=namespace)
+            except Exception as exc:
+                logger.warning(
+                    "Pinecone fetch failed for namespace=%s batch starting %s: %s",
+                    namespace, batch[0], exc,
+                )
+                continue
+
+            # Pinecone client surfaces vectors as either an attribute or a
+            # dict depending on version — handle both.
+            vectors = getattr(resp, "vectors", None)
+            if vectors is None and isinstance(resp, dict):
+                vectors = resp.get("vectors")
+            if not vectors:
+                continue
+
+            for vid, vec in vectors.items():
+                values = getattr(vec, "values", None)
+                if values is None and isinstance(vec, dict):
+                    values = vec.get("values")
+                metadata = getattr(vec, "metadata", None)
+                if metadata is None and isinstance(vec, dict):
+                    metadata = vec.get("metadata")
+                if values is None:
+                    continue
+                result[vid] = {
+                    "id": vid,
+                    "values": list(values),
+                    "metadata": dict(metadata) if metadata else {},
+                }
+
+        return result
+
     def delete_by_source(
         self,
         source_id: str,
