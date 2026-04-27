@@ -61,6 +61,41 @@ class UserService:
             user["period_start"] = settings.get("period_start")
         return users
 
+    def search_users_by_email(
+        self,
+        prefix: str,
+        limit: int = 10,
+        exclude_user_id: Optional[str] = None,
+    ) -> List[Dict[str, str]]:
+        """
+        Find users whose email starts with `prefix` (case-insensitive).
+
+        Used by the share-modal autocomplete: only the prefix (not arbitrary
+        substring) so a typo doesn't surface unrelated accounts, and so
+        results are predictable for type-ahead.
+        """
+        prefix = (prefix or "").strip().lower()
+        if len(prefix) < 1:
+            return []
+
+        # Cap limit so a malformed client can't flood the response.
+        capped_limit = max(1, min(limit, 25))
+
+        # `ilike` with a trailing % gives us case-insensitive prefix match.
+        # Escape any % / _ the caller embedded so they're treated literally.
+        safe = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        query = (
+            self.supabase.table(self.table)
+            .select("id, email")
+            .ilike("email", f"{safe}%")
+            .order("email", desc=False)
+            .limit(capped_limit)
+        )
+        if exclude_user_id:
+            query = query.neq("id", exclude_user_id)
+        resp = query.execute()
+        return resp.data or []
+
     def get_user(self, user_id: str) -> Optional[Dict[str, str]]:
         resp = (
             self.supabase.table(self.table)

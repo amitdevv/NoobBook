@@ -35,6 +35,11 @@ export interface CreateShareInput {
   expires_in_days?: ShareExpiry;
 }
 
+export interface InvitableUser {
+  id: string;
+  email: string;
+}
+
 export const sharesAPI = {
   list: (projectId: string) =>
     api.get<{ success: boolean; shares: ProjectShare[] }>(
@@ -50,5 +55,15 @@ export const sharesAPI = {
   revoke: (projectId: string, shareId: string) =>
     api.delete<{ success: boolean }>(
       `/projects/${projectId}/shares/${shareId}`,
+    ),
+
+  /**
+   * Prefix-search for users to invite. Backend caps results at 25 and
+   * excludes the requester. Empty `q` returns an empty list.
+   */
+  searchUsers: (projectId: string, q: string, limit = 8) =>
+    api.get<{ success: boolean; users: InvitableUser[] }>(
+      `/projects/${projectId}/shares/users-search`,
+      { params: { q, limit } },
     ),
 };

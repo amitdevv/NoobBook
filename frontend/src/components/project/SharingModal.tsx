@@ -28,7 +28,13 @@ import {
 } from '@phosphor-icons/react';
 import { useToast } from '../ui/use-toast';
 import { ToastContainer } from '../ui/toast';
-import { sharesAPI, type ProjectShare, type ShareExpiry, type ShareMode } from '@/lib/api/shares';
+import {
+  sharesAPI,
+  type InvitableUser,
+  type ProjectShare,
+  type ShareExpiry,
+  type ShareMode,
+} from '@/lib/api/shares';
 import { upsertOne, removeOne } from '@/lib/resourceState';
 import { createLogger } from '@/lib/logger';
 
@@ -75,6 +81,12 @@ export const SharingModal: React.FC<SharingModalProps> = ({
   // ── Per-row state ────────────────────────────────────────────────
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // ── User search (autocomplete for invited mode) ──────────────────
+  const [searchResults, setSearchResults] = useState<InvitableUser[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+
   const resetForm = useCallback(() => {
     setMode('public');
     setEmailDraft('');
@@ -105,8 +117,50 @@ export const SharingModal: React.FC<SharingModalProps> = ({
     if (!open) {
       setEmailDraft('');
       setCopiedId(null);
+      setSearchResults([]);
+      setSearchOpen(false);
     }
   }, [open]);
+
+  // Debounced user-search as the owner types into the chip input.
+  // 200ms feels instant without flooding the backend on every keystroke.
+  useEffect(() => {
+    if (mode !== 'invited') return;
+    const trimmed = emailDraft.trim();
+    if (trimmed.length < 1) {
+      setSearchResults([]);
+      setSearchOpen(false);
+      return;
+    }
+    let cancelled = false;
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await sharesAPI.searchUsers(projectId, trimmed);
+        if (cancelled) return;
+        // Hide users already in the chip list — no point re-suggesting.
+        const already = new Set(emails.map((e) => e.toLowerCase()));
+        const filtered = (res.data.users || []).filter(
+          (u) => u.email && !already.has(u.email.toLowerCase()),
+        );
+        setSearchResults(filtered);
+        setSearchOpen(filtered.length > 0);
+        setHighlightedIndex(0);
+      } catch (err) {
+        if (!cancelled) {
+          log.warn({ err }, 'user search failed');
+          setSearchResults([]);
+          setSearchOpen(false);
+        }
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [emailDraft, mode, projectId, emails]);
 
   const addEmail = (raw: string) => {
     const cleaned = raw.trim().toLowerCase();
@@ -121,8 +175,35 @@ export const SharingModal: React.FC<SharingModalProps> = ({
   };
 
   const handleEmailKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    const hasResults = searchOpen && searchResults.length > 0;
+
+    if (e.key === 'ArrowDown' && hasResults) {
+      e.preventDefault();
+      setHighlightedIndex((i) => (i + 1) % searchResults.length);
+      return;
+    }
+    if (e.key === 'ArrowUp' && hasResults) {
+      e.preventDefault();
+      setHighlightedIndex((i) => (i - 1 + searchResults.length) % searchResults.length);
+      return;
+    }
+    if (e.key === 'Escape' && searchOpen) {
+      e.preventDefault();
+      setSearchOpen(false);
+      return;
+    }
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
+      // Prefer the highlighted suggestion if any, else fall back to the
+      // raw draft so the owner can still invite an email that doesn't
+      // appear in suggestions yet (e.g. because of an indexing delay).
+      if (hasResults) {
+        const picked = searchResults[highlightedIndex];
+        if (picked?.email) {
+          addEmail(picked.email);
+          return;
+        }
+      }
       addEmail(emailDraft);
     } else if (e.key === 'Backspace' && !emailDraft && emails.length > 0) {
       setEmails((prev) => prev.slice(0, -1));
@@ -243,36 +324,91 @@ export const SharingModal: React.FC<SharingModalProps> = ({
             })}
           </div>
 
-          {/* Invited emails — chip-style input */}
+          {/* Invited emails — chip-style input with type-ahead dropdown */}
           {mode === 'invited' && (
             <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 rounded-md border border-border/70 bg-background min-h-9">
-                {emails.map((e) => (
-                  <span
-                    key={e}
-                    className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-[11px] font-medium bg-muted/70 border border-border/50"
-                  >
-                    {e}
-                    <button
-                      onClick={() => removeEmail(e)}
-                      className="rounded-full hover:bg-stone-200/70 p-0.5"
-                      aria-label={`Remove ${e}`}
+              <div className="relative">
+                <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 rounded-md border border-border/70 bg-background min-h-9">
+                  {emails.map((e) => (
+                    <span
+                      key={e}
+                      className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-[11px] font-medium bg-muted/70 border border-border/50"
                     >
-                      <X size={10} weight="bold" />
-                    </button>
-                  </span>
-                ))}
-                <Input
-                  value={emailDraft}
-                  onChange={(ev) => setEmailDraft(ev.target.value)}
-                  onKeyDown={handleEmailKey}
-                  onBlur={() => emailDraft && addEmail(emailDraft)}
-                  placeholder={emails.length ? '' : 'name@example.com, then Enter'}
-                  className="flex-1 min-w-[160px] h-7 px-1 border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                />
+                      {e}
+                      <button
+                        onClick={() => removeEmail(e)}
+                        className="rounded-full hover:bg-stone-200/70 p-0.5"
+                        aria-label={`Remove ${e}`}
+                      >
+                        <X size={10} weight="bold" />
+                      </button>
+                    </span>
+                  ))}
+                  <Input
+                    value={emailDraft}
+                    onChange={(ev) => setEmailDraft(ev.target.value)}
+                    onKeyDown={handleEmailKey}
+                    onFocus={() => {
+                      if (searchResults.length > 0) setSearchOpen(true);
+                    }}
+                    // Delay close so a click on a dropdown row registers
+                    // before blur kills the panel.
+                    onBlur={() => {
+                      setTimeout(() => setSearchOpen(false), 120);
+                      if (emailDraft) addEmail(emailDraft);
+                    }}
+                    placeholder={emails.length ? '' : 'Search by email or paste a list'}
+                    className="flex-1 min-w-[160px] h-7 px-1 border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    aria-autocomplete="list"
+                    aria-expanded={searchOpen}
+                  />
+                </div>
+
+                {searchOpen && searchResults.length > 0 && (
+                  <div
+                    role="listbox"
+                    className="absolute left-0 right-0 top-[calc(100%+4px)] z-10 max-h-[200px] overflow-y-auto rounded-md border border-border/70 bg-popover shadow-md"
+                  >
+                    {searchResults.map((u, idx) => {
+                      const isHighlighted = idx === highlightedIndex;
+                      return (
+                        <button
+                          key={u.id}
+                          role="option"
+                          aria-selected={isHighlighted}
+                          // onMouseDown fires before the input's blur, so the
+                          // selection completes even though blur is racing it.
+                          onMouseDown={(ev) => {
+                            ev.preventDefault();
+                            addEmail(u.email);
+                            setSearchOpen(false);
+                          }}
+                          onMouseEnter={() => setHighlightedIndex(idx)}
+                          className={[
+                            'w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center justify-between gap-3',
+                            isHighlighted
+                              ? 'bg-primary/8 text-foreground'
+                              : 'text-muted-foreground hover:bg-muted/50',
+                          ].join(' ')}
+                        >
+                          <span className="truncate">{u.email}</span>
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70 flex-shrink-0">
+                            User
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {searchOpen && !searching && searchResults.length === 0 && emailDraft.trim() && (
+                  <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-10 rounded-md border border-border/70 bg-popover shadow-md px-3 py-2 text-[11px] text-muted-foreground">
+                    No matching users — press Enter to invite anyway.
+                  </div>
+                )}
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Invitees must already have a NoobBook account with one of these emails.
+                Invitees must have a NoobBook account with the matching email.
               </p>
             </div>
           )}

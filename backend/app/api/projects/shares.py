@@ -20,6 +20,7 @@ from flask import current_app, jsonify, request
 from app.api.projects import projects_bp
 from app.services.auth.rbac import get_request_identity
 from app.services.data_services import project_service, share_service
+from app.services.data_services.user_service import get_user_service
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +153,49 @@ def create_project_share(project_id: str):
         }), 201
     except Exception as e:
         current_app.logger.error("Failed to create share for project %s: %s", project_id, e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@projects_bp.route('/projects/<project_id>/shares/users-search', methods=['GET'])
+def search_invitable_users(project_id: str):
+    """
+    Type-ahead search over registered users (for the invited-mode chip input).
+
+    Gated on project ownership so anyone who can't already create a share for
+    this project can't enumerate the user list either. The requester is
+    excluded from results — you can't invite yourself.
+
+    Query params:
+        q     — required, prefix to match against email (min 1 char)
+        limit — optional, defaults to 8, hard-capped at 25 server-side
+    """
+    try:
+        identity = get_request_identity()
+        project = project_service.get_project(project_id, user_id=identity.user_id)
+        if not project:
+            return jsonify({"success": False, "error": "Project not found"}), 404
+
+        prefix = (request.args.get("q") or "").strip()
+        if not prefix:
+            return jsonify({"success": True, "users": []}), 200
+
+        try:
+            limit = int(request.args.get("limit") or 8)
+        except (TypeError, ValueError):
+            limit = 8
+
+        users = get_user_service().search_users_by_email(
+            prefix=prefix,
+            limit=limit,
+            exclude_user_id=identity.user_id,
+        )
+        # Only ship the fields the client actually needs.
+        return jsonify({
+            "success": True,
+            "users": [{"id": u.get("id"), "email": u.get("email")} for u in users],
+        }), 200
+    except Exception as e:
+        current_app.logger.error("Failed to search users for project %s: %s", project_id, e)
         return jsonify({"success": False, "error": str(e)}), 500
 
 
