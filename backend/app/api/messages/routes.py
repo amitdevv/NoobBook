@@ -128,7 +128,11 @@ def stream_message(project_id, chat_id):
     identity = get_request_identity()
     user_id = identity.user_id
     app = current_app._get_current_object()
-    event_queue: "queue.Queue[object]" = queue.Queue()
+    # Bounded so the worker can't accumulate hundreds of KB of unread events
+    # after the client disconnects. 512 is well above the steady-state size
+    # of an in-flight stream (a few dozen events queued at most), so a normal
+    # slow consumer just back-pressures the worker via the blocking put.
+    event_queue: "queue.Queue[object]" = queue.Queue(maxsize=512)
     # Cancel flag — set when the SSE generator is closed (client disconnect /
     # frontend AbortController). Plumbed into the chat service so the
     # assistant message isn't persisted after the user clicks Stop. Without
@@ -138,7 +142,16 @@ def stream_message(project_id, chat_id):
     cancel_event = threading.Event()
 
     def emit(event_name: str, payload: dict) -> None:
-        event_queue.put(_format_sse(event_name, payload))
+        # After the client has disconnected, nothing reads the queue — drop
+        # the event instead of blocking forever on a bounded queue. The
+        # worker checks cancel_event between iterations and bails on its
+        # own; this just avoids it getting stuck on `put` first.
+        if cancel_event.is_set():
+            return
+        try:
+            event_queue.put(_format_sse(event_name, payload), timeout=5)
+        except queue.Full:
+            app.logger.warning("SSE queue full — dropping event %s", event_name)
 
     def worker() -> None:
         try:

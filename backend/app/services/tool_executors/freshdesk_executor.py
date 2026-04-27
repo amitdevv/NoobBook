@@ -112,7 +112,7 @@ class FreshdeskExecutor:
     ) -> Tuple[Dict[str, Any], bool]:
         """Execute a Freshdesk agent tool. Returns (result, is_termination)."""
         if tool_name == "schema_info":
-            return self._schema_info(), False
+            return self.get_schema_info(), False
         elif tool_name == "query_runner":
             return self._query_runner(tool_input), False
         elif tool_name == "return_ticket_analysis":
@@ -120,8 +120,14 @@ class FreshdeskExecutor:
         else:
             return {"success": False, "error": f"Unknown tool: {tool_name}"}, False
 
-    def _schema_info(self) -> Dict[str, Any]:
-        """Return the freshdesk_tickets schema and global ticket count."""
+    def get_schema_info(self) -> Dict[str, Any]:
+        """Return the freshdesk_tickets schema and global ticket count.
+
+        Public so the analyzer agent can run a pre-flight before entering
+        the loop — if the table is empty, we want to return an actionable
+        error instead of letting the model paraphrase 0 rows as
+        "connection had an issue".
+        """
         try:
             conn = self._get_connection()
             cur = conn.cursor()

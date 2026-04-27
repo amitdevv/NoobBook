@@ -37,35 +37,6 @@ class FreshdeskAnalyzerAgent:
         execution_id = str(uuid.uuid4())[:8]
         logger.info("[FreshdeskAgent:%s] Starting analysis for source %s", execution_id, source_id)
 
-        # Pre-flight: verify DB connection
-        if not freshdesk_executor.validate_connection():
-            return {"success": False, "error": "Cannot connect to database"}
-
-        # Pre-flight: verify the Freshdesk source actually has synced tickets.
-        # Without this we'd run the full agent loop, every SQL query would
-        # return zero rows or hit a missing table, and the model would
-        # paraphrase that as "Freshdesk connection had an issue" — a vague,
-        # confusing message that hides the real cause (sync hasn't run).
-        schema_info = freshdesk_executor._schema_info()
-        if not schema_info.get("success"):
-            return {
-                "success": False,
-                "error": (
-                    "Freshdesk tickets table is unavailable: "
-                    f"{schema_info.get('error', 'unknown error')}. "
-                    "Open the Sources panel and click 'Sync New' on the Freshdesk Tickets source to populate it."
-                ),
-            }
-        if not schema_info.get("ticket_count"):
-            return {
-                "success": False,
-                "error": (
-                    "No Freshdesk tickets have been synced yet. "
-                    "Open the Sources panel and click 'Sync New' (or 'Re-sync All') "
-                    "on the Freshdesk Tickets source, wait for the sync to finish, then ask again."
-                ),
-            }
-
         # Load config
         prompt_config = prompt_loader.get_prompt_config(self.AGENT_NAME)
         tools = self._load_tools()
@@ -86,6 +57,35 @@ class FreshdeskAnalyzerAgent:
         consecutive_errors = 0
 
         try:
+            # Pre-flights inside the try so the finally still closes the DB
+            # connection on early returns.
+            if not freshdesk_executor.validate_connection():
+                return {"success": False, "error": "Cannot connect to database"}
+
+            # Without this pre-flight the agent loop runs against an empty
+            # table, every query returns zero rows, and the model paraphrases
+            # that as "Freshdesk connection had an issue" — a vague message
+            # that hides the real cause (sync hasn't run yet).
+            schema_info = freshdesk_executor.get_schema_info()
+            if not schema_info.get("success"):
+                return {
+                    "success": False,
+                    "error": (
+                        "Freshdesk tickets table is unavailable: "
+                        f"{schema_info.get('error', 'unknown error')}. "
+                        "Open the Sources panel and click 'Sync New' on the Freshdesk Tickets source to populate it."
+                    ),
+                }
+            if not schema_info.get("ticket_count"):
+                return {
+                    "success": False,
+                    "error": (
+                        "No Freshdesk tickets have been synced yet. "
+                        "Open the Sources panel and click 'Sync New' (or 'Re-sync All') "
+                        "on the Freshdesk Tickets source, wait for the sync to finish, then ask again."
+                    ),
+                }
+
             for iteration in range(1, self.MAX_ITERATIONS + 1):
                 logger.info("[FreshdeskAgent:%s] Iteration %d", execution_id, iteration)
 

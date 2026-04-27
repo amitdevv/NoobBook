@@ -575,6 +575,15 @@ class MainChatService:
                         is_error=is_error,
                     )
 
+                # All tool_results are now persisted (so the message chain
+                # stays valid: every tool_use has a matching tool_result).
+                # Bail BEFORE the next Claude call if the user clicked Stop —
+                # otherwise we burn a full Claude API call whose response
+                # we'd just throw away. The chain is already balanced, so
+                # the next user message will work without a 400.
+                if cancel_event is not None and cancel_event.is_set():
+                    break
+
                 # Rebuild messages and call Claude again
                 api_messages = message_service.build_api_messages(project_id, chat_id)
                 self._emit_event(on_event, "ping")
