@@ -125,6 +125,50 @@ class ProjectService:
 
         raise RuntimeError("Failed to create project")
 
+    def ensure_shared_with_me_project(
+        self, user_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Find or create the user's "Shared with me" auto-project.
+
+        Used by the share-fork flow (Roadmap #15): when a viewer of a
+        shared chat clicks "Continue in your workspace", the new chat
+        lands in this project. Per-user, created lazily on the first
+        fork.
+
+        Distinguished from regular projects by the literal name
+        "Shared with me" — case-sensitive match keeps the lookup deterministic.
+        """
+        uid = _resolve_user_id(user_id)
+        existing = (
+            self.supabase.table(self.table)
+            .select("*")
+            .eq("user_id", uid)
+            .eq("name", "Shared with me")
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            return self._format_project_metadata(existing.data[0])
+
+        project_data = {
+            "user_id": uid,
+            "name": "Shared with me",
+            "description": "Chats forked from projects shared with you.",
+            "custom_prompt": None,
+            "memory": {},
+            "costs": {
+                "total_input_tokens": 0,
+                "total_output_tokens": 0,
+                "total_cost_usd": 0,
+                "by_model": {},
+            },
+        }
+        response = self.supabase.table(self.table).insert(project_data).execute()
+        if response.data:
+            return self._format_project_metadata(response.data[0])
+        return None
+
     def get_project(self, project_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Get full project data by ID.

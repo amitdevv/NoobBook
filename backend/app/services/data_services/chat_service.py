@@ -396,6 +396,93 @@ class ChatService:
 
         return True
 
+    def fork_chat(
+        self,
+        source_project_id: str,
+        source_chat_id: str,
+        target_project_id: str,
+        target_user_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Copy a chat (and its messages) into a target project.
+
+        Used by the "Continue in your workspace" flow on shared projects:
+        the viewer's fork lands in their own "Shared with me" project,
+        seeded with the owner's messages so the conversation can continue.
+
+        We deliberately do NOT copy:
+          * source selection (target user has different sources, or none)
+          * studio_signals (those reference the owner's source_ids)
+          * costs (the fork starts from zero)
+
+        We DO copy:
+          * the messages table contents in chronological order
+          * forked_from_* fields so the UI can show provenance
+
+        Args:
+            source_project_id: Project the source chat lives in.
+            source_chat_id:    The owner's chat being forked.
+            target_project_id: Where the fork should be created (caller
+                               passes the viewer's "Shared with me" id).
+            target_user_id:    Viewer's id, used for the title prefix.
+
+        Returns:
+            New chat dict (same shape as create_chat) or None on failure.
+        """
+        source_chat_row = (
+            self.supabase.table(self.table)
+            .select("*")
+            .eq("id", source_chat_id)
+            .eq("project_id", source_project_id)
+            .execute()
+        )
+        if not source_chat_row.data:
+            return None
+        source_chat = source_chat_row.data[0]
+
+        original_title = source_chat.get("title") or "Shared chat"
+
+        new_chat_row = {
+            "project_id": target_project_id,
+            "title": original_title,
+            "forked_from_chat_id": source_chat_id,
+            "forked_from_project_id": source_project_id,
+        }
+        insert_response = self.supabase.table(self.table).insert(new_chat_row).execute()
+        if not insert_response.data:
+            logger.error("Fork: failed to insert chat row for user %s", target_user_id)
+            return None
+        new_chat = insert_response.data[0]
+        new_chat_id = new_chat["id"]
+
+        messages_response = (
+            self.supabase.table(self.messages_table)
+            .select("role, content, model, error, tokens, created_at")
+            .eq("chat_id", source_chat_id)
+            .order("created_at", desc=False)
+            .execute()
+        )
+        for msg in messages_response.data or []:
+            self.supabase.table(self.messages_table).insert({
+                "chat_id": new_chat_id,
+                "role": msg.get("role"),
+                "content": msg.get("content"),
+                "model": msg.get("model"),
+                "error": msg.get("error"),
+                "tokens": msg.get("tokens"),
+            }).execute()
+
+        return {
+            "id": new_chat_id,
+            "title": new_chat["title"],
+            "project_id": target_project_id,
+            "created_at": new_chat.get("created_at"),
+            "updated_at": new_chat.get("updated_at"),
+            "forked_from_chat_id": source_chat_id,
+            "forked_from_project_id": source_project_id,
+            "message_count": len(messages_response.data or []),
+        }
+
     def sync_chat_to_index(self, project_id: str, chat_id: str) -> bool:
         """
         Sync a chat's metadata (no-op for Supabase version).

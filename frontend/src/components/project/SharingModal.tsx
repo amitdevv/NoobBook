@@ -1,0 +1,551 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import type { KeyboardEvent } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../ui/tooltip';
+import {
+  CheckCircle,
+  Clock,
+  Copy,
+  Globe,
+  LockKey,
+  Share,
+  Sparkle,
+  Trash,
+  X,
+} from '@phosphor-icons/react';
+import { useToast } from '../ui/use-toast';
+import { ToastContainer } from '../ui/toast';
+import { sharesAPI, type ProjectShare, type ShareExpiry, type ShareMode } from '@/lib/api/shares';
+import { upsertOne, removeOne } from '@/lib/resourceState';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('sharing-modal');
+
+interface SharingModalProps {
+  open: boolean;
+  onOpenChange: (next: boolean) => void;
+  projectId: string;
+  projectName: string;
+}
+
+/**
+ * SharingModal
+ *
+ * Editorial / library aesthetic — warm cream background, fine rules
+ * between sections, generous spacing. Intentional restraint: no flashy
+ * motion, no jewel tones. The most colorful element is a thin amber
+ * line under the active mode pill.
+ *
+ * Two regions:
+ *   • Top — "Create new link" form with mode + (optional) emails + expiry.
+ *   • Bottom — list of existing links with copy / revoke affordances.
+ */
+export const SharingModal: React.FC<SharingModalProps> = ({
+  open,
+  onOpenChange,
+  projectId,
+  projectName,
+}) => {
+  const { toasts, dismissToast, success, error } = useToast();
+
+  // ── List state ───────────────────────────────────────────────────
+  const [shares, setShares] = useState<ProjectShare[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+
+  // ── Create form state ────────────────────────────────────────────
+  const [mode, setMode] = useState<ShareMode>('public');
+  const [emailDraft, setEmailDraft] = useState('');
+  const [emails, setEmails] = useState<string[]>([]);
+  const [expiry, setExpiry] = useState<ShareExpiry>(7);
+  const [creating, setCreating] = useState(false);
+
+  // ── Per-row state ────────────────────────────────────────────────
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const resetForm = useCallback(() => {
+    setMode('public');
+    setEmailDraft('');
+    setEmails([]);
+    setExpiry(7);
+  }, []);
+
+  const fetchShares = useCallback(async () => {
+    try {
+      setListLoading(true);
+      const res = await sharesAPI.list(projectId);
+      setShares(res.data.shares || []);
+    } catch (err) {
+      log.error({ err }, 'failed to load shares');
+      error('Failed to load shares');
+    } finally {
+      setListLoading(false);
+    }
+  }, [projectId, error]);
+
+  useEffect(() => {
+    if (!open) return;
+    fetchShares();
+  }, [open, fetchShares]);
+
+  useEffect(() => {
+    // Don't strand draft text when the modal closes.
+    if (!open) {
+      setEmailDraft('');
+      setCopiedId(null);
+    }
+  }, [open]);
+
+  const addEmail = (raw: string) => {
+    const cleaned = raw.trim().toLowerCase();
+    if (!cleaned) return;
+    if (!cleaned.includes('@') || !cleaned.includes('.')) {
+      error('That doesn’t look like an email');
+      return;
+    }
+    if (emails.includes(cleaned)) return;
+    setEmails((prev) => [...prev, cleaned]);
+    setEmailDraft('');
+  };
+
+  const handleEmailKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addEmail(emailDraft);
+    } else if (e.key === 'Backspace' && !emailDraft && emails.length > 0) {
+      setEmails((prev) => prev.slice(0, -1));
+    }
+  };
+
+  const removeEmail = (e: string) => {
+    setEmails((prev) => prev.filter((x) => x !== e));
+  };
+
+  const canSubmit = useMemo(() => {
+    if (creating) return false;
+    if (mode === 'invited' && emails.length === 0) return false;
+    return true;
+  }, [creating, mode, emails]);
+
+  const handleCreate = async () => {
+    if (!canSubmit) return;
+    try {
+      setCreating(true);
+      const res = await sharesAPI.create(projectId, {
+        mode,
+        invited_emails: mode === 'invited' ? emails : undefined,
+        expires_in_days: expiry,
+      });
+      const created = res.data.share;
+      setShares((prev) => upsertOne(prev, created, { prepend: true }));
+      // Auto-copy + toast — the moment of joy when sharing.
+      try {
+        await navigator.clipboard.writeText(created.url);
+        success('Link copied');
+      } catch {
+        success('Link created');
+      }
+      resetForm();
+    } catch (err) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      log.error({ err }, 'failed to create share');
+      error(msg || 'Failed to create share link');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleCopy = async (share: ProjectShare) => {
+    try {
+      await navigator.clipboard.writeText(share.url);
+      setCopiedId(share.id);
+      success('Link copied');
+      setTimeout(() => setCopiedId((id) => (id === share.id ? null : id)), 1600);
+    } catch {
+      error('Could not copy. Select the URL manually.');
+    }
+  };
+
+  const handleRevoke = async (share: ProjectShare) => {
+    const confirmed = window.confirm(
+      `Revoke this share? Anyone using the link will lose access immediately.`,
+    );
+    if (!confirmed) return;
+    const previous = shares;
+    setShares((prev) => removeOne(prev, share.id));
+    try {
+      await sharesAPI.revoke(projectId, share.id);
+      success('Share revoked');
+    } catch (err) {
+      log.error({ err }, 'failed to revoke share');
+      error('Failed to revoke. Restored.');
+      setShares(previous);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[540px] p-0 overflow-hidden">
+        <div className="px-7 pt-6 pb-4 border-b">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+              <Share size={18} className="text-primary" />
+              Share &ldquo;{projectName}&rdquo;
+            </DialogTitle>
+            <DialogDescription className="text-xs leading-relaxed text-muted-foreground mt-1">
+              Anyone with the link gets <strong>read-only</strong> access to this project&apos;s chats.
+              Sources, memory, API keys, and brand stay with you.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        {/* ── CREATE ─────────────────────────────────────────── */}
+        <div className="px-7 py-5 space-y-4">
+          <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            New link
+          </div>
+
+          {/* Mode pills */}
+          <div className="flex items-center gap-2">
+            {(['public', 'invited'] as const).map((m) => {
+              const isActive = mode === m;
+              return (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className={[
+                    'group relative px-3.5 py-1.5 text-xs rounded-full border transition-colors',
+                    isActive
+                      ? 'border-primary/40 bg-primary/5 text-foreground'
+                      : 'border-border/60 bg-background text-muted-foreground hover:text-foreground',
+                  ].join(' ')}
+                  aria-pressed={isActive}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    {m === 'public' ? <Globe size={13} /> : <LockKey size={13} />}
+                    {m === 'public' ? 'Anyone with link' : 'Specific people'}
+                  </span>
+                  {isActive && (
+                    <span
+                      aria-hidden
+                      className="absolute left-3.5 right-3.5 -bottom-px h-px bg-primary/60"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Invited emails — chip-style input */}
+          {mode === 'invited' && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 rounded-md border border-border/70 bg-background min-h-9">
+                {emails.map((e) => (
+                  <span
+                    key={e}
+                    className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-[11px] font-medium bg-muted/70 border border-border/50"
+                  >
+                    {e}
+                    <button
+                      onClick={() => removeEmail(e)}
+                      className="rounded-full hover:bg-stone-200/70 p-0.5"
+                      aria-label={`Remove ${e}`}
+                    >
+                      <X size={10} weight="bold" />
+                    </button>
+                  </span>
+                ))}
+                <Input
+                  value={emailDraft}
+                  onChange={(ev) => setEmailDraft(ev.target.value)}
+                  onKeyDown={handleEmailKey}
+                  onBlur={() => emailDraft && addEmail(emailDraft)}
+                  placeholder={emails.length ? '' : 'name@example.com, then Enter'}
+                  className="flex-1 min-w-[160px] h-7 px-1 border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Invitees must already have a NoobBook account with one of these emails.
+              </p>
+            </div>
+          )}
+
+          {/* Expiry pills */}
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+              Expires
+            </div>
+            <div className="flex items-center gap-2">
+              {([7, 30, null] as const).map((opt) => {
+                const isActive = expiry === opt;
+                return (
+                  <button
+                    key={String(opt)}
+                    onClick={() => setExpiry(opt)}
+                    className={[
+                      'px-3 py-1 rounded-full text-xs border transition-colors',
+                      isActive
+                        ? 'border-primary/40 bg-primary/5 text-foreground'
+                        : 'border-border/60 bg-background text-muted-foreground hover:text-foreground',
+                    ].join(' ')}
+                  >
+                    {opt === 7 ? '7 days' : opt === 30 ? '30 days' : 'Never'}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="pt-1">
+            <Button
+              onClick={handleCreate}
+              disabled={!canSubmit}
+              className="w-full gap-2"
+            >
+              <Sparkle size={14} weight="fill" />
+              {creating ? 'Creating link…' : 'Create link'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="h-px bg-border/70" />
+
+        {/* ── ACTIVE LINKS ──────────────────────────────────── */}
+        <div className="px-7 py-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+              Active links
+            </div>
+            {!listLoading && (
+              <span className="text-[11px] text-muted-foreground">
+                {shares.filter((s) => s.is_active).length} active
+                {shares.filter((s) => !s.is_active).length
+                  ? ` · ${shares.filter((s) => !s.is_active).length} inactive`
+                  : ''}
+              </span>
+            )}
+          </div>
+
+          {listLoading ? (
+            <div className="space-y-2.5">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="h-[58px] rounded-lg border border-border/60 bg-muted/30 animate-pulse"
+                />
+              ))}
+            </div>
+          ) : shares.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1 -mr-1">
+              {shares.map((share, idx) => (
+                <ShareRow
+                  key={share.id}
+                  share={share}
+                  copied={copiedId === share.id}
+                  onCopy={handleCopy}
+                  onRevoke={handleRevoke}
+                  staggerMs={idx * 30}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// ──────────────────────────────────────────────────────────────────
+// Sub-components
+// ──────────────────────────────────────────────────────────────────
+
+const EmptyState: React.FC = () => (
+  <div className="flex flex-col items-center justify-center py-8 px-6 text-center rounded-lg border border-dashed border-border/70">
+    <div className="text-stone-400 mb-2.5">
+      <Sparkle size={20} weight="duotone" />
+    </div>
+    <p className="text-sm font-medium text-foreground">No share links yet</p>
+    <p className="text-xs text-muted-foreground mt-1 max-w-[280px] leading-relaxed">
+      Create one to give read-only access to this project&apos;s chats.
+    </p>
+  </div>
+);
+
+interface ShareRowProps {
+  share: ProjectShare;
+  copied: boolean;
+  onCopy: (s: ProjectShare) => void;
+  onRevoke: (s: ProjectShare) => void;
+  staggerMs: number;
+}
+
+const ShareRow: React.FC<ShareRowProps> = ({ share, copied, onCopy, onRevoke, staggerMs }) => {
+  const inactive = !share.is_active;
+  const inactiveLabel = share.revoked_at ? 'Revoked' : 'Expired';
+  const expiryLabel = formatExpiry(share);
+
+  return (
+    <div
+      style={{ animation: `share-row-in 320ms ${staggerMs}ms both ease-out` }}
+      className={[
+        'group relative rounded-lg border bg-card px-3 py-2.5 transition-colors',
+        inactive
+          ? 'border-border/40 opacity-60 hover:opacity-80'
+          : 'border-border/70 hover:border-primary/30',
+      ].join(' ')}
+    >
+      <style>{shareRowKeyframes}</style>
+      <div className="flex items-center gap-3">
+        {/* Mode pill */}
+        <span
+          className={[
+            'inline-flex items-center justify-center h-7 w-7 rounded-md flex-shrink-0',
+            share.mode === 'public'
+              ? 'bg-primary/10 text-primary'
+              : 'bg-stone-200/70 text-stone-700 dark:bg-stone-800/70 dark:text-stone-300',
+          ].join(' ')}
+          title={share.mode === 'public' ? 'Anyone with the link' : 'Specific people'}
+        >
+          {share.mode === 'public' ? (
+            <Globe size={14} weight="bold" />
+          ) : (
+            <LockKey size={14} weight="bold" />
+          )}
+        </span>
+
+        {/* URL + metadata */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="font-mono truncate" title={share.url}>
+              {compactUrl(share.url)}
+            </span>
+            {inactive && (
+              <span className="px-1.5 py-px rounded text-[10px] font-medium uppercase tracking-wide bg-stone-200/70 text-stone-700 dark:bg-stone-800/70 dark:text-stone-300">
+                {inactiveLabel}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <Clock size={11} />
+              {expiryLabel}
+            </span>
+            {share.mode === 'invited' && share.invited_emails.length > 0 && (
+              <>
+                <span aria-hidden>·</span>
+                <span
+                  className="truncate"
+                  title={share.invited_emails.join(', ')}
+                >
+                  {share.invited_emails.length === 1
+                    ? share.invited_emails[0]
+                    : `${share.invited_emails.length} people`}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-0.5 flex-shrink-0">
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onCopy(share)}
+                  disabled={inactive}
+                  className="h-7 w-7"
+                  aria-label="Copy link"
+                >
+                  {copied ? (
+                    <CheckCircle size={14} weight="fill" className="text-primary" />
+                  ) : (
+                    <Copy size={14} />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {copied ? 'Copied' : 'Copy link'}
+              </TooltipContent>
+            </Tooltip>
+            {!inactive && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onRevoke(share)}
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    aria-label="Revoke link"
+                  >
+                    <Trash size={14} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  Revoke
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </TooltipProvider>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ──────────────────────────────────────────────────────────────────
+// Formatting helpers
+// ──────────────────────────────────────────────────────────────────
+
+const shareRowKeyframes = `
+@keyframes share-row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+`;
+
+function compactUrl(url: string): string {
+  // Show only the last meaningful segment so the row stays tidy at any width.
+  // e.g. https://app.example.com/share/AbC123 → /share/AbC123
+  try {
+    const u = new URL(url);
+    return `${u.host}${u.pathname}`;
+  } catch {
+    return url;
+  }
+}
+
+function formatExpiry(share: ProjectShare): string {
+  if (share.revoked_at) return 'Revoked';
+  if (!share.expires_at) return 'Never expires';
+  const ms = new Date(share.expires_at).getTime() - Date.now();
+  if (ms <= 0) return 'Expired';
+  const days = Math.round(ms / (24 * 60 * 60 * 1000));
+  if (days <= 0) {
+    const hours = Math.max(1, Math.round(ms / (60 * 60 * 1000)));
+    return `Expires in ${hours}h`;
+  }
+  if (days === 1) return 'Expires tomorrow';
+  if (days < 30) return `Expires in ${days}d`;
+  const date = new Date(share.expires_at);
+  return `Expires ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+}
+

@@ -35,6 +35,7 @@ import { projectsAPI, type CostTracking, type MemoryData } from '../../lib/api';
 import { ToastContainer } from '../ui/toast';
 import { useToast } from '../ui/use-toast';
 import { createLogger } from '@/lib/logger';
+import { ShareButton } from './ShareButton';
 
 const log = createLogger('project-header');
 
@@ -397,6 +398,8 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
       {/* Right side - Actions */}
       <div className="flex items-center gap-2">
+        <ShareButton projectId={project.id} projectName={project.name} />
+
         <Button
           variant="soft"
           size="sm"
