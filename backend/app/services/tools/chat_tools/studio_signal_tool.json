@@ -36,7 +36,7 @@
             },
             "direction": {
               "type": "string",
-              "description": "Clear guidance for content generation. Include: what to focus on, user's preferred style/tone, key concepts to cover. Example: 'Create flashcards for Plato's Euthyphro focusing on circular reasoning and the Euthyphro dilemma, using layman terms as user requested simple explanations.'"
+              "description": "Pass the user's most recent message VERBATIM as the direction — do not paraphrase, summarize, expand, or add your own guidelines/style notes. The studio generator will read this exact string as the user's intent. If the user said 'make me an ad for our spring sale', the direction is 'make me an ad for our spring sale'. The backend will replace this field with the original user prompt anyway, so any rewording you add is dropped."
             },
             "sources": {
               "type": "array",

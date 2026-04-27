@@ -229,6 +229,7 @@ class MainChatService:
         tool_input: Dict[str, Any],
         user_id: Optional[str] = None,
         mcp_registry: Optional[Dict] = None,
+        user_message_text: Optional[str] = None,
     ) -> str:
         """
         Execute a tool and return result string.
@@ -316,11 +317,26 @@ class MainChatService:
                 return f"Error: {result.get('error', 'Analysis failed')}"
 
         elif tool_name == "studio_signal":
-            # Studio signal returns immediately, actual storage happens in background
+            # Override every signal's `direction` with the user's verbatim
+            # prompt. The studio generators downstream (ad creative service,
+            # social posts service, blog agent, etc.) read `direction` as
+            # the user's intent — letting Claude paraphrase introduces
+            # drift, lost specifics, and hallucinated style notes. The tool
+            # description already asks Claude to pass the prompt verbatim;
+            # this is the belt-and-braces guarantee.
+            signals = tool_input.get("signals", [])
+            if user_message_text and isinstance(signals, list):
+                stripped = user_message_text.strip()
+                if stripped:
+                    signals = [
+                        {**s, "direction": stripped} if isinstance(s, dict) else s
+                        for s in signals
+                    ]
+
             result = studio_signal_executor.execute(
                 project_id=project_id,
                 chat_id=chat_id,
-                signals=tool_input.get("signals", [])
+                signals=signals
             )
             if result.get("success"):
                 return result.get("message", "Studio signals activated")
@@ -559,6 +575,7 @@ class MainChatService:
                             tool_input,
                             user_id=resolved_user_id,
                             mcp_registry=mcp_registry,
+                            user_message_text=user_message_text,
                         )
                         is_error = False
                     except Exception as tool_error:
