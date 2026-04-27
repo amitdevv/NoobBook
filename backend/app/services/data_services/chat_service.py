@@ -455,9 +455,12 @@ class ChatService:
         new_chat = insert_response.data[0]
         new_chat_id = new_chat["id"]
 
+        # Columns that actually exist on `messages` (see migration 00001).
+        # Errors are flagged inside the `content` JSONB, not as a top-level
+        # column, so we don't need to pull a separate `error` field.
         messages_response = (
             self.supabase.table(self.messages_table)
-            .select("role, content, model, error, tokens, created_at")
+            .select("role, content, citations, model, tokens_input, tokens_output, cost_usd, created_at")
             .eq("chat_id", source_chat_id)
             .order("created_at", desc=False)
             .execute()
@@ -467,9 +470,11 @@ class ChatService:
                 "chat_id": new_chat_id,
                 "role": msg.get("role"),
                 "content": msg.get("content"),
+                "citations": msg.get("citations") or [],
                 "model": msg.get("model"),
-                "error": msg.get("error"),
-                "tokens": msg.get("tokens"),
+                "tokens_input": msg.get("tokens_input"),
+                "tokens_output": msg.get("tokens_output"),
+                "cost_usd": msg.get("cost_usd"),
             }).execute()
 
         return {
