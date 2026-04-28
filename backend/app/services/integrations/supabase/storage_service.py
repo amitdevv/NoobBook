@@ -84,6 +84,21 @@ def _upsert_file(client, bucket: str, path: str, file_data, file_options: dict) 
 # RAW FILES (Original uploads)
 # =============================================================================
 
+# Module-level cache of the last upload failure's underlying exception
+# message. Set by upload_raw_file when both streaming and buffered
+# attempts fail; consumed by callers (chunked finalize, etc.) so the
+# user-facing 500 can include the real reason instead of "see logs".
+# Single string is fine — uploads are serialized per source_id, and
+# the caller reads it immediately after the failed call.
+_last_upload_error: Optional[str] = None
+
+
+def get_last_upload_error() -> Optional[str]:
+    """Return the underlying exception message from the most recent
+    upload_raw_file failure, or ``None`` if the last call succeeded."""
+    return _last_upload_error
+
+
 def upload_raw_file(
     project_id: str,
     source_id: str,
@@ -122,6 +137,11 @@ def upload_raw_file(
     client = _get_client()
     path = _build_path(project_id, source_id, filename)
     file_options = {"content-type": content_type}
+
+    # Reset before this attempt so a stale message from a prior failure
+    # doesn't leak into a callsite that succeeds.
+    global _last_upload_error
+    _last_upload_error = None
 
     def _do_upload(payload):
         try:
@@ -186,12 +206,14 @@ def upload_raw_file(
             "Buffered upload of %s failed: %s (size=%d, content_type=%s)",
             path, err, len(payload), content_type,
         )
+        _last_upload_error = str(err)
         return None
     except Exception as exc:
         logger.error(
             "Failed to upload raw file %s: %s (streaming_error=%s)",
             path, exc, streaming_error,
         )
+        _last_upload_error = str(exc)
         return None
 
 

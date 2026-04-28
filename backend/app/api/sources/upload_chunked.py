@@ -368,13 +368,25 @@ def chunked_upload_complete(project_id: str):
             }), 500
 
         if not storage_path:
+            # Surface the underlying Supabase Storage error rather than
+            # making the user dig through backend logs. The most common
+            # cause for self-hosted setups is FILE_SIZE_LIMIT — by
+            # default Supabase Storage rejects > 50 MB unless the
+            # storage container has FILE_SIZE_LIMIT raised AND the
+            # bucket's per-bucket cap is also raised in Studio.
+            underlying = storage_service.get_last_upload_error() or "unknown error"
+            hint = ""
+            low = underlying.lower()
+            if "payload too large" in low or "file size" in low or "413" in low:
+                hint = (
+                    " — Supabase Storage rejected the file as too large. "
+                    "Raise FILE_SIZE_LIMIT on the storage container "
+                    "(e.g. 1073741824 for 1 GB) AND the per-bucket cap "
+                    "in Supabase Studio → Storage → raw-files bucket."
+                )
             return jsonify({
                 "success": False,
-                "error": (
-                    "Failed to upload to Supabase Storage. Check backend "
-                    "logs for the underlying error (common causes: bucket "
-                    "missing, RLS policy, expired SUPABASE_SERVICE_KEY)."
-                ),
+                "error": f"Supabase Storage upload failed: {underlying}{hint}",
             }), 500
 
         # Source row + processing kick-off — same shape as the multipart
