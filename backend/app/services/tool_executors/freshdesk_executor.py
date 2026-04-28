@@ -95,15 +95,29 @@ class FreshdeskExecutor:
             self._conn = None
 
     def validate_connection(self) -> bool:
-        """Check if we can connect to the database."""
+        """
+        Check that we can reach the freshdesk_tickets table.
+
+        Goes through the Supabase REST client (same path the sync service
+        uses successfully), NOT psycopg2 — the direct DB connection is a
+        separate code path that often fails in production deployments
+        where only the Supabase API gateway is reachable. As long as the
+        REST path works the agent can at least pre-flight; query_runner
+        will surface a real error later if psycopg2 itself can't connect.
+        """
         try:
-            conn = self._get_connection()
-            cur = conn.cursor()
-            cur.execute("SELECT 1")
-            cur.close()
+            from app.services.integrations.supabase import get_supabase
+
+            supabase = get_supabase()
+            (
+                supabase.table("freshdesk_tickets")
+                .select("ticket_id", count="exact")
+                .limit(1)
+                .execute()
+            )
             return True
         except Exception as e:
-            logger.error("Freshdesk executor: DB connection failed: %s", e)
+            logger.error("Freshdesk executor: REST validate failed: %s", e)
             return False
 
     def execute_tool(
@@ -123,11 +137,33 @@ class FreshdeskExecutor:
     def get_schema_info(self) -> Dict[str, Any]:
         """Return the freshdesk_tickets schema and global ticket count.
 
-        Public so the analyzer agent can run a pre-flight before entering
-        the loop — if the table is empty, we want to return an actionable
-        error instead of letting the model paraphrase 0 rows as
-        "connection had an issue".
+        Uses Supabase REST for the count (same reasoning as
+        validate_connection above). Falls back to psycopg2 if REST fails
+        — that way deployments without REST access still work.
         """
+        # REST path — primary, most reliable.
+        try:
+            from app.services.integrations.supabase import get_supabase
+
+            supabase = get_supabase()
+            resp = (
+                supabase.table("freshdesk_tickets")
+                .select("ticket_id", count="exact")
+                .limit(1)
+                .execute()
+            )
+            count = getattr(resp, "count", None)
+            if count is None and isinstance(resp, dict):
+                count = resp.get("count")
+            return {
+                "success": True,
+                "schema": FRESHDESK_SCHEMA.strip(),
+                "ticket_count": count or 0,
+            }
+        except Exception as rest_exc:
+            logger.warning("Freshdesk schema_info via REST failed (%s); falling back to psycopg2", rest_exc)
+
+        # Fallback: direct psycopg2 connection.
         try:
             conn = self._get_connection()
             cur = conn.cursor()
@@ -158,7 +194,24 @@ class FreshdeskExecutor:
             return {"success": False, "error": "Query must reference freshdesk_tickets table"}
 
         try:
-            conn = self._get_connection()
+            try:
+                conn = self._get_connection()
+            except Exception as conn_exc:
+                # Surface a clearly-attributed connection failure so the
+                # model doesn't conflate a misconfigured DB with a
+                # genuine empty-result. The chat AI uses the `error`
+                # text verbatim when paraphrasing.
+                logger.error("Freshdesk query_runner: psycopg2 connect failed: %s", conn_exc)
+                return {
+                    "success": False,
+                    "error": (
+                        "Cannot reach the Freshdesk tickets database directly. "
+                        "Set SUPABASE_DB_URL (or POSTGRES_HOST + POSTGRES_PASSWORD) "
+                        "in the backend environment so the analyzer can run SQL "
+                        f"queries. Underlying error: {conn_exc}"
+                    ),
+                    "query": sql,
+                }
             cur = conn.cursor(cursor_factory=RealDictCursor)
 
             # Set query timeout
