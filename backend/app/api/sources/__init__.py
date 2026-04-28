@@ -64,6 +64,7 @@ def check_project_access():
 
 # Import routes to register them with the blueprint
 from app.api.sources import routes  # noqa: F401
+from app.api.sources import upload_chunked  # noqa: F401
 from app.api.sources import uploads  # noqa: F401
 from app.api.sources import processing  # noqa: F401
 from app.api.sources import content  # noqa: F401

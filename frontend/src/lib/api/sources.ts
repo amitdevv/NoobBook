@@ -160,10 +160,24 @@ class SourcesAPI {
   }
 
   /**
-   * Upload a new source file
-   * Educational Note: Uses FormData for multipart file upload.
-   * Optional onProgress callback gets a 0-100 percentage during upload —
-   * important for gigabyte files where a plain spinner is misleading.
+   * Upload a new source file using chunked upload.
+   *
+   * Why chunked? The single-multipart upload path streams the whole
+   * file body through the deployment's edge proxy (Cloudflare,
+   * Traefik, etc.) and Flask, and most edge proxies cap body bytes at
+   * 100 MB or less — so anything larger 413s before reaching us.
+   * Slicing the file into ≤50 MB chunks before sending keeps every
+   * single request under any reasonable proxy cap, so this works
+   * out-of-the-box on any self-hosted deployment without DNS or proxy
+   * config changes.
+   *
+   * Three round trips:
+   *   1. POST upload-init  → mints a source_id and returns chunk_size.
+   *   2. N × POST upload-chunk (multipart) — one per slice.
+   *   3. POST upload-complete → assemble + create source row.
+   *
+   * The `uploadSource(...)` external signature is unchanged so existing
+   * callers (e.g. SourcesPanel.handleFileUpload) keep working.
    */
   async uploadSource(
     projectId: string,
@@ -173,26 +187,89 @@ class SourcesAPI {
     onProgress?: (percent: number) => void
   ): Promise<Source> {
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      if (name) formData.append('name', name);
-      if (description) formData.append('description', description);
+      // Step 1 — initialize the upload session.
+      const initResp = await axios.post<{
+        success: boolean;
+        source_id: string;
+        chunk_size: number;
+        error?: string;
+      }>(`${API_BASE_URL}/projects/${projectId}/sources/upload-init`, {
+        filename: file.name,
+        file_size: file.size,
+      });
+      if (!initResp.data.success) {
+        throw new Error(initResp.data.error || 'Failed to initialize upload');
+      }
+      const { source_id, chunk_size } = initResp.data;
+      // Defensive minimum — never use a tiny chunk size even if the
+      // backend somehow returns one.
+      const CHUNK = Math.max(chunk_size || 0, 1024 * 1024);
 
-      const response = await axios.post(
-        `${API_BASE_URL}/projects/${projectId}/sources`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          onUploadProgress: (evt) => {
-            if (!onProgress || !evt.total) return;
-            const pct = Math.round((evt.loaded / evt.total) * 100);
-            onProgress(Math.min(pct, 100));
-          },
-        }
-      );
-      return response.data.source;
+      // Step 2 — slice and send each chunk sequentially. We use sequential
+      // (not parallel) to keep the temp-file write path simple on the
+      // backend and to give the user a smooth, monotonic progress bar.
+      const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK));
+      let bytesSent = 0;
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK;
+        const end = Math.min(start + CHUNK, file.size);
+        const chunkBlob = file.slice(start, end);
+
+        const formData = new FormData();
+        // The backend expects field name "chunk".
+        formData.append('chunk', chunkBlob, file.name);
+        formData.append('source_id', source_id);
+        formData.append('offset', String(start));
+        formData.append('total_size', String(file.size));
+
+        const chunkBytes = end - start;
+        const beforeBytes = bytesSent;
+
+        await axios.post(
+          `${API_BASE_URL}/projects/${projectId}/sources/upload-chunk`,
+          formData,
+          {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            // We compute progress from beforeBytes + this chunk's
+            // partial upload, so the bar moves smoothly across all
+            // chunks instead of resetting each time.
+            onUploadProgress: (evt) => {
+              if (!onProgress) return;
+              const chunkSentSoFar = evt.loaded || 0;
+              const overall = beforeBytes + Math.min(chunkSentSoFar, chunkBytes);
+              const pct = Math.round((overall / file.size) * 100);
+              // Cap at 99 until upload-complete returns to avoid the
+              // bar hitting 100 while the assembled file is still
+              // being uploaded to Supabase server-side.
+              onProgress(Math.min(pct, 99));
+            },
+          }
+        );
+
+        bytesSent += chunkBytes;
+      }
+
+      // Step 3 — finalize: backend assembles + uploads to Supabase
+      // Storage + creates the source row.
+      const finalizeResp = await axios.post<{
+        success: boolean;
+        source: Source;
+        error?: string;
+      }>(`${API_BASE_URL}/projects/${projectId}/sources/upload-complete`, {
+        source_id,
+        filename: file.name,
+        name,
+        description,
+        mime_type: file.type || undefined,
+        total_size: file.size,
+      });
+      if (!finalizeResp.data.success) {
+        throw new Error(finalizeResp.data.error || 'Failed to finalize upload');
+      }
+
+      // Now we can claim 100%.
+      onProgress?.(100);
+      return finalizeResp.data.source;
     } catch (error) {
       log.error({ err: error }, 'failed to upload source');
       throw error;
