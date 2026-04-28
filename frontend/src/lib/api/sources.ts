@@ -160,23 +160,10 @@ class SourcesAPI {
   }
 
   /**
-   * Upload a new source file using the direct-to-Supabase flow.
-   *
-   * The classic multipart flow streams the entire file body through our
-   * edge proxy (Cloudflare on the production deployment) and Flask
-   * before reaching Supabase Storage. Cloudflare Free caps body bytes
-   * at 100 MB, so anything bigger 413s before we even see it.
-   *
-   * Direct upload sidesteps both:
-   *   1. POST /sources/upload-init  → mints a signed URL pointing at
-   *      Supabase Storage's public hostname.
-   *   2. PUT <signed-url>           → file body goes straight to
-   *      Supabase, bypassing our edge proxy and Flask entirely.
-   *   3. POST /sources/upload-finalize → tiny JSON request to create
-   *      the source row and kick off processing.
-   *
-   * The function signature is intentionally unchanged so existing
-   * callers (`SourcesPanel.handleFileUpload`) work without edits.
+   * Upload a new source file
+   * Educational Note: Uses FormData for multipart file upload.
+   * Optional onProgress callback gets a 0-100 percentage during upload —
+   * important for gigabyte files where a plain spinner is misleading.
    */
   async uploadSource(
     projectId: string,
@@ -186,81 +173,26 @@ class SourcesAPI {
     onProgress?: (percent: number) => void
   ): Promise<Source> {
     try {
-      // Step 1 — ask the backend for a signed upload URL.
-      const initResp = await axios.post<{
-        success: boolean;
-        source_id: string;
-        upload_url: string;
-        path: string;
-        stored_filename: string;
-        mime_type: string;
-        error?: string;
-      }>(
-        `${API_BASE_URL}/projects/${projectId}/sources/upload-init`,
-        {
-          filename: file.name,
-          content_type: file.type || undefined,
-          file_size: file.size,
-        }
-      );
-      if (!initResp.data.success) {
-        throw new Error(initResp.data.error || 'Failed to initialize upload');
-      }
-      const { source_id, upload_url, stored_filename, mime_type } = initResp.data;
+      const formData = new FormData();
+      formData.append('file', file);
+      if (name) formData.append('name', name);
+      if (description) formData.append('description', description);
 
-      // Step 2 — PUT the file body directly to Supabase Storage.
-      // We use XHR (not axios) here because:
-      //   - Supabase's signed-upload URL doesn't accept the global axios
-      //     request interceptors (Authorization header, etc.) — including
-      //     them would cause a 401 from Supabase.
-      //   - XHR `upload.onprogress` is the most widely-supported way to
-      //     report a real percentage for a multi-hundred-MB upload.
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', upload_url, true);
-        xhr.setRequestHeader('Content-Type', mime_type || file.type || 'application/octet-stream');
-        // x-upsert allows replacing an object at the same path on retry.
-        xhr.setRequestHeader('x-upsert', 'true');
-        if (onProgress) {
-          xhr.upload.onprogress = (evt) => {
-            if (!evt.lengthComputable) return;
+      const response = await axios.post(
+        `${API_BASE_URL}/projects/${projectId}/sources`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          onUploadProgress: (evt) => {
+            if (!onProgress || !evt.total) return;
             const pct = Math.round((evt.loaded / evt.total) * 100);
             onProgress(Math.min(pct, 100));
-          };
-        }
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            reject(new Error(`Upload failed (${xhr.status}): ${xhr.responseText || xhr.statusText}`));
-          }
-        };
-        xhr.onerror = () => reject(new Error('Network error during upload'));
-        xhr.onabort = () => reject(new Error('Upload aborted'));
-        xhr.send(file);
-      });
-
-      // Step 3 — finalize: create the source row and start processing.
-      const finalizeResp = await axios.post<{
-        success: boolean;
-        source: Source;
-        error?: string;
-      }>(
-        `${API_BASE_URL}/projects/${projectId}/sources/upload-finalize`,
-        {
-          source_id,
-          filename: file.name,
-          stored_filename,
-          mime_type: file.type || mime_type,
-          file_size: file.size,
-          name,
-          description,
+          },
         }
       );
-      if (!finalizeResp.data.success) {
-        throw new Error(finalizeResp.data.error || 'Failed to finalize upload');
-      }
-      return finalizeResp.data.source;
+      return response.data.source;
     } catch (error) {
       log.error({ err: error }, 'failed to upload source');
       throw error;
