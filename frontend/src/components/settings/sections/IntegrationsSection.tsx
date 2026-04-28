@@ -153,7 +153,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
         setGoogleMutating(false);
       }, 120000);
     } catch (err) {
-      log.error({ err }, 'failed to Lconnecting GoogleE');
+      log.error({ err }, 'failed to connect Google');
       error('Failed to connect Google Drive');
       setGoogleMutating(false);
     }
@@ -170,7 +170,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
         error('Failed to disconnect Google Drive');
       }
     } catch (err) {
-      log.error({ err }, 'failed to Ldisconnecting GoogleE');
+      log.error({ err }, 'failed to disconnect Google');
       error('Failed to disconnect Google Drive');
     } finally {
       setGoogleMutating(false);

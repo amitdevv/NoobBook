@@ -53,14 +53,18 @@ class FreshdeskSyncService:
 
         if not freshdesk_service.is_configured():
             return {
-                "tickets_fetched": 0, "tickets_created": 0,
-                "tickets_updated": 0, "errors": 1,
+                "tickets_fetched": 0, "tickets_upserted": 0,
+                "errors": 1,
                 "error_message": "Freshdesk not configured",
             }
 
+        # `tickets_upserted` counts every row inserted-or-updated. We can't
+        # cheaply distinguish create vs update inside Supabase's batch
+        # upsert path, so the previous separate "created" / "updated"
+        # counters were misleading (one was always zero).
         stats = {
-            "tickets_fetched": 0, "tickets_created": 0,
-            "tickets_updated": 0, "errors": 0,
+            "tickets_fetched": 0, "tickets_upserted": 0,
+            "errors": 0,
         }
 
         def _is_cancelled() -> bool:
@@ -92,8 +96,11 @@ class FreshdeskSyncService:
                         tickets_per_sec = total_fetched / elapsed
                         info["tickets_per_sec"] = round(tickets_per_sec, 1)
                 source_service.update_source(project_id, source_id, processing_info=info)
-            except Exception:
-                pass  # Non-critical
+            except Exception as exc:
+                # Non-critical: progress reporting is best-effort. But log
+                # so a broken DB connection doesn't silently hide every
+                # progress tick.
+                logger.warning("Freshdesk progress update failed: %s", exc)
 
         try:
             freshdesk_service.populate_caches()
@@ -140,20 +147,19 @@ class FreshdeskSyncService:
 
                 if len(batch) >= 100:
                     self._upsert_batch(batch)
-                    stats["tickets_created"] += len(batch)
+                    stats["tickets_upserted"] += len(batch)
                     batch = []
 
             # Final batch
             if batch:
                 self._upsert_batch(batch)
-                stats["tickets_created"] += len(batch)
+                stats["tickets_upserted"] += len(batch)
 
             logger.info(
-                "Freshdesk sync complete (source_id=%s): fetched=%d, created=%d, updated=%d, errors=%d",
+                "Freshdesk sync complete (source_id=%s): fetched=%d, upserted=%d, errors=%d",
                 source_id,
                 stats["tickets_fetched"],
-                stats["tickets_created"],
-                stats["tickets_updated"],
+                stats["tickets_upserted"],
                 stats["errors"],
             )
 
@@ -354,42 +360,6 @@ class FreshdeskSyncService:
             "custom_fields": raw_ticket.get("custom_fields", {}),
             "synced_at": datetime.now(timezone.utc).isoformat(),
         }
-
-    def _upsert_ticket(self, ticket_data: Dict[str, Any]) -> bool:
-        """
-        Upsert a ticket into the freshdesk_tickets table.
-
-        Educational Note: Uses Supabase's upsert (INSERT ... ON CONFLICT UPDATE)
-        on the (ticket_id, source_id) composite key. Returns True if the row
-        was newly created, False if it was updated.
-
-        Args:
-            ticket_data: Transformed ticket dict
-
-        Returns:
-            True if created (new), False if updated (existing)
-        """
-        supabase = get_supabase()
-
-        # Check if ticket already exists
-        existing = (
-            supabase.table("freshdesk_tickets")
-            .select("id")
-            .eq("ticket_id", ticket_data["ticket_id"])
-            .eq("source_id", ticket_data["source_id"])
-            .limit(1)
-            .execute()
-        )
-
-        is_new = not existing.data
-
-        # Upsert the ticket
-        supabase.table("freshdesk_tickets").upsert(
-            ticket_data,
-            on_conflict="ticket_id,source_id",
-        ).execute()
-
-        return is_new
 
     def _upsert_batch(self, tickets: List[Dict[str, Any]]) -> None:
         """Batch upsert tickets for performance (100 at a time instead of 1-by-1).

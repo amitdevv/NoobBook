@@ -63,7 +63,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
       setProjects(response.data.projects || []);
     } catch (err) {
       setError('Failed to load projects');
-      log.error({ err }, 'failed to Lloading projectsE');
+      log.error({ err }, 'failed to load projects');
     } finally {
       setLoading(false);
     }
@@ -76,7 +76,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
       // Select the project
       onSelectProject(project);
     } catch (err) {
-      log.error({ err }, 'failed to Lopening projectE');
+      log.error({ err }, 'failed to open project');
     }
   };
 
@@ -93,7 +93,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
       await projectsAPI.delete(projectToDelete);
       loadProjects(); // Refresh the list
     } catch (err) {
-      log.error({ err }, 'failed to Ldeleting projectE');
+      log.error({ err }, 'failed to delete project');
     } finally {
       setDeleteDialogOpen(false);
       setProjectToDelete(null);

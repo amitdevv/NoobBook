@@ -216,7 +216,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         });
       });
     } catch (err) {
-      log.error({ err }, 'failed to Lrefreshing sourcesE');
+      log.error({ err }, 'failed to refresh sources');
       // Don't show toast on polling errors to avoid spam
     }
   }, [projectId]);
@@ -336,7 +336,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       success(`Uploaded ${fileArray.length} file(s) successfully`);
       setSheetOpen(false);
     } catch (err: unknown) {
-      log.error({ err }, 'failed to Luploading filesE');
+      log.error({ err }, 'failed to upload files');
       const errorMessage = err instanceof Error ? err.message : 'Upload failed';
       // Check if it's an axios error with response data
       if (typeof err === 'object' && err !== null && 'response' in err) {
@@ -367,7 +367,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       success('URL source added successfully');
       setSheetOpen(false);
     } catch (err: unknown) {
-      log.error({ err }, 'failed to Ladding URL sourceE');
+      log.error({ err }, 'failed to add URL source');
       const errorMessage = err instanceof Error ? err.message : 'Failed to add URL';
       if (typeof err === 'object' && err !== null && 'response' in err) {
         const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -394,7 +394,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       success('Text source added successfully');
       setSheetOpen(false);
     } catch (err: unknown) {
-      log.error({ err }, 'failed to Ladding text sourceE');
+      log.error({ err }, 'failed to add text source');
       const errorMessage = err instanceof Error ? err.message : 'Failed to add text';
       if (typeof err === 'object' && err !== null && 'response' in err) {
         const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -423,7 +423,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       success('Deep research started - this may take a few minutes');
       setSheetOpen(false);
     } catch (err: unknown) {
-      log.error({ err }, 'failed to Lstarting researchE');
+      log.error({ err }, 'failed to start research');
       const errorMessage = err instanceof Error ? err.message : 'Failed to start research';
       if (typeof err === 'object' && err !== null && 'response' in err) {
         const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -449,7 +449,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       success('Database source added successfully');
       setSheetOpen(false);
     } catch (err: unknown) {
-      log.error({ err }, 'failed to Ladding database sourceE');
+      log.error({ err }, 'failed to add database source');
       const errorMessage = err instanceof Error ? err.message : 'Failed to add database';
       if (typeof err === 'object' && err !== null && 'response' in err) {
         const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -600,7 +600,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       // Notify parent that sources changed (triggers ChatPanel refresh)
       onSourcesChange?.();
     } catch (err) {
-      log.error({ err }, 'failed to Ldeleting sourceE');
+      log.error({ err }, 'failed to delete source');
       error('Failed to delete source');
     }
   };
@@ -636,7 +636,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       success('Source renamed successfully');
       setRenameDialogOpen(false);
     } catch (err) {
-      log.error({ err }, 'failed to Lrenaming sourceE');
+      log.error({ err }, 'failed to rename source');
       error('Failed to rename source');
     }
   };
@@ -697,7 +697,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       setSources((prev) => patchOne(prev, sourceId, { status: 'uploaded' }));
       success('Processing cancelled');
     } catch (err) {
-      log.error({ err }, 'failed to Lcancelling processingE');
+      log.error({ err }, 'failed to cancel processing');
       error('Failed to cancel processing');
     }
   };
@@ -711,7 +711,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       setSources((prev) => patchOne(prev, sourceId, { status: 'processing', error_message: null }));
       success('Processing restarted');
     } catch (err) {
-      log.error({ err }, 'failed to Lretrying processingE');
+      log.error({ err }, 'failed to retry processing');
       error('Failed to retry processing');
     }
   };
@@ -728,7 +728,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       setViewerSourceName(data.source_name);
       setViewerOpen(true);
     } catch (err) {
-      log.error({ err }, 'failed to Lfetching processed contentE');
+      log.error({ err }, 'failed to fetch processed content');
       error('Failed to load processed content');
     }
   };

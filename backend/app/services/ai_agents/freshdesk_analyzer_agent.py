@@ -59,8 +59,20 @@ class FreshdeskAnalyzerAgent:
         try:
             # Pre-flights inside the try so the finally still closes the DB
             # connection on early returns.
+            #
+            # `validate_connection` goes through the Supabase REST client
+            # (same path the sync service uses), so a failure here means the
+            # backend really can't reach the freshdesk_tickets table — not
+            # that direct psycopg2 access is unconfigured.
             if not freshdesk_executor.validate_connection():
-                return {"success": False, "error": "Cannot connect to database"}
+                return {
+                    "success": False,
+                    "error": (
+                        "Couldn't reach the Freshdesk tickets table. "
+                        "Verify the backend's Supabase credentials and that "
+                        "the freshdesk_tickets migration has been applied."
+                    ),
+                }
 
             # Without this pre-flight the agent loop runs against an empty
             # table, every query returns zero rows, and the model paraphrases
@@ -68,12 +80,16 @@ class FreshdeskAnalyzerAgent:
             # that hides the real cause (sync hasn't run yet).
             schema_info = freshdesk_executor.get_schema_info()
             if not schema_info.get("success"):
+                # Surface the underlying exception so the operator can act
+                # on it (wrong DB url, missing column, RLS denial). The
+                # generic "table is unavailable" alone isn't actionable.
+                underlying = schema_info.get("error", "unknown error")
                 return {
                     "success": False,
                     "error": (
-                        "Freshdesk tickets table is unavailable: "
-                        f"{schema_info.get('error', 'unknown error')}. "
-                        "Open the Sources panel and click 'Sync New' on the Freshdesk Tickets source to populate it."
+                        f"Freshdesk tickets table is unavailable: {underlying}. "
+                        "If the table is empty, open the Sources panel and "
+                        "click 'Sync New' on the Freshdesk Tickets source."
                     ),
                 }
             if not schema_info.get("ticket_count"):
@@ -145,9 +161,14 @@ class FreshdeskAnalyzerAgent:
                     if tool_name == "query_runner" and tool_input.get("sql_query"):
                         all_queries.append(tool_input["sql_query"])
 
-                    if not result.get("success", True) if isinstance(result, dict) else False:
+                    # Treat only a dict with explicit success=False as an
+                    # error block. Non-dict results (rare; e.g. a string)
+                    # don't reset the counter either — they're neither a
+                    # confirmed success nor a confirmed failure.
+                    is_error = isinstance(result, dict) and result.get("success", True) is False
+                    if is_error:
                         consecutive_errors += 1
-                    else:
+                    elif isinstance(result, dict):
                         consecutive_errors = 0
 
                     if consecutive_errors >= 3:

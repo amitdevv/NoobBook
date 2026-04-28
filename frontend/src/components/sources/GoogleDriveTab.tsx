@@ -77,7 +77,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
       const googleStatus = await ensureGoogleStatus({ force: true });
       setGoogleStatus(googleStatus);
     } catch (err) {
-      log.error({ err }, 'failed to Lloading Google statusE');
+      log.error({ err }, 'failed to load Google status');
     } finally {
       setLoading(false);
     }
@@ -115,7 +115,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
         error(result.error || 'Failed to load files');
       }
     } catch (err) {
-      log.error({ err }, 'failed to Lloading filesE');
+      log.error({ err }, 'failed to load files');
       error('Failed to load Google Drive files');
     } finally {
       setLoading(false);
@@ -184,7 +184,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
         error(result.error || 'Failed to import file');
       }
     } catch (err) {
-      log.error({ err }, 'failed to Limporting fileE');
+      log.error({ err }, 'failed to import file');
       error('Failed to import file');
     } finally {
       setImporting(null);

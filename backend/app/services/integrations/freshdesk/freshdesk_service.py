@@ -11,7 +11,7 @@ Rate limiting is handled by checking the X-RateLimit-Remaining response header.
 import logging
 import os
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -202,22 +202,12 @@ class FreshdeskService:
         updated_since: Optional[str] = None,
         page: int = 1,
         per_page: int = 100,
-    ) -> List[Dict]:
+    ) -> Tuple[List[Dict], Dict[str, Any]]:
         """
         List tickets with pagination.
 
-        Educational Note: Freshdesk /tickets endpoint supports:
-        - updated_since: ISO 8601 datetime filter
-        - include: comma-separated list of related objects to embed
-        - page/per_page: pagination controls (max 100 per page)
-
-        Args:
-            updated_since: ISO datetime string to filter tickets updated after this time
-            page: Page number (1-indexed)
-            per_page: Results per page (max 100)
-
-        Returns:
-            List of ticket dicts (empty list on error)
+        Returns ``(tickets, rate_info)`` so callers can surface the live
+        rate-limit headers in the sync UI alongside the ticket payload.
         """
         params: Dict[str, Any] = {
             "page": page,

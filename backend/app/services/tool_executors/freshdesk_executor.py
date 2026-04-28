@@ -37,12 +37,16 @@ freshdesk_tickets table columns:
 - requester_name (TEXT), requester_email (TEXT)
 - agent_name (TEXT), agent_email (TEXT)
 - group_name (TEXT), product_name (TEXT), company_name (TEXT)
-- category (TEXT), subcategory (TEXT), tags (TEXT[])
+- tags (TEXT[])
 - ticket_created_at (TIMESTAMPTZ), ticket_updated_at (TIMESTAMPTZ)
 - due_by (TIMESTAMPTZ), resolved_at (TIMESTAMPTZ), closed_at (TIMESTAMPTZ)
 - first_responded_at (TIMESTAMPTZ)
 - resolution_time_hours (NUMERIC), first_response_time_hours (NUMERIC)
 - is_escalated (BOOLEAN), custom_fields (JSONB)
+
+Note: `category` and `subcategory` columns exist on the table but are
+not populated by the sync service — treat them as always NULL. Use
+`ticket_type` for similar grouping needs.
 """
 
 

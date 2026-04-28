@@ -116,7 +116,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const data = await sourcesAPI.listSources(projectId);
       setSources(data);
     } catch (err) {
-      log.error({ err }, 'failed to Lloading sourcesE');
+      log.error({ err }, 'failed to load sources');
     }
   };
 
@@ -149,7 +149,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         await loadFullChat(chats[0].id);
       }
     } catch (err) {
-      log.error({ err }, 'failed to Lloading chatsE');
+      log.error({ err }, 'failed to load chats');
       error('Failed to load chats');
     } finally {
       setLoading(false);
@@ -605,7 +605,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       setShowChatList(false);
       success('New chat created');
     } catch (err) {
-      log.error({ err }, 'failed to Lcreating chatE');
+      log.error({ err }, 'failed to create chat');
       error('Failed to create chat');
     }
   };
@@ -638,7 +638,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       }
       success('Chat deleted');
     } catch (err) {
-      log.error({ err }, 'failed to Ldeleting chatE');
+      log.error({ err }, 'failed to delete chat');
       error('Failed to delete chat');
     }
   };
@@ -667,7 +667,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
       success('Chat renamed');
     } catch (err) {
-      log.error({ err }, 'failed to Lrenaming chatE');
+      log.error({ err }, 'failed to rename chat');
       error('Failed to rename chat');
     }
   };

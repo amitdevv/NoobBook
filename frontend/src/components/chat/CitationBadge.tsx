@@ -69,7 +69,7 @@ export const CitationBadge: React.FC<CitationBadgeProps> = ({
         setChunkContent(content);
         setHasLoaded(true);
       } catch (err) {
-        log.error({ err }, 'failed to Lfetching citation contentE');
+        log.error({ err }, 'failed to fetch citation content');
         setError('Failed to load citation content');
       } finally {
         setLoading(false);
