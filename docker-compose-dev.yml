@@ -254,7 +254,11 @@ services:
       PGRST_JWT_SECRET: ${JWT_SECRET}
       DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
       REQUEST_ALLOW_X_FORWARDED_PATH: "true"
-      FILE_SIZE_LIMIT: 52428800
+      # 1 GB. Must match Flask MAX_CONTENT_LENGTH and the Supabase
+      # raw-files bucket's per-bucket cap (set in Studio → Storage →
+      # raw-files → Edit bucket). The previous 52428800 (50 MB)
+      # default is what 413s big CSVs after chunked upload reassembles.
+      FILE_SIZE_LIMIT: 1073741824
       STORAGE_BACKEND: file
       STORAGE_FILE_BACKEND_PATH: /var/lib/storage
       STORAGE_FILE_ETAG_ALGORITHM: md5
