@@ -77,9 +77,12 @@ logger = logging.getLogger(__name__)
 # chunk 0 on any failure path.
 UPLOAD_TEMP_ROOT = Path(os.getenv("UPLOAD_TEMP_ROOT", "/tmp/noobbook-uploads"))
 
-# Default chunk size advertised to the client. 50 MiB sits comfortably
-# below Cloudflare Free's 100 MB body cap and most other defaults.
-DEFAULT_CHUNK_SIZE = 50 * 1024 * 1024
+# Default chunk size advertised to the client. 75 MiB sits below
+# Cloudflare Free's 100 MB body cap with margin for multipart overhead
+# (form field boundaries, Content-Disposition headers, etc.) — fewer
+# round trips than 50 MiB without risking a 413. Operators on tighter
+# proxies (a 25 MB AWS API Gateway, say) can override via env.
+DEFAULT_CHUNK_SIZE = int(os.getenv("UPLOAD_CHUNK_SIZE", str(75 * 1024 * 1024)))
 
 # Hard ceiling on a single chunk we'll accept. Anything larger is
 # almost certainly a confused client and would defeat the whole point

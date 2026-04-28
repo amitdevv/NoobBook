@@ -208,43 +208,65 @@ class SourcesAPI {
       // Step 2 — slice and send each chunk sequentially. We use sequential
       // (not parallel) to keep the temp-file write path simple on the
       // backend and to give the user a smooth, monotonic progress bar.
+      //
+      // Each chunk gets up to 3 attempts with exponential backoff. The
+      // backend's chunk handler is idempotent at a given offset (writes
+      // overwrite cleanly), so re-sending the same chunk is safe. This
+      // turns a transient 502 / connection blip during a 1 GB upload
+      // from "start over" into "lose ~1 chunk worth of bandwidth".
       const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK));
+      const MAX_CHUNK_ATTEMPTS = 3;
       let bytesSent = 0;
       for (let i = 0; i < totalChunks; i++) {
         const start = i * CHUNK;
         const end = Math.min(start + CHUNK, file.size);
         const chunkBlob = file.slice(start, end);
-
-        const formData = new FormData();
-        // The backend expects field name "chunk".
-        formData.append('chunk', chunkBlob, file.name);
-        formData.append('source_id', source_id);
-        formData.append('offset', String(start));
-        formData.append('total_size', String(file.size));
-
         const chunkBytes = end - start;
         const beforeBytes = bytesSent;
 
-        await axios.post(
-          `${API_BASE_URL}/projects/${projectId}/sources/upload-chunk`,
-          formData,
-          {
-            headers: { 'Content-Type': 'multipart/form-data' },
-            // We compute progress from beforeBytes + this chunk's
-            // partial upload, so the bar moves smoothly across all
-            // chunks instead of resetting each time.
-            onUploadProgress: (evt) => {
-              if (!onProgress) return;
-              const chunkSentSoFar = evt.loaded || 0;
-              const overall = beforeBytes + Math.min(chunkSentSoFar, chunkBytes);
-              const pct = Math.round((overall / file.size) * 100);
-              // Cap at 99 until upload-complete returns to avoid the
-              // bar hitting 100 while the assembled file is still
-              // being uploaded to Supabase server-side.
-              onProgress(Math.min(pct, 99));
-            },
+        let lastErr: unknown;
+        for (let attempt = 1; attempt <= MAX_CHUNK_ATTEMPTS; attempt++) {
+          // FormData has to be re-created per attempt — the underlying
+          // stream gets consumed by the first send.
+          const formData = new FormData();
+          formData.append('chunk', chunkBlob, file.name);
+          formData.append('source_id', source_id);
+          formData.append('offset', String(start));
+          formData.append('total_size', String(file.size));
+
+          try {
+            await axios.post(
+              `${API_BASE_URL}/projects/${projectId}/sources/upload-chunk`,
+              formData,
+              {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: (evt) => {
+                  if (!onProgress) return;
+                  const chunkSentSoFar = evt.loaded || 0;
+                  const overall = beforeBytes + Math.min(chunkSentSoFar, chunkBytes);
+                  const pct = Math.round((overall / file.size) * 100);
+                  onProgress(Math.min(pct, 99));
+                },
+              }
+            );
+            lastErr = undefined;
+            break;
+          } catch (err) {
+            lastErr = err;
+            // Don't retry on 4xx — those are deterministic failures
+            // (permission denied, bad source_id, expired session).
+            // Only network errors and 5xx are worth retrying.
+            const status = (err as { response?: { status?: number } })?.response?.status;
+            if (status && status >= 400 && status < 500) {
+              break;
+            }
+            if (attempt < MAX_CHUNK_ATTEMPTS) {
+              const backoff = 500 * 2 ** (attempt - 1); // 500ms, 1s, 2s
+              await new Promise((r) => setTimeout(r, backoff));
+            }
           }
-        );
+        }
+        if (lastErr) throw lastErr;
 
         bytesSent += chunkBytes;
       }
