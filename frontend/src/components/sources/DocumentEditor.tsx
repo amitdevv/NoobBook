@@ -92,8 +92,15 @@ const DocumentEditor = forwardRef<DocumentEditorHandle, DocumentEditorProps>(
           ]);
         },
         loadMarkdown: (markdown: string) => {
-          const blocks = editor.tryParseMarkdownToBlocks(markdown);
-          editor.replaceBlocks(editor.document, blocks);
+          // BlockNote 0.49's tryParseMarkdownToBlocks is synchronous
+          // (returns Block[], not Promise<Block[]>) — verified against
+          // the package types and the compiled implementation. We
+          // wrap with Promise.resolve so a future version that flips
+          // to async wouldn't silently no-op.
+          const result = editor.tryParseMarkdownToBlocks(markdown);
+          Promise.resolve(result).then((blocks) => {
+            editor.replaceBlocks(editor.document, blocks);
+          });
         },
       }),
       [editor],

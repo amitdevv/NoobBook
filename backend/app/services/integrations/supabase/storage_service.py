@@ -273,10 +273,27 @@ def upload_editor_image(
     client = _get_client()
     path = f"{project_id}/_editor-images/{image_id}/{filename}"
     file_options = {"content-type": content_type}
+
+    # If we're handed a stream, read it once into memory so retries
+    # can re-send the same bytes. Editor images are capped at 10 MB
+    # in the route handler, so this is cheap. Without this, the
+    # duplicate-collision retry below re-uses an exhausted stream
+    # (position at EOF) and silently uploads zero bytes.
+    payload: Union[bytes, BinaryIO]
+    if isinstance(file_data, (bytes, bytearray)):
+        payload = file_data
+    else:
+        try:
+            file_data.seek(0)
+        except Exception:
+            # Some streams aren't seekable; we'll still buffer below.
+            pass
+        payload = file_data.read()
+
     try:
         client.storage.from_(BUCKET_RAW).upload(
             path=path,
-            file=file_data,
+            file=payload,
             file_options=file_options,
         )
         return path
@@ -285,9 +302,12 @@ def upload_editor_image(
         if "duplicate" in msg or "already exists" in msg or "resource already exists" in msg:
             try:
                 client.storage.from_(BUCKET_RAW).remove([path])
+                # `payload` is bytes by this point (buffered above), so
+                # the retry sends the full file body — not an empty
+                # stream the previous attempt already consumed.
                 client.storage.from_(BUCKET_RAW).upload(
                     path=path,
-                    file=file_data,
+                    file=payload,
                     file_options=file_options,
                 )
                 return path

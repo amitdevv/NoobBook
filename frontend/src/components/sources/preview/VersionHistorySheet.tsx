@@ -66,6 +66,7 @@ export const VersionHistorySheet: React.FC<VersionHistorySheetProps> = ({
   const [expandedContent, setExpandedContent] = useState<Record<string, string>>({});
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -118,12 +119,20 @@ export const VersionHistorySheet: React.FC<VersionHistorySheetProps> = ({
       return;
     }
     setRestoringId(versionId);
+    setRestoreError(null);
     try {
       await sourcesAPI.restoreVersion(projectId, sourceId, versionId);
       onRestored?.();
       onOpenChange(false);
     } catch (e) {
       log.error({ err: e }, 'restore failed');
+      // Surface the failure to the user — previously it was
+      // swallowed silently and the sheet just sat there.
+      setRestoreError(
+        e instanceof Error
+          ? e.message
+          : 'Could not restore that version. Try again or refresh.',
+      );
     } finally {
       setRestoringId(null);
       setConfirmId(null);
@@ -167,6 +176,11 @@ export const VersionHistorySheet: React.FC<VersionHistorySheetProps> = ({
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
           {error && (
             <p className="text-sm text-rose-600">{error}</p>
+          )}
+          {restoreError && (
+            <div className="rounded-md border border-rose-200 bg-rose-50/80 px-3 py-2 text-[12px] text-rose-700">
+              {restoreError}
+            </div>
           )}
           {!versions && !error && (
             <div className="h-32 flex items-center justify-center text-sm text-stone-500">

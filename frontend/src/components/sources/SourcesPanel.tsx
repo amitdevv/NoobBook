@@ -732,11 +732,17 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   const handleTagsChange = useCallback(
     async (sourceId: string, nextTags: string[]) => {
-      // Optimistic — patch the row immediately so the popover feels
-      // instant. Revert on failure.
-      const previous = sources.find((s) => s.id === sourceId)?.tags ?? [];
+      // Optimistic — patch the row immediately and capture the prior
+      // tags inside the setSources updater so we don't depend on the
+      // outer `sources` state (which would recreate this callback on
+      // every list refresh and force-update every SourceItem).
+      let previous: string[] = [];
       setSources((prev) =>
-        prev.map((s) => (s.id === sourceId ? { ...s, tags: nextTags } : s)),
+        prev.map((s) => {
+          if (s.id !== sourceId) return s;
+          previous = s.tags ?? [];
+          return { ...s, tags: nextTags };
+        }),
       );
       try {
         await sourcesAPI.updateTags(projectId, sourceId, nextTags);
@@ -748,7 +754,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         );
       }
     },
-    [projectId, sources],
+    [projectId],
   );
 
   const toggleTagFilter = useCallback((tag: string) => {
