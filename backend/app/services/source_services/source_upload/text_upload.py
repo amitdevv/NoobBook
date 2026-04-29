@@ -100,6 +100,107 @@ def upload_text(
     return source_metadata
 
 
+def update_text(
+    project_id: str,
+    source_id: str,
+    content: str,
+    name: str = None,
+) -> Dict[str, Any]:
+    """
+    Replace a TEXT source's body content and re-run the processing
+    pipeline so chunks + embeddings reflect the edit.
+
+    Educational Note: TEXT sources are the only type the in-app editor
+    can produce, so they're the only type we know how to round-trip
+    through the editor → backend → processed-text path. Other types
+    (PDF, DOCX, ...) require re-upload, which the existing delete +
+    re-create flow already handles.
+
+    Pipeline:
+      1. Verify the source exists and is type=TEXT
+      2. Overwrite raw file (Supabase Storage upload is upsert)
+      3. Delete the previous processed file + chunks so the chunker
+         doesn't need to merge old vs new pages
+      4. Reset status to "uploaded" + update name/file_size
+      5. Submit a new processing task — the same one initial upload
+         uses, so chunks + Pinecone embeddings rebuild from scratch
+
+    Args:
+        project_id: project UUID
+        source_id: source UUID — must exist and be TEXT
+        content: new body (markdown / plain text)
+        name: optional rename; if None, the existing name is kept
+
+    Returns:
+        Updated source metadata dict.
+
+    Raises:
+        ValueError: empty content, name blank-after-strip, or wrong type.
+    """
+    from app.services.source_services import source_service
+    from app.services.integrations.supabase import storage_service as storage
+
+    if not content or not content.strip():
+        raise ValueError("Content cannot be empty")
+
+    source = source_service.get_source(project_id, source_id)
+    if not source:
+        raise ValueError("Source not found")
+
+    if (source.get("type") or "").upper() != "TEXT":
+        # Editing other source types means re-uploading the binary —
+        # not what this endpoint promises. Frontend gates the Edit
+        # button to TEXT, but defend in depth.
+        raise ValueError(
+            f"Only TEXT sources can be edited in-place "
+            f"(this source is {source.get('type')})"
+        )
+
+    embedding_info = source.get("embedding_info") or {}
+    stored_filename = embedding_info.get("stored_filename") or f"{source_id}.txt"
+
+    content = content.strip()
+    file_data = content.encode("utf-8")
+    file_size = len(file_data)
+
+    # 1. Overwrite raw file. upload_raw_file is upsert — same path,
+    #    new bytes.
+    storage_path = storage.upload_raw_file(
+        project_id=project_id,
+        source_id=source_id,
+        filename=stored_filename,
+        file_data=file_data,
+        content_type="text/plain",
+    )
+    if not storage_path:
+        raise ValueError("Failed to upload edited content")
+
+    # 2. Clear previously-derived data. The processor will rebuild
+    #    these from scratch — partial leftovers would survive into the
+    #    next chunking pass.
+    storage.delete_processed_file(project_id, source_id)
+    storage.delete_source_chunks(project_id, source_id)
+
+    # 3. Update metadata. Status drops to uploaded so the chunker /
+    #    embedder treat this as a fresh job.
+    update_kwargs = {
+        "status": "uploaded",
+        "file_size": file_size,
+    }
+    if name and name.strip():
+        update_kwargs["name"] = name.strip()
+    source_service.update_source(project_id, source_id, **update_kwargs)
+
+    # 4. Kick off background processing using the same task path as
+    #    the initial upload. The status flip to "processing" lives
+    #    inside _submit_processing_task.
+    _submit_processing_task(project_id, source_id)
+
+    # Return the freshest read so the caller can render the new state
+    # without an extra round trip.
+    return source_service.get_source(project_id, source_id)
+
+
 def _submit_processing_task(project_id: str, source_id: str) -> None:
     """
     Submit a background task to process the text source.

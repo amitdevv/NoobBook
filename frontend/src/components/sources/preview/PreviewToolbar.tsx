@@ -21,6 +21,7 @@ import {
   Download,
   ArrowsOut,
   ArrowsIn,
+  PencilSimple,
   X,
 } from '@phosphor-icons/react';
 import { Input } from '../../ui/input';
@@ -39,6 +40,8 @@ interface PreviewToolbarProps {
   fitMode?: 'fit' | 'actual';
   onFitModeChange?: (mode: 'fit' | 'actual') => void;
   onDownload?: () => void;
+  // TEXT-only — opens the document editor prefilled with this source.
+  onEdit?: () => void;
 }
 
 const Pill: React.FC<{
@@ -94,6 +97,7 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
   fitMode,
   onFitModeChange,
   onDownload,
+  onEdit,
 }) => {
   const tokenCount =
     (source.embedding_info as { token_count?: number } | undefined)?.token_count;
@@ -231,6 +235,22 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
               >
                 {fitMode === 'fit' ? <ArrowsOut size={14} /> : <ArrowsIn size={14} />}
               </button>
+            </>
+          )}
+
+          {/* Edit (TEXT only) */}
+          {onEdit && (
+            <>
+              <Divider />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onEdit}
+                className="h-8 px-2 text-stone-600 hover:text-amber-700"
+              >
+                <PencilSimple size={14} className="mr-1.5" />
+                <span className="text-[12px]">Edit</span>
+              </Button>
             </>
           )}
 

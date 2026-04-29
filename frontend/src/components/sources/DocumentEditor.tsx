@@ -17,7 +17,25 @@ import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
 import type { Block } from '@blocknote/core';
-import type { DocumentEditorHandle } from './DocumentEditorTab';
+
+/**
+ * Imperative handle exposed by DocumentEditor. Defined here (rather
+ * than colocated with one of the dialog wrappers) because two
+ * separate parents (DocumentEditorTab for create, DocumentEditorDialog
+ * for edit) both need the same shape, and putting the contract next
+ * to the implementation avoids circular imports.
+ */
+export interface DocumentEditorHandle {
+  /** Serialize the current editor doc to markdown (lossy on unsupported nodes). */
+  getMarkdown: () => string;
+  /** Best-effort title taken from the first heading block, or empty. */
+  getInferredName: () => string;
+  /** Reset the editor to a single empty paragraph. */
+  reset: () => void;
+  /** Replace the doc with blocks parsed from the given markdown.
+   *  Used by the edit flow to prefill an existing source's body. */
+  loadMarkdown: (markdown: string) => void;
+}
 
 interface DocumentEditorProps {
   disabled: boolean;
@@ -54,6 +72,13 @@ const DocumentEditor = forwardRef<DocumentEditorHandle, DocumentEditorProps>(
           editor.replaceBlocks(editor.document, [
             { type: 'paragraph', content: [] },
           ]);
+        },
+        loadMarkdown: (markdown: string) => {
+          // BlockNote's tryParseMarkdownToBlocks returns Block[]. We
+          // only have PartialBlock[] in the public type for replace,
+          // but Block is assignable. Cast for TS only.
+          const blocks = editor.tryParseMarkdownToBlocks(markdown);
+          editor.replaceBlocks(editor.document, blocks);
         },
       }),
       [editor],

@@ -680,6 +680,28 @@ class SourcesAPI {
   }
 
   /**
+   * Replace a TEXT source's body content and re-trigger processing.
+   * Backend rejects non-TEXT types (other types require re-upload).
+   */
+  async updateSourceContent(
+    projectId: string,
+    sourceId: string,
+    content: string,
+    name?: string,
+  ): Promise<Source> {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/projects/${projectId}/sources/${sourceId}/content`,
+        { content, name },
+      );
+      return response.data.source;
+    } catch (error) {
+      log.error({ err: error }, 'failed to update source content');
+      throw error;
+    }
+  }
+
+  /**
    * Get a short-lived signed URL for a source's raw file.
    * Used by the preview modal for PDF / IMAGE / AUDIO / CSV. Backend
    * rejects raw previews for text-based types — those go through

@@ -299,6 +299,60 @@ def update_source(project_id: str, source_id: str):
         }), 500
 
 
+@sources_bp.route('/projects/<project_id>/sources/<source_id>/content', methods=['PUT'])
+def update_source_content(project_id: str, source_id: str):
+    """
+    Replace a TEXT source's body and re-run processing.
+
+    Used by the in-app document editor's "Edit" flow on text sources.
+    Only TEXT sources are editable in place — other types require
+    delete + re-upload (the binary doesn't round-trip through a
+    text editor). The handler enforces this; the frontend also gates
+    the Edit button to TEXT-typed sources.
+
+    Request Body:
+        {
+            "content": "markdown or plain text",
+            "name": "optional new display name"
+        }
+
+    Returns:
+        { "success": true, "source": { ... reset to status=uploaded ... } }
+
+    Errors:
+        - 404 if source not found
+        - 400 if source type is not TEXT, content empty, or storage fails
+    """
+    try:
+        data = request.get_json() or {}
+        content = data.get('content', '')
+        name = data.get('name')
+
+        from app.services.source_services.source_upload import text_upload
+        updated = text_upload.update_text(
+            project_id=project_id,
+            source_id=source_id,
+            content=content,
+            name=name,
+        )
+        return jsonify({
+            'success': True,
+            'source': updated,
+            'message': 'Content updated; reprocessing queued',
+        }), 200
+
+    except ValueError as e:
+        # Validation errors (empty content, wrong type, missing source).
+        # Map to 400 / 404 based on message.
+        msg = str(e)
+        status = 404 if 'not found' in msg.lower() else 400
+        return jsonify({'success': False, 'error': msg}), status
+
+    except Exception as e:
+        current_app.logger.error(f"Error editing source content: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @sources_bp.route('/projects/<project_id>/sources/<source_id>', methods=['DELETE'])
 def delete_source(project_id: str, source_id: str):
     """

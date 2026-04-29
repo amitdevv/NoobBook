@@ -26,6 +26,7 @@ import { createLogger } from '@/lib/logger';
 import { PreviewToolbar } from './PreviewToolbar';
 import { MarkdownView } from './MarkdownView';
 import { useDocSearch } from './useDocSearch';
+import { DocumentEditorDialog } from '../DocumentEditorDialog';
 
 const log = createLogger('source-preview-sheet');
 
@@ -72,6 +73,11 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
   const [pdfPage, setPdfPage] = useState(1);
   const [pdfTotalPages, setPdfTotalPages] = useState<number | null>(null);
   const [fitMode, setFitMode] = useState<'fit' | 'actual'>('fit');
+  const [editOpen, setEditOpen] = useState(false);
+  // Bumped after a save to force the fetch effect below to refetch
+  // the freshly reprocessed content. Cheaper than tracking every
+  // field of the source row.
+  const [refetchKey, setRefetchKey] = useState(0);
 
   const search = useDocSearch();
 
@@ -127,9 +133,10 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
     return () => {
       cancelled = true;
     };
-    // search and projectId are stable; source.id triggers refetch.
+    // search and projectId are stable; source.id and refetchKey
+    // trigger refetch (the latter after an edit-and-save).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, source?.id, projectId]);
+  }, [open, source?.id, projectId, refetchKey]);
 
   // Cmd/Ctrl+F focuses the search input. Bound at the sheet level so
   // it works regardless of which view is active inside.
@@ -169,11 +176,35 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
     }
   }, [projectId, source]);
 
+  // Strip the page-marker header from /processed output so the
+  // editor opens with the user's clean markdown body, not the
+  // chunker's decorations. Single-page text sources have a single
+  // marker line followed by the body; multi-page sources interleave
+  // the original content. For now we drop *only* a leading single-page
+  // marker (PAGE 1 of 1) — that's the shape pasted-text sources have.
+  const stripSinglePageMarker = (raw: string): string =>
+    raw.replace(/^===\s*\w+\s*PAGE\s*1\s*of\s*1\s*===\s*\n+/i, '');
+
+  const handleEditSave = useCallback(
+    async (markdown: string, name: string) => {
+      if (!source) return;
+      await sourcesAPI.updateSourceContent(projectId, source.id, markdown, name);
+      // Force the fetch effect to refetch with the new content.
+      // The status flips to "processing" then back to "ready" — by
+      // the time the dialog closes and the refetch runs, the new
+      // processed text usually exists. If the user is fast, we'll
+      // briefly show a "loading" placeholder.
+      setRefetchKey((k) => k + 1);
+    },
+    [projectId, source],
+  );
+
   if (!source) return null;
 
   const sourceType = (source.type ?? '').toUpperCase();
   const ext = getSourceFileExtension(source);
   const useFullWidth = sourceType === 'PDF' || sourceType === 'IMAGE' || sourceType === 'CSV';
+  const isEditable = sourceType === 'TEXT';
 
   const renderBody = () => {
     if (loading) {
@@ -247,6 +278,7 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
           fitMode={sourceType === 'IMAGE' ? fitMode : undefined}
           onFitModeChange={sourceType === 'IMAGE' ? setFitMode : undefined}
           onDownload={ext ? handleDownload : undefined}
+          onEdit={isEditable ? () => setEditOpen(true) : undefined}
         />
 
         <ScrollArea className="flex-1 bg-[radial-gradient(circle_at_top_right,rgba(254,243,199,0.45),transparent_55%)]">
@@ -261,6 +293,21 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
           </div>
         </ScrollArea>
       </SheetContent>
+
+      {/* Edit dialog — TEXT sources only. Prefilled with the current
+          markdown body (page-marker header stripped). On save,
+          updateSourceContent re-uploads + reprocesses, then we bump
+          refetchKey to pull the fresh content back into the sheet. */}
+      {isEditable && (
+        <DocumentEditorDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          onSave={handleEditSave}
+          initialMarkdown={stripSinglePageMarker(content)}
+          initialName={source.name}
+          saveLabel="Save changes"
+        />
+      )}
     </Sheet>
   );
 };
