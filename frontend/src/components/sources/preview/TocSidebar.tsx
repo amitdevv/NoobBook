@@ -90,13 +90,12 @@ export const TocSidebar: React.FC<TocSidebarProps> = ({ headings, scrollRoot }) 
   };
 
   return (
-    // Floating overlay on the right edge of the preview body. Pinned
-    // with absolute positioning so it doesn't take horizontal space
-    // away from the scroll area's reading column on tighter screens
-    // (was previously a flex sibling, which collapsed the body to
-    // ~120px on a normal laptop). Hidden below lg.
-    <aside className="hidden lg:block absolute top-6 right-6 w-56 max-h-[calc(100%-3rem)] overflow-y-auto rounded-lg border border-stone-200/70 bg-white/85 backdrop-blur-sm shadow-[0_4px_24px_-12px_rgba(0,0,0,0.08)] z-10">
-      <div className="px-4 py-4">
+    // Right-side grid column sibling of the body (parent grid pins it
+    // to a 240px track at lg+ and hides it below). The inner sticky
+    // div pins the heading list near the top of the column while the
+    // body scrolls in the adjacent column.
+    <aside className="hidden lg:block border-l border-stone-200/70 bg-stone-50/40 overflow-y-auto">
+      <div className="sticky top-0 px-5 py-6">
         <p className="text-[10px] uppercase tracking-[0.2em] text-stone-400 mb-3 font-mono">
           On this page
         </p>

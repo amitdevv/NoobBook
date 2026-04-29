@@ -19,7 +19,6 @@
  */
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { Sheet, SheetContent, SheetTitle } from '../../ui/sheet';
-import { ScrollArea } from '../../ui/scroll-area';
 import { CircleNotch, FileX } from '@phosphor-icons/react';
 import { sourcesAPI, getSourceFileExtension, type Source } from '../../../lib/api/sources';
 import { createLogger } from '@/lib/logger';
@@ -216,6 +215,10 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
   const ext = getSourceFileExtension(source);
   const useFullWidth = sourceType === 'PDF' || sourceType === 'IMAGE' || sourceType === 'CSV';
   const isEditable = sourceType === 'TEXT';
+  // TOC only renders for text-derivable views with enough headings.
+  // Used to flip the body region's grid columns so the body claims
+  // 100% width when there's no TOC sibling.
+  const showToc = !useFullWidth && sourceType !== 'AUDIO' && headings.length >= 3;
 
   const renderBody = () => {
     if (loading) {
@@ -295,46 +298,42 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
           onShowHistory={isEditable ? () => setHistoryOpen(true) : undefined}
         />
 
-        {/* Body region. Relative-positioned so the TOC can float as
-            an overlay on the right rather than competing with the
-            scroll area for flex space — flex + ScrollArea + max-width
-            inner div was collapsing the body column on smaller
-            viewports. */}
-        <div className="relative flex-1 min-h-0">
-          <ScrollArea
-            className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(254,243,199,0.45),transparent_55%)]"
-            // Shadcn ScrollArea forwards via Radix; the actual
-            // overflow element lives at [data-radix-scroll-area-viewport]
-            // inside. Capture it after mount for the TOC observer.
-            ref={(node: HTMLDivElement | null) => {
-              if (!node) {
-                setScrollRoot(null);
-                return;
-              }
-              const viewport = node.querySelector<HTMLElement>(
-                '[data-radix-scroll-area-viewport]',
-              );
-              setScrollRoot(viewport ?? node);
-            }}
+        {/* Body + (optional) TOC laid out as a CSS grid. The grid
+            collapses to a single column below `lg`, so the TOC is
+            effectively hidden there and the body claims the full
+            width. Above `lg` we reserve a fixed 240px right column
+            for the TOC and let the body fill the rest. Using grid
+            (not flex / not absolute-positioned overlay) avoids the
+            prior bugs where the ScrollArea collapsed below its
+            content's intrinsic width OR the absolute-positioned
+            TOC overlapped the prose. */}
+        <div
+          className={
+            'flex-1 min-h-0 grid grid-cols-1 ' +
+            (showToc ? 'lg:grid-cols-[minmax(0,1fr)_240px]' : '')
+          }
+        >
+          <div
+            // Plain overflow container in place of shadcn's
+            // ScrollArea — Radix's internal viewport wrapper sized
+            // unpredictably inside flex/grid parents. A plain
+            // overflow-y-auto sizes correctly; native scrollbar is
+            // fine for the editorial aesthetic.
+            ref={(node) => setScrollRoot(node)}
+            className="overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(254,243,199,0.45),transparent_55%)]"
           >
             <div
               className={
                 useFullWidth
                   ? 'px-6 py-8'
-                  // Reserve right-side gutter for the floating TOC at lg+
-                  // so the body doesn't slide under it. Below lg the TOC
-                  // is hidden, so the body uses its natural reading
-                  // width.
-                  : 'mx-auto max-w-[760px] px-8 py-10 lg:pr-12 lg:max-w-none lg:w-full xl:max-w-[760px] xl:pr-12'
+                  : 'mx-auto max-w-[760px] px-8 py-10'
               }
             >
               {renderBody()}
             </div>
-          </ScrollArea>
-          {/* TOC sidebar — overlays the right side of the body so it
-              doesn't squash the reading column. Only rendered for
-              text-derivable sources with enough headings. */}
-          {!useFullWidth && sourceType !== 'AUDIO' && (
+          </div>
+
+          {showToc && (
             <TocSidebar headings={headings} scrollRoot={scrollRoot} />
           )}
         </div>
