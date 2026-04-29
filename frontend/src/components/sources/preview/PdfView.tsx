@@ -129,6 +129,27 @@ export const PdfView: React.FC<PdfViewProps> = ({ url, page, onTotalPages, searc
     applyHighlights();
   }, [term, textLayerReady, applyHighlights]);
 
+  // Re-style the active match whenever the cursor moves through
+  // collected matches. Mirrors the equivalent effect in MarkdownView
+  // and CsvTableView — without this, prev/next scrolls to the right
+  // <mark> but every mark looks identical, so the user can't tell
+  // which one is focused.
+  const { active, count } = search;
+  useEffect(() => {
+    const root = containerRef.current?.querySelector('.react-pdf__Page__textContent');
+    if (!root) return;
+    const marks = root.querySelectorAll<HTMLElement>('mark[data-doc-search]');
+    marks.forEach((m, i) => {
+      if (i === active) {
+        m.style.backgroundColor = 'rgba(251, 191, 36, 1)'; // amber-400
+        m.style.boxShadow = '0 0 0 2px rgba(252, 211, 77, 0.6)';
+      } else {
+        m.style.backgroundColor = 'rgba(252, 211, 77, 0.7)';
+        m.style.boxShadow = 'none';
+      }
+    });
+  }, [active, count]);
+
   return (
     <div ref={containerRef} className="w-full flex flex-col items-center">
       <Document
