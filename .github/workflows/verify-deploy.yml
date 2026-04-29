@@ -1,0 +1,128 @@
+name: verify-deploy
+
+# After Coolify auto-deploys a push to main / develop, this workflow
+# polls the public health endpoint to confirm the app actually came
+# back up. Catches deploys that the webhook fired for but the
+# container failed to start (bad migration, missing env var, OOM, ...)
+# and surfaces them as a red GitHub commit status instead of a silent
+# 502 the user has to discover by hand.
+#
+# Setup (one-time):
+#   1. Repo Settings → Secrets and variables → Actions → Variables tab
+#   2. Add a variable named PROD_API_URL pointing at the public API.
+#      Example: https://noobbooklm.com/api/v1
+#      (no trailing slash — workflow appends /health)
+#   3. Optionally add STAGING_API_URL if develop deploys to a separate
+#      environment. Otherwise develop pushes are skipped silently.
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Which environment to verify"
+        required: true
+        default: prod
+        type: choice
+        options: [prod, staging]
+
+# Coolify-side deploys are sequential per-app; cancel an in-flight
+# verify if a newer push lands so we don't chase stale commits.
+concurrency:
+  group: verify-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Wait for Coolify, then health-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Pick target URL
+        id: target
+        run: |
+          # Branch / dispatch input → which URL to ping.
+          target="${{ github.event.inputs.target }}"
+          if [ -z "$target" ]; then
+            if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+              target="prod"
+            else
+              target="staging"
+            fi
+          fi
+
+          if [ "$target" = "prod" ]; then
+            url="${{ vars.PROD_API_URL }}"
+          else
+            url="${{ vars.STAGING_API_URL }}"
+          fi
+
+          if [ -z "$url" ]; then
+            echo "::warning::No URL configured for target=$target. Set the matching repo variable (Settings → Secrets and variables → Actions → Variables → PROD_API_URL or STAGING_API_URL). Skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          echo "## Verifying $target deploy" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: \`$url/health\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Wait for Coolify to start the deploy
+        if: steps.target.outputs.skip != 'true'
+        # Coolify's GitHub webhook → enqueue → image build → container
+        # restart usually takes 60–180s. We start polling at 60s rather
+        # than sleeping the whole window so a fast deploy doesn't burn
+        # CI minutes and so a slow one still gets caught.
+        run: sleep 60
+
+      - name: Poll /health
+        if: steps.target.outputs.skip != 'true'
+        id: poll
+        env:
+          URL: ${{ steps.target.outputs.url }}
+        run: |
+          # Allow up to 8 minutes total wall time (60s sleep above + this
+          # loop). Coolify typical deploy: 90–150s. Pathological deploys
+          # with a fresh image pull can stretch to ~5min.
+          deadline=$(( $(date +%s) + 8 * 60 ))
+          attempt=0
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            attempt=$((attempt + 1))
+            code=$(curl -s -o /tmp/health.body -w "%{http_code}" --max-time 10 "$URL/health" || echo "000")
+            ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            echo "[$ts] attempt=$attempt http=$code"
+            if [ "$code" = "200" ]; then
+              echo "ok=true" >> "$GITHUB_OUTPUT"
+              echo "attempts=$attempt" >> "$GITHUB_OUTPUT"
+              echo "body=$(cat /tmp/health.body | tr -d '\n')" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 15
+          done
+
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          echo "attempts=$attempt" >> "$GITHUB_OUTPUT"
+          echo "::error::Health endpoint $URL/health never returned 200 within the 8min window."
+          exit 1
+
+      - name: Summary
+        if: always() && steps.target.outputs.skip != 'true'
+        run: |
+          if [ "${{ steps.poll.outputs.ok }}" = "true" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "✅ Deploy verified after ${{ steps.poll.outputs.attempts }} attempt(s)." >> "$GITHUB_STEP_SUMMARY"
+            echo "Response body: \`${{ steps.poll.outputs.body }}\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "❌ Deploy did NOT verify after ${{ steps.poll.outputs.attempts }} attempt(s) over 8 minutes." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Likely causes:**" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Container failed to start (check Coolify deploy logs)" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Migration error on boot" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Missing or invalid env var" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Coolify webhook didn't fire (Repo Settings → Webhooks → Recent Deliveries)" >> "$GITHUB_STEP_SUMMARY"
+          fi
