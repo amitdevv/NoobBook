@@ -65,9 +65,12 @@ export const DocumentEditorTab: React.FC<DocumentEditorTabProps> = ({
         }}
         saveLabel="Save as source"
         disabledReason={isAtLimit ? 'Source limit reached' : null}
-        // Persist a single draft under this key — closing the
-        // dialog mid-compose will offer to restore on next open.
-        draftKey="paste-tab"
+        // Per-project draft slot. Without the projectId namespace,
+        // a draft composed in project A would be offered for restore
+        // when the paste dialog opens in project B (different
+        // workspace, same browser, same user). Project-scoping the
+        // key isolates drafts cleanly.
+        draftKey={`paste-tab:${projectId}`}
       />
     </>
   );

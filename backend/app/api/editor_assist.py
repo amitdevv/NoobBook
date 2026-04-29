@@ -44,6 +44,8 @@ _ACTIONS = {
 
 @editor_assist_bp.route("/editor/assist", methods=["POST"])
 def editor_assist():
+    # Caller is already JWT-validated by api_bp.before_request, but
+    # we still want a user_id for cost attribution + Opik tagging.
     try:
         data = request.get_json() or {}
         action = (data.get("action") or "").strip().lower()
@@ -110,8 +112,25 @@ def upload_editor_image(project_id: str):
     a signed URL the editor can insert as a markdown image.
 
     Multipart: field name `file`. Validates MIME + 10 MB cap.
+
+    Auth: the request must be authenticated (handled by the api_bp
+    before_request hook) AND the requesting user must own the
+    project. We enforce ownership explicitly here because the backend
+    Supabase client uses the service role and bypasses RLS — without
+    this guard, any authenticated user could write into any project's
+    `_editor-images/` prefix.
     """
     try:
+        # Project ownership gate — must come before any storage write.
+        from app.services.data_services import project_service
+        user_id = getattr(g, "user_id", None)
+        project = project_service.get_project(project_id, user_id=user_id)
+        if not project:
+            return jsonify({
+                "success": False,
+                "error": "Project not found or access denied",
+            }), 404
+
         if "file" not in request.files:
             return jsonify({"success": False, "error": "file field required"}), 400
         f = request.files["file"]

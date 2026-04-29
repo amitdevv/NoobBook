@@ -75,6 +75,32 @@ function stripCalloutMarker(children: React.ReactNode): React.ReactNode {
   return [rebuilt, ...arr.slice(1)];
 }
 
+// Module-scope heading components — react-markdown holds component
+// identity stable across renders, so defining these once here avoids
+// the every-render remount cost that lifting them inside the
+// component would cause. Ids + data-heading-id are assigned by a
+// post-render effect (see useEffect inside MarkdownView).
+const HeadingComponents = {
+  h1: ({ children }: { children?: React.ReactNode }) => (
+    <h1 className="text-[26px] font-semibold mt-8 mb-3 text-stone-900 scroll-mt-24">{children}</h1>
+  ),
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <h2 className="text-[21px] font-semibold mt-7 mb-2 text-stone-900 scroll-mt-24">{children}</h2>
+  ),
+  h3: ({ children }: { children?: React.ReactNode }) => (
+    <h3 className="text-[18px] font-medium mt-5 mb-2 text-stone-900 scroll-mt-24">{children}</h3>
+  ),
+  h4: ({ children }: { children?: React.ReactNode }) => (
+    <h4 className="text-[16px] font-medium mt-4 mb-2 text-stone-900 scroll-mt-24">{children}</h4>
+  ),
+  h5: ({ children }: { children?: React.ReactNode }) => (
+    <h5 className="text-[15px] font-medium mt-4 mb-2 text-stone-900 scroll-mt-24">{children}</h5>
+  ),
+  h6: ({ children }: { children?: React.ReactNode }) => (
+    <h6 className="text-[14px] font-medium mt-4 mb-2 text-stone-700 scroll-mt-24">{children}</h6>
+  ),
+};
+
 // Slug stable enough across renders for the TOC scroll target.
 function slugify(text: string): string {
   return text
@@ -230,28 +256,10 @@ export const MarkdownView: React.FC<MarkdownViewProps> = ({
 
   // Heading wrapper shared across h1-h6 — assigns the slug id and
   // applies the typography styles inline.
-  // Heading components carry only their typography classes here —
-  // ids and data-heading-id come from the post-render effect above.
-  const HeadingComponents = {
-    h1: ({ children }: { children?: React.ReactNode }) => (
-      <h1 className="text-[26px] font-semibold mt-8 mb-3 text-stone-900 scroll-mt-24">{children}</h1>
-    ),
-    h2: ({ children }: { children?: React.ReactNode }) => (
-      <h2 className="text-[21px] font-semibold mt-7 mb-2 text-stone-900 scroll-mt-24">{children}</h2>
-    ),
-    h3: ({ children }: { children?: React.ReactNode }) => (
-      <h3 className="text-[18px] font-medium mt-5 mb-2 text-stone-900 scroll-mt-24">{children}</h3>
-    ),
-    h4: ({ children }: { children?: React.ReactNode }) => (
-      <h4 className="text-[16px] font-medium mt-4 mb-2 text-stone-900 scroll-mt-24">{children}</h4>
-    ),
-    h5: ({ children }: { children?: React.ReactNode }) => (
-      <h5 className="text-[15px] font-medium mt-4 mb-2 text-stone-900 scroll-mt-24">{children}</h5>
-    ),
-    h6: ({ children }: { children?: React.ReactNode }) => (
-      <h6 className="text-[14px] font-medium mt-4 mb-2 text-stone-700 scroll-mt-24">{children}</h6>
-    ),
-  };
+  // Heading typography classes are inlined in HeadingComponents above
+  // (module scope) so react-markdown gets a stable component ref per
+  // heading level — recreating the map every render forces a remount
+  // of every heading element on each MarkdownView render.
 
   return (
     <div
