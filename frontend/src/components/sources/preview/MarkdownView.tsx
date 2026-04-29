@@ -176,11 +176,11 @@ const Blockquote = ({ children }: { children?: React.ReactNode }) => {
 
 // Inline code is compact + warm; block code is delegated to
 // CodeBlock via the `pre` override below.
-const InlineCode = ({
+const InlineCode: React.FC<React.HTMLAttributes<HTMLElement>> = ({
   className,
   children,
   ...props
-}: { className?: string; children?: React.ReactNode } & Record<string, unknown>) => {
+}) => {
   // react-markdown wraps fenced code in a <pre><code>; for inline
   // there is no `pre` parent, so the `pre` override doesn't
   // intercept those — we handle them here. Fenced blocks have a

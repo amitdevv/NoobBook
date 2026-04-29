@@ -20,7 +20,7 @@
  *      surrounding paragraph as context).
  */
 
-import { forwardRef, useImperativeHandle, useState } from 'react';
+import { forwardRef, useImperativeHandle, useMemo, useState } from 'react';
 import {
   useCreateBlockNote,
   FormattingToolbar,
@@ -30,10 +30,19 @@ import {
 } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
-import type { Block } from '@blocknote/core';
+import {
+  BlockNoteSchema,
+  defaultBlockSpecs,
+  createCodeBlockSpec,
+  type Block,
+} from '@blocknote/core';
 import { Sparkle, ArrowFatLineRight, ListBullets, CircleNotch } from '@phosphor-icons/react';
 import { uploadEditorImage, assistText, type AssistAction } from '@/lib/api/editor';
 import { createLogger } from '@/lib/logger';
+import {
+  EDITOR_LANGUAGE_DISPLAY,
+  getEditorHighlighter,
+} from './editorHighlighter';
 
 const log = createLogger('document-editor');
 
@@ -51,7 +60,27 @@ interface DocumentEditorProps {
 
 const DocumentEditor = forwardRef<DocumentEditorHandle, DocumentEditorProps>(
   ({ disabled, projectId }, ref) => {
+    // Schema is built once per editor instance: replace the default
+    // codeBlock with a Shiki-highlighted variant. Memoised so a
+    // parent re-render doesn't churn the editor schema (which would
+    // remount every existing block in the document).
+    const schema = useMemo(
+      () =>
+        BlockNoteSchema.create({
+          blockSpecs: {
+            ...defaultBlockSpecs,
+            codeBlock: createCodeBlockSpec({
+              defaultLanguage: 'text',
+              supportedLanguages: EDITOR_LANGUAGE_DISPLAY,
+              createHighlighter: getEditorHighlighter,
+            }),
+          },
+        }),
+      [],
+    );
+
     const editor = useCreateBlockNote({
+      schema,
       // BlockNote calls this for /image, drag-drop, and paste-image
       // events. We forward the file to our backend endpoint and
       // return the signed URL it inserts as the image src.
