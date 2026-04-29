@@ -100,31 +100,118 @@ class PromptLoader:
         """Initialize the prompt service."""
         self.prompts_dir = Config.DATA_DIR / "prompts"
         self.projects_dir = Config.PROJECTS_DIR
+        # Sibling of prompts_dir. Persisted via the same `backend-data`
+        # Docker volume but **not** clobbered by entrypoint.sh's
+        # `cp /app/_prompts_staging/* data/prompts/`. Admin edits land
+        # here so they survive container redeploys.
+        self.overrides_dir = Config.DATA_DIR / "prompt_overrides"
 
-        # Ensure prompts directory exists
+        # Ensure both directories exist
         self.prompts_dir.mkdir(exist_ok=True, parents=True)
+        self.overrides_dir.mkdir(exist_ok=True, parents=True)
+
+    # ────────────────────────────────────────────────────────────────
+    # Override resolution helpers (Roadmap #16 — admin-editable prompts).
+    # Overrides live alongside the shipped defaults but in a sibling
+    # directory that the container entrypoint doesn't clobber. The
+    # resolver merges {**base, **override} so an override file only
+    # needs the fields the admin actually changed.
+    # ────────────────────────────────────────────────────────────────
+
+    def _override_path(self, prompt_name: str) -> Path:
+        return self.overrides_dir / f"{prompt_name}_prompt.json"
+
+    def _load_override(self, prompt_name: str) -> Optional[Dict[str, Any]]:
+        """Read the override file for ``prompt_name``, or return ``None``."""
+        path = self._override_path(prompt_name)
+        if not path.exists():
+            return None
+        try:
+            with open(path, 'r') as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                logger.warning("Override %s is not a JSON object — ignoring", path)
+                return None
+            return data
+        except (json.JSONDecodeError, IOError) as e:
+            logger.error("Failed to read override %s: %s", path, e)
+            return None
+
+    def has_override(self, prompt_name: str) -> bool:
+        """True iff an admin override file exists for this prompt."""
+        return self._override_path(prompt_name).exists()
+
+    def write_override(self, prompt_name: str, override: Dict[str, Any]) -> bool:
+        """
+        Persist an admin override. Caller is responsible for validation
+        (see ``prompt_var_utils.validate_edit``) — this just writes to disk.
+        """
+        path = self._override_path(prompt_name)
+        try:
+            with open(path, 'w') as f:
+                json.dump(override, f, indent=2)
+            return True
+        except IOError as e:
+            logger.error("Failed to write override %s: %s", path, e)
+            return False
+
+    def clear_override(self, prompt_name: str) -> bool:
+        """Delete the override file. Returns False only on a real I/O error."""
+        path = self._override_path(prompt_name)
+        if not path.exists():
+            return True
+        try:
+            path.unlink()
+            return True
+        except IOError as e:
+            logger.error("Failed to delete override %s: %s", path, e)
+            return False
+
+    def _load_base(self, prompt_name: str) -> Optional[Dict[str, Any]]:
+        """Load the shipped default for ``prompt_name``, no merge."""
+        prompt_file = self.prompts_dir / f"{prompt_name}_prompt.json"
+        try:
+            with open(prompt_file, 'r') as f:
+                data = json.load(f)
+            # Legacy format compat
+            if "prompt" in data and "system_prompt" not in data:
+                data["system_prompt"] = data.pop("prompt")
+            return data
+        except (FileNotFoundError, json.JSONDecodeError):
+            return None
+
+    def get_prompt_default_config(self, prompt_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Return the shipped default for a prompt, ignoring any admin override.
+
+        Used by the Admin Settings → Prompts editor to show a "compare to
+        default" diff and to compute the canonical required-variable list.
+        """
+        base = self._load_base(prompt_name)
+        if base is None:
+            return None
+        return PromptConfig(base, prompt_name=prompt_name)
 
     def get_default_prompt_config(self) -> Dict[str, Any]:
         """
         Load the full default prompt configuration.
 
         Educational Note: Returns the complete prompt config including
-        model, max_tokens, temperature, and system_prompt. This allows
-        services to use consistent settings from a single source.
+        model, max_tokens, temperature, and system_prompt. Resolves
+        admin overrides — same path ``get_prompt_config`` uses.
 
         Returns:
             Dict with all prompt config fields
         """
-        default_prompt_file = self.prompts_dir / "default_prompt.json"
-
-        with open(default_prompt_file, 'r') as f:
-            prompt_data = json.load(f)
-
-            # Handle legacy format where "prompt" was used instead of "system_prompt"
-            if "prompt" in prompt_data and "system_prompt" not in prompt_data:
-                prompt_data["system_prompt"] = prompt_data.pop("prompt")
-
-            return PromptConfig(prompt_data, prompt_name="default")
+        config = self.get_prompt_config("default")
+        if config is None:
+            # Should never happen — default_prompt.json ships with the repo
+            # — but if it ever does, fail loudly rather than returning None
+            # silently and breaking every chat downstream.
+            raise FileNotFoundError(
+                "default_prompt.json missing from prompts directory"
+            )
+        return config
 
     def get_default_prompt(self) -> str:
         """
@@ -291,35 +378,31 @@ class PromptLoader:
 
     def get_prompt_config(self, prompt_name: str) -> Optional[Dict[str, Any]]:
         """
-        Load full prompt configuration by name.
+        Load full prompt configuration by name, with admin override merged.
 
-        Educational Note: Loads the complete prompt config including
-        model, max_tokens, temperature, system_prompt, and user_message.
-        Used by services like memory_service, summary_service for
-        specialized AI tasks.
-
-        Args:
-            prompt_name: Name of the prompt file (without _prompt.json suffix)
-                        e.g., "memory" loads "memory_prompt.json"
+        Resolution order:
+          1. ``data/prompts/<name>_prompt.json``  (shipped default)
+          2. ``data/prompt_overrides/<name>_prompt.json`` (admin override,
+             merged on top — only fields the admin edited need to be
+             present in the override file)
 
         Returns:
-            Full prompt config dict, or None if not found
+            Full prompt config dict, or None if neither file exists.
         """
-        prompt_file = self.prompts_dir / f"{prompt_name}_prompt.json"
-
-        try:
-            with open(prompt_file, 'r') as f:
-                return PromptConfig(json.load(f), prompt_name=prompt_name)
-        except (FileNotFoundError, json.JSONDecodeError):
+        base = self._load_base(prompt_name)
+        if base is None:
             return None
+        override = self._load_override(prompt_name) or {}
+        merged = {**base, **override}
+        return PromptConfig(merged, prompt_name=prompt_name)
 
     def list_all_prompts(self) -> list[Dict[str, Any]]:
         """
         List all prompt configurations from the prompts directory.
 
-        Educational Note: This dynamically reads all *_prompt.json files
-        from the prompts directory, making it easy to add new prompts
-        without code changes.
+        Each entry is the *effective* config (base merged with any admin
+        override) plus a ``has_override`` boolean and a ``prompt_name``
+        suitable for the admin editor URL.
 
         Returns:
             List of prompt config dicts with all fields
@@ -332,16 +415,27 @@ class PromptLoader:
         for prompt_file in prompt_files:
             try:
                 with open(prompt_file, 'r') as f:
-                    prompt_data = json.load(f)
+                    base_data = json.load(f)
 
                     # Handle legacy format where "prompt" was used instead of "system_prompt"
-                    if "prompt" in prompt_data and "system_prompt" not in prompt_data:
-                        prompt_data["system_prompt"] = prompt_data.pop("prompt")
+                    if "prompt" in base_data and "system_prompt" not in base_data:
+                        base_data["system_prompt"] = base_data.pop("prompt")
 
-                    # Add filename for reference
-                    prompt_data["filename"] = prompt_file.name
+                    # `prompt_name` is the filename stripped of "_prompt.json"
+                    # — this is what every other API in this module uses
+                    # as the lookup key.
+                    prompt_name = prompt_file.stem
+                    if prompt_name.endswith("_prompt"):
+                        prompt_name = prompt_name[: -len("_prompt")]
 
-                    prompts.append(prompt_data)
+                    override = self._load_override(prompt_name) or {}
+                    effective = {**base_data, **override}
+
+                    effective["filename"] = prompt_file.name
+                    effective["prompt_name"] = prompt_name
+                    effective["has_override"] = bool(override)
+
+                    prompts.append(effective)
             except (json.JSONDecodeError, IOError) as e:
                 logger.error("Failed to load prompt %s: %s", prompt_file, e)
                 continue

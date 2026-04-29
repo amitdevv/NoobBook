@@ -4,7 +4,7 @@
  * Features: Profile, Team Management, API Keys, Integrations, System Settings.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import {
   SystemSection,
   DesignSection,
   ModelsSection,
+  PromptsSection,
 } from '../settings/sections';
 
 interface AppSettingsProps {
@@ -47,7 +48,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
 
   // Handle section change with admin check
   const handleSectionChange = (section: SettingsSection) => {
-    const adminOnlySections: SettingsSection[] = ['team', 'api-keys', 'models', 'design', 'system'];
+    const adminOnlySections: SettingsSection[] = ['team', 'api-keys', 'models', 'prompts', 'design', 'system'];
     if (!isAdmin && adminOnlySections.includes(section)) {
       return; // Prevent non-admins from switching to admin sections
     }
@@ -59,6 +60,23 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
     });
     setActiveSection(section);
   };
+
+  // Cross-section navigation hook — PromptEditor's "Edit in Models →"
+  // link dispatches this event so the user jumps from prompt editing
+  // straight to the model picker without closing the dialog.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const next = (e as CustomEvent<SettingsSection>).detail;
+      if (!next) return;
+      handleSectionChange(next);
+    };
+    window.addEventListener('noobbook:settings:switch-section', handler);
+    return () => window.removeEventListener('noobbook:settings:switch-section', handler);
+    // handleSectionChange is stable for our purposes (closes over isAdmin
+    // which doesn't change during a single dialog session). Re-listening
+    // on every isAdmin flip is fine and rare.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
 
   // Reset to profile when closing (so next open starts fresh)
   const handleOpenChange = (isOpen: boolean) => {
@@ -78,6 +96,8 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
         return isAdmin ? <ApiKeysSection /> : null;
       case 'models':
         return isAdmin ? <ModelsSection /> : null;
+      case 'prompts':
+        return isAdmin ? <PromptsSection /> : null;
       case 'integrations':
         return <IntegrationsSection isAdmin={isAdmin} />;
       case 'design':
@@ -90,7 +110,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
   };
 
   const visibleSections = Array.from(mountedSections).filter((section) => {
-    const adminOnlySections: SettingsSection[] = ['team', 'api-keys', 'models', 'design', 'system'];
+    const adminOnlySections: SettingsSection[] = ['team', 'api-keys', 'models', 'prompts', 'design', 'system'];
     return isAdmin || !adminOnlySections.includes(section);
   });
 
