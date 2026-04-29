@@ -18,11 +18,13 @@ import { DocumentEditorDialog } from './DocumentEditorDialog';
 export type { DocumentEditorHandle } from './DocumentEditor';
 
 interface DocumentEditorTabProps {
+  projectId: string;
   onAddText: (content: string, name: string) => Promise<void>;
   isAtLimit: boolean;
 }
 
 export const DocumentEditorTab: React.FC<DocumentEditorTabProps> = ({
+  projectId,
   onAddText,
   isAtLimit,
 }) => {
@@ -57,6 +59,7 @@ export const DocumentEditorTab: React.FC<DocumentEditorTabProps> = ({
       <DocumentEditorDialog
         open={open}
         onOpenChange={setOpen}
+        projectId={projectId}
         onSave={async (markdown, name) => {
           await onAddText(markdown, name);
         }}

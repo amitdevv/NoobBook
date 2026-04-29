@@ -44,6 +44,9 @@ const PAPER_GRAIN =
 interface DocumentEditorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Project the editor lives in. Used for image uploads (drop/paste
+   *  flow) and to scope server-side rate limits. */
+  projectId: string;
   /** Called when the user saves. Caller decides create vs update. */
   onSave: (markdown: string, name: string) => Promise<void>;
   /** Initial markdown body (edit flow). Empty string for create. */
@@ -116,6 +119,7 @@ function relativeTime(savedAt: number): string {
 export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
   open,
   onOpenChange,
+  projectId,
   onSave,
   initialMarkdown = '',
   initialName = '',
@@ -340,7 +344,11 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
                   </div>
                 }
               >
-                <LazyDocumentEditor ref={editorRef} disabled={adding} />
+                <LazyDocumentEditor
+                  ref={editorRef}
+                  disabled={adding}
+                  projectId={projectId}
+                />
               </Suspense>
             </div>
           </div>

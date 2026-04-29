@@ -28,6 +28,7 @@ import { MarkdownView, type HeadingEntry } from './MarkdownView';
 import { useDocSearch } from './useDocSearch';
 import { TocSidebar } from './TocSidebar';
 import { DocumentEditorDialog } from '../DocumentEditorDialog';
+import { VersionHistorySheet } from './VersionHistorySheet';
 
 const log = createLogger('source-preview-sheet');
 
@@ -75,6 +76,7 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
   const [pdfTotalPages, setPdfTotalPages] = useState<number | null>(null);
   const [fitMode, setFitMode] = useState<'fit' | 'actual'>('fit');
   const [editOpen, setEditOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   // Bumped after a save to force the fetch effect below to refetch
   // the freshly reprocessed content. Cheaper than tracking every
   // field of the source row.
@@ -290,6 +292,7 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
           onFitModeChange={sourceType === 'IMAGE' ? setFitMode : undefined}
           onDownload={ext ? handleDownload : undefined}
           onEdit={isEditable ? () => setEditOpen(true) : undefined}
+          onShowHistory={isEditable ? () => setHistoryOpen(true) : undefined}
         />
 
         <div className="flex-1 flex min-h-0">
@@ -326,6 +329,17 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
         </div>
       </SheetContent>
 
+      {/* Version history sheet — TEXT sources only. */}
+      {isEditable && (
+        <VersionHistorySheet
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          projectId={projectId}
+          sourceId={source.id}
+          onRestored={() => setRefetchKey((k) => k + 1)}
+        />
+      )}
+
       {/* Edit dialog — TEXT sources only. Prefilled with the current
           markdown body (page-marker header stripped). On save,
           updateSourceContent re-uploads + reprocesses, then we bump
@@ -334,6 +348,7 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
         <DocumentEditorDialog
           open={editOpen}
           onOpenChange={setEditOpen}
+          projectId={projectId}
           onSave={handleEditSave}
           initialMarkdown={stripSinglePageMarker(content)}
           initialName={source.name}

@@ -179,7 +179,11 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
 
             {canPaste && (
               <TabsContent value="paste" className="mt-6">
-                <DocumentEditorTab onAddText={onAddText} isAtLimit={isAtLimit} />
+                <DocumentEditorTab
+                  projectId={projectId}
+                  onAddText={onAddText}
+                  isAtLimit={isAtLimit}
+                />
               </TabsContent>
             )}
 

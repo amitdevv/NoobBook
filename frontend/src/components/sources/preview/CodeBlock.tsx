@@ -33,6 +33,7 @@ import typescript from 'react-syntax-highlighter/dist/esm/languages/hljs/typescr
 import xml from 'react-syntax-highlighter/dist/esm/languages/hljs/xml';
 import yaml from 'react-syntax-highlighter/dist/esm/languages/hljs/yaml';
 import { Copy, Check } from '@phosphor-icons/react';
+import { MermaidBlock } from './MermaidBlock';
 
 // Track registered language IDs so we can decide whether to fall
 // through to plain rendering. SyntaxHighlighter doesn't expose its
@@ -82,6 +83,43 @@ interface CodeBlockProps {
 
 export const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
   const [copied, setCopied] = useState(false);
+
+  // Special-case: ```mermaid``` blocks render as the diagram itself.
+  // Source still gets a copy button via the wrapper layout.
+  if (language === 'mermaid') {
+    const handleCopyMermaid = async () => {
+      try {
+        await navigator.clipboard.writeText(code);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1500);
+      } catch {
+        /* ignore */
+      }
+    };
+    return (
+      <div className="group relative my-4">
+        <button
+          type="button"
+          onClick={handleCopyMermaid}
+          aria-label={copied ? 'Copied' : 'Copy mermaid source'}
+          className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition rounded border border-stone-200 bg-white/90 px-2 py-1 text-[10px] font-medium text-stone-600 hover:text-stone-900 inline-flex items-center gap-1"
+        >
+          {copied ? (
+            <>
+              <Check size={11} weight="bold" />
+              Copied
+            </>
+          ) : (
+            <>
+              <Copy size={11} />
+              Copy source
+            </>
+          )}
+        </button>
+        <MermaidBlock source={code} />
+      </div>
+    );
+  }
 
   const handleCopy = async () => {
     try {

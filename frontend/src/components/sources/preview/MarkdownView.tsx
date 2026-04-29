@@ -44,6 +44,37 @@ function isPageMarker(segment: string): boolean {
   return new RegExp(PAGE_MARKER_PATTERN, 'i').test(segment);
 }
 
+// Callout palette per GitHub-flavored convention.
+const CALLOUT_PALETTE: Record<
+  'NOTE' | 'WARNING' | 'TIP' | 'IMPORTANT' | 'CAUTION',
+  { border: string; bg: string; label: string; text: string }
+> = {
+  NOTE:      { border: 'border-sky-200',    bg: 'bg-sky-50/70',    label: 'text-sky-700',    text: 'text-stone-700' },
+  TIP:       { border: 'border-emerald-200',bg: 'bg-emerald-50/70',label: 'text-emerald-700',text: 'text-stone-700' },
+  IMPORTANT: { border: 'border-violet-200', bg: 'bg-violet-50/70', label: 'text-violet-700', text: 'text-stone-700' },
+  WARNING:   { border: 'border-amber-300',  bg: 'bg-amber-50/70',  label: 'text-amber-800',  text: 'text-stone-800' },
+  CAUTION:   { border: 'border-rose-200',   bg: 'bg-rose-50/70',   label: 'text-rose-700',   text: 'text-stone-800' },
+};
+
+// Drop the leading `[!XYZ]` token from a react-markdown blockquote's
+// children tree. The marker always lives at the start of the first
+// text node of the first paragraph child.
+function stripCalloutMarker(children: React.ReactNode): React.ReactNode {
+  const arr = React.Children.toArray(children);
+  if (arr.length === 0) return children;
+  const first = arr[0];
+  if (!React.isValidElement(first)) return children;
+  const firstProps = first.props as { children?: React.ReactNode };
+  const innerArr = React.Children.toArray(firstProps.children);
+  if (innerArr.length === 0) return children;
+  const head = innerArr[0];
+  if (typeof head !== 'string') return children;
+  const stripped = head.replace(/^\s*\[!(NOTE|WARNING|TIP|IMPORTANT|CAUTION)\]\s*/i, '');
+  if (stripped === head) return children;
+  const rebuilt = React.cloneElement(first, undefined, [stripped, ...innerArr.slice(1)]);
+  return [rebuilt, ...arr.slice(1)];
+}
+
 // Slug stable enough across renders for the TOC scroll target.
 function slugify(text: string): string {
   return text
@@ -267,11 +298,42 @@ export const MarkdownView: React.FC<MarkdownViewProps> = ({
                   {children}
                 </a>
               ),
-              blockquote: ({ children }) => (
-                <blockquote className="my-4 pl-4 border-l-2 border-amber-300 text-stone-600 italic">
-                  {children}
-                </blockquote>
-              ),
+              blockquote: ({ children }) => {
+                // GitHub-flavored callout convention: a blockquote
+                // whose first line is `[!NOTE]` (or WARNING / TIP /
+                // IMPORTANT / CAUTION) renders as a colored panel.
+                // Otherwise it's a plain styled blockquote.
+                const text = childrenToText(children);
+                const m = text.match(/^\[!(NOTE|WARNING|TIP|IMPORTANT|CAUTION)\]\s*/i);
+                if (!m) {
+                  return (
+                    <blockquote className="my-4 pl-4 border-l-2 border-amber-300 text-stone-600 italic">
+                      {children}
+                    </blockquote>
+                  );
+                }
+                const variant = m[1].toUpperCase() as
+                  | 'NOTE' | 'WARNING' | 'TIP' | 'IMPORTANT' | 'CAUTION';
+                const palette = CALLOUT_PALETTE[variant];
+                // Rebuild children with the marker token stripped
+                // from the first text node. We only need to drop the
+                // leading `[!XYZ]` whitespace prefix.
+                return (
+                  <div
+                    className={`my-4 rounded-lg border ${palette.border} ${palette.bg} px-4 py-3 not-italic`}
+                  >
+                    <p
+                      className={`text-[11px] font-mono uppercase tracking-[0.18em] ${palette.label} mb-1`}
+                    >
+                      {variant}
+                    </p>
+                    <div className={`text-[15px] leading-relaxed ${palette.text} [&>p]:my-1`}>
+                      {/* Drop the marker from rendered output. */}
+                      {stripCalloutMarker(children)}
+                    </div>
+                  </div>
+                );
+              },
               hr: () => <hr className="my-6 border-stone-200" />,
               img: ({ src, alt }) => (
                 <img src={src} alt={alt ?? ''} className="rounded-lg my-4 max-w-full" />

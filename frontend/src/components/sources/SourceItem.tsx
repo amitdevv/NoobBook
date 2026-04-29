@@ -53,6 +53,7 @@ import {
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import { formatFileSize, isSourceViewable, type Source } from '../../lib/api/sources';
+import { TagStrip, TagEditor } from './SourceTags';
 
 interface SourceItemProps {
   source: Source;
@@ -65,6 +66,18 @@ interface SourceItemProps {
   onViewProcessed: (sourceId: string) => void;
   onSyncFreshdesk?: (sourceId: string) => void;
   onBackfillFreshdesk?: (sourceId: string) => void;
+  /** Bulk-mode: parent controls a per-row selected state. Renders a
+   *  selection checkbox to the left of the icon when set. */
+  selected?: boolean;
+  onToggleSelected?: (sourceId: string, next: boolean) => void;
+  /** Click on a tag chip — parent decides what to do (filter the
+   *  list, open a tag editor, etc.). */
+  onTagClick?: (tag: string) => void;
+  /** All tags used in the project (drives the editor's suggestion list). */
+  knownTags?: string[];
+  /** Persist a tag set change. Caller should optimistically update
+   *  state then PUT to backend. */
+  onTagsChange?: (sourceId: string, next: string[]) => void;
 }
 
 /**
@@ -212,7 +225,14 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   onViewProcessed,
   onSyncFreshdesk,
   onBackfillFreshdesk,
+  selected,
+  onToggleSelected,
+  onTagClick,
+  knownTags = [],
+  onTagsChange,
 }) => {
+  const tags = Array.isArray(source.tags) ? source.tags : [];
+  const inBulkMode = !!onToggleSelected;
   const { icon: Icon, weight: iconWeight } = getSourceIcon(source);
   const statusDisplay = getStatusDisplay(source.status, source);
   const isFreshdesk = ((source.embedding_info as Record<string, string>)?.file_extension || '') === '.freshdesk';
@@ -255,10 +275,22 @@ export const SourceItem: React.FC<SourceItemProps> = ({
     <>
     <div
       onClick={handleRowClick}
-      className={`grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 p-2 rounded-lg hover:bg-accent group transition-colors ${
+      className={`grid ${inBulkMode ? 'grid-cols-[auto_auto_1fr_auto_auto]' : 'grid-cols-[auto_1fr_auto_auto]'} items-center gap-2 p-2 rounded-lg hover:bg-accent group transition-colors ${
         isActivelyWorking ? 'opacity-60' : ''
-      } ${canView ? 'cursor-pointer' : ''}`}
+      } ${canView ? 'cursor-pointer' : ''} ${selected ? 'bg-amber-50/60 ring-1 ring-amber-200' : ''}`}
     >
+      {/* Bulk-select checkbox — only rendered when parent passed an
+          onToggleSelected handler. */}
+      {inBulkMode && (
+        <Checkbox
+          checked={!!selected}
+          onCheckedChange={(checked) => onToggleSelected?.(source.id, checked === true)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Select for bulk action"
+          className="flex-shrink-0"
+        />
+      )}
+
       {/* Icon Area - Shows category icon, transforms to menu on hover */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -344,6 +376,22 @@ export const SourceItem: React.FC<SourceItemProps> = ({
             </span>
           )}
         </div>
+        {/* Tag strip — applied tags + a hover-revealed editor trigger.
+            The trigger is always rendered (so the popover can mount
+            even when tags is empty), but its label only appears on
+            hover so empty rows stay quiet. */}
+        {(tags.length > 0 || onTagsChange) && (
+          <div className="mt-1 flex items-center gap-1.5">
+            <TagStrip tags={tags} onTagClick={onTagClick} />
+            {onTagsChange && (
+              <TagEditor
+                tags={tags}
+                suggestions={knownTags}
+                onChange={(next) => onTagsChange(source.id, next)}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Checkbox + Freshdesk actions */}

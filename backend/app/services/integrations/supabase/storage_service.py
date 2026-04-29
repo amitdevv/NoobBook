@@ -253,6 +253,69 @@ def delete_raw_file(project_id: str, source_id: str, filename: str) -> bool:
         return False
 
 
+def upload_editor_image(
+    project_id: str,
+    image_id: str,
+    filename: str,
+    file_data: Union[bytes, BinaryIO],
+    content_type: str,
+) -> Optional[str]:
+    """
+    Upload an image dropped/pasted into the document editor.
+
+    Stored at `<project_id>/_editor-images/<image_id>.<ext>` inside the
+    raw-files bucket — keeps these out of the source_id namespace
+    (they're not sources, they're inline assets) but reuses the bucket
+    + RLS so we don't need a new piece of infra.
+
+    Returns the storage path on success.
+    """
+    client = _get_client()
+    path = f"{project_id}/_editor-images/{image_id}/{filename}"
+    file_options = {"content-type": content_type}
+    try:
+        client.storage.from_(BUCKET_RAW).upload(
+            path=path,
+            file=file_data,
+            file_options=file_options,
+        )
+        return path
+    except Exception as exc:
+        msg = str(exc).lower()
+        if "duplicate" in msg or "already exists" in msg or "resource already exists" in msg:
+            try:
+                client.storage.from_(BUCKET_RAW).remove([path])
+                client.storage.from_(BUCKET_RAW).upload(
+                    path=path,
+                    file=file_data,
+                    file_options=file_options,
+                )
+                return path
+            except Exception as retry_exc:
+                logger.error("Editor image upload retry failed for %s: %s", path, retry_exc)
+                return None
+        logger.error("Editor image upload failed for %s: %s", path, exc)
+        return None
+
+
+def get_editor_image_url(
+    project_id: str,
+    image_id: str,
+    filename: str,
+    expires_in: int = 7 * 24 * 3600,
+) -> Optional[str]:
+    """Signed URL for an editor-image. Default 7-day TTL — long enough
+    for a doc to be opened weeks later in the same browser session."""
+    client = _get_client()
+    path = f"{project_id}/_editor-images/{image_id}/{filename}"
+    try:
+        response = client.storage.from_(BUCKET_RAW).create_signed_url(path, expires_in)
+        return response.get("signedURL")
+    except Exception as e:
+        logger.error("Failed to sign editor image %s: %s", path, e)
+        return None
+
+
 def get_raw_file_url(project_id: str, source_id: str, filename: str, expires_in: int = 3600) -> Optional[str]:
     """
     Get a signed URL for a raw file.
