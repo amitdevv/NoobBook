@@ -102,6 +102,20 @@ export interface ProcessedContent {
 }
 
 /**
+ * Signed-URL payload for raw-file preview (PDF, IMAGE, AUDIO, CSV).
+ * Backend returns a short-lived URL the browser can render natively —
+ * <img>, <audio>, react-pdf, or a CSV table parser.
+ */
+export interface RawFileUrl {
+  url: string;
+  expires_in: number;
+  source_name: string;
+  type: string;
+  mime_type?: string | null;
+  file_extension?: string | null;
+}
+
+/**
  * File extensions that are viewable in the processed content viewer
  * Educational Note: Only text-based sources can be viewed.
  * Audio, image, and CSV files are excluded.
@@ -135,12 +149,16 @@ export function getSourceFileExtension(source: Source): string {
 }
 
 /**
- * Check if a source is viewable based on its file extension
+ * Check if a source is viewable.
+ *
+ * The new type-aware SourcePreviewSheet renders every source type the
+ * backend can hand us — PDFs through PDF.js, images via signed URL,
+ * audio via <audio> + transcript, CSV as a table, and the
+ * text-derivable types via markdown. As long as the source finished
+ * processing, it's viewable.
  */
 export function isSourceViewable(source: Source): boolean {
-  if (source.status !== 'ready') return false;
-  const ext = getSourceFileExtension(source);
-  return !NON_VIEWABLE_EXTENSIONS.includes(ext);
+  return source.status === 'ready';
 }
 
 class SourcesAPI {
@@ -657,6 +675,31 @@ class SourcesAPI {
       };
     } catch (error) {
       log.error({ err: error }, 'failed to fetch processed content');
+      throw error;
+    }
+  }
+
+  /**
+   * Get a short-lived signed URL for a source's raw file.
+   * Used by the preview modal for PDF / IMAGE / AUDIO / CSV. Backend
+   * rejects raw previews for text-based types — those go through
+   * getProcessedContent instead.
+   */
+  async getRawUrl(projectId: string, sourceId: string): Promise<RawFileUrl> {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/projects/${projectId}/sources/${sourceId}/raw`
+      );
+      return {
+        url: response.data.url,
+        expires_in: response.data.expires_in,
+        source_name: response.data.source_name,
+        type: response.data.type,
+        mime_type: response.data.mime_type ?? null,
+        file_extension: response.data.file_extension ?? null,
+      };
+    } catch (error) {
+      log.error({ err: error }, 'failed to fetch raw signed url');
       throw error;
     }
   }

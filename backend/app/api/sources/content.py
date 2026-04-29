@@ -283,3 +283,81 @@ def get_processed_content(project_id: str, source_id: str):
             'success': False,
             'error': str(e)
         }), 500
+
+
+_RAW_URL_TTL_SECONDS = 300  # 5 minutes — long enough to fetch + render
+
+
+@sources_bp.route('/projects/<project_id>/sources/<source_id>/raw', methods=['GET'])
+def get_raw_signed_url(project_id: str, source_id: str):
+    """
+    Return a short-lived signed URL for the source's raw file.
+
+    Two callers:
+      1. The source preview modal, for types whose original bytes the
+         browser renders natively (PDF, IMAGE, AUDIO, CSV).
+      2. The "Download" button on the preview toolbar, for ANY source
+         that has raw bytes — including text-based types whose stored
+         file is the user's pasted markdown / scraped HTML / extracted
+         transcript.
+
+    The earlier implementation gated this endpoint to the raw-preview
+    type set. That silently broke download for TEXT/DOCX/LINK/etc.: the
+    toolbar swallowed the resulting 400 and the click did nothing. The
+    only check that matters here is "does the source belong to this
+    project and have a raw file" — `source_service.get_source` enforces
+    project scoping, and the signed URL is short-lived, so opening this
+    up to every type is safe.
+
+    Returns:
+        { "success": true, "url": "https://...", "expires_in": 300,
+          "source_name": "...", "type": "PDF", "mime_type": "..." }
+
+    Errors:
+        - 404 if source not found / has no raw file (still uploading)
+        - 500 if Supabase Storage signing fails
+    """
+    try:
+        source = source_service.get_source(project_id, source_id)
+        if not source:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+
+        source_type = (source.get('type') or '').upper()
+        raw_file_path = source.get('raw_file_path')
+        if not raw_file_path:
+            return jsonify({
+                'success': False,
+                'error': 'Source has no raw file (still uploading or upload failed)'
+            }), 404
+
+        # raw_file_path is "<project_id>/<source_id>/<stored_filename>".
+        # storage_service.get_raw_file_url rebuilds that path from the
+        # filename, so split on '/' and take the trailing segment.
+        stored_filename = raw_file_path.rsplit('/', 1)[-1]
+
+        signed_url = storage_service.get_raw_file_url(
+            project_id=project_id,
+            source_id=source_id,
+            filename=stored_filename,
+            expires_in=_RAW_URL_TTL_SECONDS,
+        )
+        if not signed_url:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to sign raw file URL'
+            }), 500
+
+        embedding_info = source.get('embedding_info') or {}
+        return jsonify({
+            'success': True,
+            'url': signed_url,
+            'expires_in': _RAW_URL_TTL_SECONDS,
+            'source_name': source.get('name', 'Unknown'),
+            'type': source_type,
+            'mime_type': embedding_info.get('mime_type'),
+            'file_extension': embedding_info.get('file_extension'),
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Error signing raw file URL: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500

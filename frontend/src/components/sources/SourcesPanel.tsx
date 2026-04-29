@@ -18,7 +18,7 @@ import { SourcesHeader } from './SourcesHeader';
 import { SourcesList } from './SourcesList';
 import { SourcesFooter } from './SourcesFooter';
 import { AddSourcesSheet } from './AddSourcesSheet';
-import { ProcessedContentSheet } from './ProcessedContentSheet';
+import { SourcePreviewSheet } from './preview/SourcePreviewSheet';
 import {
   Dialog,
   DialogContent,
@@ -149,10 +149,11 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const [renameSourceId, setRenameSourceId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
-  // Processed content viewer state
+  // Source preview state. The new SourcePreviewSheet does its own
+  // fetching from the source object, so we only need to track which
+  // source is open + visibility.
   const [viewerOpen, setViewerOpen] = useState(false);
-  const [viewerContent, setViewerContent] = useState('');
-  const [viewerSourceName, setViewerSourceName] = useState('');
+  const [viewerSource, setViewerSource] = useState<Source | null>(null);
 
   /**
    * Ref for error function to avoid infinite loop in useCallback
@@ -721,16 +722,14 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
    * Educational Note: Fetches the extracted text from the backend and displays
    * it in a side sheet. Only available for text-based sources that are ready.
    */
-  const handleViewProcessed = async (sourceId: string) => {
-    try {
-      const data = await sourcesAPI.getProcessedContent(projectId, sourceId);
-      setViewerContent(data.content);
-      setViewerSourceName(data.source_name);
-      setViewerOpen(true);
-    } catch (err) {
-      log.error({ err }, 'failed to fetch processed content');
-      error('Failed to load processed content');
+  const handleViewProcessed = (sourceId: string) => {
+    const target = sources.find((s) => s.id === sourceId);
+    if (!target) {
+      log.warn({ sourceId }, 'cannot preview: source not in current list');
+      return;
     }
+    setViewerSource(target);
+    setViewerOpen(true);
   };
 
   // Calculate totals
@@ -904,12 +903,13 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Processed Content Viewer */}
-      <ProcessedContentSheet
+      {/* Source preview — type-aware (PDF, image, audio, csv,
+          markdown for everything text-based). */}
+      <SourcePreviewSheet
         open={viewerOpen}
         onOpenChange={setViewerOpen}
-        sourceName={viewerSourceName}
-        content={viewerContent}
+        projectId={projectId}
+        source={viewerSource}
       />
 
       {/* Toast notifications */}
