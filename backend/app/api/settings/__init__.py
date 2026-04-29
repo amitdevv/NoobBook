@@ -41,3 +41,4 @@ from app.api.settings import databases  # noqa: F401
 from app.api.settings import mcp  # noqa: F401
 from app.api.settings import users  # noqa: F401
 from app.api.settings import models  # noqa: F401
+from app.api.settings import prompts  # noqa: F401

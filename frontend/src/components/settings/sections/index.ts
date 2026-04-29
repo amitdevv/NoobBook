@@ -5,3 +5,4 @@ export { IntegrationsSection } from './IntegrationsSection';
 export { SystemSection } from './SystemSection';
 export { DesignSection } from './DesignSection';
 export { ModelsSection } from './ModelsSection';
+export { PromptsSection } from './PromptsSection';
