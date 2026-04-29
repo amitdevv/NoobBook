@@ -1,7 +1,7 @@
 /**
  * AddSourcesSheet Component
  * Educational Note: Sheet modal with tabs for different source upload methods.
- * Orchestrates UploadTab, LinkTab, and PasteTab components.
+ * Orchestrates UploadTab, LinkTab, and DocumentEditorTab components.
  */
 
 import React from 'react';
@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { UploadTab } from './UploadTab';
 import { LinkTab } from './LinkTab';
-import { PasteTab } from './PasteTab';
+import { DocumentEditorTab } from './DocumentEditorTab';
 import { GoogleDriveTab } from './GoogleDriveTab';
 import { ResearchTab } from './ResearchTab';
 import { DatabaseTab } from './DatabaseTab';
@@ -179,7 +179,7 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
 
             {canPaste && (
               <TabsContent value="paste" className="mt-6">
-                <PasteTab onAddText={onAddText} isAtLimit={isAtLimit} />
+                <DocumentEditorTab onAddText={onAddText} isAtLimit={isAtLimit} />
               </TabsContent>
             )}
 
