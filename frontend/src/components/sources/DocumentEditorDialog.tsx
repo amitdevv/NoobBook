@@ -54,6 +54,63 @@ interface DocumentEditorDialogProps {
   saveLabel?: string;
   /** Disable saving — e.g. project at source limit (create flow only). */
   disabledReason?: string | null;
+  /** localStorage key for autosave drafts. When set, the dialog saves
+   *  current editor state every ~2s while open and offers a Restore
+   *  prompt on next open if a non-empty draft exists. Only set this
+   *  for create flows — edit flows would prompt to restore stale work
+   *  that conflicts with the source's actual stored content. */
+  draftKey?: string | null;
+}
+
+interface StoredDraft {
+  markdown: string;
+  name: string;
+  savedAt: number;
+}
+
+const DRAFT_NAMESPACE = 'noobbook:doc-editor:draft:';
+
+function loadDraft(key: string): StoredDraft | null {
+  try {
+    const raw = window.localStorage.getItem(DRAFT_NAMESPACE + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredDraft;
+    if (
+      typeof parsed?.markdown === 'string' &&
+      typeof parsed?.name === 'string' &&
+      typeof parsed?.savedAt === 'number'
+    ) {
+      return parsed;
+    }
+  } catch {
+    // localStorage can be disabled or full; either way, no draft.
+  }
+  return null;
+}
+
+function saveDraft(key: string, draft: StoredDraft) {
+  try {
+    window.localStorage.setItem(DRAFT_NAMESPACE + key, JSON.stringify(draft));
+  } catch {
+    // Quota exceeded etc — silently drop. The user just won't get
+    // restore-on-reload for this draft.
+  }
+}
+
+function clearDraft(key: string) {
+  try {
+    window.localStorage.removeItem(DRAFT_NAMESPACE + key);
+  } catch {
+    // ignore
+  }
+}
+
+function relativeTime(savedAt: number): string {
+  const diff = Date.now() - savedAt;
+  if (diff < 60_000) return 'just now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} h ago`;
+  return `${Math.floor(diff / 86_400_000)} d ago`;
 }
 
 export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
@@ -64,6 +121,7 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
   initialName = '',
   saveLabel = 'Save as source',
   disabledReason = null,
+  draftKey = null,
 }) => {
   const editorRef = useRef<DocumentEditorHandle | null>(null);
   const titleRef = useRef<HTMLInputElement | null>(null);
@@ -74,6 +132,12 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
   // for this open. Prevents re-hydrating on every render and resets
   // when the dialog closes so the next open starts fresh.
   const [hydrated, setHydrated] = useState(false);
+  // Draft restoration — populated on open if a draft exists in
+  // localStorage AND we're in create mode (no initialMarkdown). Until
+  // the user clicks Restore or Discard, the editor stays empty and
+  // the autosave loop is paused so we don't immediately overwrite
+  // the saved draft with an empty document.
+  const [draftAvailable, setDraftAvailable] = useState<StoredDraft | null>(null);
 
   const disabled = adding || !!disabledReason;
 
@@ -100,8 +164,48 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
     if (!open) {
       setHydrated(false);
       setWordCount(0);
+      setDraftAvailable(null);
     }
   }, [open]);
+
+  // On open, surface a previously-saved draft so the user can choose
+  // to restore it. Only runs in create mode (no initialMarkdown) and
+  // only when a draftKey was passed — edit flow has its own canonical
+  // content and shouldn't fight a stale localStorage draft.
+  useEffect(() => {
+    if (!open || !draftKey || initialMarkdown) return;
+    const existing = loadDraft(draftKey);
+    if (existing && existing.markdown.trim().length > 0) {
+      setDraftAvailable(existing);
+    }
+  }, [open, draftKey, initialMarkdown]);
+
+  // Autosave loop — every 2s, snapshot editor state to localStorage.
+  // Paused until the user resolves the restore prompt (otherwise the
+  // empty doc would overwrite the draft they're about to restore).
+  useEffect(() => {
+    if (!open || !draftKey || draftAvailable) return;
+    const tick = () => {
+      const md = editorRef.current?.getMarkdown() ?? '';
+      const trimmed = md.trim();
+      if (!trimmed) return; // don't write empty drafts
+      saveDraft(draftKey, { markdown: md, name, savedAt: Date.now() });
+    };
+    const id = window.setInterval(tick, 2000);
+    return () => window.clearInterval(id);
+  }, [open, draftKey, draftAvailable, name]);
+
+  const handleRestoreDraft = () => {
+    if (!draftAvailable) return;
+    setName(draftAvailable.name);
+    editorRef.current?.loadMarkdown(draftAvailable.markdown);
+    setDraftAvailable(null);
+  };
+
+  const handleDiscardDraft = () => {
+    if (draftKey) clearDraft(draftKey);
+    setDraftAvailable(null);
+  };
 
   // Poll word count once per second while open. Keeps React out of
   // the keystroke path; cheaper than wiring into BlockNote's change
@@ -141,6 +245,9 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
       await onSave(markdown, finalName);
       handle.reset();
       setName('');
+      // The doc is now persisted server-side; toss the local draft so
+      // a future open starts clean.
+      if (draftKey) clearDraft(draftKey);
       onOpenChange(false);
     } finally {
       setAdding(false);
@@ -186,6 +293,30 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
 
         <div className="relative z-10 flex-1 min-h-0 overflow-y-auto">
           <div className="mx-auto max-w-[680px] px-8 pt-16 pb-32">
+            {draftAvailable && (
+              <div className="mb-6 rounded-lg border border-amber-200/80 bg-amber-50/80 px-4 py-3 flex items-center gap-3 text-[13px] text-stone-700">
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-700">
+                  Draft
+                </span>
+                <span className="flex-1">
+                  You have an unsaved draft from {relativeTime(draftAvailable.savedAt)}.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRestoreDraft}
+                  className="rounded border border-amber-300 bg-white px-2 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-100"
+                >
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDiscardDraft}
+                  className="text-[11px] text-stone-500 hover:text-stone-800"
+                >
+                  Discard
+                </button>
+              </div>
+            )}
             <input
               ref={titleRef}
               type="text"

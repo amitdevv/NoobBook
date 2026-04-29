@@ -62,6 +62,9 @@ export const DocumentEditorTab: React.FC<DocumentEditorTabProps> = ({
         }}
         saveLabel="Save as source"
         disabledReason={isAtLimit ? 'Source limit reached' : null}
+        // Persist a single draft under this key — closing the
+        // dialog mid-compose will offer to restore on next open.
+        draftKey="paste-tab"
       />
     </>
   );
