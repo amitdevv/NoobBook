@@ -295,9 +295,14 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
           onShowHistory={isEditable ? () => setHistoryOpen(true) : undefined}
         />
 
-        <div className="flex-1 flex min-h-0">
+        {/* Body region. Relative-positioned so the TOC can float as
+            an overlay on the right rather than competing with the
+            scroll area for flex space — flex + ScrollArea + max-width
+            inner div was collapsing the body column on smaller
+            viewports. */}
+        <div className="relative flex-1 min-h-0">
           <ScrollArea
-            className="flex-1 bg-[radial-gradient(circle_at_top_right,rgba(254,243,199,0.45),transparent_55%)]"
+            className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(254,243,199,0.45),transparent_55%)]"
             // Shadcn ScrollArea forwards via Radix; the actual
             // overflow element lives at [data-radix-scroll-area-viewport]
             // inside. Capture it after mount for the TOC observer.
@@ -316,13 +321,19 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
               className={
                 useFullWidth
                   ? 'px-6 py-8'
-                  : 'mx-auto max-w-[760px] px-8 py-10'
+                  // Reserve right-side gutter for the floating TOC at lg+
+                  // so the body doesn't slide under it. Below lg the TOC
+                  // is hidden, so the body uses its natural reading
+                  // width.
+                  : 'mx-auto max-w-[760px] px-8 py-10 lg:pr-12 lg:max-w-none lg:w-full xl:max-w-[760px] xl:pr-12'
               }
             >
               {renderBody()}
             </div>
           </ScrollArea>
-          {/* TOC sidebar — only meaningful for the markdown views. */}
+          {/* TOC sidebar — overlays the right side of the body so it
+              doesn't squash the reading column. Only rendered for
+              text-derivable sources with enough headings. */}
           {!useFullWidth && sourceType !== 'AUDIO' && (
             <TocSidebar headings={headings} scrollRoot={scrollRoot} />
           )}

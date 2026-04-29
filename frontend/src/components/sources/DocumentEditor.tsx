@@ -20,7 +20,7 @@
  *      surrounding paragraph as context).
  */
 
-import { forwardRef, useImperativeHandle, useMemo, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import {
   useCreateBlockNote,
   FormattingToolbar,
@@ -56,10 +56,14 @@ export interface DocumentEditorHandle {
 interface DocumentEditorProps {
   disabled: boolean;
   projectId: string;
+  /** Markdown to seed the editor with on first mount. Used by the
+   *  Edit-source flow. The editor is uncontrolled afterwards — this
+   *  is read-once. */
+  initialMarkdown?: string;
 }
 
 const DocumentEditor = forwardRef<DocumentEditorHandle, DocumentEditorProps>(
-  ({ disabled, projectId }, ref) => {
+  ({ disabled, projectId, initialMarkdown }, ref) => {
     // Schema is built once per editor instance: replace the default
     // codeBlock with a Shiki-highlighted variant. Memoised so a
     // parent re-render doesn't churn the editor schema (which would
@@ -96,6 +100,23 @@ const DocumentEditor = forwardRef<DocumentEditorHandle, DocumentEditorProps>(
         }
       },
     });
+
+    // Seed the editor with initialMarkdown on first mount. Living
+    // inside DocumentEditor (not the parent dialog) means we run
+    // *after* useCreateBlockNote has produced the editor instance,
+    // so we don't have to play timeout-games with a forwarded ref
+    // that's null until BlockNoteView mounts. Runs once.
+    const [seeded, setSeeded] = useState(false);
+    useEffect(() => {
+      if (seeded || !initialMarkdown) return;
+      const blocks = editor.tryParseMarkdownToBlocks(initialMarkdown);
+      // tryParseMarkdownToBlocks is synchronous in BlockNote 0.49 but
+      // we wrap defensively in case a future version flips it async.
+      Promise.resolve(blocks).then((parsed) => {
+        editor.replaceBlocks(editor.document, parsed);
+        setSeeded(true);
+      });
+    }, [editor, initialMarkdown, seeded]);
 
     useImperativeHandle(
       ref,

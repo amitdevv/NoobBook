@@ -132,10 +132,13 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
   const [name, setName] = useState(initialName);
   const [adding, setAdding] = useState(false);
   const [wordCount, setWordCount] = useState(0);
-  // Tracks whether the editor has been hydrated with initialMarkdown
-  // for this open. Prevents re-hydrating on every render and resets
-  // when the dialog closes so the next open starts fresh.
-  const [hydrated, setHydrated] = useState(false);
+  // Mounting key — bumped on every open so the lazy DocumentEditor
+  // re-mounts and re-seeds itself with the current initialMarkdown.
+  // Without this, a second open with different initialMarkdown
+  // (e.g. opening Edit on source A, closing, opening Edit on source
+  // B) would keep showing source A's content because the editor
+  // instance was created with A's seed.
+  const [mountKey, setMountKey] = useState(0);
   // Draft restoration — populated on open if a draft exists in
   // localStorage AND we're in create mode (no initialMarkdown). Until
   // the user clicks Restore or Discard, the editor stays empty and
@@ -145,28 +148,25 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
 
   const disabled = adding || !!disabledReason;
 
-  // When the dialog opens with initialMarkdown, ask BlockNote to parse
-  // and replace its blocks. Runs once per open. The editor handle's
-  // `loadMarkdown` is added below in DocumentEditor.tsx.
+  // Sync the title input with whatever name was passed in for this
+  // open. Runs only when the dialog transitions to open so the
+  // user's edits to the title aren't clobbered mid-session.
   useEffect(() => {
-    if (!open || hydrated) return;
-    setName(initialName);
-    if (initialMarkdown && editorRef.current) {
-      // Defer to next frame so BlockNote is mounted.
-      const id = window.setTimeout(() => {
-        editorRef.current?.loadMarkdown?.(initialMarkdown);
-        setHydrated(true);
-      }, 50);
-      return () => window.clearTimeout(id);
-    }
-    setHydrated(true);
-  }, [open, hydrated, initialMarkdown, initialName]);
+    if (open) setName(initialName);
+  }, [open, initialName]);
 
-  // Reset hydration state when dialog closes so the next open starts
-  // clean (or re-hydrates with a different source).
+  // Force the lazy DocumentEditor to re-mount on every open so its
+  // own seed-from-initialMarkdown effect re-runs against the freshly
+  // created editor instance. Cheaper than mutating an existing
+  // editor and avoids the prior race where loadMarkdown() fired
+  // before the lazy chunk had finished hydrating.
+  useEffect(() => {
+    if (open) setMountKey((k) => k + 1);
+  }, [open]);
+
+  // Reset transient state when the dialog closes.
   useEffect(() => {
     if (!open) {
-      setHydrated(false);
       setWordCount(0);
       setDraftAvailable(null);
     }
@@ -345,9 +345,14 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
                 }
               >
                 <LazyDocumentEditor
+                  // mountKey forces a fresh editor instance per open
+                  // so initialMarkdown takes effect on the new
+                  // instance's first mount (vs. a stale one).
+                  key={mountKey}
                   ref={editorRef}
                   disabled={adding}
                   projectId={projectId}
+                  initialMarkdown={initialMarkdown}
                 />
               </Suspense>
             </div>
