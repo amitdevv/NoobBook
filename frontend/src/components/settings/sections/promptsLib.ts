@@ -8,24 +8,22 @@
  */
 
 /**
+ * Pull deduped placeholder names out of `text` in document order.
+ * Empty / non-string input returns an empty array.
+ *
  * Single-token placeholder, matching Python identifier rules:
  *   `{var_name}` ✓     `{varName}` ✗ (uppercase rejected)
  *   `{ x }` ✗           `{"key": "value"}` ✗
  *
- * Lowercase + underscore + digits, must start with a letter/underscore.
- */
-const VAR_RE = /\{([a-z_][a-z0-9_]*)\}/g;
-
-/**
- * Pull deduped placeholder names out of `text` in document order.
- * Empty / non-string input returns an empty array.
+ * The regex is created fresh inside the function rather than at module
+ * scope, since a stateful global regex can leak `lastIndex` between
+ * calls if reused.
  */
 export function extractVars(text: string | null | undefined): string[] {
   if (!text || typeof text !== 'string') return [];
+  const VAR_RE = /\{([a-z_][a-z0-9_]*)\}/g;
   const seen = new Set<string>();
   const ordered: string[] = [];
-  // Reset lastIndex defensively even though we re-create with /g each call.
-  VAR_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = VAR_RE.exec(text)) !== null) {
     const name = match[1];

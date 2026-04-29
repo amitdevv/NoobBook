@@ -29,7 +29,8 @@ link.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any, Dict, List, Optional, Tuple
 
 from flask import current_app, jsonify, request
 
@@ -44,6 +45,38 @@ from app.utils.prompt_var_utils import extract_vars, required_vars, validate_edi
 # leave any subset out of the PUT body — only the keys present are
 # overridden, the rest fall back to the shipped default.
 _EDITABLE_FIELDS = ("system_prompt", "user_message", "user_message_template", "max_tokens", "temperature")
+
+
+# Path-traversal guard. Every prompt_name flows from the URL into
+# pathlib joins (``data/prompt_overrides/<name>_prompt.json`` and
+# ``data/prompts/<name>_prompt.json``); ``pathlib`` happily resolves
+# ``..`` components, so a crafted ``../prompts/default`` would route
+# write_override straight into the shipped-defaults directory and
+# clobber files we never meant to touch.
+#
+# Matching shipped prompt filenames: lowercase, digits, underscore. No
+# dots, no slashes, no path separators of any platform. Routes admin-
+# gating is defense in depth; this gate is the actual fix.
+_SAFE_NAME_RE = re.compile(r"^[a-z0-9_]+$")
+
+
+def _validate_prompt_name(prompt_name: str) -> Optional[Tuple[Dict[str, Any], int]]:
+    """
+    Return ``None`` if ``prompt_name`` is safe, else an
+    ``(error_payload, status)`` tuple suitable for direct ``jsonify``.
+    """
+    if not prompt_name or not _SAFE_NAME_RE.match(prompt_name):
+        return (
+            {
+                "success": False,
+                "error": (
+                    "Invalid prompt name. Names must be lowercase letters, "
+                    "digits, and underscores only."
+                ),
+            },
+            400,
+        )
+    return None
 
 
 def _summarize(prompt_name: str, base: Dict[str, Any], effective: Dict[str, Any]) -> Dict[str, Any]:
@@ -120,6 +153,9 @@ def list_prompts():
 @require_admin
 def get_prompt(prompt_name: str):
     """Return the full editor payload for one prompt."""
+    bad = _validate_prompt_name(prompt_name)
+    if bad:
+        return jsonify(bad[0]), bad[1]
     try:
         detail = _detail(prompt_name)
         if detail is None:
@@ -146,7 +182,16 @@ def update_prompt(prompt_name: str):
       * ``temperature`` must be a number in [0, 2].
       * Any required ``.format()`` token in the shipped default must
         still be present in the merged effective body.
+
+    Persistence semantics: incoming fields are *merged* on top of the
+    existing override file, not replacing it. The frontend sends only
+    the fields that changed since it loaded the config, so a naive
+    full-file rewrite would silently erase any field the admin saved
+    earlier in a previous session.
     """
+    bad = _validate_prompt_name(prompt_name)
+    if bad:
+        return jsonify(bad[0]), bad[1]
     try:
         base = prompt_loader.get_prompt_default_config(prompt_name)
         if base is None:
@@ -163,34 +208,41 @@ def update_prompt(prompt_name: str):
                 "error": "Request body must be a JSON object",
             }), 400
 
-        # Build the override from the editable subset of the body.
-        override: Dict[str, Any] = {}
+        # Build the patch from the editable subset of the body.
+        patch: Dict[str, Any] = {}
         for field in _EDITABLE_FIELDS:
             if field in body:
-                override[field] = body[field]
+                patch[field] = body[field]
 
         # Per-field type checks — one pass before persisting so a single
         # bad field doesn't leave a half-written override on disk.
-        if "max_tokens" in override:
-            v = override["max_tokens"]
+        if "max_tokens" in patch:
+            v = patch["max_tokens"]
             if not isinstance(v, int) or isinstance(v, bool) or v <= 0 or v > 65536:
                 return jsonify({
                     "success": False,
                     "error": "max_tokens must be a positive integer ≤ 65536",
                 }), 400
-        if "temperature" in override:
-            v = override["temperature"]
+        if "temperature" in patch:
+            v = patch["temperature"]
             if not isinstance(v, (int, float)) or isinstance(v, bool) or v < 0 or v > 2:
                 return jsonify({
                     "success": False,
                     "error": "temperature must be a number between 0 and 2",
                 }), 400
         for field in ("system_prompt", "user_message", "user_message_template"):
-            if field in override and not isinstance(override[field], str):
+            if field in patch and not isinstance(patch[field], str):
                 return jsonify({
                     "success": False,
                     "error": f"{field} must be a string",
                 }), 400
+
+        # Merge the patch on top of any existing override so previously
+        # saved fields are preserved when this save only touches a
+        # different field. Without this merge, save A → save B silently
+        # erases A.
+        existing_override = prompt_loader._load_override(prompt_name) or {}  # noqa: SLF001
+        override = {**existing_override, **patch}
 
         # Compute the effective config as it would be after this save,
         # then check that no required var has gone missing.
@@ -207,8 +259,9 @@ def update_prompt(prompt_name: str):
                 "extra_vars": extra,
             }), 400
 
-        # If the override is empty (admin sent no fields, or sent a body
-        # identical to base) it's effectively a reset — clear instead of
+        # If the merged override is empty (e.g. admin sent fields all
+        # equal to base, OR there was no prior override and this PUT
+        # carries nothing) it's effectively a reset — clear instead of
         # writing an empty file.
         if not override:
             prompt_loader.clear_override(prompt_name)
@@ -234,6 +287,9 @@ def update_prompt(prompt_name: str):
 @require_admin
 def reset_prompt(prompt_name: str):
     """Drop the override file. Returns the now-effective (shipped) config."""
+    bad = _validate_prompt_name(prompt_name)
+    if bad:
+        return jsonify(bad[0]), bad[1]
     try:
         if prompt_loader.get_prompt_default_config(prompt_name) is None:
             return jsonify({
