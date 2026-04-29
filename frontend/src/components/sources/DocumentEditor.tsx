@@ -149,6 +149,36 @@ function blockToPlainText(block: Block): string {
 // non-empty text selection in inline-content blocks).
 // ----------------------------------------------------------------------
 
+// AssistButton lives at module scope so React holds a stable
+// component identity across AiAssistButtons renders. Defining it
+// inside the parent would force a remount of all three buttons every
+// time `busy` flipped — losing focus, disrupting transitions, and
+// burning DOM work.
+interface AssistButtonProps {
+  action: AssistAction;
+  label: string;
+  Icon: React.ComponentType<{ size?: number; weight?: 'bold' }>;
+  busy: AssistAction | null;
+  onRun: (action: AssistAction) => void;
+}
+
+const AssistButton: React.FC<AssistButtonProps> = ({ action, label, Icon, busy, onRun }) => (
+  <button
+    type="button"
+    onClick={() => onRun(action)}
+    disabled={busy === action}
+    title={`${label} (Haiku)`}
+    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-stone-700 hover:bg-amber-50 hover:text-amber-800 disabled:opacity-50 transition-colors"
+  >
+    {busy === action ? (
+      <CircleNotch size={11} weight="bold" />
+    ) : (
+      <Icon size={11} weight="bold" />
+    )}
+    <span>{label}</span>
+  </button>
+);
+
 function AiAssistButtons() {
   const editor = useBlockNoteEditor();
   const [busy, setBusy] = useState<AssistAction | null>(null);
@@ -191,39 +221,11 @@ function AiAssistButtons() {
     }
   };
 
-  // BlockNote's button styling is via Mantine; we use a div of plain
-  // buttons with a small visual treatment so they don't look like
-  // half-baked Mantine buttons.
-  const Btn = ({
-    action,
-    label,
-    Icon,
-  }: {
-    action: AssistAction;
-    label: string;
-    Icon: React.ComponentType<{ size?: number; weight?: 'bold' }>;
-  }) => (
-    <button
-      type="button"
-      onClick={() => runAssist(action)}
-      disabled={busy === action}
-      title={`${label} (Haiku)`}
-      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-stone-700 hover:bg-amber-50 hover:text-amber-800 disabled:opacity-50 transition-colors"
-    >
-      {busy === action ? (
-        <CircleNotch size={11} weight="bold" />
-      ) : (
-        <Icon size={11} weight="bold" />
-      )}
-      <span>{label}</span>
-    </button>
-  );
-
   return (
     <div className="flex items-center gap-0.5 px-1 border-r border-stone-200">
-      <Btn action="improve" label="Improve" Icon={Sparkle} />
-      <Btn action="continue" label="Continue" Icon={ArrowFatLineRight} />
-      <Btn action="summarize" label="Summarize" Icon={ListBullets} />
+      <AssistButton action="improve" label="Improve" Icon={Sparkle} busy={busy} onRun={runAssist} />
+      <AssistButton action="continue" label="Continue" Icon={ArrowFatLineRight} busy={busy} onRun={runAssist} />
+      <AssistButton action="summarize" label="Summarize" Icon={ListBullets} busy={busy} onRun={runAssist} />
     </div>
   );
 }

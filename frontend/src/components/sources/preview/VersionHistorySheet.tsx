@@ -256,35 +256,40 @@ export const VersionHistorySheet: React.FC<VersionHistorySheetProps> = ({
                   <span className="text-[10px] text-stone-300 font-mono" title={exactTimestamp(v.created_at)}>
                     {exactTimestamp(v.created_at)}
                   </span>
-                  {!isCurrent && (
-                    <button
-                      type="button"
-                      onClick={() => handleRestore(v.id)}
-                      disabled={restoringId === v.id}
-                      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
-                        confirmId === v.id
-                          ? 'bg-amber-600 text-white hover:bg-amber-700'
-                          : 'bg-stone-100 text-stone-700 hover:bg-amber-50 hover:text-amber-800'
-                      }`}
-                    >
-                      {restoringId === v.id ? (
-                        <>
-                          <CircleNotch size={11} className="animate-spin" />
-                          Restoring
-                        </>
-                      ) : confirmId === v.id ? (
-                        <>
-                          <ArrowUUpLeft size={11} weight="bold" />
-                          Confirm restore
-                        </>
-                      ) : (
-                        <>
-                          <ArrowUUpLeft size={11} />
-                          Restore
-                        </>
-                      )}
-                    </button>
-                  )}
+                  {/* Restore is available on every snapshot —
+                      including the most-recent one. The "current"
+                      label is for the most-recent SNAPSHOT, not the
+                      live document; the user has typically edited
+                      past it, so rolling back to the most-recent
+                      snapshot is the primary undo-the-last-save
+                      use case. */}
+                  <button
+                    type="button"
+                    onClick={() => handleRestore(v.id)}
+                    disabled={restoringId === v.id}
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                      confirmId === v.id
+                        ? 'bg-amber-600 text-white hover:bg-amber-700'
+                        : 'bg-stone-100 text-stone-700 hover:bg-amber-50 hover:text-amber-800'
+                    }`}
+                  >
+                    {restoringId === v.id ? (
+                      <>
+                        <CircleNotch size={11} className="animate-spin" />
+                        Restoring
+                      </>
+                    ) : confirmId === v.id ? (
+                      <>
+                        <ArrowUUpLeft size={11} weight="bold" />
+                        Confirm restore
+                      </>
+                    ) : (
+                      <>
+                        <ArrowUUpLeft size={11} />
+                        Restore
+                      </>
+                    )}
+                  </button>
                 </div>
               </article>
             );

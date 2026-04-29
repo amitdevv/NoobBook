@@ -75,31 +75,171 @@ function stripCalloutMarker(children: React.ReactNode): React.ReactNode {
   return [rebuilt, ...arr.slice(1)];
 }
 
-// Module-scope heading components — react-markdown holds component
-// identity stable across renders, so defining these once here avoids
-// the every-render remount cost that lifting them inside the
-// component would cause. Ids + data-heading-id are assigned by a
-// post-render effect (see useEffect inside MarkdownView).
-const HeadingComponents = {
-  h1: ({ children }: { children?: React.ReactNode }) => (
-    <h1 className="text-[26px] font-semibold mt-8 mb-3 text-stone-900 scroll-mt-24">{children}</h1>
-  ),
-  h2: ({ children }: { children?: React.ReactNode }) => (
-    <h2 className="text-[21px] font-semibold mt-7 mb-2 text-stone-900 scroll-mt-24">{children}</h2>
-  ),
-  h3: ({ children }: { children?: React.ReactNode }) => (
-    <h3 className="text-[18px] font-medium mt-5 mb-2 text-stone-900 scroll-mt-24">{children}</h3>
-  ),
-  h4: ({ children }: { children?: React.ReactNode }) => (
-    <h4 className="text-[16px] font-medium mt-4 mb-2 text-stone-900 scroll-mt-24">{children}</h4>
-  ),
-  h5: ({ children }: { children?: React.ReactNode }) => (
-    <h5 className="text-[15px] font-medium mt-4 mb-2 text-stone-900 scroll-mt-24">{children}</h5>
-  ),
-  h6: ({ children }: { children?: React.ReactNode }) => (
-    <h6 className="text-[14px] font-medium mt-4 mb-2 text-stone-700 scroll-mt-24">{children}</h6>
-  ),
+// Module-scope component overrides for react-markdown. Defining them
+// once here gives react-markdown stable component identity across
+// renders — recreating the components-map inside the parent forces a
+// remount of every rendered element on every parent render, which
+// among other things wipes any DOM mutations our search-highlight
+// effect just made.
+//
+// Heading ids + data-heading-id are assigned post-render by an effect
+// inside MarkdownView (we can't access the local headings array from
+// here, so the effect walks the rendered DOM in document order).
+
+const Heading1 = ({ children }: { children?: React.ReactNode }) => (
+  <h1 className="text-[26px] font-semibold mt-8 mb-3 text-stone-900 scroll-mt-24">{children}</h1>
+);
+const Heading2 = ({ children }: { children?: React.ReactNode }) => (
+  <h2 className="text-[21px] font-semibold mt-7 mb-2 text-stone-900 scroll-mt-24">{children}</h2>
+);
+const Heading3 = ({ children }: { children?: React.ReactNode }) => (
+  <h3 className="text-[18px] font-medium mt-5 mb-2 text-stone-900 scroll-mt-24">{children}</h3>
+);
+const Heading4 = ({ children }: { children?: React.ReactNode }) => (
+  <h4 className="text-[16px] font-medium mt-4 mb-2 text-stone-900 scroll-mt-24">{children}</h4>
+);
+const Heading5 = ({ children }: { children?: React.ReactNode }) => (
+  <h5 className="text-[15px] font-medium mt-4 mb-2 text-stone-900 scroll-mt-24">{children}</h5>
+);
+const Heading6 = ({ children }: { children?: React.ReactNode }) => (
+  <h6 className="text-[14px] font-medium mt-4 mb-2 text-stone-700 scroll-mt-24">{children}</h6>
+);
+
+const Paragraph = ({ children }: { children?: React.ReactNode }) => (
+  <p className="my-3">{children}</p>
+);
+const UnorderedList = ({ children }: { children?: React.ReactNode }) => (
+  <ul className="my-3 pl-6 list-disc">{children}</ul>
+);
+const OrderedList = ({ children }: { children?: React.ReactNode }) => (
+  <ol className="my-3 pl-6 list-decimal">{children}</ol>
+);
+const ListItem = ({ children }: { children?: React.ReactNode }) => (
+  <li className="my-1">{children}</li>
+);
+const Anchor = ({ children, href }: { children?: React.ReactNode; href?: string }) => (
+  <a
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-amber-700 underline underline-offset-2 hover:text-amber-800"
+  >
+    {children}
+  </a>
+);
+const Hr = () => <hr className="my-6 border-stone-200" />;
+const Img = ({ src, alt }: { src?: string; alt?: string }) => (
+  <img src={src} alt={alt ?? ''} className="rounded-lg my-4 max-w-full" />
+);
+const Tbl = ({ children }: { children?: React.ReactNode }) => (
+  <table className="my-4 w-full border-collapse">{children}</table>
+);
+const Th = ({ children }: { children?: React.ReactNode }) => (
+  <th className="border border-stone-200 bg-stone-50 px-3 py-2 text-left text-sm font-medium">
+    {children}
+  </th>
+);
+const Td = ({ children }: { children?: React.ReactNode }) => (
+  <td className="border border-stone-200 px-3 py-2 text-sm">{children}</td>
+);
+
+const Blockquote = ({ children }: { children?: React.ReactNode }) => {
+  // GitHub-flavored callout convention: a blockquote whose first
+  // line is `[!NOTE]` (or WARNING / TIP / IMPORTANT / CAUTION)
+  // renders as a colored panel. Otherwise it's a plain styled
+  // blockquote.
+  const text = childrenToText(children);
+  const m = text.match(/^\[!(NOTE|WARNING|TIP|IMPORTANT|CAUTION)\]\s*/i);
+  if (!m) {
+    return (
+      <blockquote className="my-4 pl-4 border-l-2 border-amber-300 text-stone-600 italic">
+        {children}
+      </blockquote>
+    );
+  }
+  const variant = m[1].toUpperCase() as
+    | 'NOTE' | 'WARNING' | 'TIP' | 'IMPORTANT' | 'CAUTION';
+  const palette = CALLOUT_PALETTE[variant];
+  return (
+    <div
+      className={`my-4 rounded-lg border ${palette.border} ${palette.bg} px-4 py-3 not-italic`}
+    >
+      <p className={`text-[11px] font-mono uppercase tracking-[0.18em] ${palette.label} mb-1`}>
+        {variant}
+      </p>
+      <div className={`text-[15px] leading-relaxed ${palette.text} [&>p]:my-1`}>
+        {stripCalloutMarker(children)}
+      </div>
+    </div>
+  );
 };
+
+// Inline code is compact + warm; block code is delegated to
+// CodeBlock via the `pre` override below.
+const InlineCode = ({
+  className,
+  children,
+  ...props
+}: { className?: string; children?: React.ReactNode } & Record<string, unknown>) => {
+  // react-markdown wraps fenced code in a <pre><code>; for inline
+  // there is no `pre` parent, so the `pre` override doesn't
+  // intercept those — we handle them here. Fenced blocks have a
+  // className like `language-ts`; treat presence of that as the
+  // signal they're block code (and pass through unchanged for the
+  // <pre> override to grab).
+  const isBlock = typeof className === 'string' && className.startsWith('language-');
+  if (isBlock) {
+    return (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    );
+  }
+  return (
+    <code className="bg-stone-100 text-stone-800 rounded px-1 py-0.5 text-[0.85em] font-mono">
+      {children}
+    </code>
+  );
+};
+
+const PreBlock = ({ children }: { children?: React.ReactNode }) => {
+  // children is the inner <code>; pull language + text out of it.
+  // react-markdown gives us a single child.
+  let language: string | null = null;
+  let codeText = '';
+  if (React.isValidElement(children)) {
+    const props = children.props as { className?: string; children?: React.ReactNode };
+    const cls = props.className ?? '';
+    const m = cls.match(/language-([\w-]+)/);
+    if (m) language = m[1].toLowerCase();
+    codeText = childrenToText(props.children);
+  }
+  return <CodeBlock language={language} code={codeText.replace(/\n$/, '')} />;
+};
+
+// Single, frozen components map. Stable identity is what
+// react-markdown needs to avoid remounting every node on each render.
+const MD_COMPONENTS = {
+  h1: Heading1,
+  h2: Heading2,
+  h3: Heading3,
+  h4: Heading4,
+  h5: Heading5,
+  h6: Heading6,
+  p: Paragraph,
+  ul: UnorderedList,
+  ol: OrderedList,
+  li: ListItem,
+  a: Anchor,
+  blockquote: Blockquote,
+  hr: Hr,
+  img: Img,
+  table: Tbl,
+  th: Th,
+  td: Td,
+  code: InlineCode,
+  pre: PreBlock,
+} as const;
 
 // Slug stable enough across renders for the TOC scroll target.
 function slugify(text: string): string {
@@ -282,123 +422,7 @@ export const MarkdownView: React.FC<MarkdownViewProps> = ({
         const trimmed = segment.replace(/^\n+/, '');
         if (!trimmed) return null;
         return (
-          <ReactMarkdown
-            key={i}
-            remarkPlugins={[remarkGfm]}
-            components={{
-              h1: HeadingComponents.h1,
-              h2: HeadingComponents.h2,
-              h3: HeadingComponents.h3,
-              h4: HeadingComponents.h4,
-              h5: HeadingComponents.h5,
-              h6: HeadingComponents.h6,
-              p: ({ children }) => <p className="my-3">{children}</p>,
-              ul: ({ children }) => <ul className="my-3 pl-6 list-disc">{children}</ul>,
-              ol: ({ children }) => <ol className="my-3 pl-6 list-decimal">{children}</ol>,
-              li: ({ children }) => <li className="my-1">{children}</li>,
-              a: ({ children, href }) => (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-amber-700 underline underline-offset-2 hover:text-amber-800"
-                >
-                  {children}
-                </a>
-              ),
-              blockquote: ({ children }) => {
-                // GitHub-flavored callout convention: a blockquote
-                // whose first line is `[!NOTE]` (or WARNING / TIP /
-                // IMPORTANT / CAUTION) renders as a colored panel.
-                // Otherwise it's a plain styled blockquote.
-                const text = childrenToText(children);
-                const m = text.match(/^\[!(NOTE|WARNING|TIP|IMPORTANT|CAUTION)\]\s*/i);
-                if (!m) {
-                  return (
-                    <blockquote className="my-4 pl-4 border-l-2 border-amber-300 text-stone-600 italic">
-                      {children}
-                    </blockquote>
-                  );
-                }
-                const variant = m[1].toUpperCase() as
-                  | 'NOTE' | 'WARNING' | 'TIP' | 'IMPORTANT' | 'CAUTION';
-                const palette = CALLOUT_PALETTE[variant];
-                // Rebuild children with the marker token stripped
-                // from the first text node. We only need to drop the
-                // leading `[!XYZ]` whitespace prefix.
-                return (
-                  <div
-                    className={`my-4 rounded-lg border ${palette.border} ${palette.bg} px-4 py-3 not-italic`}
-                  >
-                    <p
-                      className={`text-[11px] font-mono uppercase tracking-[0.18em] ${palette.label} mb-1`}
-                    >
-                      {variant}
-                    </p>
-                    <div className={`text-[15px] leading-relaxed ${palette.text} [&>p]:my-1`}>
-                      {/* Drop the marker from rendered output. */}
-                      {stripCalloutMarker(children)}
-                    </div>
-                  </div>
-                );
-              },
-              hr: () => <hr className="my-6 border-stone-200" />,
-              img: ({ src, alt }) => (
-                <img src={src} alt={alt ?? ''} className="rounded-lg my-4 max-w-full" />
-              ),
-              table: ({ children }) => (
-                <table className="my-4 w-full border-collapse">{children}</table>
-              ),
-              th: ({ children }) => (
-                <th className="border border-stone-200 bg-stone-50 px-3 py-2 text-left text-sm font-medium">
-                  {children}
-                </th>
-              ),
-              td: ({ children }) => (
-                <td className="border border-stone-200 px-3 py-2 text-sm">{children}</td>
-              ),
-              // Inline code stays compact + warm; block code is
-              // delegated to CodeBlock via the `pre` override below.
-              code: ({ className, children, ...props }) => {
-                // react-markdown wraps fenced code in a <pre><code>; for
-                // the *inline* case there is no `pre` parent, so the
-                // `pre` override doesn't intercept those — we handle
-                // them here. Fenced blocks have a className like
-                // `language-ts`; treat presence of that as the signal
-                // they're block code (and pass through unchanged for
-                // the <pre> override to grab).
-                const isBlock = typeof className === 'string' && className.startsWith('language-');
-                if (isBlock) {
-                  // Let `pre` render this; we just forward className
-                  // so it can extract the language hint.
-                  return (
-                    <code className={className} {...props}>
-                      {children}
-                    </code>
-                  );
-                }
-                return (
-                  <code className="bg-stone-100 text-stone-800 rounded px-1 py-0.5 text-[0.85em] font-mono">
-                    {children}
-                  </code>
-                );
-              },
-              pre: ({ children }) => {
-                // children is the inner <code>; pull language + text
-                // out of it. react-markdown gives us a single child.
-                let language: string | null = null;
-                let codeText = '';
-                if (React.isValidElement(children)) {
-                  const props = children.props as { className?: string; children?: React.ReactNode };
-                  const cls = props.className ?? '';
-                  const m = cls.match(/language-([\w-]+)/);
-                  if (m) language = m[1].toLowerCase();
-                  codeText = childrenToText(props.children);
-                }
-                return <CodeBlock language={language} code={codeText.replace(/\n$/, '')} />;
-              },
-            }}
-          >
+          <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
             {trimmed}
           </ReactMarkdown>
         );

@@ -73,10 +73,17 @@ def editor_assist():
             }), 400
 
         prompt_config = prompt_loader.get_prompt_config("editor_assist")
+        # str.format treats `{...}` as a placeholder, so any user
+        # selection containing curly braces (JSON snippets, code,
+        # f-strings, Jinja, TS generics, ...) would raise KeyError /
+        # IndexError before reaching Claude. Escape the user-controlled
+        # value by doubling its braces, which str.format renders back
+        # as literal single braces.
+        escaped_text = text.replace("{", "{{").replace("}", "}}")
         user_message = prompt_config["user_message"].format(
             action=action,
             action_short=_ACTIONS[action],
-            text=text,
+            text=escaped_text,
         )
 
         user_id = getattr(g, "user_id", None)
