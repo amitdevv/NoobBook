@@ -11,7 +11,7 @@
  * piggybacks on react-pdf's textLayer: after every page render we
  * post-process the textLayer DOM the same way MarkdownView does.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -33,6 +33,13 @@ interface PdfViewProps {
 export const PdfView: React.FC<PdfViewProps> = ({ url, page, onTotalPages, search }) => {
   const [width, setWidth] = useState<number | undefined>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Tracks which page number currently has a rendered text layer in
+  // the DOM. Compared against the `page` prop to know whether
+  // `applyHighlights` has anything to walk. Storing the page number
+  // (rather than a boolean + a separate "reset on page change" effect)
+  // means we never have to write state from inside an effect.
+  const [renderedPage, setRenderedPage] = useState(0);
+  const textLayerReady = renderedPage === page;
 
   // Keep the page width responsive so the document fills the modal
   // body without overflowing horizontally.
@@ -46,9 +53,13 @@ export const PdfView: React.FC<PdfViewProps> = ({ url, page, onTotalPages, searc
     return () => observer.disconnect();
   }, []);
 
-  // Highlight matches inside the rendered text layer of the current
-  // page. Runs after the page paints and whenever the term changes.
-  const onPageRendered = () => {
+  const { term, registerMatches } = search;
+
+  // The highlight pass is shared by two triggers:
+  //   1. onRenderSuccess fires it after a fresh page renders
+  //   2. a useEffect fires it when search.term changes mid-page
+  // Wrapped in useCallback so the effect's dep list is stable.
+  const applyHighlights = useCallback(() => {
     const root = containerRef.current?.querySelector('.react-pdf__Page__textContent');
     if (!root) return;
 
@@ -61,12 +72,12 @@ export const PdfView: React.FC<PdfViewProps> = ({ url, page, onTotalPages, searc
       parent.normalize();
     });
 
-    const term = search.term.trim();
-    if (!term) {
-      search.registerMatches([]);
+    const trimmed = term.trim();
+    if (!trimmed) {
+      registerMatches([]);
       return;
     }
-    const lowerTerm = term.toLowerCase();
+    const lowerTerm = trimmed.toLowerCase();
     const matches: HTMLElement[] = [];
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: (n) =>
@@ -94,15 +105,29 @@ export const PdfView: React.FC<PdfViewProps> = ({ url, page, onTotalPages, searc
         mark.dataset.docSearch = 'true';
         mark.style.backgroundColor = 'rgba(252, 211, 77, 0.7)';
         mark.style.color = 'inherit';
-        mark.textContent = text.slice(idx, idx + term.length);
+        mark.textContent = text.slice(idx, idx + trimmed.length);
         fragment.appendChild(mark);
         matches.push(mark);
-        cursor = idx + term.length;
+        cursor = idx + trimmed.length;
       }
       node.parentNode?.replaceChild(fragment, node);
     });
-    search.registerMatches(matches);
+    registerMatches(matches);
+  }, [term, registerMatches]);
+
+  const onPageRendered = () => {
+    setRenderedPage(page);
+    applyHighlights();
   };
+
+  // Re-run the highlight pass when the search term changes while the
+  // user is staring at an already-rendered page. Without this, typing
+  // in the search box doesn't highlight anything until the user
+  // navigates to another page and back.
+  useEffect(() => {
+    if (!textLayerReady) return;
+    applyHighlights();
+  }, [term, textLayerReady, applyHighlights]);
 
   return (
     <div ref={containerRef} className="w-full flex flex-col items-center">

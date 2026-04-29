@@ -285,11 +285,6 @@ def get_processed_content(project_id: str, source_id: str):
         }), 500
 
 
-# Source types we hand the raw file directly to the browser for preview.
-# Text-like types (DOCX, PPTX, LINK, YOUTUBE, RESEARCH, TEXT) keep using
-# the /processed endpoint — extracted text is what we want to show, not
-# the original binary.
-_RAW_PREVIEW_TYPES = {'PDF', 'IMAGE', 'AUDIO', 'CSV'}
 _RAW_URL_TTL_SECONDS = 300  # 5 minutes — long enough to fetch + render
 
 
@@ -298,19 +293,28 @@ def get_raw_signed_url(project_id: str, source_id: str):
     """
     Return a short-lived signed URL for the source's raw file.
 
-    Used by the source preview modal for types whose original bytes the
-    browser can render natively (PDF via PDF.js, IMAGE via <img>, AUDIO
-    via <audio>, CSV parsed client-side). Text-based types (DOCX, LINK,
-    YOUTUBE, ...) continue to use /processed so the user sees the
-    extracted-text version.
+    Two callers:
+      1. The source preview modal, for types whose original bytes the
+         browser renders natively (PDF, IMAGE, AUDIO, CSV).
+      2. The "Download" button on the preview toolbar, for ANY source
+         that has raw bytes — including text-based types whose stored
+         file is the user's pasted markdown / scraped HTML / extracted
+         transcript.
+
+    The earlier implementation gated this endpoint to the raw-preview
+    type set. That silently broke download for TEXT/DOCX/LINK/etc.: the
+    toolbar swallowed the resulting 400 and the click did nothing. The
+    only check that matters here is "does the source belong to this
+    project and have a raw file" — `source_service.get_source` enforces
+    project scoping, and the signed URL is short-lived, so opening this
+    up to every type is safe.
 
     Returns:
         { "success": true, "url": "https://...", "expires_in": 300,
-          "source_name": "...", "type": "PDF", "mime_type": "application/pdf" }
+          "source_name": "...", "type": "PDF", "mime_type": "..." }
 
     Errors:
-        - 404 if source not found / not yet uploaded
-        - 400 if source type is not in the raw-preview set
+        - 404 if source not found / has no raw file (still uploading)
         - 500 if Supabase Storage signing fails
     """
     try:
@@ -319,12 +323,6 @@ def get_raw_signed_url(project_id: str, source_id: str):
             return jsonify({'success': False, 'error': 'Source not found'}), 404
 
         source_type = (source.get('type') or '').upper()
-        if source_type not in _RAW_PREVIEW_TYPES:
-            return jsonify({
-                'success': False,
-                'error': f'Raw preview not supported for type {source_type or "<empty>"}'
-            }), 400
-
         raw_file_path = source.get('raw_file_path')
         if not raw_file_path:
             return jsonify({

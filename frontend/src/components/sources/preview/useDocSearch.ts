@@ -84,29 +84,3 @@ export function useDocSearch(): DocSearchAPI {
     [term, setTerm, active, count, next, prev, clear, registerMatches],
   );
 }
-
-/**
- * Split a string on case-insensitive matches of `term`. Returns
- * alternating non-match / match segments. Used by views to render
- * `<mark>` elements without dangerously inserting HTML.
- */
-export function splitOnTerm(text: string, term: string): { value: string; match: boolean }[] {
-  if (!term) return [{ value: text, match: false }];
-  const lowerTerm = term.toLowerCase();
-  const parts: { value: string; match: boolean }[] = [];
-  let cursor = 0;
-  const lower = text.toLowerCase();
-  while (cursor < text.length) {
-    const idx = lower.indexOf(lowerTerm, cursor);
-    if (idx === -1) {
-      parts.push({ value: text.slice(cursor), match: false });
-      break;
-    }
-    if (idx > cursor) {
-      parts.push({ value: text.slice(cursor, idx), match: false });
-    }
-    parts.push({ value: text.slice(idx, idx + term.length), match: true });
-    cursor = idx + term.length;
-  }
-  return parts;
-}
