@@ -151,7 +151,9 @@ class SourceService:
         active: Optional[bool] = None,
         processing_info: Optional[Dict[str, Any]] = None,
         embedding_info: Optional[Dict[str, Any]] = None,
-        summary_info: Optional[Dict[str, Any]] = None
+        summary_info: Optional[Dict[str, Any]] = None,
+        tags: Optional[list] = None,
+        file_size: Optional[int] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Update a source's metadata.
@@ -190,6 +192,20 @@ class SourceService:
             updates["embedding_info"] = embedding_info
         if summary_info is not None:
             updates["summary_info"] = summary_info
+        if tags is not None:
+            # Normalize: lowercased, stripped, dedup'd, max-32 chars per tag.
+            seen = set()
+            cleaned = []
+            for t in tags:
+                if not isinstance(t, str):
+                    continue
+                slug = t.strip().lower()[:32]
+                if slug and slug not in seen:
+                    seen.add(slug)
+                    cleaned.append(slug)
+            updates["tags"] = cleaned
+        if file_size is not None:
+            updates["file_size"] = file_size
 
         result = source_index_service.update_source_in_index(project_id, source_id, updates)
 

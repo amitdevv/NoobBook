@@ -22,6 +22,7 @@ import {
   ArrowsOut,
   ArrowsIn,
   PencilSimple,
+  ClockCounterClockwise,
   X,
 } from '@phosphor-icons/react';
 import { Input } from '../../ui/input';
@@ -42,6 +43,8 @@ interface PreviewToolbarProps {
   onDownload?: () => void;
   // TEXT-only — opens the document editor prefilled with this source.
   onEdit?: () => void;
+  /** TEXT-only — opens the version history sheet. */
+  onShowHistory?: () => void;
 }
 
 const Pill: React.FC<{
@@ -98,6 +101,7 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
   onFitModeChange,
   onDownload,
   onEdit,
+  onShowHistory,
 }) => {
   const tokenCount =
     (source.embedding_info as { token_count?: number } | undefined)?.token_count;
@@ -235,6 +239,23 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
               >
                 {fitMode === 'fit' ? <ArrowsOut size={14} /> : <ArrowsIn size={14} />}
               </button>
+            </>
+          )}
+
+          {/* History (TEXT only — listed first so Edit stays nearest
+              the destructive Download/Edit cluster). */}
+          {onShowHistory && (
+            <>
+              <Divider />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onShowHistory}
+                className="h-8 px-2 text-stone-600 hover:text-amber-700"
+              >
+                <ClockCounterClockwise size={14} className="mr-1.5" />
+                <span className="text-[12px]">History</span>
+              </Button>
             </>
           )}
 

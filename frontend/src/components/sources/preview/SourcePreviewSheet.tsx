@@ -24,9 +24,11 @@ import { CircleNotch, FileX } from '@phosphor-icons/react';
 import { sourcesAPI, getSourceFileExtension, type Source } from '../../../lib/api/sources';
 import { createLogger } from '@/lib/logger';
 import { PreviewToolbar } from './PreviewToolbar';
-import { MarkdownView } from './MarkdownView';
+import { MarkdownView, type HeadingEntry } from './MarkdownView';
 import { useDocSearch } from './useDocSearch';
+import { TocSidebar } from './TocSidebar';
 import { DocumentEditorDialog } from '../DocumentEditorDialog';
+import { VersionHistorySheet } from './VersionHistorySheet';
 
 const log = createLogger('source-preview-sheet');
 
@@ -74,10 +76,19 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
   const [pdfTotalPages, setPdfTotalPages] = useState<number | null>(null);
   const [fitMode, setFitMode] = useState<'fit' | 'actual'>('fit');
   const [editOpen, setEditOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   // Bumped after a save to force the fetch effect below to refetch
   // the freshly reprocessed content. Cheaper than tracking every
   // field of the source row.
   const [refetchKey, setRefetchKey] = useState(0);
+  // Headings collected from MarkdownView when applicable. Populated
+  // via the onHeadings callback so the TOC stays a single source of
+  // truth (the heading regex lives only in MarkdownView).
+  const [headings, setHeadings] = useState<HeadingEntry[]>([]);
+  // Resolved scroll-area viewport — the IntersectionObserver root for
+  // the TOC. Captured via callback ref because the shadcn ScrollArea
+  // wraps its scrollable element in a child div.
+  const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
 
   const search = useDocSearch();
 
@@ -257,7 +268,9 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
       default:
         // TEXT, DOCX, PPTX, LINK, YOUTUBE, RESEARCH and any future
         // text-derivable type all render the same way.
-        return <MarkdownView content={content} search={search} />;
+        return (
+          <MarkdownView content={content} search={search} onHeadings={setHeadings} />
+        );
     }
   };
 
@@ -279,20 +292,53 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
           onFitModeChange={sourceType === 'IMAGE' ? setFitMode : undefined}
           onDownload={ext ? handleDownload : undefined}
           onEdit={isEditable ? () => setEditOpen(true) : undefined}
+          onShowHistory={isEditable ? () => setHistoryOpen(true) : undefined}
         />
 
-        <ScrollArea className="flex-1 bg-[radial-gradient(circle_at_top_right,rgba(254,243,199,0.45),transparent_55%)]">
-          <div
-            className={
-              useFullWidth
-                ? 'px-6 py-8'
-                : 'mx-auto max-w-[760px] px-8 py-10'
-            }
+        <div className="flex-1 flex min-h-0">
+          <ScrollArea
+            className="flex-1 bg-[radial-gradient(circle_at_top_right,rgba(254,243,199,0.45),transparent_55%)]"
+            // Shadcn ScrollArea forwards via Radix; the actual
+            // overflow element lives at [data-radix-scroll-area-viewport]
+            // inside. Capture it after mount for the TOC observer.
+            ref={(node: HTMLDivElement | null) => {
+              if (!node) {
+                setScrollRoot(null);
+                return;
+              }
+              const viewport = node.querySelector<HTMLElement>(
+                '[data-radix-scroll-area-viewport]',
+              );
+              setScrollRoot(viewport ?? node);
+            }}
           >
-            {renderBody()}
-          </div>
-        </ScrollArea>
+            <div
+              className={
+                useFullWidth
+                  ? 'px-6 py-8'
+                  : 'mx-auto max-w-[760px] px-8 py-10'
+              }
+            >
+              {renderBody()}
+            </div>
+          </ScrollArea>
+          {/* TOC sidebar — only meaningful for the markdown views. */}
+          {!useFullWidth && sourceType !== 'AUDIO' && (
+            <TocSidebar headings={headings} scrollRoot={scrollRoot} />
+          )}
+        </div>
       </SheetContent>
+
+      {/* Version history sheet — TEXT sources only. */}
+      {isEditable && (
+        <VersionHistorySheet
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          projectId={projectId}
+          sourceId={source.id}
+          onRestored={() => setRefetchKey((k) => k + 1)}
+        />
+      )}
 
       {/* Edit dialog — TEXT sources only. Prefilled with the current
           markdown body (page-marker header stripped). On save,
@@ -302,6 +348,7 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
         <DocumentEditorDialog
           open={editOpen}
           onOpenChange={setEditOpen}
+          projectId={projectId}
           onSave={handleEditSave}
           initialMarkdown={stripSinglePageMarker(content)}
           initialName={source.name}

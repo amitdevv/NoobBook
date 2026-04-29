@@ -276,7 +276,8 @@ def update_source(project_id: str, source_id: str):
             source_id=source_id,
             name=data.get('name'),
             description=data.get('description'),
-            active=data.get('active')
+            active=data.get('active'),
+            tags=data.get('tags'),
         )
 
         if not source:
@@ -350,6 +351,89 @@ def update_source_content(project_id: str, source_id: str):
 
     except Exception as e:
         current_app.logger.error(f"Error editing source content: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@sources_bp.route('/projects/<project_id>/sources/<source_id>/versions', methods=['GET'])
+def list_source_versions(project_id: str, source_id: str):
+    """
+    List version snapshots for a TEXT source (newest first).
+
+    Returns:
+        { "success": true, "versions": [{ id, source_id, name, created_at }, ...] }
+    """
+    try:
+        # Source-existence check serves as the project-scoping guard.
+        source = source_service.get_source(project_id, source_id)
+        if not source:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+
+        from app.services.source_services import source_version_service
+        versions = source_version_service.list_versions(source_id)
+        return jsonify({'success': True, 'versions': versions}), 200
+    except Exception as e:
+        current_app.logger.error(f"Error listing source versions: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@sources_bp.route(
+    '/projects/<project_id>/sources/<source_id>/versions/<version_id>',
+    methods=['GET'],
+)
+def get_source_version(project_id: str, source_id: str, version_id: str):
+    """Fetch a single version including its content body."""
+    try:
+        source = source_service.get_source(project_id, source_id)
+        if not source:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+
+        from app.services.source_services import source_version_service
+        version = source_version_service.get_version(version_id)
+        if not version or version.get('source_id') != source_id:
+            return jsonify({'success': False, 'error': 'Version not found'}), 404
+
+        return jsonify({'success': True, 'version': version}), 200
+    except Exception as e:
+        current_app.logger.error(f"Error fetching source version: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@sources_bp.route(
+    '/projects/<project_id>/sources/<source_id>/versions/<version_id>/restore',
+    methods=['POST'],
+)
+def restore_source_version(project_id: str, source_id: str, version_id: str):
+    """
+    Restore a previous version: copy its content back to the raw file
+    via the regular update_text path. Snapshots the now-current body
+    first so the restore itself becomes a new version (no history loss).
+    """
+    try:
+        source = source_service.get_source(project_id, source_id)
+        if not source:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+
+        from app.services.source_services import source_version_service
+        from app.services.source_services.source_upload import text_upload
+        version = source_version_service.get_version(version_id)
+        if not version or version.get('source_id') != source_id:
+            return jsonify({'success': False, 'error': 'Version not found'}), 404
+
+        updated = text_upload.update_text(
+            project_id=project_id,
+            source_id=source_id,
+            content=version['content'],
+            name=version.get('name'),
+        )
+        return jsonify({
+            'success': True,
+            'source': updated,
+            'message': 'Version restored; reprocessing queued',
+        }), 200
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error restoring source version: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
