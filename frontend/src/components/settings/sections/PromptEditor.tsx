@@ -144,7 +144,14 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
   );
 
   const dirty = useMemo(() => isDirty(form, detail), [form, detail]);
-  const canSave = dirty && missing.length === 0 && !saving;
+  // Empty numerics are not a valid save state. With the backend's merge
+  // semantics, a PUT that omits max_tokens/temperature preserves the
+  // existing override value — meaning a "cleared" input would silently
+  // no-op while showing a success toast. The "use default" link on
+  // each NumericKnob is the real path to un-override; we point at it
+  // when the admin lands here.
+  const numericsBlank = form.max_tokens === '' || form.temperature === '';
+  const canSave = dirty && missing.length === 0 && !numericsBlank && !saving;
 
   // Refs for the textareas so we can insert chip tokens at the caret.
   const systemRef = useRef<HTMLTextAreaElement | null>(null);
@@ -380,7 +387,18 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
           )}
 
           {/* Validation indicator */}
-          <ValidationLine missing={missing} extras={extras} requiredCount={requiredVars.length} />
+          <ValidationLine
+            missing={missing}
+            extras={extras}
+            requiredCount={requiredVars.length}
+            blankNumeric={
+              form.max_tokens === ''
+                ? 'max_tokens'
+                : form.temperature === ''
+                  ? 'temperature'
+                  : null
+            }
+          />
 
           {/* Diff / view default */}
           <DiffPanel
@@ -589,13 +607,34 @@ interface ValidationLineProps {
   missing: string[];
   extras: string[];
   requiredCount: number;
+  /** Name of the cleared numeric field, if any — drives the hint pointing
+   * at the "use default" link, since saving an empty numeric would be
+   * a silent no-op under the backend's merge semantics. */
+  blankNumeric: 'max_tokens' | 'temperature' | null;
 }
 
 const ValidationLine: React.FC<ValidationLineProps> = ({
   missing,
   extras,
   requiredCount,
+  blankNumeric,
 }) => {
+  // Blank numeric is a hard save block — surface it before everything
+  // else so the admin knows what to fix.
+  if (blankNumeric) {
+    return (
+      <div className="flex items-start gap-2 text-[12.5px] text-rose-700">
+        <WarningCircle size={14} weight="fill" className="mt-0.5 flex-shrink-0" />
+        <div>
+          <span className="font-medium">{blankNumeric} is empty.</span>{' '}
+          Type a value, or use the{' '}
+          <span className="font-mono text-[12px]">use default</span>{' '}
+          link above the field to clear your override.
+        </div>
+      </div>
+    );
+  }
+
   if (requiredCount === 0 && extras.length === 0) {
     return (
       <div className="text-[12px] text-stone-400 italic">
