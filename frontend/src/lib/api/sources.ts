@@ -161,6 +161,40 @@ export function isSourceViewable(source: Source): boolean {
   return source.status === 'ready';
 }
 
+/**
+ * Which preview view should render this source.
+ *
+ * Single source of truth for source-type → view routing. Both the
+ * "fetch raw signed URL vs fetch processed text" decision and the
+ * `renderBody` switch in SourcePreviewSheet derive from this — used
+ * to be two parallel switches that drifted apart (the CSV-preview
+ * regression came from one matching `type === 'CSV'` while the
+ * upload pipeline writes `type === 'DATA'` for .csv files).
+ *
+ * Routing logic:
+ *   - Match by file extension first (precise — `.csv`, `.pdf`).
+ *   - Fall back to `source.type` for types that have no file (LINK,
+ *     YOUTUBE, RESEARCH, DATABASE, MCP, FRESHDESK, JIRA, MIXPANEL).
+ *   - `markdown` is the catch-all — covers TEXT, DOCX, PPTX, and
+ *     every connection-style type whose preview body is the
+ *     extracted-text file.
+ */
+export type SourceViewKind = 'pdf' | 'image' | 'audio' | 'csv' | 'markdown';
+
+export function getViewKind(source: Source): SourceViewKind {
+  const t = (source.type ?? '').toUpperCase();
+  const ext = getSourceFileExtension(source);
+  if (t === 'PDF' || ext === '.pdf') return 'pdf';
+  if (t === 'IMAGE') return 'image';
+  if (t === 'AUDIO') return 'audio';
+  // CSV files upload as type='DATA' (category 'data' → upper) so the
+  // .csv extension is the precise signal. DATABASE / MCP /
+  // FRESHDESK / JIRA / MIXPANEL have no extension and correctly fall
+  // through to markdown.
+  if (ext === '.csv') return 'csv';
+  return 'markdown';
+}
+
 class SourcesAPI {
   /**
    * List all sources for a project

@@ -21,7 +21,13 @@ import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { Sheet, SheetContent, SheetTitle } from '../../ui/sheet';
 import { ScrollArea } from '../../ui/scroll-area';
 import { CircleNotch, FileX } from '@phosphor-icons/react';
-import { sourcesAPI, getSourceFileExtension, type Source } from '../../../lib/api/sources';
+import {
+  sourcesAPI,
+  getSourceFileExtension,
+  getViewKind,
+  type Source,
+  type SourceViewKind,
+} from '../../../lib/api/sources';
 import { createLogger } from '@/lib/logger';
 import { PreviewToolbar } from './PreviewToolbar';
 import { MarkdownView } from './MarkdownView';
@@ -50,13 +56,13 @@ interface SourcePreviewSheetProps {
 
 type Mode = 'raw' | 'processed';
 
-function pickMode(source: Source): Mode {
-  // Raw signed URL types: the browser needs the original bytes.
-  // Type field is reliable here — uppercase canonical strings written
-  // by the backend's source_upload pipeline.
-  const t = (source.type ?? '').toUpperCase();
-  if (t === 'PDF' || t === 'IMAGE' || t === 'AUDIO' || t === 'CSV') return 'raw';
-  return 'processed';
+// Kinds whose preview reads the original raw bytes via /raw signed
+// URL (PdfView / ImageView / AudioView / CsvTableView). Markdown
+// kinds read the extracted text via /processed.
+const RAW_KINDS = new Set<SourceViewKind>(['pdf', 'image', 'audio', 'csv']);
+
+function pickMode(kind: SourceViewKind): Mode {
+  return RAW_KINDS.has(kind) ? 'raw' : 'processed';
 }
 
 export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
@@ -96,7 +102,7 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
     setLoading(true);
 
     let cancelled = false;
-    const mode = pickMode(source);
+    const mode = pickMode(getViewKind(source));
 
     const work = async () => {
       try {
@@ -106,7 +112,7 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
           setRawUrl(raw.url);
           // Audio sources: also fetch the extracted transcript so we
           // can show it below the player. Failure is non-fatal.
-          if ((source.type ?? '').toUpperCase() === 'AUDIO') {
+          if (getViewKind(source) === 'audio') {
             try {
               const proc = await sourcesAPI.getProcessedContent(projectId, source.id);
               if (!cancelled) setTranscript(proc.content);
@@ -203,7 +209,11 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
 
   const sourceType = (source.type ?? '').toUpperCase();
   const ext = getSourceFileExtension(source);
-  const useFullWidth = sourceType === 'PDF' || sourceType === 'IMAGE' || sourceType === 'CSV';
+  const kind = getViewKind(source);
+  // Layout: PDF / IMAGE / CSV breakouts use the modal's full body
+  // width; markdown/audio center at the reading-measure 760px column.
+  const useFullWidth = kind === 'pdf' || kind === 'image' || kind === 'csv';
+  // Edit dialog is TEXT-only — other sources can't be edited in-place.
   const isEditable = sourceType === 'TEXT';
 
   const renderBody = () => {
@@ -224,8 +234,8 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
       );
     }
 
-    switch (sourceType) {
-      case 'PDF':
+    switch (kind) {
+      case 'pdf':
         return (
           <Suspense fallback={<div className="h-64" />}>
             <PdfView
@@ -236,27 +246,28 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
             />
           </Suspense>
         );
-      case 'IMAGE':
+      case 'image':
         return (
           <Suspense fallback={<div className="h-64" />}>
             <ImageView url={rawUrl} alt={source.name} fitMode={fitMode} />
           </Suspense>
         );
-      case 'AUDIO':
+      case 'audio':
         return (
           <Suspense fallback={<div className="h-64" />}>
             <AudioView url={rawUrl} transcript={transcript} search={search} />
           </Suspense>
         );
-      case 'CSV':
+      case 'csv':
         return (
           <Suspense fallback={<div className="h-64" />}>
             <CsvTableView url={rawUrl} search={search} />
           </Suspense>
         );
       default:
-        // TEXT, DOCX, PPTX, LINK, YOUTUBE, RESEARCH and any future
-        // text-derivable type all render the same way.
+        // 'markdown' — TEXT, DOCX, PPTX, LINK, YOUTUBE, RESEARCH,
+        // DATABASE, MCP, FRESHDESK, JIRA, MIXPANEL all render the
+        // extracted-text body the same way.
         return <MarkdownView content={content} search={search} />;
     }
   };
@@ -272,11 +283,11 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
         <PreviewToolbar
           source={source}
           search={search}
-          pdfPage={sourceType === 'PDF' ? pdfPage : undefined}
-          pdfTotalPages={sourceType === 'PDF' ? pdfTotalPages ?? undefined : undefined}
-          onPdfPageChange={sourceType === 'PDF' ? setPdfPage : undefined}
-          fitMode={sourceType === 'IMAGE' ? fitMode : undefined}
-          onFitModeChange={sourceType === 'IMAGE' ? setFitMode : undefined}
+          pdfPage={kind === 'pdf' ? pdfPage : undefined}
+          pdfTotalPages={kind === 'pdf' ? pdfTotalPages ?? undefined : undefined}
+          onPdfPageChange={kind === 'pdf' ? setPdfPage : undefined}
+          fitMode={kind === 'image' ? fitMode : undefined}
+          onFitModeChange={kind === 'image' ? setFitMode : undefined}
           onDownload={ext ? handleDownload : undefined}
           onEdit={isEditable ? () => setEditOpen(true) : undefined}
         />
