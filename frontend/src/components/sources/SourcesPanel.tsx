@@ -155,12 +155,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerSource, setViewerSource] = useState<Source | null>(null);
 
-  // Tags filter (AND across selected tags) and bulk-select mode.
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
-  const [bulkMode, setBulkMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkBusy, setBulkBusy] = useState(false);
-
   /**
    * Ref for error function to avoid infinite loop in useCallback
    * Educational Note: Toast functions are recreated each render, causing
@@ -728,144 +722,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
    * Educational Note: Fetches the extracted text from the backend and displays
    * it in a side sheet. Only available for text-based sources that are ready.
    */
-  // Tags + bulk handlers ------------------------------------------------
-
-  const handleTagsChange = useCallback(
-    async (sourceId: string, nextTags: string[]) => {
-      // Optimistic — patch the row immediately and capture the prior
-      // tags inside the setSources updater so we don't depend on the
-      // outer `sources` state (which would recreate this callback on
-      // every list refresh and force-update every SourceItem).
-      let previous: string[] = [];
-      setSources((prev) =>
-        prev.map((s) => {
-          if (s.id !== sourceId) return s;
-          previous = s.tags ?? [];
-          return { ...s, tags: nextTags };
-        }),
-      );
-      try {
-        await sourcesAPI.updateTags(projectId, sourceId, nextTags);
-      } catch (err) {
-        log.error({ err, sourceId }, 'failed to update tags');
-        errorRef.current('Failed to update tags');
-        setSources((prev) =>
-          prev.map((s) => (s.id === sourceId ? { ...s, tags: previous } : s)),
-        );
-      }
-    },
-    [projectId],
-  );
-
-  const toggleTagFilter = useCallback((tag: string) => {
-    setTagFilter((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
-  }, []);
-  const clearTagFilter = useCallback(() => setTagFilter([]), []);
-
-  const toggleBulkMode = useCallback(() => {
-    setBulkMode((prev) => {
-      const next = !prev;
-      if (!next) setSelectedIds(new Set()); // exiting clears selection
-      return next;
-    });
-  }, []);
-
-  const toggleSelected = useCallback((sourceId: string, next: boolean) => {
-    setSelectedIds((prev) => {
-      const updated = new Set(prev);
-      if (next) updated.add(sourceId);
-      else updated.delete(sourceId);
-      return updated;
-    });
-  }, []);
-
-  // Helper: run a per-id mutation across a Set, count failures, and
-  // surface an honest success / partial / fail toast. The previous
-  // implementation logged warnings on per-item errors but always
-  // showed "Activated N sources" — the user could have lost half of
-  // the operation without ever seeing a hint.
-  const runBulkOp = useCallback(
-    async <T,>(
-      ids: string[],
-      verb: { ing: string; past: string; failed: string },
-      op: (id: string) => Promise<T>,
-    ): Promise<{ ok: number; failed: number }> => {
-      const results = await Promise.allSettled(ids.map((id) => op(id)));
-      const failedIds: string[] = [];
-      results.forEach((r, i) => {
-        if (r.status === 'rejected') {
-          failedIds.push(ids[i]);
-          log.warn({ err: r.reason, id: ids[i] }, `bulk ${verb.ing} failed for source`);
-        }
-      });
-      const ok = ids.length - failedIds.length;
-      if (failedIds.length === 0) {
-        success(`${verb.past} ${ok} source${ok === 1 ? '' : 's'}`);
-      } else if (ok > 0) {
-        errorRef.current(
-          `${verb.past} ${ok}/${ids.length} sources — ${failedIds.length} ${verb.failed}.`,
-        );
-      } else {
-        errorRef.current(`Could not ${verb.ing} any of the ${ids.length} sources.`);
-      }
-      return { ok, failed: failedIds.length };
-    },
-    [success],
-  );
-
-  const handleBulkActivate = useCallback(async () => {
-    if (selectedIds.size === 0) return;
-    const ids = Array.from(selectedIds);
-    setBulkBusy(true);
-    try {
-      await runBulkOp(
-        ids,
-        { ing: 'activate', past: 'Activated', failed: 'failed' },
-        (id) => sourcesAPI.updateSource(projectId, id, { active: true }),
-      );
-      setSelectedIds(new Set());
-      await refreshSources();
-    } finally {
-      setBulkBusy(false);
-    }
-  }, [projectId, selectedIds, runBulkOp, refreshSources]);
-
-  const handleBulkDeactivate = useCallback(async () => {
-    if (selectedIds.size === 0) return;
-    const ids = Array.from(selectedIds);
-    setBulkBusy(true);
-    try {
-      await runBulkOp(
-        ids,
-        { ing: 'deactivate', past: 'Deactivated', failed: 'failed' },
-        (id) => sourcesAPI.updateSource(projectId, id, { active: false }),
-      );
-      setSelectedIds(new Set());
-      await refreshSources();
-    } finally {
-      setBulkBusy(false);
-    }
-  }, [projectId, selectedIds, runBulkOp, refreshSources]);
-
-  const handleBulkDelete = useCallback(async () => {
-    if (selectedIds.size === 0) return;
-    if (!window.confirm(`Delete ${selectedIds.size} source${selectedIds.size === 1 ? '' : 's'}? This can't be undone.`)) return;
-    const ids = Array.from(selectedIds);
-    setBulkBusy(true);
-    try {
-      await runBulkOp(
-        ids,
-        { ing: 'delete', past: 'Deleted', failed: 'failed' },
-        (id) => sourcesAPI.deleteSource(projectId, id),
-      );
-      setSelectedIds(new Set());
-      setBulkMode(false);
-      await refreshSources();
-    } finally {
-      setBulkBusy(false);
-    }
-  }, [projectId, selectedIds, runBulkOp, refreshSources]);
-
   const handleViewProcessed = (sourceId: string) => {
     const target = sources.find((s) => s.id === sourceId);
     if (!target) {
@@ -971,8 +827,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
             onSearchChange={setSearchQuery}
             onAddClick={() => setSheetOpen(true)}
             isAtLimit={isAtLimit}
-            bulkMode={bulkMode}
-            onToggleBulkMode={toggleBulkMode}
           />
 
           <SourcesList
@@ -988,18 +842,6 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
             onViewProcessed={handleViewProcessed}
             onSyncFreshdesk={handleSyncFreshdesk}
             onBackfillFreshdesk={handleBackfillFreshdesk}
-            tagFilter={tagFilter}
-            onTagFilterToggle={toggleTagFilter}
-            onTagFilterClear={clearTagFilter}
-            onTagsChange={handleTagsChange}
-            bulkMode={bulkMode}
-            selectedIds={selectedIds}
-            onToggleSelected={toggleSelected}
-            onBulkActivate={handleBulkActivate}
-            onBulkDeactivate={handleBulkDeactivate}
-            onBulkDelete={handleBulkDelete}
-            onCancelBulk={toggleBulkMode}
-            bulkBusy={bulkBusy}
           />
 
           <SourcesFooter sourcesCount={sourcesCount} totalSize={totalSize} />

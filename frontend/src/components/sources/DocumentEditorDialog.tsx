@@ -21,15 +21,7 @@
 
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '../ui/dialog';
-import {
-  ClipboardText,
-  CircleNotch,
-  FloppyDisk,
-  Sparkle,
-  ArrowFatLineRight,
-  ListBullets,
-} from '@phosphor-icons/react';
-import { assistText, type AssistAction } from '@/lib/api/editor';
+import { ClipboardText, CircleNotch, FloppyDisk } from '@phosphor-icons/react';
 import type { DocumentEditorHandle } from './DocumentEditorTab';
 
 const LazyDocumentEditor = React.lazy(() => import('./DocumentEditor'));
@@ -52,9 +44,6 @@ const PAPER_GRAIN =
 interface DocumentEditorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Project the editor lives in. Used for image uploads (drop/paste
-   *  flow) and to scope server-side rate limits. */
-  projectId: string;
   /** Called when the user saves. Caller decides create vs update. */
   onSave: (markdown: string, name: string) => Promise<void>;
   /** Initial markdown body (edit flow). Empty string for create. */
@@ -65,202 +54,54 @@ interface DocumentEditorDialogProps {
   saveLabel?: string;
   /** Disable saving — e.g. project at source limit (create flow only). */
   disabledReason?: string | null;
-  /** localStorage key for autosave drafts. When set, the dialog saves
-   *  current editor state every ~2s while open and offers a Restore
-   *  prompt on next open if a non-empty draft exists. Only set this
-   *  for create flows — edit flows would prompt to restore stale work
-   *  that conflicts with the source's actual stored content. */
-  draftKey?: string | null;
-}
-
-interface StoredDraft {
-  markdown: string;
-  name: string;
-  savedAt: number;
-}
-
-const DRAFT_NAMESPACE = 'noobbook:doc-editor:draft:';
-
-function loadDraft(key: string): StoredDraft | null {
-  try {
-    const raw = window.localStorage.getItem(DRAFT_NAMESPACE + key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredDraft;
-    if (
-      typeof parsed?.markdown === 'string' &&
-      typeof parsed?.name === 'string' &&
-      typeof parsed?.savedAt === 'number'
-    ) {
-      return parsed;
-    }
-  } catch {
-    // localStorage can be disabled or full; either way, no draft.
-  }
-  return null;
-}
-
-function saveDraft(key: string, draft: StoredDraft) {
-  try {
-    window.localStorage.setItem(DRAFT_NAMESPACE + key, JSON.stringify(draft));
-  } catch {
-    // Quota exceeded etc — silently drop. The user just won't get
-    // restore-on-reload for this draft.
-  }
-}
-
-function clearDraft(key: string) {
-  try {
-    window.localStorage.removeItem(DRAFT_NAMESPACE + key);
-  } catch {
-    // ignore
-  }
-}
-
-// Pill-styled AI button. Module-scope so React holds stable
-// component identity — recreating per render would remount all three
-// every time `aiBusy` flipped.
-interface AiPillButtonProps {
-  action: AssistAction;
-  label: string;
-  Icon: React.ComponentType<{ size?: number; weight?: 'bold' }>;
-  aiBusy: AssistAction | null;
-  onRun: (action: AssistAction) => void;
-  hint: string;
-}
-
-const AiPillButton: React.FC<AiPillButtonProps> = ({
-  action,
-  label,
-  Icon,
-  aiBusy,
-  onRun,
-  hint,
-}) => {
-  const isRunning = aiBusy === action;
-  const otherRunning = aiBusy !== null && !isRunning;
-  return (
-    <button
-      type="button"
-      onClick={() => onRun(action)}
-      disabled={otherRunning}
-      title={hint}
-      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-stone-600 hover:bg-amber-50 hover:text-amber-800 disabled:text-stone-400 disabled:hover:bg-transparent transition-colors"
-    >
-      {isRunning ? (
-        <CircleNotch size={11} weight="bold" className="animate-spin" />
-      ) : (
-        <Icon size={11} weight="bold" />
-      )}
-      <span>{label}</span>
-    </button>
-  );
-};
-
-function relativeTime(savedAt: number): string {
-  const diff = Date.now() - savedAt;
-  if (diff < 60_000) return 'just now';
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min ago`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} h ago`;
-  return `${Math.floor(diff / 86_400_000)} d ago`;
 }
 
 export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
   open,
   onOpenChange,
-  projectId,
   onSave,
   initialMarkdown = '',
   initialName = '',
   saveLabel = 'Save as source',
   disabledReason = null,
-  draftKey = null,
 }) => {
   const editorRef = useRef<DocumentEditorHandle | null>(null);
   const titleRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState(initialName);
   const [adding, setAdding] = useState(false);
   const [wordCount, setWordCount] = useState(0);
-  // AI-assist (Improve / Continue / Summarize) lives in the bottom
-  // pill now. `aiBusy` is the action currently in flight, or null.
-  const [aiBusy, setAiBusy] = useState<AssistAction | null>(null);
-  // Mounting key — bumped on every open so the lazy DocumentEditor
-  // re-mounts and re-seeds itself with the current initialMarkdown.
-  // Without this, a second open with different initialMarkdown
-  // (e.g. opening Edit on source A, closing, opening Edit on source
-  // B) would keep showing source A's content because the editor
-  // instance was created with A's seed.
-  const [mountKey, setMountKey] = useState(0);
-  // Draft restoration — populated on open if a draft exists in
-  // localStorage AND we're in create mode (no initialMarkdown). Until
-  // the user clicks Restore or Discard, the editor stays empty and
-  // the autosave loop is paused so we don't immediately overwrite
-  // the saved draft with an empty document.
-  const [draftAvailable, setDraftAvailable] = useState<StoredDraft | null>(null);
+  // Tracks whether the editor has been hydrated with initialMarkdown
+  // for this open. Prevents re-hydrating on every render and resets
+  // when the dialog closes so the next open starts fresh.
+  const [hydrated, setHydrated] = useState(false);
 
   const disabled = adding || !!disabledReason;
 
-  // Sync the title input with whatever name was passed in for this
-  // open. Runs only when the dialog transitions to open so the
-  // user's edits to the title aren't clobbered mid-session.
+  // When the dialog opens with initialMarkdown, ask BlockNote to parse
+  // and replace its blocks. Runs once per open. The editor handle's
+  // `loadMarkdown` is added below in DocumentEditor.tsx.
   useEffect(() => {
-    if (open) setName(initialName);
-  }, [open, initialName]);
+    if (!open || hydrated) return;
+    setName(initialName);
+    if (initialMarkdown && editorRef.current) {
+      // Defer to next frame so BlockNote is mounted.
+      const id = window.setTimeout(() => {
+        editorRef.current?.loadMarkdown?.(initialMarkdown);
+        setHydrated(true);
+      }, 50);
+      return () => window.clearTimeout(id);
+    }
+    setHydrated(true);
+  }, [open, hydrated, initialMarkdown, initialName]);
 
-  // Force the lazy DocumentEditor to re-mount on every open so its
-  // own seed-from-initialMarkdown effect re-runs against the freshly
-  // created editor instance. Cheaper than mutating an existing
-  // editor and avoids the prior race where loadMarkdown() fired
-  // before the lazy chunk had finished hydrating.
-  useEffect(() => {
-    if (open) setMountKey((k) => k + 1);
-  }, [open]);
-
-  // Reset transient state when the dialog closes.
+  // Reset hydration state when dialog closes so the next open starts
+  // clean (or re-hydrates with a different source).
   useEffect(() => {
     if (!open) {
+      setHydrated(false);
       setWordCount(0);
-      setDraftAvailable(null);
     }
   }, [open]);
-
-  // On open, surface a previously-saved draft so the user can choose
-  // to restore it. Only runs in create mode (no initialMarkdown) and
-  // only when a draftKey was passed — edit flow has its own canonical
-  // content and shouldn't fight a stale localStorage draft.
-  useEffect(() => {
-    if (!open || !draftKey || initialMarkdown) return;
-    const existing = loadDraft(draftKey);
-    if (existing && existing.markdown.trim().length > 0) {
-      setDraftAvailable(existing);
-    }
-  }, [open, draftKey, initialMarkdown]);
-
-  // Autosave loop — every 2s, snapshot editor state to localStorage.
-  // Paused until the user resolves the restore prompt (otherwise the
-  // empty doc would overwrite the draft they're about to restore).
-  useEffect(() => {
-    if (!open || !draftKey || draftAvailable) return;
-    const tick = () => {
-      const md = editorRef.current?.getMarkdown() ?? '';
-      const trimmed = md.trim();
-      if (!trimmed) return; // don't write empty drafts
-      saveDraft(draftKey, { markdown: md, name, savedAt: Date.now() });
-    };
-    const id = window.setInterval(tick, 2000);
-    return () => window.clearInterval(id);
-  }, [open, draftKey, draftAvailable, name]);
-
-  const handleRestoreDraft = () => {
-    if (!draftAvailable) return;
-    setName(draftAvailable.name);
-    editorRef.current?.loadMarkdown(draftAvailable.markdown);
-    setDraftAvailable(null);
-  };
-
-  const handleDiscardDraft = () => {
-    if (draftKey) clearDraft(draftKey);
-    setDraftAvailable(null);
-  };
 
   // Poll word count once per second while open. Keeps React out of
   // the keystroke path; cheaper than wiring into BlockNote's change
@@ -300,9 +141,6 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
       await onSave(markdown, finalName);
       handle.reset();
       setName('');
-      // The doc is now persisted server-side; toss the local draft so
-      // a future open starts clean.
-      if (draftKey) clearDraft(draftKey);
       onOpenChange(false);
     } finally {
       setAdding(false);
@@ -313,43 +151,6 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       void handleSave();
-    }
-  };
-
-  const runAi = async (action: AssistAction) => {
-    if (aiBusy) return;
-    const handle = editorRef.current;
-    if (!handle) return;
-
-    // Improve / Summarize need a non-empty selection. Continue is the
-    // exception — without a selection, we feed the surrounding doc
-    // (capped at the last 4KB of markdown) as context and append the
-    // AI's continuation as a new paragraph.
-    const selected = handle.getSelectedText().trim();
-    let payload = selected;
-    if (!payload) {
-      if (action !== 'continue') return;
-      const md = handle.getMarkdown();
-      payload = md.slice(-4000).trim();
-      if (!payload) return;
-    }
-
-    setAiBusy(action);
-    try {
-      const result = await assistText(action, payload);
-      const trimmed = result.trim();
-      if (!trimmed) return;
-      if (selected) {
-        handle.replaceSelectionWith(trimmed);
-      } else {
-        handle.appendAtCursor(trimmed);
-      }
-    } catch {
-      // Endpoint logs the underlying error; surface UI feedback via
-      // the existing word-count pill (the AI button itself returns
-      // to its idle icon and the user can retry).
-    } finally {
-      setAiBusy(null);
     }
   };
 
@@ -385,30 +186,6 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
 
         <div className="relative z-10 flex-1 min-h-0 overflow-y-auto">
           <div className="mx-auto max-w-[680px] px-8 pt-16 pb-32">
-            {draftAvailable && (
-              <div className="mb-6 rounded-lg border border-amber-200/80 bg-amber-50/80 px-4 py-3 flex items-center gap-3 text-[13px] text-stone-700">
-                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-700">
-                  Draft
-                </span>
-                <span className="flex-1">
-                  You have an unsaved draft from {relativeTime(draftAvailable.savedAt)}.
-                </span>
-                <button
-                  type="button"
-                  onClick={handleRestoreDraft}
-                  className="rounded border border-amber-300 bg-white px-2 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-100"
-                >
-                  Restore
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDiscardDraft}
-                  className="text-[11px] text-stone-500 hover:text-stone-800"
-                >
-                  Discard
-                </button>
-              </div>
-            )}
             <input
               ref={titleRef}
               type="text"
@@ -432,16 +209,7 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
                   </div>
                 }
               >
-                <LazyDocumentEditor
-                  // mountKey forces a fresh editor instance per open
-                  // so initialMarkdown takes effect on the new
-                  // instance's first mount (vs. a stale one).
-                  key={mountKey}
-                  ref={editorRef}
-                  disabled={adding}
-                  projectId={projectId}
-                  initialMarkdown={initialMarkdown}
-                />
+                <LazyDocumentEditor ref={editorRef} disabled={adding} />
               </Suspense>
             </div>
           </div>
@@ -453,40 +221,6 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
             <span className="font-mono text-[11px] tabular-nums text-stone-600">
               {wordCount.toLocaleString()} {wordCount === 1 ? 'word' : 'words'}
             </span>
-            <span className="h-3 w-px bg-stone-200" />
-
-            {/* AI section — Improve / Continue / Summarize. Always
-                visible (not selection-gated like the old toolbar
-                version) so the affordance is discoverable. Improve
-                and Summarize need a selection; Continue works at the
-                cursor against the trailing 4KB of context. */}
-            <div className="flex items-center gap-0.5">
-              <AiPillButton
-                action="improve"
-                label="Improve"
-                Icon={Sparkle}
-                aiBusy={aiBusy}
-                onRun={runAi}
-                hint="Select text first"
-              />
-              <AiPillButton
-                action="continue"
-                label="Continue"
-                Icon={ArrowFatLineRight}
-                aiBusy={aiBusy}
-                onRun={runAi}
-                hint="Cursor or selection"
-              />
-              <AiPillButton
-                action="summarize"
-                label="Summarize"
-                Icon={ListBullets}
-                aiBusy={aiBusy}
-                onRun={runAi}
-                hint="Select text first"
-              />
-            </div>
-
             <span className="h-3 w-px bg-stone-200" />
             <span className="text-[11px] text-stone-500">
               <kbd className="font-mono text-stone-700">/</kbd> commands

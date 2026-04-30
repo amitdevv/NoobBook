@@ -163,22 +163,6 @@ def update_text(
     file_data = content.encode("utf-8")
     file_size = len(file_data)
 
-    # Snapshot the *previous* body before overwriting. This gives us
-    # "view earlier versions" history. Failure to snapshot is a soft
-    # error — never block the save on it.
-    try:
-        prev_bytes = storage.download_raw_file(project_id, source_id, stored_filename)
-        if prev_bytes:
-            prev_text = prev_bytes.decode("utf-8", errors="replace")
-            from app.services.source_services import source_version_service
-            source_version_service.record_version(
-                source_id=source_id,
-                content=prev_text,
-                name=source.get("name") or "Untitled",
-            )
-    except Exception as e:
-        logger.warning("Pre-edit snapshot failed for %s: %s", source_id, e)
-
     # 1. Overwrite raw file. upload_raw_file is upsert — same path,
     #    new bytes.
     storage_path = storage.upload_raw_file(

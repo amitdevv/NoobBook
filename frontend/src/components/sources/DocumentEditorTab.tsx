@@ -18,13 +18,11 @@ import { DocumentEditorDialog } from './DocumentEditorDialog';
 export type { DocumentEditorHandle } from './DocumentEditor';
 
 interface DocumentEditorTabProps {
-  projectId: string;
   onAddText: (content: string, name: string) => Promise<void>;
   isAtLimit: boolean;
 }
 
 export const DocumentEditorTab: React.FC<DocumentEditorTabProps> = ({
-  projectId,
   onAddText,
   isAtLimit,
 }) => {
@@ -59,18 +57,11 @@ export const DocumentEditorTab: React.FC<DocumentEditorTabProps> = ({
       <DocumentEditorDialog
         open={open}
         onOpenChange={setOpen}
-        projectId={projectId}
         onSave={async (markdown, name) => {
           await onAddText(markdown, name);
         }}
         saveLabel="Save as source"
         disabledReason={isAtLimit ? 'Source limit reached' : null}
-        // Per-project draft slot. Without the projectId namespace,
-        // a draft composed in project A would be offered for restore
-        // when the paste dialog opens in project B (different
-        // workspace, same browser, same user). Project-scoping the
-        // key isolates drafts cleanly.
-        draftKey={`paste-tab:${projectId}`}
       />
     </>
   );

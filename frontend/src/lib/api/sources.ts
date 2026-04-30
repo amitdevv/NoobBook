@@ -39,8 +39,6 @@ export interface Source {
   processed_file_path?: string | null;
   error_message?: string | null;
   url?: string | null;
-  /** User-applied tags. Empty array if untagged. */
-  tags?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -339,7 +337,7 @@ class SourcesAPI {
   async updateSource(
     projectId: string,
     sourceId: string,
-    data: { name?: string; description?: string; active?: boolean; tags?: string[] }
+    data: { name?: string; description?: string; active?: boolean }
   ): Promise<Source> {
     try {
       const response = await axios.put(
@@ -679,59 +677,6 @@ class SourcesAPI {
       log.error({ err: error }, 'failed to fetch processed content');
       throw error;
     }
-  }
-
-  /**
-   * Update a source's tag list. Tags are normalized server-side
-   * (lowercased, deduplicated, 32-char cap each).
-   */
-  async updateTags(projectId: string, sourceId: string, tags: string[]): Promise<Source> {
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/projects/${projectId}/sources/${sourceId}`,
-        { tags },
-      );
-      return response.data.source;
-    } catch (error) {
-      log.error({ err: error }, 'failed to update source tags');
-      throw error;
-    }
-  }
-
-  /**
-   * List the version history of a TEXT source (newest first).
-   * Each entry is metadata-only — fetch full content with getVersion.
-   */
-  async listVersions(
-    projectId: string,
-    sourceId: string,
-  ): Promise<Array<{ id: string; source_id: string; name: string; created_at: string }>> {
-    const response = await axios.get(
-      `${API_BASE_URL}/projects/${projectId}/sources/${sourceId}/versions`,
-    );
-    return response.data.versions ?? [];
-  }
-
-  async getVersion(
-    projectId: string,
-    sourceId: string,
-    versionId: string,
-  ): Promise<{ id: string; source_id: string; name: string; content: string; created_at: string }> {
-    const response = await axios.get(
-      `${API_BASE_URL}/projects/${projectId}/sources/${sourceId}/versions/${versionId}`,
-    );
-    return response.data.version;
-  }
-
-  async restoreVersion(
-    projectId: string,
-    sourceId: string,
-    versionId: string,
-  ): Promise<Source> {
-    const response = await axios.post(
-      `${API_BASE_URL}/projects/${projectId}/sources/${sourceId}/versions/${versionId}/restore`,
-    );
-    return response.data.source;
   }
 
   /**
