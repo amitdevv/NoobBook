@@ -24,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '../ui/tooltip';
+import { copyToClipboard } from '@/lib/clipboard';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('chat-messages');
@@ -219,29 +220,16 @@ const MessageActions: React.FC<MessageActionsProps> = ({ content }) => {
    * Educational Note: Uses modern Clipboard API with visual feedback
    */
   const handleCopy = async () => {
-    // Remove citation markers for cleaner copied text
+    // Strip citation markers ([[cite:...]]) so the copied text reads cleanly
+    // outside the app — they're rendered as badges, not literal text.
     const cleanContent = content.replace(/\[\[cite:[^\]]+\]\]/g, '');
 
-    try {
-      await navigator.clipboard.writeText(cleanContent);
+    const ok = await copyToClipboard(cleanContent);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback for non-HTTPS or restricted contexts (e.g. iframe, older browsers)
-      try {
-        const textarea = document.createElement('textarea');
-        textarea.value = cleanContent;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } catch (fallbackErr) {
-        log.error({ err: fallbackErr }, 'failed to copy text');
-      }
+    } else {
+      log.error('failed to copy text');
     }
   };
 

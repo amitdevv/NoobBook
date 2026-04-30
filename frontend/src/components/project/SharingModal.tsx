@@ -36,6 +36,7 @@ import {
   type ShareMode,
 } from '@/lib/api/shares';
 import { upsertOne, removeOne } from '@/lib/resourceState';
+import { copyToClipboard } from '@/lib/clipboard';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('sharing-modal');
@@ -243,12 +244,15 @@ export const SharingModal: React.FC<SharingModalProps> = ({
   };
 
   const handleCopy = async (share: ProjectShare) => {
-    try {
-      await navigator.clipboard.writeText(share.url);
+    // copyToClipboard handles the modern Clipboard API + the legacy
+    // execCommand fallback for non-HTTPS / unfocused contexts where
+    // navigator.clipboard.writeText throws (the original failure mode here).
+    const ok = await copyToClipboard(share.url);
+    if (ok) {
       setCopiedId(share.id);
       success('Link copied');
       setTimeout(() => setCopiedId((id) => (id === share.id ? null : id)), 1600);
-    } catch {
+    } else {
       error('Could not copy. Select the URL manually.');
     }
   };

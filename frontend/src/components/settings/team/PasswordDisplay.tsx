@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Copy, Check, Eye, EyeSlash, Warning } from '@phosphor-icons/react';
 import { useToast } from '@/components/ui/use-toast';
+import { copyToClipboard } from '@/lib/clipboard';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('password-display');
@@ -27,29 +28,14 @@ export const PasswordDisplay: React.FC<PasswordDisplayProps> = ({
   const { success, error } = useToast();
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(password);
+    const ok = await copyToClipboard(password);
+    if (ok) {
       setCopied(true);
       success('Password copied to clipboard');
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback for non-HTTPS or restricted contexts
-      try {
-        const textarea = document.createElement('textarea');
-        textarea.value = password;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        setCopied(true);
-        success('Password copied to clipboard');
-        setTimeout(() => setCopied(false), 2000);
-      } catch (fallbackErr) {
-        error('Failed to copy password');
-        log.error({ err: fallbackErr }, 'failed to copy password');
-      }
+    } else {
+      error('Failed to copy password');
+      log.error('failed to copy password');
     }
   };
 

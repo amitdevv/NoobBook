@@ -18,6 +18,7 @@ import { ShareNetwork, DownloadSimple, PencilSimple } from '@phosphor-icons/reac
 import { useToast } from '../../ui/use-toast';
 import type { SocialPostJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
+import { copyToClipboard } from '@/lib/clipboard';
 
 interface SocialPostViewerModalProps {
   viewingSocialPostJob: SocialPostJob | null;
@@ -71,7 +72,7 @@ export const SocialPostViewerModal: React.FC<SocialPostViewerModalProps> = ({
   isGenerating,
   defaultEditInput,
 }) => {
-  const { success: showSuccess } = useToast();
+  const { success: showSuccess, error: showError } = useToast();
   const postCount = viewingSocialPostJob?.posts.length || 0;
 
   // Responsive grid: 1 post = centered single col, 2 = 2-col, 3 = 3-col
@@ -167,10 +168,14 @@ export const SocialPostViewerModal: React.FC<SocialPostViewerModalProps> = ({
                   size="sm"
                   variant="soft"
                   className="w-full text-xs"
-                  onClick={() => {
+                  onClick={async () => {
                     const fullText = `${post.copy}\n\n${post.hashtags.join(' ')}`;
-                    navigator.clipboard.writeText(fullText);
-                    showSuccess('Copied to clipboard!');
+                    const ok = await copyToClipboard(fullText);
+                    if (ok) {
+                      showSuccess('Copied to clipboard!');
+                    } else {
+                      showError('Could not copy. Select the text manually.');
+                    }
                   }}
                 >
                   Copy Caption

@@ -19,6 +19,7 @@ import { SquaresFour, Copy, DownloadSimple, Check, PencilSimple } from '@phospho
 import { type ComponentJob } from '@/lib/api/studio';
 import { api, getAuthUrl } from '@/lib/api/client';
 import { useToast } from '../../ui/use-toast';
+import { copyToClipboard } from '@/lib/clipboard';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('component-viewer');
@@ -62,22 +63,25 @@ export const ComponentViewerModal: React.FC<ComponentViewerModalProps> = ({
   onClose,
   onEdit,
 }) => {
-  const { success: showSuccess } = useToast();
+  const { success: showSuccess, error: showError } = useToast();
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  const copyToClipboard = async (previewUrl: string, index: number) => {
+  const handleCopyHtml = async (previewUrl: string, index: number) => {
     try {
-      // Fetch the HTML content from the preview URL
       const response = await api.get(previewUrl, { responseType: 'text' });
       const htmlContent = response.data;
 
-      await navigator.clipboard.writeText(htmlContent);
-      setCopiedIndex(index);
-      showSuccess('Code copied to clipboard!');
-
-      setTimeout(() => setCopiedIndex(null), 2000);
-    } catch (error) {
-      log.error({ err: error }, 'failed to copy code');
+      const ok = await copyToClipboard(htmlContent);
+      if (ok) {
+        setCopiedIndex(index);
+        showSuccess('Code copied to clipboard!');
+        setTimeout(() => setCopiedIndex(null), 2000);
+      } else {
+        showError('Could not copy. Select the code manually.');
+      }
+    } catch (err) {
+      log.error({ err }, 'failed to fetch component HTML');
+      showError('Failed to load component code');
     }
   };
 
@@ -152,7 +156,7 @@ export const ComponentViewerModal: React.FC<ComponentViewerModalProps> = ({
                       size="sm"
                       variant="default"
                       className="gap-1 flex-1"
-                      onClick={() => copyToClipboard(component.preview_url, index)}
+                      onClick={() => handleCopyHtml(component.preview_url, index)}
                     >
                       {copiedIndex === index ? (
                         <>

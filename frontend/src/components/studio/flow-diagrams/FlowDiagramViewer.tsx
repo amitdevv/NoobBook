@@ -24,6 +24,7 @@ import {
   ArrowsOutCardinal,
 } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
+import { copyToClipboard } from '@/lib/clipboard';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('flow-diagram-viewer');
@@ -211,12 +212,12 @@ export const FlowDiagramViewer: React.FC<FlowDiagramViewerProps> = ({
 
   // Copy mermaid syntax to clipboard
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(mermaidSyntax);
+    const ok = await copyToClipboard(mermaidSyntax);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      log.error({ err }, 'failed to copy');
+    } else {
+      log.error('failed to copy mermaid syntax');
     }
   };
 

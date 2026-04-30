@@ -13,6 +13,7 @@ import json from 'react-syntax-highlighter/dist/esm/languages/hljs/json';
 import { githubGist } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { chatsAPI } from '../../lib/api/chats';
 import type { RawMessage } from '../../lib/api/chats';
+import { copyToClipboard } from '@/lib/clipboard';
 
 // Register only JSON language for minimal bundle size
 SyntaxHighlighter.registerLanguage('json', json);
@@ -38,9 +39,11 @@ const RawMessageCard: React.FC<{ message: RawMessage; index: number }> = ({ mess
   const jsonString = useMemo(() => JSON.stringify(message, null, 2), [message]);
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(jsonString);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const ok = await copyToClipboard(jsonString);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   }, [jsonString]);
 
   return (
