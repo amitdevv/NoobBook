@@ -7,15 +7,13 @@
 import React from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Plus, MagnifyingGlass, Books, ListChecks } from '@phosphor-icons/react';
+import { Plus, MagnifyingGlass, Books } from '@phosphor-icons/react';
 
 interface SourcesHeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onAddClick: () => void;
   isAtLimit: boolean;
-  bulkMode?: boolean;
-  onToggleBulkMode?: () => void;
 }
 
 export const SourcesHeader: React.FC<SourcesHeaderProps> = ({
@@ -23,37 +21,18 @@ export const SourcesHeader: React.FC<SourcesHeaderProps> = ({
   onSearchChange,
   onAddClick,
   isAtLimit,
-  bulkMode = false,
-  onToggleBulkMode,
 }) => {
   return (
     <div>
       {/* Header Section - matches Chat/Studio header style */}
-      <div className="px-4 py-3 pr-12 border-b flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Books size={20} className="text-primary" />
-            <h2 className="font-semibold">Sources</h2>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            All sources for your project
-          </p>
+      <div className="px-4 py-3 pr-12 border-b">
+        <div className="flex items-center gap-2">
+          <Books size={20} className="text-primary" />
+          <h2 className="font-semibold">Sources</h2>
         </div>
-        {onToggleBulkMode && (
-          <button
-            type="button"
-            onClick={onToggleBulkMode}
-            title={bulkMode ? 'Exit selection mode' : 'Select multiple sources'}
-            className={`flex-shrink-0 rounded-md p-1.5 transition-colors ${
-              bulkMode
-                ? 'bg-amber-100 text-amber-800'
-                : 'text-stone-400 hover:bg-stone-100 hover:text-stone-700'
-            }`}
-            aria-label="Toggle bulk selection"
-          >
-            <ListChecks size={15} weight="bold" />
-          </button>
-        )}
+        <p className="text-xs text-muted-foreground mt-1">
+          All sources for your project
+        </p>
       </div>
 
       {/* Controls Section */}

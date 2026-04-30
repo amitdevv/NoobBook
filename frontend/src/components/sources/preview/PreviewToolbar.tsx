@@ -22,9 +22,6 @@ import {
   ArrowsOut,
   ArrowsIn,
   PencilSimple,
-  ClockCounterClockwise,
-  CornersOut,
-  CornersIn,
   X,
 } from '@phosphor-icons/react';
 import { Input } from '../../ui/input';
@@ -45,13 +42,6 @@ interface PreviewToolbarProps {
   onDownload?: () => void;
   // TEXT-only — opens the document editor prefilled with this source.
   onEdit?: () => void;
-  /** TEXT-only — opens the version history sheet. */
-  onShowHistory?: () => void;
-  /** Current display mode. 'sheet' = left side panel, 'window' =
-   *  centered dialog with more breathing room. */
-  mode?: 'sheet' | 'window';
-  /** Toggle between sheet ↔ window modes. Always visible. */
-  onToggleMode?: () => void;
 }
 
 const Pill: React.FC<{
@@ -108,9 +98,6 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
   onFitModeChange,
   onDownload,
   onEdit,
-  onShowHistory,
-  mode,
-  onToggleMode,
 }) => {
   const tokenCount =
     (source.embedding_info as { token_count?: number } | undefined)?.token_count;
@@ -128,16 +115,10 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
 
   return (
     <div className="flex-shrink-0 border-b border-stone-200/80 bg-white">
-      {/* Title row — bigger serif title in window mode for the
-          reading-desk feel. */}
+      {/* Title row */}
       <div className="flex items-center gap-3 px-5 pt-4 pb-2">
         <h2
-          className={
-            'flex-1 truncate text-stone-900 ' +
-            (mode === 'window'
-              ? 'font-serif text-[22px] leading-tight'
-              : 'text-base font-medium')
-          }
+          className="flex-1 truncate text-base font-medium text-stone-900"
           title={source.name}
         >
           {source.name}
@@ -145,21 +126,6 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
         <Pill tone="amber" title={`Source type: ${source.type ?? 'unknown'}`}>
           {source.type ?? 'UNKNOWN'}
         </Pill>
-        {onToggleMode && (
-          <button
-            type="button"
-            onClick={onToggleMode}
-            title={mode === 'window' ? 'Collapse to side panel' : 'Open in window'}
-            aria-label={mode === 'window' ? 'Collapse to side panel' : 'Open in window'}
-            className="rounded-md p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
-          >
-            {mode === 'window' ? (
-              <CornersIn size={14} weight="bold" />
-            ) : (
-              <CornersOut size={14} weight="bold" />
-            )}
-          </button>
-        )}
       </div>
 
       {/* Metadata + actions row */}
@@ -269,23 +235,6 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
               >
                 {fitMode === 'fit' ? <ArrowsOut size={14} /> : <ArrowsIn size={14} />}
               </button>
-            </>
-          )}
-
-          {/* History (TEXT only — listed first so Edit stays nearest
-              the destructive Download/Edit cluster). */}
-          {onShowHistory && (
-            <>
-              <Divider />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onShowHistory}
-                className="h-8 px-2 text-stone-600 hover:text-amber-700"
-              >
-                <ClockCounterClockwise size={14} className="mr-1.5" />
-                <span className="text-[12px]">History</span>
-              </Button>
             </>
           )}
 

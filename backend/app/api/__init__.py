@@ -89,7 +89,6 @@ from app.api.sources import sources_bp
 from app.api.studio import studio_bp
 from app.api.brand import brand_bp
 from app.api.share import share_bp
-from app.api.editor_assist import editor_assist_bp
 
 # Register nested blueprints with the main api blueprint
 # No url_prefix needed - routes already have full paths
@@ -105,4 +104,3 @@ api_bp.register_blueprint(sources_bp)
 api_bp.register_blueprint(studio_bp)
 api_bp.register_blueprint(brand_bp)
 api_bp.register_blueprint(share_bp)
-api_bp.register_blueprint(editor_assist_bp)

@@ -19,16 +19,14 @@
  */
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { Sheet, SheetContent, SheetTitle } from '../../ui/sheet';
-import { Dialog, DialogContent, DialogTitle } from '../../ui/dialog';
+import { ScrollArea } from '../../ui/scroll-area';
 import { CircleNotch, FileX } from '@phosphor-icons/react';
 import { sourcesAPI, getSourceFileExtension, type Source } from '../../../lib/api/sources';
 import { createLogger } from '@/lib/logger';
 import { PreviewToolbar } from './PreviewToolbar';
-import { MarkdownView, type HeadingEntry } from './MarkdownView';
+import { MarkdownView } from './MarkdownView';
 import { useDocSearch } from './useDocSearch';
-import { TocSidebar } from './TocSidebar';
 import { DocumentEditorDialog } from '../DocumentEditorDialog';
-import { VersionHistorySheet } from './VersionHistorySheet';
 
 const log = createLogger('source-preview-sheet');
 
@@ -76,38 +74,10 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
   const [pdfTotalPages, setPdfTotalPages] = useState<number | null>(null);
   const [fitMode, setFitMode] = useState<'fit' | 'actual'>('fit');
   const [editOpen, setEditOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  // 'sheet' = quick-peek left-side panel (default).
-  // 'window' = centered dialog with way more room. Toggled via the
-  // Maximize / Minimize button on the toolbar. State persists for
-  // the session in localStorage so a user who likes window mode
-  // doesn't have to re-toggle on every open.
-  const [mode, setMode] = useState<'sheet' | 'window'>(() => {
-    if (typeof window === 'undefined') return 'sheet';
-    const saved = window.localStorage.getItem('noobbook:preview-mode');
-    return saved === 'window' ? 'window' : 'sheet';
-  });
-  const toggleMode = useCallback(() => {
-    setMode((cur) => {
-      const next = cur === 'sheet' ? 'window' : 'sheet';
-      try {
-        window.localStorage.setItem('noobbook:preview-mode', next);
-      } catch { /* ignore quota */ }
-      return next;
-    });
-  }, []);
   // Bumped after a save to force the fetch effect below to refetch
   // the freshly reprocessed content. Cheaper than tracking every
   // field of the source row.
   const [refetchKey, setRefetchKey] = useState(0);
-  // Headings collected from MarkdownView when applicable. Populated
-  // via the onHeadings callback so the TOC stays a single source of
-  // truth (the heading regex lives only in MarkdownView).
-  const [headings, setHeadings] = useState<HeadingEntry[]>([]);
-  // Resolved scroll-area viewport — the IntersectionObserver root for
-  // the TOC. Captured via callback ref because the shadcn ScrollArea
-  // wraps its scrollable element in a child div.
-  const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
 
   const search = useDocSearch();
 
@@ -235,10 +205,6 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
   const ext = getSourceFileExtension(source);
   const useFullWidth = sourceType === 'PDF' || sourceType === 'IMAGE' || sourceType === 'CSV';
   const isEditable = sourceType === 'TEXT';
-  // TOC only renders for text-derivable views with enough headings.
-  // Used to flip the body region's grid columns so the body claims
-  // 100% width when there's no TOC sibling.
-  const showToc = !useFullWidth && sourceType !== 'AUDIO' && headings.length >= 3;
 
   const renderBody = () => {
     if (loading) {
@@ -291,119 +257,42 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
       default:
         // TEXT, DOCX, PPTX, LINK, YOUTUBE, RESEARCH and any future
         // text-derivable type all render the same way.
-        return (
-          <MarkdownView content={content} search={search} onHeadings={setHeadings} />
-        );
+        return <MarkdownView content={content} search={search} />;
     }
   };
 
-  // Body + toolbar render the same in both Sheet and Window modes;
-  // only the outer chrome differs. Returning JSX (not a component)
-  // because the toolbar / scroll container have references back to
-  // local state.
-  const inner = (
-    <>
-      <PreviewToolbar
-        source={source}
-        search={search}
-        pdfPage={sourceType === 'PDF' ? pdfPage : undefined}
-        pdfTotalPages={sourceType === 'PDF' ? pdfTotalPages ?? undefined : undefined}
-        onPdfPageChange={sourceType === 'PDF' ? setPdfPage : undefined}
-        fitMode={sourceType === 'IMAGE' ? fitMode : undefined}
-        onFitModeChange={sourceType === 'IMAGE' ? setFitMode : undefined}
-        onDownload={ext ? handleDownload : undefined}
-        onEdit={isEditable ? () => setEditOpen(true) : undefined}
-        onShowHistory={isEditable ? () => setHistoryOpen(true) : undefined}
-        mode={mode}
-        onToggleMode={toggleMode}
-      />
-
-      <div
-        className={
-          'flex-1 min-h-0 grid grid-cols-1 ' +
-          (showToc ? 'lg:grid-cols-[minmax(0,1fr)_240px]' : '')
-        }
-      >
-        <div
-          ref={(node) => setScrollRoot(node)}
-          className={
-            'overflow-y-auto ' +
-            (mode === 'window'
-              // Window mode: pure ivory, no radial wash. The reading
-              // surface should feel like a clean desk, not a warm
-              // sidebar.
-              ? 'bg-[#fafaf7]'
-              : 'bg-[radial-gradient(circle_at_top_right,rgba(254,243,199,0.45),transparent_55%)]')
-          }
-        >
-          <div
-            className={
-              useFullWidth
-                ? 'px-6 py-8'
-                : mode === 'window'
-                  // Window mode gets more breathing room — wider
-                  // padding, taller line-height via parent classes,
-                  // bigger top space so the title has air.
-                  ? 'mx-auto max-w-[760px] px-10 pt-16 pb-24'
-                  : 'mx-auto max-w-[760px] px-8 py-10'
-            }
-          >
-            {renderBody()}
-          </div>
-        </div>
-
-        {showToc && (
-          <TocSidebar headings={headings} scrollRoot={scrollRoot} />
-        )}
-      </div>
-    </>
-  );
-
-  // Two materials, one body. Switching between them is a re-mount of
-  // the outer Radix portal; transient state (scroll position, search
-  // matches) gets reset, which is fine — toggling mode is rare and
-  // intentional.
-  const portal = mode === 'window' ? (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="
-          max-w-[1280px] w-[95vw] h-[92vh]
-          flex flex-col p-0 gap-0 overflow-hidden
-          bg-[#fafaf7] rounded-[18px]
-          border border-stone-300/60
-          shadow-[0_24px_80px_-24px_rgba(0,0,0,0.32),0_2px_8px_-2px_rgba(0,0,0,0.06)]
-        "
-      >
-        <DialogTitle className="sr-only">{source.name}</DialogTitle>
-        {inner}
-      </DialogContent>
-    </Dialog>
-  ) : (
+  return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="left"
         className="w-[95vw] sm:w-[920px] lg:w-[1080px] max-w-[1100px] flex flex-col p-0 bg-stone-50"
       >
         <SheetTitle className="sr-only">{source.name}</SheetTitle>
-        {inner}
-      </SheetContent>
-    </Sheet>
-  );
 
-  return (
-    <>
-      {portal}
-
-      {/* Version history sheet — TEXT sources only. */}
-      {isEditable && (
-        <VersionHistorySheet
-          open={historyOpen}
-          onOpenChange={setHistoryOpen}
-          projectId={projectId}
-          sourceId={source.id}
-          onRestored={() => setRefetchKey((k) => k + 1)}
+        <PreviewToolbar
+          source={source}
+          search={search}
+          pdfPage={sourceType === 'PDF' ? pdfPage : undefined}
+          pdfTotalPages={sourceType === 'PDF' ? pdfTotalPages ?? undefined : undefined}
+          onPdfPageChange={sourceType === 'PDF' ? setPdfPage : undefined}
+          fitMode={sourceType === 'IMAGE' ? fitMode : undefined}
+          onFitModeChange={sourceType === 'IMAGE' ? setFitMode : undefined}
+          onDownload={ext ? handleDownload : undefined}
+          onEdit={isEditable ? () => setEditOpen(true) : undefined}
         />
-      )}
+
+        <ScrollArea className="flex-1 bg-[radial-gradient(circle_at_top_right,rgba(254,243,199,0.45),transparent_55%)]">
+          <div
+            className={
+              useFullWidth
+                ? 'px-6 py-8'
+                : 'mx-auto max-w-[760px] px-8 py-10'
+            }
+          >
+            {renderBody()}
+          </div>
+        </ScrollArea>
+      </SheetContent>
 
       {/* Edit dialog — TEXT sources only. Prefilled with the current
           markdown body (page-marker header stripped). On save,
@@ -413,13 +302,12 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
         <DocumentEditorDialog
           open={editOpen}
           onOpenChange={setEditOpen}
-          projectId={projectId}
           onSave={handleEditSave}
           initialMarkdown={stripSinglePageMarker(content)}
           initialName={source.name}
           saveLabel="Save changes"
         />
       )}
-    </>
+    </Sheet>
   );
 };
