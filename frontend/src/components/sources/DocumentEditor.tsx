@@ -21,13 +21,7 @@
  */
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
-import {
-  useCreateBlockNote,
-  FormattingToolbar,
-  FormattingToolbarController,
-  getFormattingToolbarItems,
-  useBlockNoteEditor,
-} from '@blocknote/react';
+import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
 import {
@@ -36,8 +30,7 @@ import {
   createCodeBlockSpec,
   type Block,
 } from '@blocknote/core';
-import { Sparkle, ArrowFatLineRight, ListBullets, CircleNotch } from '@phosphor-icons/react';
-import { uploadEditorImage, assistText, type AssistAction } from '@/lib/api/editor';
+import { uploadEditorImage } from '@/lib/api/editor';
 import { createLogger } from '@/lib/logger';
 import {
   EDITOR_LANGUAGE_DISPLAY,
@@ -51,6 +44,16 @@ export interface DocumentEditorHandle {
   getInferredName: () => string;
   reset: () => void;
   loadMarkdown: (markdown: string) => void;
+  /** Plaintext of the current selection (empty string if none). Used
+   *  by the dialog's pill to drive the AI-assist buttons. */
+  getSelectedText: () => string;
+  /** Replace the current selection inline with the given text.
+   *  Multi-paragraph results land as additional blocks after the
+   *  selection's anchor. */
+  replaceSelectionWith: (text: string) => void;
+  /** Append a paragraph at the current cursor (no replacement) —
+   *  used by Continue when there's no selection. */
+  appendAtCursor: (text: string) => void;
 }
 
 interface DocumentEditorProps {
@@ -152,23 +155,53 @@ const DocumentEditor = forwardRef<DocumentEditorHandle, DocumentEditorProps>(
             editor.replaceBlocks(editor.document, blocks);
           });
         },
+        getSelectedText: () => editor.getSelectedText() ?? '',
+        replaceSelectionWith: (text: string) => {
+          // First paragraph replaces the selection inline; if the AI
+          // returned multiple paragraphs (`\n\n` separated), the
+          // remaining ones are inserted as new blocks after the
+          // current cursor block.
+          const paragraphs = text.split(/\n{2,}/);
+          const [first, ...rest] = paragraphs;
+          if (first) {
+            editor.insertInlineContent([{ type: 'text', text: first, styles: {} }]);
+          }
+          if (rest.length > 0) {
+            const cursorBlock = editor.getTextCursorPosition().block;
+            editor.insertBlocks(
+              rest.map((p) => ({
+                type: 'paragraph' as const,
+                content: [{ type: 'text' as const, text: p, styles: {} }],
+              })),
+              cursorBlock,
+              'after',
+            );
+          }
+        },
+        appendAtCursor: (text: string) => {
+          // Used when Continue runs without a selection. We append a
+          // new paragraph after the current block so we don't disturb
+          // whatever the user was already writing.
+          const cursorBlock = editor.getTextCursorPosition().block;
+          const paragraphs = text.split(/\n{2,}/);
+          editor.insertBlocks(
+            paragraphs.map((p) => ({
+              type: 'paragraph' as const,
+              content: [{ type: 'text' as const, text: p, styles: {} }],
+            })),
+            cursorBlock,
+            'after',
+          );
+        },
       }),
       [editor],
     );
 
-    return (
-      <BlockNoteView editor={editor} editable={!disabled} theme="light">
-        <FormattingToolbarController
-          formattingToolbar={() => (
-            <FormattingToolbar>
-              {/* Custom AI buttons appear before the default ones. */}
-              <AiAssistButtons />
-              {getFormattingToolbarItems()}
-            </FormattingToolbar>
-          )}
-        />
-      </BlockNoteView>
-    );
+    // Default formatting toolbar — AI buttons used to live here but
+    // are now hosted in the dialog's bottom pill (better
+    // discoverability, always visible, no selection required for
+    // Continue).
+    return <BlockNoteView editor={editor} editable={!disabled} theme="light" />;
   },
 );
 
@@ -190,92 +223,3 @@ function blockToPlainText(block: Block): string {
     .trim();
 }
 
-// ----------------------------------------------------------------------
-// AiAssistButtons — three pill buttons in the floating toolbar that
-// run the selection through Haiku via /editor/assist.
-//
-// Lives inside <FormattingToolbar> so it inherits BlockNote's
-// positioning + visibility logic (the toolbar only shows on a
-// non-empty text selection in inline-content blocks).
-// ----------------------------------------------------------------------
-
-// AssistButton lives at module scope so React holds a stable
-// component identity across AiAssistButtons renders. Defining it
-// inside the parent would force a remount of all three buttons every
-// time `busy` flipped — losing focus, disrupting transitions, and
-// burning DOM work.
-interface AssistButtonProps {
-  action: AssistAction;
-  label: string;
-  Icon: React.ComponentType<{ size?: number; weight?: 'bold' }>;
-  busy: AssistAction | null;
-  onRun: (action: AssistAction) => void;
-}
-
-const AssistButton: React.FC<AssistButtonProps> = ({ action, label, Icon, busy, onRun }) => (
-  <button
-    type="button"
-    onClick={() => onRun(action)}
-    disabled={busy === action}
-    title={`${label} (Haiku)`}
-    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-stone-700 hover:bg-amber-50 hover:text-amber-800 disabled:opacity-50 transition-colors"
-  >
-    {busy === action ? (
-      <CircleNotch size={11} weight="bold" />
-    ) : (
-      <Icon size={11} weight="bold" />
-    )}
-    <span>{label}</span>
-  </button>
-);
-
-function AiAssistButtons() {
-  const editor = useBlockNoteEditor();
-  const [busy, setBusy] = useState<AssistAction | null>(null);
-
-  const runAssist = async (action: AssistAction) => {
-    if (busy) return;
-    // Pull the selected plaintext. BlockNote's `getSelectedText`
-    // returns a flat string of inline content within the selection.
-    const selected = editor.getSelectedText().trim();
-    if (!selected) return;
-
-    setBusy(action);
-    try {
-      const out = await assistText(action, selected);
-      // Replace the selection inline. We split the response into
-      // logical paragraphs but BlockNote's insertInlineContent expects
-      // inline objects; for simplicity we drop one line at a time.
-      const paragraphs = out.split(/\n{2,}/);
-      // First paragraph replaces the selection; the rest are appended
-      // as new paragraph blocks below the selection's anchor block.
-      const [first, ...rest] = paragraphs;
-      editor.insertInlineContent([{ type: 'text', text: first, styles: {} }]);
-      if (rest.length > 0) {
-        const cursorBlock = editor.getTextCursorPosition().block;
-        editor.insertBlocks(
-          rest.map((p) => ({
-            type: 'paragraph' as const,
-            content: [{ type: 'text' as const, text: p, styles: {} }],
-          })),
-          cursorBlock,
-          'after',
-        );
-      }
-    } catch (e) {
-      log.error({ err: e, action }, 'AI-assist failed');
-      // BlockNote toolbar buttons can't reach our toast hook from here;
-      // a console error is acceptable for a dev-grade selection action.
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-0.5 px-1 border-r border-stone-200">
-      <AssistButton action="improve" label="Improve" Icon={Sparkle} busy={busy} onRun={runAssist} />
-      <AssistButton action="continue" label="Continue" Icon={ArrowFatLineRight} busy={busy} onRun={runAssist} />
-      <AssistButton action="summarize" label="Summarize" Icon={ListBullets} busy={busy} onRun={runAssist} />
-    </div>
-  );
-}

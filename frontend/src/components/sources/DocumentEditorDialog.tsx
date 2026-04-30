@@ -21,7 +21,15 @@
 
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '../ui/dialog';
-import { ClipboardText, CircleNotch, FloppyDisk } from '@phosphor-icons/react';
+import {
+  ClipboardText,
+  CircleNotch,
+  FloppyDisk,
+  Sparkle,
+  ArrowFatLineRight,
+  ListBullets,
+} from '@phosphor-icons/react';
+import { assistText, type AssistAction } from '@/lib/api/editor';
 import type { DocumentEditorHandle } from './DocumentEditorTab';
 
 const LazyDocumentEditor = React.lazy(() => import('./DocumentEditor'));
@@ -108,6 +116,46 @@ function clearDraft(key: string) {
   }
 }
 
+// Pill-styled AI button. Module-scope so React holds stable
+// component identity — recreating per render would remount all three
+// every time `aiBusy` flipped.
+interface AiPillButtonProps {
+  action: AssistAction;
+  label: string;
+  Icon: React.ComponentType<{ size?: number; weight?: 'bold' }>;
+  aiBusy: AssistAction | null;
+  onRun: (action: AssistAction) => void;
+  hint: string;
+}
+
+const AiPillButton: React.FC<AiPillButtonProps> = ({
+  action,
+  label,
+  Icon,
+  aiBusy,
+  onRun,
+  hint,
+}) => {
+  const isRunning = aiBusy === action;
+  const otherRunning = aiBusy !== null && !isRunning;
+  return (
+    <button
+      type="button"
+      onClick={() => onRun(action)}
+      disabled={otherRunning}
+      title={hint}
+      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-stone-600 hover:bg-amber-50 hover:text-amber-800 disabled:text-stone-400 disabled:hover:bg-transparent transition-colors"
+    >
+      {isRunning ? (
+        <CircleNotch size={11} weight="bold" className="animate-spin" />
+      ) : (
+        <Icon size={11} weight="bold" />
+      )}
+      <span>{label}</span>
+    </button>
+  );
+};
+
 function relativeTime(savedAt: number): string {
   const diff = Date.now() - savedAt;
   if (diff < 60_000) return 'just now';
@@ -132,6 +180,9 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
   const [name, setName] = useState(initialName);
   const [adding, setAdding] = useState(false);
   const [wordCount, setWordCount] = useState(0);
+  // AI-assist (Improve / Continue / Summarize) lives in the bottom
+  // pill now. `aiBusy` is the action currently in flight, or null.
+  const [aiBusy, setAiBusy] = useState<AssistAction | null>(null);
   // Mounting key — bumped on every open so the lazy DocumentEditor
   // re-mounts and re-seeds itself with the current initialMarkdown.
   // Without this, a second open with different initialMarkdown
@@ -265,6 +316,43 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
     }
   };
 
+  const runAi = async (action: AssistAction) => {
+    if (aiBusy) return;
+    const handle = editorRef.current;
+    if (!handle) return;
+
+    // Improve / Summarize need a non-empty selection. Continue is the
+    // exception — without a selection, we feed the surrounding doc
+    // (capped at the last 4KB of markdown) as context and append the
+    // AI's continuation as a new paragraph.
+    const selected = handle.getSelectedText().trim();
+    let payload = selected;
+    if (!payload) {
+      if (action !== 'continue') return;
+      const md = handle.getMarkdown();
+      payload = md.slice(-4000).trim();
+      if (!payload) return;
+    }
+
+    setAiBusy(action);
+    try {
+      const result = await assistText(action, payload);
+      const trimmed = result.trim();
+      if (!trimmed) return;
+      if (selected) {
+        handle.replaceSelectionWith(trimmed);
+      } else {
+        handle.appendAtCursor(trimmed);
+      }
+    } catch {
+      // Endpoint logs the underlying error; surface UI feedback via
+      // the existing word-count pill (the AI button itself returns
+      // to its idle icon and the user can retry).
+    } finally {
+      setAiBusy(null);
+    }
+  };
+
   const handleOpenChange = (next: boolean) => {
     if (next) {
       onOpenChange(true);
@@ -365,6 +453,40 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
             <span className="font-mono text-[11px] tabular-nums text-stone-600">
               {wordCount.toLocaleString()} {wordCount === 1 ? 'word' : 'words'}
             </span>
+            <span className="h-3 w-px bg-stone-200" />
+
+            {/* AI section — Improve / Continue / Summarize. Always
+                visible (not selection-gated like the old toolbar
+                version) so the affordance is discoverable. Improve
+                and Summarize need a selection; Continue works at the
+                cursor against the trailing 4KB of context. */}
+            <div className="flex items-center gap-0.5">
+              <AiPillButton
+                action="improve"
+                label="Improve"
+                Icon={Sparkle}
+                aiBusy={aiBusy}
+                onRun={runAi}
+                hint="Select text first"
+              />
+              <AiPillButton
+                action="continue"
+                label="Continue"
+                Icon={ArrowFatLineRight}
+                aiBusy={aiBusy}
+                onRun={runAi}
+                hint="Cursor or selection"
+              />
+              <AiPillButton
+                action="summarize"
+                label="Summarize"
+                Icon={ListBullets}
+                aiBusy={aiBusy}
+                onRun={runAi}
+                hint="Select text first"
+              />
+            </div>
+
             <span className="h-3 w-px bg-stone-200" />
             <span className="text-[11px] text-stone-500">
               <kbd className="font-mono text-stone-700">/</kbd> commands

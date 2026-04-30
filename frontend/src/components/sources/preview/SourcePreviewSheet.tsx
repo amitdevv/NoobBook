@@ -19,6 +19,7 @@
  */
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { Sheet, SheetContent, SheetTitle } from '../../ui/sheet';
+import { Dialog, DialogContent, DialogTitle } from '../../ui/dialog';
 import { CircleNotch, FileX } from '@phosphor-icons/react';
 import { sourcesAPI, getSourceFileExtension, type Source } from '../../../lib/api/sources';
 import { createLogger } from '@/lib/logger';
@@ -76,6 +77,25 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
   const [fitMode, setFitMode] = useState<'fit' | 'actual'>('fit');
   const [editOpen, setEditOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // 'sheet' = quick-peek left-side panel (default).
+  // 'window' = centered dialog with way more room. Toggled via the
+  // Maximize / Minimize button on the toolbar. State persists for
+  // the session in localStorage so a user who likes window mode
+  // doesn't have to re-toggle on every open.
+  const [mode, setMode] = useState<'sheet' | 'window'>(() => {
+    if (typeof window === 'undefined') return 'sheet';
+    const saved = window.localStorage.getItem('noobbook:preview-mode');
+    return saved === 'window' ? 'window' : 'sheet';
+  });
+  const toggleMode = useCallback(() => {
+    setMode((cur) => {
+      const next = cur === 'sheet' ? 'window' : 'sheet';
+      try {
+        window.localStorage.setItem('noobbook:preview-mode', next);
+      } catch { /* ignore quota */ }
+      return next;
+    });
+  }, []);
   // Bumped after a save to force the fetch effect below to refetch
   // the freshly reprocessed content. Cheaper than tracking every
   // field of the source row.
@@ -277,67 +297,102 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
     }
   };
 
-  return (
+  // Body + toolbar render the same in both Sheet and Window modes;
+  // only the outer chrome differs. Returning JSX (not a component)
+  // because the toolbar / scroll container have references back to
+  // local state.
+  const inner = (
+    <>
+      <PreviewToolbar
+        source={source}
+        search={search}
+        pdfPage={sourceType === 'PDF' ? pdfPage : undefined}
+        pdfTotalPages={sourceType === 'PDF' ? pdfTotalPages ?? undefined : undefined}
+        onPdfPageChange={sourceType === 'PDF' ? setPdfPage : undefined}
+        fitMode={sourceType === 'IMAGE' ? fitMode : undefined}
+        onFitModeChange={sourceType === 'IMAGE' ? setFitMode : undefined}
+        onDownload={ext ? handleDownload : undefined}
+        onEdit={isEditable ? () => setEditOpen(true) : undefined}
+        onShowHistory={isEditable ? () => setHistoryOpen(true) : undefined}
+        mode={mode}
+        onToggleMode={toggleMode}
+      />
+
+      <div
+        className={
+          'flex-1 min-h-0 grid grid-cols-1 ' +
+          (showToc ? 'lg:grid-cols-[minmax(0,1fr)_240px]' : '')
+        }
+      >
+        <div
+          ref={(node) => setScrollRoot(node)}
+          className={
+            'overflow-y-auto ' +
+            (mode === 'window'
+              // Window mode: pure ivory, no radial wash. The reading
+              // surface should feel like a clean desk, not a warm
+              // sidebar.
+              ? 'bg-[#fafaf7]'
+              : 'bg-[radial-gradient(circle_at_top_right,rgba(254,243,199,0.45),transparent_55%)]')
+          }
+        >
+          <div
+            className={
+              useFullWidth
+                ? 'px-6 py-8'
+                : mode === 'window'
+                  // Window mode gets more breathing room — wider
+                  // padding, taller line-height via parent classes,
+                  // bigger top space so the title has air.
+                  ? 'mx-auto max-w-[760px] px-10 pt-16 pb-24'
+                  : 'mx-auto max-w-[760px] px-8 py-10'
+            }
+          >
+            {renderBody()}
+          </div>
+        </div>
+
+        {showToc && (
+          <TocSidebar headings={headings} scrollRoot={scrollRoot} />
+        )}
+      </div>
+    </>
+  );
+
+  // Two materials, one body. Switching between them is a re-mount of
+  // the outer Radix portal; transient state (scroll position, search
+  // matches) gets reset, which is fine — toggling mode is rare and
+  // intentional.
+  const portal = mode === 'window' ? (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="
+          max-w-[1280px] w-[95vw] h-[92vh]
+          flex flex-col p-0 gap-0 overflow-hidden
+          bg-[#fafaf7] rounded-[18px]
+          border border-stone-300/60
+          shadow-[0_24px_80px_-24px_rgba(0,0,0,0.32),0_2px_8px_-2px_rgba(0,0,0,0.06)]
+        "
+      >
+        <DialogTitle className="sr-only">{source.name}</DialogTitle>
+        {inner}
+      </DialogContent>
+    </Dialog>
+  ) : (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="left"
         className="w-[95vw] sm:w-[920px] lg:w-[1080px] max-w-[1100px] flex flex-col p-0 bg-stone-50"
       >
         <SheetTitle className="sr-only">{source.name}</SheetTitle>
-
-        <PreviewToolbar
-          source={source}
-          search={search}
-          pdfPage={sourceType === 'PDF' ? pdfPage : undefined}
-          pdfTotalPages={sourceType === 'PDF' ? pdfTotalPages ?? undefined : undefined}
-          onPdfPageChange={sourceType === 'PDF' ? setPdfPage : undefined}
-          fitMode={sourceType === 'IMAGE' ? fitMode : undefined}
-          onFitModeChange={sourceType === 'IMAGE' ? setFitMode : undefined}
-          onDownload={ext ? handleDownload : undefined}
-          onEdit={isEditable ? () => setEditOpen(true) : undefined}
-          onShowHistory={isEditable ? () => setHistoryOpen(true) : undefined}
-        />
-
-        {/* Body + (optional) TOC laid out as a CSS grid. The grid
-            collapses to a single column below `lg`, so the TOC is
-            effectively hidden there and the body claims the full
-            width. Above `lg` we reserve a fixed 240px right column
-            for the TOC and let the body fill the rest. Using grid
-            (not flex / not absolute-positioned overlay) avoids the
-            prior bugs where the ScrollArea collapsed below its
-            content's intrinsic width OR the absolute-positioned
-            TOC overlapped the prose. */}
-        <div
-          className={
-            'flex-1 min-h-0 grid grid-cols-1 ' +
-            (showToc ? 'lg:grid-cols-[minmax(0,1fr)_240px]' : '')
-          }
-        >
-          <div
-            // Plain overflow container in place of shadcn's
-            // ScrollArea — Radix's internal viewport wrapper sized
-            // unpredictably inside flex/grid parents. A plain
-            // overflow-y-auto sizes correctly; native scrollbar is
-            // fine for the editorial aesthetic.
-            ref={(node) => setScrollRoot(node)}
-            className="overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(254,243,199,0.45),transparent_55%)]"
-          >
-            <div
-              className={
-                useFullWidth
-                  ? 'px-6 py-8'
-                  : 'mx-auto max-w-[760px] px-8 py-10'
-              }
-            >
-              {renderBody()}
-            </div>
-          </div>
-
-          {showToc && (
-            <TocSidebar headings={headings} scrollRoot={scrollRoot} />
-          )}
-        </div>
+        {inner}
       </SheetContent>
+    </Sheet>
+  );
+
+  return (
+    <>
+      {portal}
 
       {/* Version history sheet — TEXT sources only. */}
       {isEditable && (
@@ -365,6 +420,6 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
           saveLabel="Save changes"
         />
       )}
-    </Sheet>
+    </>
   );
 };
