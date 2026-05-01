@@ -184,7 +184,17 @@ class FreshdeskExecutor:
             return {"success": False, "error": str(e)}
 
     def _query_runner(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a read-only SQL query against the global freshdesk_tickets table."""
+        """Execute a read-only SQL query against the global freshdesk_tickets table.
+
+        Two paths, tried in order:
+          1. Supabase REST RPC (`exec_freshdesk_query`) — works in any
+             deployment where the backend can already reach Supabase via
+             the API gateway. This is the common case, including Coolify
+             and managed-Supabase setups where direct DB access is blocked.
+          2. Direct psycopg2 — fallback for the bundled docker-compose
+             stack and for older deployments that haven't applied
+             migration 00025 yet.
+        """
         sql = (tool_input.get("sql_query") or "").strip()
         if not sql:
             return {"success": False, "error": "sql_query is required"}
@@ -197,6 +207,86 @@ class FreshdeskExecutor:
         if "freshdesk_tickets" not in sql.lower():
             return {"success": False, "error": "Query must reference freshdesk_tickets table"}
 
+        rpc_result = self._run_via_rpc(sql)
+        if rpc_result is not None:
+            return rpc_result
+        return self._run_via_psycopg2(sql)
+
+    def _run_via_rpc(self, sql: str) -> Dict[str, Any] | None:
+        """
+        Try the PostgREST `exec_freshdesk_query` RPC.
+
+        Returns the formatted result on success, or `None` *only* when the
+        RPC function itself is unavailable (PGRST202 — function not found —
+        or any non-PostgREST error like a transport failure). When the
+        function exists but the user's SQL hit a Postgres error, we return
+        the error directly so the agent can correct it on the next
+        iteration; falling back to psycopg2 there would hide the real cause
+        behind a connection-refused message in deployments that don't have
+        a direct DB route.
+        """
+        try:
+            from app.services.integrations.supabase import get_supabase
+            from postgrest.exceptions import APIError
+
+            supabase = get_supabase()
+            start = time.time()
+            resp = supabase.rpc("exec_freshdesk_query", {"sql_query": sql}).execute()
+            elapsed = round((time.time() - start) * 1000, 1)
+
+            rows = resp.data if isinstance(resp.data, list) else []
+            # Defensive: PostgREST returns None for an empty jsonb result.
+            if rows is None:
+                rows = []
+            column_names = list(rows[0].keys()) if rows and isinstance(rows[0], dict) else []
+            truncated = len(rows) >= 100
+
+            result = {
+                "success": True,
+                "query": sql,
+                "row_count": len(rows),
+                "results": rows,
+                "column_names": column_names,
+                "execution_time_ms": elapsed,
+                "truncated": truncated,
+            }
+            if truncated:
+                result["warning"] = (
+                    "Results limited to 100 rows. Use GROUP BY, COUNT, or LIMIT to get aggregated data."
+                )
+            return result
+        except APIError as api_exc:
+            code = (api_exc.code or "").upper()
+            # PGRST202 = function not found in the schema cache. PGRST200
+            # is "matching procedure not found" (signature mismatch). Both
+            # mean migration 00025 hasn't been applied — fall back.
+            if code in ("PGRST202", "PGRST200", "42883"):  # 42883 = undefined_function
+                logger.info(
+                    "Freshdesk RPC unavailable (code=%s); falling back to psycopg2", code
+                )
+                return None
+            # Real query error from inside the function (bad SQL, missing
+            # column, validation rejection). Surface it so the agent can
+            # adjust on its next iteration.
+            logger.warning("Freshdesk RPC query error: %s", api_exc)
+            return {
+                "success": False,
+                "error": api_exc.message or str(api_exc),
+                "query": sql,
+            }
+        except Exception as exc:
+            # Network / client-init issues (e.g. SUPABASE_URL unreachable).
+            # Try psycopg2 — it might be a deployment where direct DB
+            # access works even when REST doesn't.
+            logger.info(
+                "Freshdesk RPC failed at the transport layer (%s); falling back to psycopg2",
+                exc,
+            )
+            return None
+
+    def _run_via_psycopg2(self, sql: str) -> Dict[str, Any]:
+        """Direct-Postgres fallback. Requires SUPABASE_DB_URL or POSTGRES_*
+        env vars and network access to the Postgres container."""
         try:
             try:
                 conn = self._get_connection()
@@ -209,10 +299,11 @@ class FreshdeskExecutor:
                 return {
                     "success": False,
                     "error": (
-                        "Cannot reach the Freshdesk tickets database directly. "
-                        "Set SUPABASE_DB_URL (or POSTGRES_HOST + POSTGRES_PASSWORD) "
-                        "in the backend environment so the analyzer can run SQL "
-                        f"queries. Underlying error: {conn_exc}"
+                        "Cannot reach the Freshdesk tickets database. "
+                        "Apply the latest migrations (00025 adds an RPC fallback that "
+                        "needs no extra env vars) or set SUPABASE_DB_URL "
+                        "(or POSTGRES_HOST + POSTGRES_PASSWORD) in the backend "
+                        f"environment. Underlying error: {conn_exc}"
                     ),
                     "query": sql,
                 }
