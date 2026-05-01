@@ -1,12 +1,16 @@
 /**
  * Simple Toast Notification Component
+ *
  * Educational Note: A lightweight toast notification system for showing
- * temporary messages to users.
+ * temporary messages to users. Toasts can carry an optional action
+ * button (e.g. "View logs") which is admin-gated when `adminOnly` is
+ * set on the action.
  */
 
 import React, { useEffect } from 'react';
 import { CheckCircle, XCircle, Info, X } from '@phosphor-icons/react';
 import type { Toast } from './use-toast';
+import { getAdminMode } from '@/lib/adminMode';
 
 interface ToastContainerProps {
   toasts: Toast[];
@@ -29,13 +33,16 @@ interface ToastItemProps {
 }
 
 const ToastItem: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
+  // Toasts with an action stay on screen longer — the user needs time to
+  // notice and click. Plain toasts dismiss in 5s as before.
+  const dismissMs = toast.action ? 8000 : 5000;
   useEffect(() => {
     const timer = setTimeout(() => {
       onDismiss(toast.id);
-    }, 5000); // Auto dismiss after 5 seconds
+    }, dismissMs);
 
     return () => clearTimeout(timer);
-  }, [toast.id, onDismiss]);
+  }, [toast.id, onDismiss, dismissMs]);
 
   const getIcon = () => {
     switch (toast.type) {
@@ -59,12 +66,29 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
     }
   };
 
+  // Action button visibility: hide adminOnly actions when the current
+  // user isn't admin, so a "View logs" button never appears for someone
+  // who can't actually see logs.
+  const showAction =
+    toast.action && (!toast.action.adminOnly || getAdminMode());
+
   return (
     <div
       className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${getBgColor()} min-w-[300px] max-w-[500px] animate-in slide-in-from-right`}
     >
       {getIcon()}
       <p className="flex-1 text-sm">{toast.message}</p>
+      {showAction && toast.action && (
+        <button
+          onClick={() => {
+            toast.action!.onClick();
+            onDismiss(toast.id);
+          }}
+          className="text-xs font-medium text-stone-700 hover:text-stone-900 underline underline-offset-2 decoration-stone-400 hover:decoration-stone-700 whitespace-nowrap"
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button
         onClick={() => onDismiss(toast.id)}
         className="text-muted-foreground hover:text-foreground"

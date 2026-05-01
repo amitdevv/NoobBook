@@ -95,7 +95,7 @@ export const ApiKeysSection: React.FC = () => {
   const [validationState, setValidationState] = useState<ValidationState>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  const { success, error, info } = useToast();
+  const { success, error, info, errorWithLogs } = useToast();
 
   useEffect(() => {
     loadApiKeys();
@@ -109,7 +109,7 @@ export const ApiKeysSection: React.FC = () => {
       setModifiedKeys({});
     } catch (err) {
       log.error({ err }, 'failed to load API keys');
-      error('Failed to load API keys');
+      errorWithLogs('Failed to load API keys');
     } finally {
       setInitialLoading(false);
     }

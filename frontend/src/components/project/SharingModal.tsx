@@ -66,7 +66,7 @@ export const SharingModal: React.FC<SharingModalProps> = ({
   projectId,
   projectName,
 }) => {
-  const { toasts, dismissToast, success, error } = useToast();
+  const { toasts, dismissToast, success, error, errorWithLogs } = useToast();
 
   // ── List state ───────────────────────────────────────────────────
   const [shares, setShares] = useState<ProjectShare[]>([]);
@@ -102,11 +102,11 @@ export const SharingModal: React.FC<SharingModalProps> = ({
       setShares(res.data.shares || []);
     } catch (err) {
       log.error({ err }, 'failed to load shares');
-      error('Failed to load shares');
+      errorWithLogs('Failed to load shares');
     } finally {
       setListLoading(false);
     }
-  }, [projectId, error]);
+  }, [projectId, errorWithLogs]);
 
   useEffect(() => {
     if (!open) return;
