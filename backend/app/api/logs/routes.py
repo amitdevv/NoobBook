@@ -16,7 +16,7 @@ from flask import Response, current_app, g, jsonify, request
 from app.api.logs import logs_bp
 from app.api.logs.bundle import build_bundle
 from app.api.logs.redaction import redact_line
-from app.services.auth.rbac import require_admin
+from app.services.auth.rbac import require_admin, require_auth
 from app.utils import logger as logger_module
 
 logger = logging.getLogger(__name__)
@@ -155,6 +155,7 @@ def clear_logs():
 
 
 @logs_bp.route("/logs/client", methods=["POST"])
+@require_auth
 def report_client_error():
     """Frontend hook for browser-side errors.
 
@@ -162,6 +163,13 @@ def report_client_error():
     own browser errors. The error gets written to backend.log via the
     standard logger so it interleaves with server-side events in the
     bundle.
+
+    Note: `api_bp.before_request` already validates the JWT for every
+    `/api/v1/*` route that isn't on the auth/health/share allowlist, so
+    `@require_auth` here is defense-in-depth — it pins the contract at
+    the route level so a future change to `before_request` (e.g. adding
+    `/logs/` to the allowlist by accident) can't silently expose this
+    write endpoint to anonymous callers.
 
     Request body:
         {
@@ -180,10 +188,15 @@ def report_client_error():
     user_id = getattr(g, "user_id", "anonymous")
 
     # Truncate to keep the log file from being abused as bulk storage.
+    # Caps are conservative — a real browser error rarely exceeds these.
     if len(message) > 1000:
         message = message[:1000] + "…(truncated)"
     if len(stack) > 4000:
         stack = stack[:4000] + "\n…(truncated)"
+    if len(url) > 500:
+        url = url[:500] + "…"
+    if len(user_agent) > 200:
+        user_agent = user_agent[:200]
 
     summary = (
         f"[CLIENT user={user_id} url={url} ua={user_agent[:80]}] {message}"
