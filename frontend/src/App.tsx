@@ -11,6 +11,8 @@ import { PermissionsProvider } from './contexts/PermissionsContext';
 import { IntegrationsProvider } from './contexts/IntegrationsContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ShareWorkspace } from './components/share/ShareWorkspace';
+import { GlobalLogsModalGate } from './components/project/GlobalLogsModalGate';
+import { setAdminMode } from './lib/adminMode';
 
 const log = createLogger('app');
 
@@ -110,10 +112,12 @@ function AppContent({
 function ProjectWorkspaceRoute({
   setRefreshTrigger,
   isAuthenticated,
+  isAdmin,
   onSignOut,
 }: {
   setRefreshTrigger: (fn: (prev: number) => number) => void;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   onSignOut: () => Promise<void>;
 }) {
   const { projectId } = useParams<{ projectId: string }>();
@@ -182,6 +186,7 @@ function ProjectWorkspaceRoute({
         onDeleteProject={handleDeleteProject}
         onRenameProject={handleRenameProject}
         onSignOut={isAuthenticated ? onSignOut : undefined}
+        isAdmin={isAdmin}
       />
     </ErrorBoundary>
   );
@@ -233,6 +238,13 @@ function App() {
     refreshAuth();
   }, []);
 
+  // Mirror admin status into the module-level adminMode flag so leaf
+  // components (toast renderer in particular) can gate admin-only
+  // affordances without prop-drilling.
+  useEffect(() => {
+    setAdminMode(isAdmin);
+  }, [isAdmin]);
+
   if (!authReady) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
@@ -269,6 +281,7 @@ function App() {
                 <ProjectWorkspaceRoute
                   setRefreshTrigger={setRefreshTrigger}
                   isAuthenticated={isAuthenticated}
+                  isAdmin={isAdmin}
                   onSignOut={handleSignOut}
                 />
               }
@@ -294,6 +307,11 @@ function App() {
             />
             </Routes>
           </BrowserRouter>
+          {/* Single shared LogsModal mounted at the App root. Any toast
+              that calls `errorWithLogs(...)` dispatches a window event
+              this gate listens for, opening the modal regardless of
+              which route the user is on. Renders nothing for non-admins. */}
+          <GlobalLogsModalGate isAdmin={isAdmin} />
         </IntegrationsProvider>
       </PermissionsProvider>
     </ErrorBoundary>

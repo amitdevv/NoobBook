@@ -36,6 +36,7 @@ import { ToastContainer } from '../ui/toast';
 import { useToast } from '../ui/use-toast';
 import { createLogger } from '@/lib/logger';
 import { ShareButton } from './ShareButton';
+import { LogsButton } from './LogsButton';
 
 const log = createLogger('project-header');
 
@@ -56,6 +57,7 @@ interface ProjectHeaderProps {
   costsVersion?: number; // Increment to trigger cost refresh
   onRename?: (newName: string) => Promise<void>;
   onSignOut?: () => Promise<void>;
+  isAdmin?: boolean;
 }
 
 export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
@@ -65,8 +67,9 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   costsVersion,
   onRename,
   onSignOut,
+  isAdmin = false,
 }) => {
-  const { toasts, dismissToast, error, success } = useToast();
+  const { toasts, dismissToast, error, success, errorWithLogs } = useToast();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
@@ -142,7 +145,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
       }
     } catch (err) {
       log.error({ err }, 'failed to load memory');
-      error('Failed to load memory');
+      errorWithLogs('Failed to load memory');
     } finally {
       setLoadingMemory(false);
     }
@@ -205,7 +208,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
       setAllPrompts(prompts);
     } catch (err) {
       log.error({ err }, 'failed to load prompts');
-      error('Failed to load prompts');
+      errorWithLogs('Failed to load prompts');
     } finally {
       setLoadingPrompts(false);
     }
@@ -399,6 +402,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
       {/* Right side - Actions */}
       <div className="flex items-center gap-2">
         <ShareButton projectId={project.id} projectName={project.name} />
+        {isAdmin && <LogsButton />}
 
         <Button
           variant="soft"
