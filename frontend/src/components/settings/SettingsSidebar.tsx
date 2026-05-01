@@ -4,10 +4,10 @@
  */
 
 import React from 'react';
-import { User, Users, Key, Plug, Gear, Palette, Brain, TextAa } from '@phosphor-icons/react';
+import { User, Users, Key, Plug, Gear, Palette, Brain, TextAa, Bug } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 
-export type SettingsSection = 'profile' | 'team' | 'api-keys' | 'models' | 'prompts' | 'integrations' | 'design' | 'system';
+export type SettingsSection = 'profile' | 'team' | 'api-keys' | 'models' | 'prompts' | 'integrations' | 'design' | 'system' | 'logs';
 
 interface SettingsSidebarProps {
   activeSection: SettingsSection;
@@ -32,6 +32,7 @@ const sidebarItems: SidebarItem[] = [
   { id: 'integrations', label: 'Integrations', icon: <Plug size={18} />, category: 'workspace' },
   { id: 'design', label: 'Design', icon: <Palette size={18} />, category: 'workspace', adminOnly: true },
   { id: 'system', label: 'System', icon: <Gear size={18} />, category: 'workspace', adminOnly: true },
+  { id: 'logs', label: 'Logs', icon: <Bug size={18} />, category: 'workspace', adminOnly: true },
 ];
 
 export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({

@@ -56,7 +56,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onRemoveSendingChat,
   openChatId,
 }) => {
-  const { toasts, dismissToast, success, error } = useToast();
+  const { toasts, dismissToast, success, error, errorWithLogs } = useToast();
 
   // Chat state
   const [message, setMessage] = useState('');
@@ -131,7 +131,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       onActiveChatChange(chat.id, chat.selected_source_ids ?? []);
     } catch (err) {
       log.error({ err }, 'failed to load chat');
-      error('Failed to load chat');
+      errorWithLogs('Failed to load chat');
     }
   };
 
@@ -150,7 +150,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       }
     } catch (err) {
       log.error({ err }, 'failed to load chats');
-      error('Failed to load chats');
+      errorWithLogs('Failed to load chats');
     } finally {
       setLoading(false);
     }
@@ -559,11 +559,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             }
           } catch (fallbackError) {
             log.error({ err: fallbackError }, 'failed to send message via fallback');
-            error('Failed to send message');
+            errorWithLogs('Failed to send message');
           }
         } else {
           log.error({ err }, 'failed to send message');
-          error('Failed to send message');
+          errorWithLogs('Failed to send message');
         }
       }
       setStreamingAssistantContent('');

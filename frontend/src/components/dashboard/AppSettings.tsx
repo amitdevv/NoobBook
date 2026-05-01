@@ -21,6 +21,7 @@ import {
   DesignSection,
   ModelsSection,
   PromptsSection,
+  LogsSection,
 } from '../settings/sections';
 
 interface AppSettingsProps {
@@ -48,7 +49,7 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
 
   // Handle section change with admin check
   const handleSectionChange = (section: SettingsSection) => {
-    const adminOnlySections: SettingsSection[] = ['team', 'api-keys', 'models', 'prompts', 'design', 'system'];
+    const adminOnlySections: SettingsSection[] = ['team', 'api-keys', 'models', 'prompts', 'design', 'system', 'logs'];
     if (!isAdmin && adminOnlySections.includes(section)) {
       return; // Prevent non-admins from switching to admin sections
     }
@@ -104,13 +105,15 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
         return isAdmin ? <DesignSection /> : null;
       case 'system':
         return isAdmin ? <SystemSection /> : null;
+      case 'logs':
+        return isAdmin ? <LogsSection /> : null;
       default:
         return null;
     }
   };
 
   const visibleSections = Array.from(mountedSections).filter((section) => {
-    const adminOnlySections: SettingsSection[] = ['team', 'api-keys', 'models', 'prompts', 'design', 'system'];
+    const adminOnlySections: SettingsSection[] = ['team', 'api-keys', 'models', 'prompts', 'design', 'system', 'logs'];
     return isAdmin || !adminOnlySections.includes(section);
   });
 
