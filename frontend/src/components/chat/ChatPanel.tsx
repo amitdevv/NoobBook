@@ -444,6 +444,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     });
 
     const replaceTempWithCanonicalUser = (canonicalUserMessage: Chat['messages'][number]) => {
+      // Some SSE producers occasionally emit a `user_message` event with a
+      // missing/null payload during reconnects. Bail out instead of poisoning
+      // activeChat.messages with `undefined`, which crashes the renderer
+      // (`Cannot read properties of undefined (reading 'id')`).
+      if (!canonicalUserMessage?.id) return;
       canonicalUserMessageReceivedRef.current = true;
       setActiveChat((prev) => {
         if (!prev) return null;
@@ -459,6 +464,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     };
 
     const appendAssistantMessage = (assistantMessage: Chat['messages'][number]) => {
+      // Same defensive guard as replaceTempWithCanonicalUser. See note there.
+      if (!assistantMessage?.id) {
+        log.warn('appendAssistantMessage called with empty payload — ignoring');
+        setStreamingAssistantContent('');
+        return;
+      }
       // Append the final message first, THEN clear streaming content in the
       // same React batch. This prevents a flash where neither the streaming
       // bubble nor the final message is visible.
@@ -487,9 +498,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       setActiveChat((prev) => {
         if (!prev) return null;
         const messagesWithoutTemp = prev.messages.filter((m) => m.id !== tempUserMessage.id);
+        // Filter out anything missing an `id` so a malformed REST fallback
+        // payload doesn't crash the renderer downstream.
+        const incoming = [result.user_message, result.assistant_message].filter(
+          (m): m is Chat['messages'][number] => Boolean(m?.id),
+        );
         return {
           ...prev,
-          messages: [...messagesWithoutTemp, result.user_message, result.assistant_message],
+          messages: [...messagesWithoutTemp, ...incoming],
           updated_at: new Date().toISOString(),
         };
       });
