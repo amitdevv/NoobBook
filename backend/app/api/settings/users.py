@@ -14,7 +14,10 @@ from flask import jsonify, request, current_app
 
 from app.api.settings import settings_bp
 from app.services.auth.rbac import require_admin, get_request_identity
-from app.services.data_services.user_service import get_user_service
+from app.services.data_services.user_service import (
+    get_user_service,
+    SpendingPersistenceError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -249,7 +252,16 @@ def reset_cost_period(user_id: str):
         return jsonify({"success": False, "error": "User not found"}), 404
     prior_spend = float(target.get("period_spend") or 0.0)
 
-    updated = svc.reset_spending_period(user_id)
+    try:
+        updated = svc.reset_spending_period(user_id)
+    except SpendingPersistenceError as exc:
+        # Persistence failure — Supabase update affected 0 rows. Distinct
+        # from "no limit set" so the admin sees the right error.
+        logger.error("Failed to persist spend reset for %s: %s", user_id, exc)
+        return jsonify({
+            "success": False,
+            "error": "Failed to persist spend reset — try again or check backend logs",
+        }), 500
     if updated is None:
         return jsonify({"success": False, "error": "User has no spending limit to reset"}), 400
 

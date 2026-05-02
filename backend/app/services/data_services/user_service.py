@@ -26,6 +26,15 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+class SpendingPersistenceError(RuntimeError):
+    """Raised when a spending-config write succeeds at the SDK level but
+    Supabase reports zero rows affected (e.g. the user_id was deleted
+    between fetch and update). Distinct from the "user has no cost_limit
+    to reset" case so the route layer can map each to the correct HTTP
+    status — 500 vs 400.
+    """
+
+
 def default_user_settings() -> Dict[str, Any]:
     """
     Build the seed `users.settings` JSONB for newly-created accounts.
@@ -242,10 +251,16 @@ class UserService:
 
         Returns:
             Updated settings dict on success.
-            None if the user has no `cost_limit` set (nothing to reset) or
-            the persistence layer reported the row wasn't updated. The
-            caller surfaces this as a 400. Missing-user is handled at the
-            route layer via a pre-fetch `get_user`.
+            None if the user has no `cost_limit` set (nothing to reset).
+            Caller surfaces this as a 400.
+
+        Raises:
+            SpendingPersistenceError: if the underlying Supabase write
+            reports zero rows affected. Caller surfaces as a 500 — this
+            is a real backend failure, not a "no-op" the admin can
+            interpret as "user already had no limit".
+            Missing-user is handled at the route layer via a pre-fetch
+            `get_user`.
         """
         settings = self.get_user_settings_raw(user_id)
         if not settings.get("cost_limit"):
@@ -255,13 +270,10 @@ class UserService:
         if settings.get("reset_frequency"):
             settings["period_start"] = _now_iso()
 
-        # Propagate the persistence outcome — matches the contract the rest
-        # of this file follows (update_spending_config and friends all
-        # return the boolean from save_user_settings). Without this, a
-        # silent Supabase write failure still echoes "success" + the
-        # mutated in-memory dict back to the admin and into the audit log.
         if not self.save_user_settings(user_id, settings):
-            return None
+            raise SpendingPersistenceError(
+                f"Supabase update affected 0 rows for user {user_id}"
+            )
         return settings
 
     def increment_period_spend(self, user_id: str, amount: float) -> None:
