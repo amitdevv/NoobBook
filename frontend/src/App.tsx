@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { Dashboard, CreateProjectDialog } from './components/dashboard';
 import { ProjectWorkspace } from './components/project';
@@ -12,7 +12,9 @@ import { IntegrationsProvider } from './contexts/IntegrationsContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ShareWorkspace } from './components/share/ShareWorkspace';
 import { GlobalLogsModalGate } from './components/project/GlobalLogsModalGate';
-import { setAdminMode } from './lib/adminMode';
+import { setAdminMode, SESSION_EXPIRED_EVENT } from './lib/adminMode';
+import { useToast } from './components/ui/use-toast';
+import { ToastContainer } from './components/ui/toast';
 
 const log = createLogger('app');
 
@@ -193,6 +195,13 @@ function ProjectWorkspaceRoute({
 }
 
 function App() {
+  const { toasts, dismissToast, error: showError } = useToast();
+  // Defensive dedup for SESSION_EXPIRED_EVENT — `tryRefreshToken` only
+  // fires the event once per refresh window today, but if any other
+  // path ever ends up dispatching it twice (e.g. App-level /auth/me
+  // probe + axios 401 handler racing) we still only show one toast +
+  // run one refreshAuth.
+  const sessionExpiredAtRef = useRef<number>(0);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [authReady, setAuthReady] = useState(false);
@@ -244,6 +253,30 @@ function App() {
   useEffect(() => {
     setAdminMode(isAdmin);
   }, [isAdmin]);
+
+  // Surface a toast and re-run auth when the API client detects a
+  // permanent refresh failure (refresh token rejected by GoTrue).
+  // refreshAuth() makes the next /auth/me fail → isAuthenticated flips
+  // false → AuthPage renders. Without this listener the user would just
+  // see the app suddenly bounce them to sign-in with no explanation.
+  //
+  // Dedup window (3s) suppresses duplicate toasts if anything ever
+  // dispatches the event more than once for the same logout — e.g.
+  // /auth/me race conditions during initial mount.
+  useEffect(() => {
+    const handler = () => {
+      const now = Date.now();
+      if (now - sessionExpiredAtRef.current < 3000) return;
+      sessionExpiredAtRef.current = now;
+      showError('Your session expired. Please sign in again.');
+      refreshAuth();
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, handler);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handler);
+    // refreshAuth and showError are stable from useToast / closure;
+    // re-binding on every render would just churn the listener.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!authReady) {
     return (
@@ -312,6 +345,9 @@ function App() {
               this gate listens for, opening the modal regardless of
               which route the user is on. Renders nothing for non-admins. */}
           <GlobalLogsModalGate isAdmin={isAdmin} />
+          {/* Top-level toasts — used by the SESSION_EXPIRED_EVENT handler
+              so the user gets an explanation before AuthPage renders. */}
+          <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </IntegrationsProvider>
       </PermissionsProvider>
     </ErrorBoundary>

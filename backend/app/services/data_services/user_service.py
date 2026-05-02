@@ -276,6 +276,75 @@ class UserService:
             )
         return settings
 
+    def count_unlimited_users(self) -> int:
+        """Number of users with no `cost_limit` set in their settings.
+
+        Used by the admin Team table to decide whether to surface the
+        "Apply default to unlimited users" banner. Reads `settings` only
+        — cheap.
+        """
+        resp = self.supabase.table(self.table).select("settings").execute()
+        rows = resp.data or []
+        return sum(
+            1 for r in rows
+            if not (r.get("settings") or {}).get("cost_limit")
+        )
+
+    def apply_default_to_unlimited_users(self) -> Dict[str, Any]:
+        """
+        Apply the env-configured default spending limit to every user
+        whose `settings.cost_limit` is currently unset.
+
+        Existing users with a limit (any value) are skipped — the admin
+        explicitly intended their config and we don't want to overwrite
+        it. New users created after this call still pick up the same
+        defaults via the standard creation paths.
+
+        Returns:
+            Dict with `updated`, `skipped`, `default_limit`,
+            `default_frequency`, and `opted_out` (true when the env
+            override sets the limit to 0 / non-positive — in that case
+            no work is done and the caller should surface it).
+        """
+        defaults = default_user_settings()
+        if not defaults.get("cost_limit"):
+            return {
+                "updated": 0,
+                "skipped": 0,
+                "default_limit": None,
+                "default_frequency": None,
+                "opted_out": True,
+            }
+
+        resp = (
+            self.supabase.table(self.table)
+            .select("id, settings")
+            .execute()
+        )
+        rows = resp.data or []
+
+        updated = 0
+        skipped = 0
+        for row in rows:
+            current = row.get("settings") or {}
+            if current.get("cost_limit"):
+                skipped += 1
+                continue
+            # Merge defaults INTO the existing settings so any unrelated
+            # keys (memory hints, future extensions) survive the bulk
+            # update.
+            merged = {**current, **defaults}
+            if self.save_user_settings(row["id"], merged):
+                updated += 1
+
+        return {
+            "updated": updated,
+            "skipped": skipped,
+            "default_limit": defaults.get("cost_limit"),
+            "default_frequency": defaults.get("reset_frequency"),
+            "opted_out": False,
+        }
+
     def increment_period_spend(self, user_id: str, amount: float) -> None:
         """
         Add to the user's period_spend after a successful API call.

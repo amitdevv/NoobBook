@@ -44,6 +44,7 @@ import {
   Infinity as InfinityIcon,
   PencilSimple,
   ArrowCounterClockwise,
+  Info,
 } from '@phosphor-icons/react';
 import {
   Popover,
@@ -342,10 +343,24 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
   const [resettingPassword, setResettingPassword] = useState(false);
   const [editingPermissionsUser, setEditingPermissionsUser] = useState<UserSummary | null>(null);
 
+  // Default-limit banner state. `defaultConfig === null` means we haven't
+  // fetched yet (avoid a flash of the banner on first paint). Once
+  // fetched, the banner only renders when there are unlimited users AND
+  // the operator hasn't opted out via NOOBBOOK_DEFAULT_USER_COST_LIMIT=0.
+  const [defaultConfig, setDefaultConfig] = useState<{
+    default_limit: number | null;
+    default_frequency: ResetFrequency;
+    unlimited_count: number;
+    opted_out: boolean;
+  } | null>(null);
+  const [applyDialogOpen, setApplyDialogOpen] = useState(false);
+  const [applying, setApplying] = useState(false);
+
   const { success, error } = useToast();
 
   useEffect(() => {
     loadUsers();
+    loadDefaultConfig();
   }, []);
 
   const loadUsers = async () => {
@@ -357,6 +372,43 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
       log.error({ err }, 'failed to load users');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDefaultConfig = async () => {
+    try {
+      const cfg = await usersAPI.getDefaultCostLimit();
+      setDefaultConfig(cfg);
+    } catch (err) {
+      // Non-fatal — banner just doesn't appear. Don't toast; failing to
+      // load this is informational, not blocking.
+      log.error({ err }, 'failed to load default cost limit config');
+    }
+  };
+
+  const handleApplyDefault = async () => {
+    setApplying(true);
+    try {
+      const result = await usersAPI.applyDefaultCostLimit();
+      if (result.opted_out) {
+        error(
+          'Default spending limit is opted-out via NOOBBOOK_DEFAULT_USER_COST_LIMIT=0',
+        );
+        return;
+      }
+      success(
+        `Applied $${result.default_limit} / ${result.default_frequency} to ${result.updated} ${result.updated === 1 ? 'user' : 'users'}`,
+      );
+      setApplyDialogOpen(false);
+      // Refresh both the user list (rows now show their new limits) and
+      // the default-config (unlimited_count drops, hiding the banner).
+      await Promise.all([loadUsers(), loadDefaultConfig()]);
+    } catch (err) {
+      log.error({ err }, 'failed to apply default cost limit');
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      error(axiosErr.response?.data?.error || 'Failed to apply default limit');
+    } finally {
+      setApplying(false);
     }
   };
 
@@ -425,6 +477,15 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
     );
   }
 
+  // Banner is shown when:
+  //  • we've loaded the default config
+  //  • the operator hasn't opted out via env (NOOBBOOK_DEFAULT_USER_COST_LIMIT=0)
+  //  • at least one user has no spending limit set
+  const showApplyDefaultBanner =
+    defaultConfig !== null &&
+    !defaultConfig.opted_out &&
+    defaultConfig.unlimited_count > 0;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -439,6 +500,35 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
           Add User
         </Button>
       </div>
+
+      {showApplyDefaultBanner && defaultConfig && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 rounded-md border border-amber-200/80 bg-amber-50/60">
+          <div className="flex items-start gap-2.5 text-sm">
+            <Info size={16} className="text-amber-700 flex-shrink-0 mt-0.5" weight="fill" />
+            <div className="text-stone-700 leading-relaxed">
+              <span className="font-medium text-stone-900">
+                {defaultConfig.unlimited_count}{' '}
+                {defaultConfig.unlimited_count === 1 ? 'user has' : 'users have'} no spending limit set.
+              </span>
+              <span className="block sm:inline text-stone-500 sm:ml-1.5">
+                Apply the default of{' '}
+                <span className="font-medium tabular-nums text-stone-700">
+                  ${defaultConfig.default_limit}
+                </span>{' '}
+                / {defaultConfig.default_frequency} to keep spend tracked across the team.
+              </span>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => setApplyDialogOpen(true)}
+            className="self-start sm:self-auto flex-shrink-0"
+          >
+            Apply default
+          </Button>
+        </div>
+      )}
 
       {users.length === 0 ? (
         <div className="text-center py-8 border rounded-lg bg-muted/20">
@@ -622,6 +712,58 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Apply-default-cost-limit confirm dialog. Defensive guard on
+          defaultConfig (the banner already requires it to be loaded
+          before opening, but a typing-level null check keeps TS happy). */}
+      {defaultConfig && !defaultConfig.opted_out && (
+        <Dialog open={applyDialogOpen} onOpenChange={(o) => !applying && setApplyDialogOpen(o)}>
+          <DialogContent className="sm:max-w-[460px]">
+            <DialogHeader>
+              <DialogTitle>Apply default spending limit</DialogTitle>
+              <DialogDescription className="leading-relaxed">
+                Set{' '}
+                <span className="font-medium text-stone-800 tabular-nums">
+                  ${defaultConfig.default_limit}
+                </span>{' '}
+                / {defaultConfig.default_frequency} as the spending limit for all{' '}
+                <span className="font-medium text-stone-800">
+                  {defaultConfig.unlimited_count}{' '}
+                  {defaultConfig.unlimited_count === 1 ? 'user' : 'users'}
+                </span>{' '}
+                without one. Their period spend starts at $0 and resets{' '}
+                {defaultConfig.default_frequency} from now.
+              </DialogDescription>
+            </DialogHeader>
+            <p className="text-xs text-stone-500 leading-relaxed">
+              Existing users with a limit (any value) are skipped. You can adjust
+              individual limits afterward from the Spend Limit column.
+            </p>
+            <DialogFooter>
+              <Button
+                variant="soft"
+                onClick={() => setApplyDialogOpen(false)}
+                disabled={applying}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleApplyDefault} disabled={applying}>
+                {applying ? (
+                  <>
+                    <CircleNotch size={14} className="animate-spin mr-2" />
+                    Applying…
+                  </>
+                ) : (
+                  <>
+                    Apply to {defaultConfig.unlimited_count}{' '}
+                    {defaultConfig.unlimited_count === 1 ? 'user' : 'users'}
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
