@@ -502,6 +502,31 @@ class UsersAPI {
     }
   }
 
+  /**
+   * Hard-reset a user's running spend tally to $0 without waiting for
+   * the time-based weekly / monthly tick. Returns the prior period_spend
+   * so the UI can show "reset $11.06" in the toast.
+   */
+  async resetCostPeriod(
+    userId: string,
+  ): Promise<{
+    cost_limit: number | null;
+    reset_frequency: ResetFrequency;
+    period_spend: number;
+    period_start: string | null;
+    prior_period_spend: number;
+  }> {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/settings/users/${userId}/cost-limit/reset`,
+      );
+      return response.data;
+    } catch (error) {
+      log.error({ err: error }, 'failed to reset cost period');
+      throw error;
+    }
+  }
+
   async getMyUsage(): Promise<UserUsage | null> {
     try {
       const response = await axios.get(`${API_BASE_URL}/settings/users/me/usage`);

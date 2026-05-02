@@ -8,11 +8,18 @@ Routes:
 - PUT  /settings/users/<user_id>/role
 - POST /settings/users/<user_id>/reset-password
 """
+import logging
+
 from flask import jsonify, request, current_app
 
 from app.api.settings import settings_bp
 from app.services.auth.rbac import require_admin, get_request_identity
-from app.services.data_services.user_service import get_user_service
+from app.services.data_services.user_service import (
+    get_user_service,
+    SpendingPersistenceError,
+)
+
+logger = logging.getLogger(__name__)
 
 
 @settings_bp.route("/settings/users", methods=["GET"])
@@ -219,6 +226,64 @@ def update_cost_limit(user_id: str):
         return jsonify({"success": False, "error": "User not found"}), 404
 
     return jsonify({"success": True, "cost_limit": cost_limit, "reset_frequency": reset_frequency}), 200
+
+
+@settings_bp.route("/settings/users/<user_id>/cost-limit/reset", methods=["POST"])
+@require_admin
+def reset_cost_period(user_id: str):
+    """
+    Hard-reset a user's running spend tally without waiting for the
+    weekly / monthly tick.
+
+    Use case: admin manually approves a one-off overrun, or wants to
+    clear the slate for a user mid-period. For lifetime caps (no
+    reset_frequency), zeroes period_spend only.
+
+    Returns the freshly-updated settings so the frontend can replace
+    the row state in one go (same shape as the cost-limit PUT response,
+    plus the post-reset period_spend / period_start).
+    """
+    svc = get_user_service()
+
+    # Capture the user's email and prior period_spend BEFORE the write so
+    # we can attribute the action in the audit log.
+    target = svc.get_user(user_id)
+    if not target:
+        return jsonify({"success": False, "error": "User not found"}), 404
+    prior_spend = float(target.get("period_spend") or 0.0)
+
+    try:
+        updated = svc.reset_spending_period(user_id)
+    except SpendingPersistenceError as exc:
+        # Persistence failure — Supabase update affected 0 rows. Distinct
+        # from "no limit set" so the admin sees the right error.
+        logger.error("Failed to persist spend reset for %s: %s", user_id, exc)
+        return jsonify({
+            "success": False,
+            "error": "Failed to persist spend reset — try again or check backend logs",
+        }), 500
+    if updated is None:
+        return jsonify({"success": False, "error": "User has no spending limit to reset"}), 400
+
+    # Audit log — lands in the rotating log file, included in the admin
+    # diagnostic bundle (see backend/app/api/logs/). Lets us answer "who
+    # reset whom and when" without a separate audit table.
+    identity = get_request_identity()
+    admin_email = (identity.email or identity.user_id) if identity else "unknown"
+    target_email = target.get("email") or user_id
+    logger.info(
+        "[ADMIN] %s reset cost period for %s (was $%.2f)",
+        admin_email, target_email, prior_spend,
+    )
+
+    return jsonify({
+        "success": True,
+        "cost_limit": updated.get("cost_limit"),
+        "reset_frequency": updated.get("reset_frequency"),
+        "period_spend": updated.get("period_spend", 0.0),
+        "period_start": updated.get("period_start"),
+        "prior_period_spend": prior_spend,
+    }), 200
 
 
 @settings_bp.route("/settings/users/me/usage", methods=["GET"])

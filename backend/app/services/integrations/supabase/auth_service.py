@@ -265,8 +265,19 @@ class AuthService:
         user data like memory and settings.
         """
         try:
+            # Lazy import to avoid the user_service's own import-time Supabase
+            # init when this auth path runs in environments where user_service
+            # hasn't been needed yet.
+            from app.services.data_services.user_service import default_user_settings
+
             self.supabase.table("users").insert(
-                {"id": user_id, "email": email, "role": role, "memory": {}, "settings": {}}
+                {
+                    "id": user_id,
+                    "email": email,
+                    "role": role,
+                    "memory": {},
+                    "settings": default_user_settings(),
+                }
             ).execute()
         except Exception as e:
             logger.warning("Failed to create user profile: %s", e)
