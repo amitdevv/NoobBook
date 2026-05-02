@@ -527,6 +527,51 @@ class UsersAPI {
     }
   }
 
+  /**
+   * Read the env-configured default spending-limit values + how many
+   * existing users have no limit set. Drives the admin Team banner.
+   */
+  async getDefaultCostLimit(): Promise<{
+    default_limit: number | null;
+    default_frequency: ResetFrequency;
+    unlimited_count: number;
+    opted_out: boolean;
+  }> {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/settings/users/default-cost-limit`,
+      );
+      return response.data;
+    } catch (error) {
+      log.error({ err: error }, 'failed to fetch default cost limit');
+      throw error;
+    }
+  }
+
+  /**
+   * Apply the env-configured default spending limit to every user
+   * currently without one. Idempotent — running it twice in a row
+   * just skips everyone. Returns counts so the UI can show
+   * "Applied to N users".
+   */
+  async applyDefaultCostLimit(): Promise<{
+    updated: number;
+    skipped: number;
+    default_limit: number | null;
+    default_frequency: ResetFrequency;
+    opted_out: boolean;
+  }> {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/settings/users/apply-default-cost-limit`,
+      );
+      return response.data;
+    } catch (error) {
+      log.error({ err: error }, 'failed to apply default cost limit');
+      throw error;
+    }
+  }
+
   async getMyUsage(): Promise<UserUsage | null> {
     try {
       const response = await axios.get(`${API_BASE_URL}/settings/users/me/usage`);
