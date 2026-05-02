@@ -9,7 +9,7 @@ operations always use the service_role key.
 """
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from supabase import create_client
@@ -18,6 +18,57 @@ from app.services.integrations.supabase import is_supabase_enabled
 from app.utils.password_utils import generate_secure_password
 
 logger = logging.getLogger(__name__)
+
+
+def _now_iso() -> str:
+    """ISO-8601 UTC with `Z` suffix — matches the convention used elsewhere
+    in this module (see `update_spending_config`)."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def default_user_settings() -> Dict[str, Any]:
+    """
+    Build the seed `users.settings` JSONB for newly-created accounts.
+
+    Driven by env vars so self-hosted operators can override without a
+    code change:
+      - NOOBBOOK_DEFAULT_USER_COST_LIMIT  (default: 25)
+      - NOOBBOOK_DEFAULT_USER_RESET_FREQUENCY  (default: weekly)
+
+    Setting the limit to 0 (or any non-positive number) opts out — new
+    users get an empty settings object and behave as unlimited, matching
+    the pre-feature default.
+    """
+    raw_limit = os.getenv("NOOBBOOK_DEFAULT_USER_COST_LIMIT", "25")
+    raw_freq = os.getenv("NOOBBOOK_DEFAULT_USER_RESET_FREQUENCY", "weekly")
+
+    try:
+        cost_limit = float(raw_limit)
+    except ValueError:
+        logger.warning(
+            "Invalid NOOBBOOK_DEFAULT_USER_COST_LIMIT=%r; falling back to 25", raw_limit
+        )
+        cost_limit = 25.0
+
+    if cost_limit <= 0:
+        return {}
+
+    if raw_freq not in ("daily", "weekly", "monthly", "none"):
+        logger.warning(
+            "Invalid NOOBBOOK_DEFAULT_USER_RESET_FREQUENCY=%r; falling back to weekly",
+            raw_freq,
+        )
+        raw_freq = "weekly"
+
+    if raw_freq == "none":
+        return {"cost_limit": cost_limit, "period_spend": 0.0}
+
+    return {
+        "cost_limit": cost_limit,
+        "reset_frequency": raw_freq,
+        "period_spend": 0.0,
+        "period_start": _now_iso(),
+    }
 
 
 class UserService:
@@ -180,6 +231,33 @@ class UserService:
 
         return self.save_user_settings(user_id, settings)
 
+    def reset_spending_period(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Hard-reset a user's period_spend to 0 and bump period_start to now.
+
+        Used by the admin "Reset spend now" button — lets an operator clear
+        a user's running tally without waiting for the time-based weekly /
+        monthly tick. For lifetime caps (no `reset_frequency`), zeroes
+        period_spend only and leaves period_start untouched.
+
+        Returns:
+            Updated settings dict on success.
+            None if the user doesn't exist or has no `cost_limit` set
+            (nothing to reset). The caller surfaces this as a 400 / 404.
+        """
+        settings = self.get_user_settings_raw(user_id)
+        if settings is None:
+            return None
+        if not settings.get("cost_limit"):
+            return None
+
+        settings["period_spend"] = 0.0
+        if settings.get("reset_frequency"):
+            settings["period_start"] = _now_iso()
+
+        self.save_user_settings(user_id, settings)
+        return settings
+
     def increment_period_spend(self, user_id: str, amount: float) -> None:
         """
         Add to the user's period_spend after a successful API call.
@@ -324,13 +402,15 @@ class UserService:
         if not user_id:
             raise ValueError("Failed to create user in auth system")
 
-        # Create profile in public.users
+        # Create profile in public.users with the env-driven default
+        # spending limit ($25/week unless an operator overrides via
+        # NOOBBOOK_DEFAULT_USER_COST_LIMIT / RESET_FREQUENCY).
         self.supabase.table(self.table).insert({
             "id": user_id,
             "email": email,
             "role": role,
             "memory": {},
-            "settings": {}
+            "settings": default_user_settings()
         }).execute()
 
         user = self.get_user(user_id)
