@@ -164,25 +164,31 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    // `modal={false}` is the load-bearing fix for BlockNote's slash menu,
+    // formatting toolbar, and link editor inside this dialog. BlockNote
+    // renders those popups into a separate floating-ui portal at
+    // document.body. With Radix's default `modal=true`, the dialog wraps
+    // its tree in a FocusScope that intercepts focus moves OUT of the
+    // tree and yanks focus back — which kicks in the moment the user
+    // mouses-down on a menu item, breaking the editor's selection
+    // tracker before BlockNote's onItemClick can replace the `/<query>`
+    // range. The earlier attempts (onPointerDownOutside +
+    // onInteractOutside + onFocusOutside preventDefault) didn't disable
+    // the FocusScope itself, only its event-driven side-effects, so the
+    // bug persisted. Setting modal={false} skips FocusScope entirely.
+    //
+    // Trade-offs accepted:
+    //   • Tab can move focus to elements behind the dialog. For an
+    //     authoring surface with a clear close X + Esc, this is fine.
+    //   • Screen readers don't get "modal" semantics. Acceptable since
+    //     the dialog is full-screen-y and the only meaningful element
+    //     behind it is the dashboard-level layout chrome.
+    <Dialog open={open} onOpenChange={handleOpenChange} modal={false}>
       <DialogContent
         onKeyDown={handleKeyDown}
-        // BlockNote's slash menu, formatting toolbar, and link editor
-        // render into a separate floating-ui portal at document.body.
-        // Three Radix-side guards needed for click-from-menu to work:
-        //   • onPointerDownOutside — stops Radix from auto-closing on
-        //     mouse-down outside the trapped tree.
-        //   • onInteractOutside — same for the higher-level interaction
-        //     event Radix dispatches.
-        //   • onFocusOutside — stops Radix's FocusScope from yanking
-        //     focus back inside the dialog when the user clicks a menu
-        //     item (briefly moving focus to the portaled button). This
-        //     was the missing piece — without it, focus snapped back
-        //     before BlockNote could process the click, and the
-        //     `/<query>` text leaked into the document.
-        // Side benefit: typing into the editor and then bumping the
-        // trackpad no longer dismisses the dialog. Esc + close X still
-        // close.
+        // Belt-and-suspenders: even with modal={false}, keep the outside
+        // handlers preventDefaulted so a casual click on the dimmed
+        // background doesn't dismiss the draft mid-edit.
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
         onFocusOutside={(e) => e.preventDefault()}
