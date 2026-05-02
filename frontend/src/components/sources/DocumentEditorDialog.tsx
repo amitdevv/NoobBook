@@ -167,6 +167,16 @@ export const DocumentEditorDialog: React.FC<DocumentEditorDialogProps> = ({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         onKeyDown={handleKeyDown}
+        // BlockNote's slash menu, formatting toolbar, and link editor
+        // render into a separate floating-ui portal at document.body.
+        // Without these handlers, Radix's modal focus trap treats clicks
+        // on those popups as "outside" → fires onPointerDownOutside →
+        // resets focus before BlockNote's onItemClick can replace the
+        // `/<query>` range. Side benefit: typing into the editor and
+        // then bumping the trackpad no longer dismisses the dialog and
+        // loses an in-progress draft. Esc + the close X still close.
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
         className="max-w-[1040px] w-[92vw] h-[88vh] p-0 gap-0 border-stone-200 rounded-2xl overflow-hidden bg-stone-50 [&>button[type=button]]:z-30 [&>button[type=button]]:opacity-50 [&>button[type=button]:hover]:opacity-100"
       >
         <DialogTitle className="sr-only">
