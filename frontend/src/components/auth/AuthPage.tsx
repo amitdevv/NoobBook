@@ -1,21 +1,39 @@
 /**
  * AuthPage — sign in / sign up.
  *
- * Editorial-minimal aesthetic, paired with the rest of the app's voice
- * (`DocumentEditorDialog`, the project header's serif italics). The
- * intent is for the auth surface to feel like the *first page of the
- * book* rather than a generic shadcn card — single column, generous
- * negative space, one warm radial wash, two inputs, one button. The
- * Admin/User portal toggle from the previous version was purely
- * cosmetic (the role is server-assigned from `NOOBBOOK_ADMIN_EMAILS`
- * regardless of which button you pressed) and has been removed.
+ * Built on the shadcn `login-03` Card pattern (`npx shadcn add login-03`)
+ * but folded into NoobBook's existing voice rather than rendered with the
+ * generated component. The design metaphor is the inside front cover of
+ * a notebook: warm cream wash, serif-italic title, mono small-caps
+ * subtitle, a white card hosting the form, generous negative space.
+ *
+ * The shadcn template's Apple/Google OAuth buttons are dropped — the
+ * NoobBook backend (`backend/app/api/auth/routes.py:41-77`) only accepts
+ * email/password, and surfacing OAuth where no real flow exists would be
+ * confusing. The "Forgot password" link is dropped for the same reason
+ * (admins reset passwords from the Team table). The terms-of-service
+ * footer is dropped — no such page exists.
+ *
+ * Functional behaviour (auth, share-link redirect, password show/hide,
+ * toast errors) matches the previous AuthPage version one-for-one.
  */
 import React, { useState } from 'react';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '../ui/card';
 import { useToast } from '../ui/use-toast';
 import { ToastContainer } from '../ui/toast';
 import { authAPI } from '@/lib/api/auth';
 import { createLogger } from '@/lib/logger';
-import { Eye, EyeSlash, CircleNotch } from '@phosphor-icons/react';
+import {
+  CircleNotch,
+  Eye,
+  EyeSlash,
+  Ghost,
+} from '@phosphor-icons/react';
 
 const log = createLogger('auth-page');
 
@@ -97,99 +115,120 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
       : 'Create account';
 
   return (
-    <div className="min-h-screen bg-stone-50 flex items-center justify-center px-6 relative overflow-hidden">
-      {/* Atmosphere — single warm radial wash, same vocabulary as
-          DocumentEditorDialog. No grain overlay here; the page is meant
-          to feel airy, not literary. */}
+    <div className="min-h-screen bg-stone-50 flex items-center justify-center px-6 py-10 relative overflow-hidden">
+      {/* Atmosphere — warm radial wash from the top-right corner, same
+          vocabulary as DocumentEditorDialog. Establishes "this is the
+          NoobBook surface" before the user reads a single word. */}
       <div
         aria-hidden
-        className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top_right,rgba(254,243,199,0.5),transparent_55%)]"
+        className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top_right,rgba(254,243,199,0.55),transparent_55%)]"
+      />
+      {/* Faint diagonal hairline — paper-stationery cue, sub-perceptual
+          but adds depth. Stops the cream from looking like flat CSS. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none opacity-[0.025]"
+        style={{
+          backgroundImage:
+            'repeating-linear-gradient(135deg, rgba(120, 53, 15, 0.4) 0px, rgba(120, 53, 15, 0.4) 1px, transparent 1px, transparent 8px)',
+        }}
       />
 
-      <div className="relative w-full max-w-[380px]">
-        {/* Brand header — serif-italic display, thin amber rule, small-caps
-            mono subtitle. Same type system as the project header and the
-            document editor's "Untitled note" treatment. */}
-        <header className="mb-10">
-          <h1 className="font-serif italic text-[44px] leading-none text-stone-900 select-none">
+      <div className="relative w-full max-w-[400px] auth-fade-in">
+        {/* Brand header — sits OUTSIDE the card so the identity moment is
+            distinct from the form moment. Ghost icon nods to the favicon
+            convention; serif italic title matches the
+            DocumentEditorDialog "Untitled note" treatment. */}
+        <header className="mb-7 flex flex-col items-center text-center select-none">
+          <Ghost
+            size={28}
+            weight="duotone"
+            className="text-amber-600 mb-3"
+          />
+          <h1 className="font-serif italic text-[42px] leading-none text-stone-900 tracking-tight">
             NoobBook
           </h1>
-          <div className="mt-3 h-px w-10 bg-amber-600" />
-          <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.22em] text-stone-400">
-            {mode === 'signin' ? 'Sign in' : 'Create account'}
-          </p>
+          <div className="mt-3 h-px w-10 bg-amber-600/80" />
         </header>
 
-        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-          {/* Bottom-rule inputs — no boxes, no card. The page itself is
-              the chrome. Focus state thickens the rule and darkens to
-              stone-900 (matches the body text colour). */}
-          <div>
-            <label
-              htmlFor="auth-email"
-              className="block font-mono text-[10px] uppercase tracking-[0.18em] text-stone-400 mb-2"
-            >
-              Email
-            </label>
-            <input
-              id="auth-email"
-              type="email"
-              autoComplete="email"
-              autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={submitting}
-              placeholder="you@example.com"
-              className="w-full bg-transparent border-0 border-b border-stone-300 px-0 py-2.5 text-base text-stone-900 placeholder:text-stone-300 focus:outline-none focus:border-stone-900 transition-colors"
-            />
-          </div>
+        <Card className="border-amber-100/70 shadow-[0_2px_24px_-8px_rgba(120,53,15,0.12)] bg-white/95 backdrop-blur-sm">
+          <CardHeader className="pb-2 pt-6 text-center">
+            <CardTitle className="font-mono text-[10px] uppercase tracking-[0.22em] text-stone-400 font-normal">
+              {mode === 'signin' ? 'Sign in' : 'Create account'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-7 pb-7 pt-2">
+            <form onSubmit={handleSubmit} className="grid gap-5" noValidate>
+              <div className="grid gap-2">
+                <label
+                  htmlFor="auth-email"
+                  className="text-[12px] font-medium text-stone-700"
+                >
+                  Email
+                </label>
+                <input
+                  id="auth-email"
+                  type="email"
+                  autoComplete="email"
+                  autoFocus
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={submitting}
+                  placeholder="you@example.com"
+                  className="h-10 w-full rounded-md border border-stone-200 bg-stone-50/40 px-3 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200/60 focus:bg-white transition-colors disabled:opacity-60"
+                />
+              </div>
 
-          <div>
-            <label
-              htmlFor="auth-password"
-              className="block font-mono text-[10px] uppercase tracking-[0.18em] text-stone-400 mb-2"
-            >
-              Password
-            </label>
-            <div className="relative">
-              <input
-                id="auth-password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={submitting}
-                placeholder={mode === 'signin' ? '••••••••' : 'Choose a password'}
-                className="w-full bg-transparent border-0 border-b border-stone-300 px-0 py-2.5 pr-9 text-base text-stone-900 placeholder:text-stone-300 focus:outline-none focus:border-stone-900 transition-colors"
-              />
+              <div className="grid gap-2">
+                <label
+                  htmlFor="auth-password"
+                  className="text-[12px] font-medium text-stone-700"
+                >
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="auth-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete={
+                      mode === 'signin' ? 'current-password' : 'new-password'
+                    }
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={submitting}
+                    placeholder={mode === 'signin' ? '••••••••' : 'Choose a password'}
+                    className="h-10 w-full rounded-md border border-stone-200 bg-stone-50/40 px-3 pr-10 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-200/60 focus:bg-white transition-colors disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    tabIndex={-1}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeSlash size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
               <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                tabIndex={-1}
-                className="absolute right-0 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 transition-colors p-1"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                type="submit"
+                disabled={submitting}
+                className="w-full mt-1 inline-flex items-center justify-center gap-2 h-11 rounded-md bg-amber-600 text-white text-sm font-medium tracking-wide shadow-[0_1px_0_rgba(0,0,0,0.06),0_2px_8px_-2px_rgba(217,119,6,0.4)] hover:bg-amber-700 hover:shadow-[0_1px_0_rgba(0,0,0,0.06),0_4px_12px_-2px_rgba(217,119,6,0.5)] active:bg-amber-700 active:shadow-[0_1px_0_rgba(0,0,0,0.06)] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
               >
-                {showPassword ? <EyeSlash size={16} /> : <Eye size={16} />}
+                {submitting && (
+                  <CircleNotch size={14} className="animate-spin" />
+                )}
+                {submitLabel}
               </button>
-            </div>
-          </div>
+            </form>
+          </CardContent>
+        </Card>
 
-          {/* Primary action — full-width, amber-600. The only "card-like"
-              element on the page; everything else dissolves into the
-              wash. */}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full mt-2 inline-flex items-center justify-center gap-2 h-11 rounded-md bg-amber-600 text-white text-sm font-medium tracking-wide hover:bg-amber-700 active:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-[0_1px_0_rgba(0,0,0,0.08)]"
-          >
-            {submitting && <CircleNotch size={14} className="animate-spin" />}
-            {submitLabel}
-          </button>
-        </form>
-
-        {/* Mode switch — text link, not a tab. Amber underline reads as
-            a continuation of the brand rule above the title. */}
-        <p className="mt-6 text-sm text-stone-500">
+        {/* Mode toggle — text link, amber underline as a continuation of
+            the rule under the brand title. Sits below the card so it
+            reads as supporting metadata rather than a primary action. */}
+        <p className="mt-6 text-center text-sm text-stone-500">
           {mode === 'signin' ? 'New here? ' : 'Already have an account? '}
           <button
             type="button"
@@ -204,12 +243,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
           </button>
         </p>
 
-        {/* Admin-emails footer — replaces the old Admin/User portal
-            toggle. Admins use the same form; the role is granted
-            server-side from NOOBBOOK_ADMIN_EMAILS, so there's nothing
-            for the user to choose. Surfacing the env var name makes
-            this discoverable for the operator who configured it. */}
-        <p className="mt-14 text-[11px] text-stone-400 leading-relaxed">
+        {/* Admin-emails footer — replaces login-03's terms-of-service
+            footer. NoobBook's role assignment is deterministic from
+            an env var; surfacing the var name makes the convention
+            discoverable for the operator who set it up. */}
+        <p className="mt-12 text-center text-[11px] text-stone-400 leading-relaxed max-w-[340px] mx-auto">
           Administrator privileges are granted automatically to emails
           listed in{' '}
           <code className="font-mono text-stone-500 bg-stone-100 px-1 py-0.5 rounded">
@@ -220,6 +258,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthenticated }) => {
       </div>
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      <style>{`
+        @keyframes auth-fade-in {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .auth-fade-in {
+          animation: auth-fade-in 360ms cubic-bezier(0.2, 0.65, 0.3, 1) both;
+        }
+      `}</style>
     </div>
   );
 };
