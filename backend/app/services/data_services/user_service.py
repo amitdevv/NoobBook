@@ -242,12 +242,12 @@ class UserService:
 
         Returns:
             Updated settings dict on success.
-            None if the user doesn't exist or has no `cost_limit` set
-            (nothing to reset). The caller surfaces this as a 400 / 404.
+            None if the user has no `cost_limit` set (nothing to reset) or
+            the persistence layer reported the row wasn't updated. The
+            caller surfaces this as a 400. Missing-user is handled at the
+            route layer via a pre-fetch `get_user`.
         """
         settings = self.get_user_settings_raw(user_id)
-        if settings is None:
-            return None
         if not settings.get("cost_limit"):
             return None
 
@@ -255,7 +255,13 @@ class UserService:
         if settings.get("reset_frequency"):
             settings["period_start"] = _now_iso()
 
-        self.save_user_settings(user_id, settings)
+        # Propagate the persistence outcome — matches the contract the rest
+        # of this file follows (update_spending_config and friends all
+        # return the boolean from save_user_settings). Without this, a
+        # silent Supabase write failure still echoes "success" + the
+        # mutated in-memory dict back to the admin and into the audit log.
+        if not self.save_user_settings(user_id, settings):
+            return None
         return settings
 
     def increment_period_spend(self, user_id: str, amount: float) -> None:

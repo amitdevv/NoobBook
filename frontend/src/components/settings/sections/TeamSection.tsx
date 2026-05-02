@@ -3,7 +3,7 @@
  * Full team management: list users, create, delete, reset password, change roles.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -85,14 +85,32 @@ const SpendLimitCell: React.FC<{
   const [saving, setSaving] = useState(false);
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [resetting, setResetting] = useState(false);
+  // Track the arming-window timer so we can cancel it on close / re-arm.
+  // Without this, a stale 4s timer from a previous open could fire mid-way
+  // through a fresh confirmation window and silently disarm the button.
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { success: showSuccess, error: showError } = useToast();
 
+  const cancelResetTimer = () => {
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = null;
+    }
+  };
+
+  // Cancel any pending arming-window timer when this row unmounts so it
+  // doesn't fire against a torn-down state setter.
+  useEffect(() => () => cancelResetTimer(), []);
+
   // Sync draft when popover opens. Also clear the reset confirm-state so a
-  // half-armed confirmation from a previous open doesn't carry over.
+  // half-armed confirmation from a previous open doesn't carry over, and
+  // cancel any in-flight arming timer on close.
   const handleOpen = (isOpen: boolean) => {
     if (isOpen) {
       setDraftLimit(value != null ? String(value) : '');
       setDraftFreq(resetFrequency || 'none');
+    } else {
+      cancelResetTimer();
     }
     setConfirmingReset(false);
     setOpen(isOpen);
@@ -130,10 +148,15 @@ const SpendLimitCell: React.FC<{
   // doesn't return to a primed nuke button.
   const handleReset = async () => {
     if (!confirmingReset) {
+      cancelResetTimer();
       setConfirmingReset(true);
-      setTimeout(() => setConfirmingReset(false), 4000);
+      resetTimerRef.current = setTimeout(() => {
+        setConfirmingReset(false);
+        resetTimerRef.current = null;
+      }, 4000);
       return;
     }
+    cancelResetTimer();
     setConfirmingReset(false);
     setResetting(true);
     try {
