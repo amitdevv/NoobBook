@@ -286,6 +286,87 @@ def reset_cost_period(user_id: str):
     }), 200
 
 
+@settings_bp.route("/settings/users/default-cost-limit", methods=["GET"])
+@require_admin
+def get_default_cost_limit():
+    """
+    Return the env-configured default spending limit + the count of
+    users who currently have no limit set. Drives the "Apply default
+    to N unlimited users" banner in the admin Team table.
+
+    Returns:
+        {
+          "default_limit": 25.0 | null,        // null when opted-out
+          "default_frequency": "weekly" | null,
+          "unlimited_count": 8,                // pre-existing users w/o limit
+          "opted_out": false
+        }
+    """
+    from app.services.data_services.user_service import default_user_settings
+
+    defaults = default_user_settings()
+    cost_limit = defaults.get("cost_limit")
+
+    svc = get_user_service()
+    unlimited_count = svc.count_unlimited_users()
+
+    return jsonify({
+        "success": True,
+        "default_limit": cost_limit,
+        "default_frequency": defaults.get("reset_frequency"),
+        "unlimited_count": unlimited_count,
+        "opted_out": not cost_limit,
+    }), 200
+
+
+@settings_bp.route("/settings/users/apply-default-cost-limit", methods=["POST"])
+@require_admin
+def apply_default_cost_limit():
+    """
+    Apply the env-configured default spending limit to every user that
+    currently has no `cost_limit` set. Existing users with a limit are
+    skipped — admin intent is preserved.
+
+    Behavior:
+      - Reads NOOBBOOK_DEFAULT_USER_COST_LIMIT / RESET_FREQUENCY at call
+        time so an operator can flip the env and have the next bulk-apply
+        pick it up without a redeploy.
+      - Idempotent: running twice in a row just skips everyone the second
+        time (their limit is already set).
+      - Audit-logged so the diagnostic bundle records who triggered the
+        bulk action and how many rows were touched.
+    """
+    svc = get_user_service()
+    result = svc.apply_default_to_unlimited_users()
+
+    if result.get("opted_out"):
+        # Operator has set NOOBBOOK_DEFAULT_USER_COST_LIMIT=0 explicitly.
+        # Don't silently no-op — surface the misconfiguration.
+        return jsonify({
+            "success": False,
+            "error": (
+                "Default spending limit is opted-out via "
+                "NOOBBOOK_DEFAULT_USER_COST_LIMIT=0. Set a positive value "
+                "in the backend environment to enable this action."
+            ),
+            **result,
+        }), 400
+
+    identity = get_request_identity()
+    admin_email = (identity.email or identity.user_id) if identity else "unknown"
+    logger.info(
+        "[ADMIN] %s applied default spending limit to %d user(s) "
+        "(skipped %d, limit=$%s, frequency=%s)",
+        admin_email,
+        result["updated"],
+        result["skipped"],
+        result["default_limit"],
+        result["default_frequency"],
+    )
+
+    return jsonify({"success": True, **result}), 200
+
+
 @settings_bp.route("/settings/users/me/usage", methods=["GET"])
 def get_my_usage():
     """
