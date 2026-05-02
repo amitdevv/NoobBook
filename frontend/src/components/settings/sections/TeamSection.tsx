@@ -3,7 +3,7 @@
  * Full team management: list users, create, delete, reset password, change roles.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -43,6 +43,7 @@ import {
   Sliders,
   Infinity as InfinityIcon,
   PencilSimple,
+  ArrowCounterClockwise,
 } from '@phosphor-icons/react';
 import {
   Popover,
@@ -82,14 +83,36 @@ const SpendLimitCell: React.FC<{
   const [draftLimit, setDraftLimit] = useState('');
   const [draftFreq, setDraftFreq] = useState<string>('none');
   const [saving, setSaving] = useState(false);
+  const [confirmingReset, setConfirmingReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  // Track the arming-window timer so we can cancel it on close / re-arm.
+  // Without this, a stale 4s timer from a previous open could fire mid-way
+  // through a fresh confirmation window and silently disarm the button.
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { success: showSuccess, error: showError } = useToast();
 
-  // Sync draft when popover opens
+  const cancelResetTimer = () => {
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = null;
+    }
+  };
+
+  // Cancel any pending arming-window timer when this row unmounts so it
+  // doesn't fire against a torn-down state setter.
+  useEffect(() => () => cancelResetTimer(), []);
+
+  // Sync draft when popover opens. Also clear the reset confirm-state so a
+  // half-armed confirmation from a previous open doesn't carry over, and
+  // cancel any in-flight arming timer on close.
   const handleOpen = (isOpen: boolean) => {
     if (isOpen) {
       setDraftLimit(value != null ? String(value) : '');
       setDraftFreq(resetFrequency || 'none');
+    } else {
+      cancelResetTimer();
     }
+    setConfirmingReset(false);
     setOpen(isOpen);
   };
 
@@ -115,6 +138,40 @@ const SpendLimitCell: React.FC<{
       showError('Failed to update');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Two-click confirm pattern (matches the LogsModal "Clear logs" flow):
+  // first click flips the button into a destructive armed state; a second
+  // click within 4s fires the API. After 4s without a follow-up click the
+  // button reverts to its neutral state, so an admin who walks away
+  // doesn't return to a primed nuke button.
+  const handleReset = async () => {
+    if (!confirmingReset) {
+      cancelResetTimer();
+      setConfirmingReset(true);
+      resetTimerRef.current = setTimeout(() => {
+        setConfirmingReset(false);
+        resetTimerRef.current = null;
+      }, 4000);
+      return;
+    }
+    cancelResetTimer();
+    setConfirmingReset(false);
+    setResetting(true);
+    try {
+      const result = await usersAPI.resetCostPeriod(userId);
+      onSaved(userId, {
+        cost_limit: result.cost_limit,
+        reset_frequency: result.reset_frequency,
+        period_spend: result.period_spend,
+      });
+      showSuccess(`Reset $${result.prior_period_spend.toFixed(2)} spend to $0`);
+      setOpen(false);
+    } catch {
+      showError('Failed to reset spend');
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -229,6 +286,39 @@ const SpendLimitCell: React.FC<{
             Save
           </Button>
         </div>
+
+        {/* Hard-reset row — separated by a divider so it reads as a
+            distinct destructive action, not a sibling of "Save". Only
+            shown when the user actually has accumulated spend; if
+            period_spend is already $0 there's nothing to reset. */}
+        {periodSpend > 0 && (
+          <div className="pt-3 border-t border-stone-100 space-y-2">
+            <p className="text-[11px] text-stone-500">
+              Current period: <span className="tabular-nums text-stone-700 font-medium">${periodSpend.toFixed(2)}</span> spent
+            </p>
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={resetting}
+              className={cn(
+                'w-full h-7 inline-flex items-center justify-center gap-1.5 rounded-md text-xs font-medium transition-colors',
+                confirmingReset
+                  ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100'
+                  : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900',
+                resetting && 'opacity-60 cursor-not-allowed',
+              )}
+            >
+              {resetting ? (
+                <CircleNotch size={12} className="animate-spin" />
+              ) : (
+                <ArrowCounterClockwise size={12} />
+              )}
+              {confirmingReset
+                ? `Click again to confirm — resets $${periodSpend.toFixed(2)}`
+                : 'Reset spend now'}
+            </button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );
