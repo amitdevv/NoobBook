@@ -27,7 +27,12 @@ export function getAdminMode(): boolean {
  * here so producers and consumers can't drift on the string.
  */
 export const LOGS_OPEN_EVENT = 'noobbook:open-logs';
+export const SESSION_EXPIRED_EVENT = 'noobbook:session-expired';
 
 export function openLogsModal(): void {
   window.dispatchEvent(new CustomEvent(LOGS_OPEN_EVENT));
+}
+
+export function notifySessionExpired(): void {
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
 }

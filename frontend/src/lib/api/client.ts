@@ -8,6 +8,7 @@
 import axios, { AxiosError } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
 import { getAccessToken, getRefreshToken, setSession, clearSession } from '../auth/session';
+import { notifySessionExpired } from '@/lib/adminMode';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('api-client');
@@ -53,17 +54,27 @@ api.interceptors.request.use(
 axios.interceptors.request.use(attachAuthHeader);
 
 // ---------- Auto-refresh on 401 ----------
-// Educational Note: When the JWT expires (default ~1 hour), API calls return 401.
-// Instead of forcing re-login, we intercept the 401, use the stored refresh_token
-// to get a new token pair, then transparently retry the original request.
-// A shared `refreshPromise` ensures concurrent 401s trigger only one refresh call;
-// all queued requests wait on the same promise.
+// When the access token expires, API calls return 401. We intercept the 401,
+// use the stored refresh_token to get a new token pair, then transparently
+// retry the original request. A shared `refreshPromise` ensures concurrent
+// 401s trigger only one refresh call.
+//
+// Failure modes are NOT all equivalent:
+//   - permanent: refresh token is genuinely invalid (401/403 from /auth/refresh
+//     or 200-with-malformed-body) → clear session, surface a toast, send the
+//     user back to the auth page.
+//   - transient: network blip, GoTrue restart, 5xx, browser-offline → keep
+//     the session intact and let the next API call try again. Logging the
+//     user out for a 30-second connectivity hiccup was the original cause
+//     of the "frequent logouts" reports.
 
-let refreshPromise: Promise<boolean> | null = null;
+type RefreshOutcome = 'success' | 'transient' | 'permanent';
 
-async function tryRefreshToken(): Promise<boolean> {
+let refreshPromise: Promise<RefreshOutcome> | null = null;
+
+async function tryRefreshToken(): Promise<RefreshOutcome> {
   const refreshToken = getRefreshToken();
-  if (!refreshToken) return false;
+  if (!refreshToken) return 'permanent';
 
   try {
     const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {
@@ -71,14 +82,23 @@ async function tryRefreshToken(): Promise<boolean> {
     });
     if (data?.success && data.session?.access_token) {
       setSession(data.session.access_token, data.session.refresh_token);
-      return true;
+      return 'success';
     }
+    // 200 OK but no usable session in the body — treat as permanent. The
+    // server told us refresh "worked" but didn't hand back a token, and
+    // retrying will produce the same shape.
+    log.error({ data }, 'refresh returned malformed body');
+    return 'permanent';
   } catch (err) {
-    log.error({ err }, 'token refresh failed');
+    const status = (err as AxiosError).response?.status;
+    if (status === 401 || status === 403) {
+      log.warn({ status }, 'refresh token rejected — session expired');
+      return 'permanent';
+    }
+    // Network error, timeout, 5xx, 408, 502, 504 — keep session intact.
+    log.warn({ err, status }, 'transient refresh failure — keeping session');
+    return 'transient';
   }
-
-  clearSession();
-  return false;
 }
 
 // Shared 401 error handler used by both the `api` instance and global `axios` interceptors.
@@ -97,14 +117,23 @@ async function handle401Error(error: AxiosError, retryWith: typeof api | typeof 
       refreshPromise = tryRefreshToken().finally(() => { refreshPromise = null; });
     }
 
-    const refreshed = await refreshPromise;
-    if (refreshed) {
+    const outcome = await refreshPromise;
+    if (outcome === 'success') {
       originalRequest._retried = true;
       // Update the header with the fresh token and retry
       originalRequest.headers = originalRequest.headers || {};
       originalRequest.headers.Authorization = `Bearer ${getAccessToken()}`;
       return retryWith(originalRequest);
     }
+    if (outcome === 'permanent') {
+      // Real auth failure — drop the session and tell the user. The auth
+      // gate in App.tsx then routes to AuthPage on next render.
+      clearSession();
+      notifySessionExpired();
+    }
+    // 'transient' falls through: keep the session, let the original
+    // request reject with its own error so the caller's UI shows the
+    // normal API-error toast (not a "you're logged out" experience).
   }
 
   log.error({ status, data: error.response?.data }, 'API response error');
