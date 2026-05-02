@@ -74,7 +74,12 @@ let refreshPromise: Promise<RefreshOutcome> | null = null;
 
 async function tryRefreshToken(): Promise<RefreshOutcome> {
   const refreshToken = getRefreshToken();
-  if (!refreshToken) return 'permanent';
+  if (!refreshToken) {
+    // No refresh token = permanent. Fire the side effects here too so
+    // first-load callers get the same behavior as mid-session expiry.
+    handlePermanentFailure();
+    return 'permanent';
+  }
 
   try {
     const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {
@@ -88,17 +93,33 @@ async function tryRefreshToken(): Promise<RefreshOutcome> {
     // server told us refresh "worked" but didn't hand back a token, and
     // retrying will produce the same shape.
     log.error({ data }, 'refresh returned malformed body');
+    handlePermanentFailure();
     return 'permanent';
   } catch (err) {
     const status = (err as AxiosError).response?.status;
     if (status === 401 || status === 403) {
       log.warn({ status }, 'refresh token rejected — session expired');
+      handlePermanentFailure();
       return 'permanent';
     }
     // Network error, timeout, 5xx, 408, 502, 504 — keep session intact.
     log.warn({ err, status }, 'transient refresh failure — keeping session');
     return 'transient';
   }
+}
+
+/**
+ * Fire session-cleanup side-effects exactly once per refresh-failure
+ * window. Lives inside `tryRefreshToken` so concurrent 401s sharing the
+ * same `refreshPromise` only emit one `noobbook:session-expired` event
+ * and one `clearSession()` call between them — without this, 5 parallel
+ * requests against an expired refresh token would surface 5 duplicate
+ * "session expired" toasts and trigger 5 simultaneous `refreshAuth()`
+ * calls.
+ */
+function handlePermanentFailure(): void {
+  clearSession();
+  notifySessionExpired();
 }
 
 // Shared 401 error handler used by both the `api` instance and global `axios` interceptors.
@@ -125,13 +146,11 @@ async function handle401Error(error: AxiosError, retryWith: typeof api | typeof 
       originalRequest.headers.Authorization = `Bearer ${getAccessToken()}`;
       return retryWith(originalRequest);
     }
-    if (outcome === 'permanent') {
-      // Real auth failure — drop the session and tell the user. The auth
-      // gate in App.tsx then routes to AuthPage on next render.
-      clearSession();
-      notifySessionExpired();
-    }
-    // 'transient' falls through: keep the session, let the original
+    // outcome === 'permanent' — session-cleanup side effects already
+    // fired inside `tryRefreshToken` exactly once for this dedup window.
+    // The auth gate in App.tsx routes to AuthPage on next render.
+    //
+    // outcome === 'transient' — keep the session, let the original
     // request reject with its own error so the caller's UI shows the
     // normal API-error toast (not a "you're logged out" experience).
   }

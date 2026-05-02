@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { Dashboard, CreateProjectDialog } from './components/dashboard';
 import { ProjectWorkspace } from './components/project';
@@ -196,6 +196,12 @@ function ProjectWorkspaceRoute({
 
 function App() {
   const { toasts, dismissToast, error: showError } = useToast();
+  // Defensive dedup for SESSION_EXPIRED_EVENT — `tryRefreshToken` only
+  // fires the event once per refresh window today, but if any other
+  // path ever ends up dispatching it twice (e.g. App-level /auth/me
+  // probe + axios 401 handler racing) we still only show one toast +
+  // run one refreshAuth.
+  const sessionExpiredAtRef = useRef<number>(0);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [authReady, setAuthReady] = useState(false);
@@ -253,8 +259,15 @@ function App() {
   // refreshAuth() makes the next /auth/me fail → isAuthenticated flips
   // false → AuthPage renders. Without this listener the user would just
   // see the app suddenly bounce them to sign-in with no explanation.
+  //
+  // Dedup window (3s) suppresses duplicate toasts if anything ever
+  // dispatches the event more than once for the same logout — e.g.
+  // /auth/me race conditions during initial mount.
   useEffect(() => {
     const handler = () => {
+      const now = Date.now();
+      if (now - sessionExpiredAtRef.current < 3000) return;
+      sessionExpiredAtRef.current = now;
       showError('Your session expired. Please sign in again.');
       refreshAuth();
     };
