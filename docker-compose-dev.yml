@@ -99,6 +99,10 @@ services:
       KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth,request-termination,ip-restriction
       KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
       KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      # Cap OpenResty workers. Default `auto` spawns one per CPU core
+      # (72 on this host = ~5.7GB pre-allocated). 4 workers handles all
+      # NoobBook traffic and keeps Kong at ~400-500MB.
+      KONG_NGINX_WORKER_PROCESSES: ${KONG_NGINX_WORKER_PROCESSES:-4}
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       DASHBOARD_USERNAME: ${DASHBOARD_USERNAME}
@@ -514,6 +518,11 @@ services:
       - SUPABASE_URL=http://kong:8000
       - SUPABASE_ANON_KEY=${ANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_ROLE_KEY}
+      # Same secret Kong/GoTrue/Postgrest already share. With this set,
+      # the backend verifies JWTs locally instead of calling Kong's
+      # /auth/v1/user on every request — the dominant latency contributor
+      # on dashboard loads (was firing 7+ redundant calls per page).
+      - JWT_SECRET=${JWT_SECRET}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
       - SECRET_KEY=${SECRET_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
