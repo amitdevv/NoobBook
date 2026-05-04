@@ -6,24 +6,47 @@ We keep using the SERVICE_KEY Supabase client for database queries (bypasses RLS
 but validate the user's JWT to extract their user_id. This is simpler than
 switching to ANON_KEY and lets the backend act as a trusted server.
 
-Token Validation Cache: We cache successful token validations for 60 seconds
-to avoid hitting Supabase Auth on every request. This prevents failures when
-many concurrent requests (e.g., loading multiple images) overwhelm the Auth
-server. JWTs are already self-validating (signed + expiry), so a short cache
-window is safe — even if a token is revoked, the cache expires quickly.
+Validation strategy:
+  1. **Local signature verification** (preferred) — when JWT_SECRET is configured
+     in the backend env, we decode the JWT locally with PyJWT. No network call,
+     microsecond-fast, immune to the cache-miss race that previously caused 7+
+     parallel /auth/v1/user calls per dashboard load when many requests arrived
+     before the first cache write.
+  2. **Supabase Auth roundtrip** (fallback) — if JWT_SECRET isn't set, fall
+     back to `supabase.auth.get_user(token)` (60s cached). This keeps dev
+     workflows working when nobody's wired up the secret.
 
 Pattern: Decorator-based auth, similar to Flask-Login but using Supabase JWTs.
 """
 import functools
 import logging
+import os
 import time
 import threading
 from typing import Optional, Dict, Tuple
 
+import jwt
 from flask import request, jsonify, g
 from app.services.integrations.supabase import get_supabase
 
 logger = logging.getLogger(__name__)
+
+# Read once at module load — env vars don't change between requests.
+# Supabase signs JWTs with the same JWT_SECRET its Auth/Postgrest containers
+# share via docker-compose. If the operator hasn't plumbed it through to the
+# backend container, we fall back to the network-roundtrip path.
+_JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("SUPABASE_JWT_SECRET") or ""
+# Default to "authenticated" — the audience claim Supabase puts on user JWTs.
+_JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "authenticated")
+
+if _JWT_SECRET:
+    logger.info("Auth middleware: local JWT verification enabled")
+else:
+    logger.warning(
+        "Auth middleware: JWT_SECRET not set — falling back to Supabase Auth "
+        "roundtrip on every cache miss. Set JWT_SECRET on the backend container "
+        "to eliminate redundant Kong calls."
+    )
 
 # ─── Token Validation Cache ─────────────────────────────────────────────────
 # Educational Note: Without caching, every API request triggers an HTTP call
@@ -104,7 +127,42 @@ def validate_token() -> Optional[str]:
         logger.warning("No auth token found (header=%s, query=%s)", bool(auth_header), bool(request.args.get('token')))
         return None
 
-    # Check cache first — avoids redundant Supabase Auth calls
+    # Fast path: verify the JWT signature locally. Costs microseconds, no
+    # network call, no cache race. Requires JWT_SECRET in the backend env
+    # (the same secret Supabase Auth/Postgrest already share).
+    if _JWT_SECRET:
+        try:
+            claims = jwt.decode(
+                token,
+                _JWT_SECRET,
+                algorithms=["HS256"],
+                audience=_JWT_AUDIENCE,
+            )
+            user_id = claims.get("sub")
+            if not user_id:
+                logger.warning("JWT decoded but has no `sub` claim")
+                return None
+            return str(user_id)
+        except jwt.ExpiredSignatureError:
+            # Token is past its `exp`. Frontend's silent-refresh path will
+            # exchange the refresh token and retry — no need to log noisily.
+            return None
+        except jwt.InvalidAudienceError:
+            logger.warning("JWT audience mismatch (expected %s)", _JWT_AUDIENCE)
+            return None
+        except jwt.InvalidSignatureError:
+            logger.warning("JWT signature mismatch — wrong JWT_SECRET on backend?")
+            return None
+        except jwt.InvalidTokenError as e:
+            logger.warning("JWT decode failed: %s", e)
+            return None
+        except Exception as e:
+            # Unexpected failure during local decode — fall through to the
+            # network path so we don't lock anyone out from a library quirk.
+            logger.warning("Local JWT decode raised %s: %s — falling back to Auth", type(e).__name__, e)
+
+    # Slow path (no JWT_SECRET configured, or local decode hit an unexpected
+    # exception): cache + Supabase Auth roundtrip. Same behaviour as before.
     cached_user_id = _get_cached_user_id(token)
     if cached_user_id:
         return cached_user_id
