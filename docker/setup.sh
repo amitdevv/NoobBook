@@ -219,6 +219,8 @@ if [ ! -f "$NOOBBOOK_ENV" ]; then
     replace_env_var "$NOOBBOOK_ENV" "SUPABASE_ANON_KEY" "$ANON_KEY"
     replace_env_var "$NOOBBOOK_ENV" "SUPABASE_SERVICE_KEY" "$SERVICE_ROLE_KEY"
     replace_env_var "$NOOBBOOK_ENV" "POSTGRES_PASSWORD" "$POSTGRES_PASSWORD"
+    # JWT_SECRET so the backend verifies user JWTs locally (no Kong roundtrip).
+    replace_env_var "$NOOBBOOK_ENV" "JWT_SECRET" "$JWT_SECRET"
     replace_env_var "$NOOBBOOK_ENV" "SECRET_KEY" "$(generate_password)"
 
     success "NoobBook .env created"
@@ -238,6 +240,10 @@ else
     replace_env_var "$NOOBBOOK_ENV" "SUPABASE_ANON_KEY" "$ANON_KEY"
     replace_env_var "$NOOBBOOK_ENV" "SUPABASE_SERVICE_KEY" "$SERVICE_ROLE_KEY"
     replace_env_var "$NOOBBOOK_ENV" "POSTGRES_PASSWORD" "$POSTGRES_PASSWORD"
+    # JWT_SECRET so the backend can verify JWTs locally (eliminates the
+    # /auth/v1/user roundtrip on every API request — was the dominant
+    # latency contributor on dashboard loads).
+    replace_env_var "$NOOBBOOK_ENV" "JWT_SECRET" "$JWT_SECRET"
     success "Supabase keys synced from supabase/.env"
 fi
 
