@@ -14,20 +14,33 @@ Authentication note:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 import os
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, TypeVar
 
-from flask import jsonify, request
+import jwt
+from flask import g, jsonify, request
 
 from app.services.integrations.supabase import get_supabase, is_supabase_enabled
 from app.services.data_services.project_service import DEFAULT_USER_ID
 
 
+logger = logging.getLogger(__name__)
+
 ROLE_ADMIN = "admin"
 ROLE_USER = "user"
 _VALID_ROLES = {ROLE_ADMIN, ROLE_USER}
+
+# Same env vars auth_middleware uses. When JWT_SECRET is set, we decode the
+# JWT locally instead of round-tripping to Kong's /auth/v1/user. This is
+# what eliminates the second wave of Kong calls per request: even though
+# auth_middleware already validates the token at before_request, every
+# `get_request_identity()` call further down the stack used to call
+# `supabase.auth.get_user()` again to fetch email/role.
+_JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("SUPABASE_JWT_SECRET") or ""
+_JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "authenticated")
 
 T = TypeVar("T", bound=Callable[..., Any])
 
@@ -91,10 +104,61 @@ def get_request_identity() -> RequestIdentity:
     1) Supabase Auth JWT (Authorization: Bearer <jwt>) if Supabase configured
     2) Explicit dev headers (X-NoobBook-User-Id / X-NoobBook-Role)
     3) Single-user fallback (DEFAULT_USER_ID as admin)
+
+    Per-request caching: result is stashed on Flask's `g` so multiple
+    callers within the same request (the before_request hook,
+    @require_admin, the route's own use, etc.) don't each rebuild the
+    identity. Without this, a single request hitting an admin endpoint
+    can trigger 3+ duplicate Kong roundtrips just to look up the role.
     """
-    # 1) Supabase Auth JWT
+    cached = getattr(g, "_rbac_identity", None)
+    if cached is not None:
+        return cached
+
+    identity = _resolve_identity()
+    try:
+        g._rbac_identity = identity
+    except RuntimeError:
+        # Outside an app context (e.g. background thread). Skip cache.
+        pass
+    return identity
+
+
+def _resolve_identity() -> RequestIdentity:
+    # 1) Supabase Auth JWT — local decode when JWT_SECRET is configured,
+    #    network roundtrip otherwise (matches auth_middleware behavior).
     token = _get_bearer_token()
     if token and is_supabase_enabled():
+        # Fast path: decode the JWT locally. user_id + email come from
+        # claims; role still needs a Postgrest lookup but that's cheap
+        # (~5ms vs ~50-100ms for the Kong/GoTrue path).
+        if _JWT_SECRET:
+            try:
+                claims = jwt.decode(
+                    token,
+                    _JWT_SECRET,
+                    algorithms=["HS256"],
+                    audience=_JWT_AUDIENCE,
+                )
+                user_id = claims.get("sub")
+                email = claims.get("email")
+                if user_id:
+                    role = _load_role_from_users_table(str(user_id)) or ROLE_USER
+                    return RequestIdentity(
+                        user_id=str(user_id),
+                        email=str(email) if email else None,
+                        role=role,
+                        is_authenticated=True,
+                    )
+            except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+                # Local decode rejected — fall through to network path
+                # so we have a single source-of-truth error message.
+                pass
+            except Exception as e:
+                logger.warning("Local JWT decode in rbac raised %s: %s", type(e).__name__, e)
+
+        # Slow path: original Supabase Auth roundtrip. Only reached
+        # when JWT_SECRET isn't set or local decode unexpectedly failed.
         try:
             supabase = get_supabase()
             user_resp = supabase.auth.get_user(token)
