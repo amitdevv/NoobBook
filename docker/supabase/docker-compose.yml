@@ -73,6 +73,13 @@ services:
       KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
       # Allow uploads up to 1GB (matches Flask MAX_CONTENT_LENGTH and storage FILE_SIZE_LIMIT)
       KONG_NGINX_HTTP_CLIENT_MAX_BODY_SIZE: 1g
+      # Cap OpenResty worker count. Default `auto` spawns one worker per
+      # CPU core; on a 72-core host that's ~5.7GB of allocated RAM for
+      # what is effectively an HTTP gateway. 4 workers is plenty for
+      # NoobBook traffic and bounds Kong at ~400-500MB. Override with
+      # KONG_NGINX_WORKER_PROCESSES in docker/supabase/.env if you need
+      # more concurrency.
+      KONG_NGINX_WORKER_PROCESSES: ${KONG_NGINX_WORKER_PROCESSES:-4}
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       DASHBOARD_USERNAME: ${DASHBOARD_USERNAME}

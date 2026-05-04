@@ -18,6 +18,11 @@ services:
       - SUPABASE_URL=http://supabase-kong:8000
       - SUPABASE_DB_URL=postgresql://postgres:${POSTGRES_PASSWORD}@supabase-db:5432/postgres
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost}
+      # Same secret Supabase Auth/Postgrest already share. With this set,
+      # the backend verifies JWTs locally instead of calling Kong's
+      # /auth/v1/user on every request — eliminates the 7+ redundant
+      # Kong roundtrips per dashboard load (cache-miss race).
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
       - backend-data:/app/data
       - ./docker/.env:/app/.env
