@@ -347,14 +347,27 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
   // fetched yet (avoid a flash of the banner on first paint). Once
   // fetched, the banner only renders when there are unlimited users AND
   // the operator hasn't opted out via NOOBBOOK_DEFAULT_USER_COST_LIMIT=0.
+  // The same payload also carries the standardized reset anchor (default
+  // Sunday 09:00 IST) and the count of users currently on a reset
+  // frequency — drives the schedule subtitle + "Realign now" link.
   const [defaultConfig, setDefaultConfig] = useState<{
     default_limit: number | null;
     default_frequency: ResetFrequency;
     unlimited_count: number;
     opted_out: boolean;
+    anchor?: {
+      tz: string;
+      hour: number;
+      weekday_name: string;
+      weekly_label: string;
+      [key: string]: unknown;
+    };
+    users_with_frequency?: number;
   } | null>(null);
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [realignDialogOpen, setRealignDialogOpen] = useState(false);
+  const [realigning, setRealigning] = useState(false);
 
   const { success, error } = useToast();
 
@@ -409,6 +422,25 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
       error(axiosErr.response?.data?.error || 'Failed to apply default limit');
     } finally {
       setApplying(false);
+    }
+  };
+
+  const handleRealignSpendingPeriods = async () => {
+    setRealigning(true);
+    try {
+      const result = await usersAPI.realignSpendingPeriods();
+      success(
+        `Realigned ${result.updated} ${result.updated === 1 ? 'user' : 'users'} to ${result.anchor.weekly_label}`,
+      );
+      setRealignDialogOpen(false);
+      // Refresh both — rows now show $0 spend with the new aligned start.
+      await Promise.all([loadUsers(), loadDefaultConfig()]);
+    } catch (err) {
+      log.error({ err }, 'failed to realign spending periods');
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      error(axiosErr.response?.data?.error || 'Failed to realign spending periods');
+    } finally {
+      setRealigning(false);
     }
   };
 
@@ -486,6 +518,16 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
     !defaultConfig.opted_out &&
     defaultConfig.unlimited_count > 0;
 
+  // Schedule subtitle is shown when at least one user is on a reset
+  // frequency. Surfaces the global anchor (e.g. "Resets every Sunday
+  // at 09:00 Asia/Kolkata") and a small "Realign now" link the admin
+  // can use to bulk-snap existing users to the schedule and zero
+  // their period_spend.
+  const showScheduleSubtitle =
+    defaultConfig !== null &&
+    defaultConfig.anchor !== undefined &&
+    (defaultConfig.users_with_frequency ?? 0) > 0;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -494,6 +536,22 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
           <p className="text-sm text-muted-foreground">
             Manage users and their access levels
           </p>
+          {showScheduleSubtitle && defaultConfig?.anchor && (
+            <p className="mt-1.5 text-[12px] text-stone-500 leading-relaxed">
+              <span className="text-stone-600">Spending limits reset:</span>{' '}
+              <span className="text-stone-700 tabular-nums">
+                {defaultConfig.anchor.weekly_label}
+              </span>
+              <span className="mx-1.5 text-stone-300">·</span>
+              <button
+                type="button"
+                onClick={() => setRealignDialogOpen(true)}
+                className="text-stone-700 underline underline-offset-4 decoration-amber-600 decoration-1 hover:decoration-stone-900 transition-colors"
+              >
+                Realign existing users
+              </button>
+            </p>
+          )}
         </div>
         <Button onClick={() => setCreateDialogOpen(true)}>
           <Plus size={16} className="mr-2" />
@@ -757,6 +815,66 @@ export const TeamSection: React.FC<TeamSectionProps> = ({ currentUserId }) => {
                   <>
                     Apply to {defaultConfig.unlimited_count}{' '}
                     {defaultConfig.unlimited_count === 1 ? 'user' : 'users'}
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Realign-spending-periods confirm dialog. Bulk-snaps every user
+          with a reset_frequency to the standardized anchor (default
+          Sunday 09:00 IST) and zeroes period_spend — the "full reset"
+          semantic the operator opted into. */}
+      {defaultConfig?.anchor && (
+        <Dialog open={realignDialogOpen} onOpenChange={(o) => !realigning && setRealignDialogOpen(o)}>
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle>Realign spending periods</DialogTitle>
+              <DialogDescription className="leading-relaxed">
+                Snap every user with a reset frequency to the global
+                schedule and zero out their current period spend.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="rounded-md border border-amber-100/80 bg-amber-50/40 px-3.5 py-2.5 text-[12px] text-stone-600 leading-relaxed space-y-1.5">
+              <p>
+                <span className="text-stone-500">Schedule:</span>{' '}
+                <span className="font-medium text-stone-800">
+                  {defaultConfig.anchor.weekly_label}
+                </span>
+              </p>
+              <p>
+                <span className="text-stone-500">Affected users:</span>{' '}
+                <span className="font-medium text-stone-800 tabular-nums">
+                  {defaultConfig.users_with_frequency ?? 0}
+                </span>{' '}
+                <span className="text-stone-500">
+                  ({defaultConfig.users_with_frequency === 1 ? 'has' : 'have'} a daily / weekly / monthly reset)
+                </span>
+              </p>
+            </div>
+            <p className="text-xs text-stone-500 leading-relaxed">
+              Each user's <span className="font-medium text-stone-700">period_spend</span> resets to <span className="tabular-nums">$0</span> and their next auto-reset will fire at the same wall-clock instant as everyone else. Users without a reset frequency (lifetime caps, unlimited) are skipped. Idempotent — running twice produces the same state.
+            </p>
+            <DialogFooter>
+              <Button
+                variant="soft"
+                onClick={() => setRealignDialogOpen(false)}
+                disabled={realigning}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleRealignSpendingPeriods} disabled={realigning}>
+                {realigning ? (
+                  <>
+                    <CircleNotch size={14} className="animate-spin mr-2" />
+                    Realigning…
+                  </>
+                ) : (
+                  <>
+                    Realign {defaultConfig.users_with_frequency ?? 0}{' '}
+                    {defaultConfig.users_with_frequency === 1 ? 'user' : 'users'}
                   </>
                 )}
               </Button>

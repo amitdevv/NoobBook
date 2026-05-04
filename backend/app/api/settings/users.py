@@ -296,19 +296,23 @@ def get_default_cost_limit():
 
     Returns:
         {
-          "default_limit": 25.0 | null,        // null when opted-out
+          "default_limit": 25.0 | null,
           "default_frequency": "weekly" | null,
-          "unlimited_count": 8,                // pre-existing users w/o limit
-          "opted_out": false
+          "unlimited_count": 8,
+          "opted_out": false,
+          "anchor": { ...spending_schedule.get_anchor_summary()... },
+          "users_with_frequency": 12   // size of the realign-target set
         }
     """
     from app.services.data_services.user_service import default_user_settings
+    from app.utils.spending_schedule import get_anchor_summary
 
     defaults = default_user_settings()
     cost_limit = defaults.get("cost_limit")
 
     svc = get_user_service()
     unlimited_count = svc.count_unlimited_users()
+    users_with_frequency = svc.count_users_with_reset_frequency()
 
     return jsonify({
         "success": True,
@@ -316,6 +320,8 @@ def get_default_cost_limit():
         "default_frequency": defaults.get("reset_frequency"),
         "unlimited_count": unlimited_count,
         "opted_out": not cost_limit,
+        "anchor": get_anchor_summary(),
+        "users_with_frequency": users_with_frequency,
     }), 200
 
 
@@ -362,6 +368,49 @@ def apply_default_cost_limit():
         result["skipped"],
         result["default_limit"],
         result["default_frequency"],
+    )
+
+    return jsonify({"success": True, **result}), 200
+
+
+@settings_bp.route("/settings/users/realign-spending-periods", methods=["POST"])
+@require_admin
+def realign_spending_periods():
+    """
+    Bulk-realign every user with a `reset_frequency` to the standardized
+    anchor schedule (default: every Sunday 09:00 Asia/Kolkata).
+
+    Behavior:
+      - Zeroes `period_spend` for every targeted user (the "full reset"
+        the operator opted into when this feature shipped).
+      - Rewrites `period_start` to the most recent anchor boundary so
+        the next auto-reset fires at the same wall-clock instant for
+        everyone.
+      - Skips users without a reset_frequency (lifetime caps + unlimited).
+      - Idempotent — running twice produces the same state.
+
+    Use case: shipped after an admin redeploys with this feature, or
+    after they change `NOOBBOOK_RESET_TZ` / `NOOBBOOK_RESET_HOUR` env
+    vars and want every existing user re-snapped to the new schedule
+    without waiting for each individual user's next request.
+    """
+    svc = get_user_service()
+    try:
+        result = svc.realign_spending_periods()
+    except Exception as exc:
+        logger.exception("Failed to realign spending periods")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+    identity = get_request_identity()
+    admin_email = (identity.email or identity.user_id) if identity else "unknown"
+    anchor = result.get("anchor", {})
+    logger.info(
+        "[ADMIN] %s realigned spending periods for %d user(s) "
+        "(skipped %d) to anchor: %s",
+        admin_email,
+        result["updated"],
+        result["skipped"],
+        anchor.get("weekly_label", "unknown"),
     )
 
     return jsonify({"success": True, **result}), 200

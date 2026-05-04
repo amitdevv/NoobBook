@@ -529,13 +529,26 @@ class UsersAPI {
 
   /**
    * Read the env-configured default spending-limit values + how many
-   * existing users have no limit set. Drives the admin Team banner.
+   * existing users have no limit set + the standardized reset anchor
+   * (timezone, day-of-week, hour). Drives both the "Apply default to
+   * unlimited users" banner and the "Realign spending periods" action.
    */
   async getDefaultCostLimit(): Promise<{
     default_limit: number | null;
     default_frequency: ResetFrequency;
     unlimited_count: number;
     opted_out: boolean;
+    anchor?: {
+      tz: string;
+      hour: number;
+      weekday: number;
+      weekday_name: string;
+      monthly_day: number;
+      weekly_label: string;
+      daily_label: string;
+      monthly_label: string;
+    };
+    users_with_frequency?: number;
   }> {
     try {
       const response = await axios.get(
@@ -568,6 +581,34 @@ class UsersAPI {
       return response.data;
     } catch (error) {
       log.error({ err: error }, 'failed to apply default cost limit');
+      throw error;
+    }
+  }
+
+  /**
+   * Realign every user's spending period to the standardized anchor
+   * schedule (default: every Sunday 09:00 Asia/Kolkata). Zeroes
+   * period_spend and rewrites period_start to the most recent anchor
+   * boundary. Idempotent.
+   */
+  async realignSpendingPeriods(): Promise<{
+    updated: number;
+    skipped: number;
+    anchor: {
+      tz: string;
+      hour: number;
+      weekday_name: string;
+      weekly_label: string;
+      [key: string]: unknown;
+    };
+  }> {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/settings/users/realign-spending-periods`,
+      );
+      return response.data;
+    } catch (error) {
+      log.error({ err: error }, 'failed to realign spending periods');
       throw error;
     }
   }

@@ -326,22 +326,16 @@ def add_image_usage(
 
 
 def _is_period_expired(period_start: Optional[str], frequency: Optional[str]) -> bool:
-    """Check if a spending period has expired based on the reset frequency."""
-    if not period_start or not frequency:
-        return False
-    from datetime import datetime, timedelta
-    try:
-        start = datetime.fromisoformat(period_start.replace("Z", "+00:00"))
-        now = datetime.now(start.tzinfo) if start.tzinfo else datetime.utcnow()
-        if frequency == "daily":
-            return now >= start + timedelta(days=1)
-        elif frequency == "weekly":
-            return now >= start + timedelta(weeks=1)
-        elif frequency == "monthly":
-            return now >= start + timedelta(days=30)
-        return False
-    except Exception:
-        return False
+    """Check if a spending period has expired based on the reset frequency.
+
+    Delegates to the standardized schedule (`spending_schedule.is_period_expired`)
+    which uses an env-driven anchor (default: Sunday 09:00 Asia/Kolkata) so all
+    weekly users reset at the same wall-clock instant instead of drifting to
+    whenever they were created.
+    """
+    from app.utils.spending_schedule import is_period_expired
+
+    return is_period_expired(period_start, frequency)
 
 
 def check_user_spending_limit(user_id: Optional[str]) -> Optional[str]:
@@ -380,10 +374,15 @@ def check_user_spending_limit(user_id: Optional[str]) -> Optional[str]:
             period_start = settings.get("period_start")
             period_spend = settings.get("period_spend", 0.0)
 
-            # Auto-reset if period expired
+            # Auto-reset if period expired. Realigns to the most recent
+            # anchor (default: Sunday 09:00 Asia/Kolkata) instead of
+            # `now`, so every user with the same frequency stays in
+            # lockstep for the next reset.
             if _is_period_expired(period_start, reset_frequency):
+                from app.utils.spending_schedule import aligned_period_start_iso
+
                 settings["period_spend"] = 0.0
-                settings["period_start"] = datetime.utcnow().isoformat() + "Z"
+                settings["period_start"] = aligned_period_start_iso(reset_frequency)
                 svc.save_user_settings(user_id, settings)
                 period_spend = 0.0
 

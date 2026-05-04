@@ -72,11 +72,16 @@ def default_user_settings() -> Dict[str, Any]:
     if raw_freq == "none":
         return {"cost_limit": cost_limit, "period_spend": 0.0}
 
+    # Anchor period_start to the standardized schedule (default Sunday
+    # 09:00 Asia/Kolkata) so every new user joins the same global reset
+    # cadence as everyone else — no per-user drift.
+    from app.utils.spending_schedule import aligned_period_start_iso
+
     return {
         "cost_limit": cost_limit,
         "reset_frequency": raw_freq,
         "period_spend": 0.0,
-        "period_start": _now_iso(),
+        "period_start": aligned_period_start_iso(raw_freq),
     }
 
 
@@ -228,11 +233,14 @@ class UserService:
         # Update reset frequency
         if reset_frequency in ("daily", "weekly", "monthly"):
             settings["reset_frequency"] = reset_frequency
-            # Reset period if frequency changed
+            # Reset period if frequency changed. Anchor to the global
+            # schedule (default Sunday 09:00 Asia/Kolkata) so this user
+            # joins the same reset cadence as everyone else.
             if reset_frequency != old_freq:
-                from datetime import datetime
+                from app.utils.spending_schedule import aligned_period_start_iso
+
                 settings["period_spend"] = 0.0
-                settings["period_start"] = datetime.utcnow().isoformat() + "Z"
+                settings["period_start"] = aligned_period_start_iso(reset_frequency)
         else:
             settings.pop("reset_frequency", None)
             settings.pop("period_spend", None)
@@ -268,7 +276,18 @@ class UserService:
 
         settings["period_spend"] = 0.0
         if settings.get("reset_frequency"):
-            settings["period_start"] = _now_iso()
+            # Anchor to the standardized schedule, NOT to `now`. Two
+            # reasons: (1) the user's next auto-reset still happens at
+            # the same wall-clock instant as everyone else (Sunday
+            # 09:00 IST by default), so admins don't accidentally
+            # offset a user's reset cadence by clicking the button;
+            # (2) keeps support answers uniform — "your reset is
+            # always Sunday 9am IST" regardless of admin actions.
+            from app.utils.spending_schedule import aligned_period_start_iso
+
+            settings["period_start"] = aligned_period_start_iso(
+                settings["reset_frequency"]
+            )
 
         if not self.save_user_settings(user_id, settings):
             raise SpendingPersistenceError(
@@ -343,6 +362,65 @@ class UserService:
             "default_limit": defaults.get("cost_limit"),
             "default_frequency": defaults.get("reset_frequency"),
             "opted_out": False,
+        }
+
+    def count_users_with_reset_frequency(self) -> int:
+        """How many users currently have a `reset_frequency` set.
+        Drives the admin "Realign now" surface — only meaningful when
+        there are users to realign."""
+        resp = self.supabase.table(self.table).select("settings").execute()
+        rows = resp.data or []
+        return sum(
+            1 for r in rows
+            if (r.get("settings") or {}).get("reset_frequency")
+        )
+
+    def realign_spending_periods(self) -> Dict[str, Any]:
+        """
+        Bulk-realign every user with a `reset_frequency` to the
+        standardized anchor schedule. Zeroes their `period_spend` (the
+        "full reset" semantic the operator opted into when this feature
+        shipped) and rewrites `period_start` to the most recent anchor
+        boundary.
+
+        Idempotent: running twice in a row produces the same result.
+        Users without a `reset_frequency` are untouched.
+
+        Returns dict with `updated`, `skipped`, plus the anchor summary
+        the caller surfaces in the audit log + UI confirmation toast.
+        """
+        from app.utils.spending_schedule import (
+            aligned_period_start_iso,
+            get_anchor_summary,
+        )
+
+        resp = (
+            self.supabase.table(self.table)
+            .select("id, settings")
+            .execute()
+        )
+        rows = resp.data or []
+
+        updated = 0
+        skipped = 0
+        for row in rows:
+            current = row.get("settings") or {}
+            frequency = current.get("reset_frequency")
+            if not frequency or not current.get("cost_limit"):
+                skipped += 1
+                continue
+            new_settings = {
+                **current,
+                "period_spend": 0.0,
+                "period_start": aligned_period_start_iso(frequency),
+            }
+            if self.save_user_settings(row["id"], new_settings):
+                updated += 1
+
+        return {
+            "updated": updated,
+            "skipped": skipped,
+            "anchor": get_anchor_summary(),
         }
 
     def increment_period_spend(self, user_id: str, amount: float) -> None:
