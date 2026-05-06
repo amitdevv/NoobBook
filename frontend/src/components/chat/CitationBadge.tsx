@@ -12,7 +12,6 @@ import {
   HoverCardTrigger,
 } from '../ui/hover-card';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
-import { Badge } from '../ui/badge';
 import { FileText, CircleNotch } from '@phosphor-icons/react';
 import { sourcesAPI, type ChunkContent } from '../../lib/api/sources';
 import { createLogger } from '@/lib/logger';
@@ -96,14 +95,21 @@ export const CitationBadge: React.FC<CitationBadgeProps> = ({
       .trim();
   };
 
+  // Citation trigger is a real <button> so keyboard users can Tab to it and
+  // Radix HoverCard's focus listener opens the same content the mouse path
+  // does. The visual still reads as an inline superscript badge.
+  const ariaLabel = `Citation ${citationNumber}${sourceName ? ` from ${sourceName}` : ''}, page ${pageNumber}`;
+
   return (
     <HoverCard openDelay={200} closeDelay={100} onOpenChange={handleOpenChange}>
       <HoverCardTrigger asChild>
-        <Badge
-          className="cursor-pointer text-[11px] px-2 py-0.5 h-[18px] align-super -mt-1 bg-primary text-primary-foreground hover:bg-primary/90 border-0"
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          className="inline-flex cursor-pointer items-center justify-center rounded-md align-super -mt-1 h-[18px] min-w-[20px] px-1.5 text-[11px] font-medium leading-none bg-primary text-primary-foreground hover:bg-primary/90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
         >
           {citationNumber}
-        </Badge>
+        </button>
       </HoverCardTrigger>
       <HoverCardContent className="w-[28rem] p-0" side="top" align="start">
         <Card className="border-0 shadow-none">
