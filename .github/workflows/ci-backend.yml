@@ -1,0 +1,76 @@
+name: ci-backend
+
+# Pre-merge gate for the backend: syntax check + pytest. Tests use
+# mocks (see backend/tests/conftest.py) so no real services are
+# touched and no API keys are required.
+#
+# Safety notes for this PUBLIC repo:
+#   - Triggered by `pull_request` (NOT `pull_request_target`), so PRs
+#     from forks run with NO access to repository secrets.
+#   - The workflow reads no secrets. The SUPABASE_* values below are
+#     literal dummy strings, NOT secrets — they exist because several
+#     modules instantiate a Supabase client at import time (e.g.
+#     auth_service.py:372) and the SDK rejects malformed keys, even
+#     though every test patches the client with mocks.
+#   - Permissions are pinned to read-only at the workflow level.
+#   - Path filter: only runs when backend/** actually changes.
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile-check all .py files
+        # Cheap pre-flight before pytest spins up — catches syntax
+        # errors instantly without waiting for collection.
+        run: python -m compileall -q app
+
+      - name: Run pytest
+        run: pytest -q --maxfail=3
+        env:
+          FLASK_ENV: testing
+          PYTHONDONTWRITEBYTECODE: '1'
+          # Dummy JWT-shaped strings, not secrets. Required because
+          # several modules construct a Supabase client at import time
+          # and the SDK validates the key format before any patch
+          # applied by tests can take effect.
+          SUPABASE_URL: 'http://test.invalid'
+          SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiJ9.dummy'
+          SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.dummy'
