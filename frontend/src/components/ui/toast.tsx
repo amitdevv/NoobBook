@@ -34,7 +34,9 @@ interface ToastItemProps {
 
 const ToastItem: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
   // Toasts with an action stay on screen longer — the user needs time to
-  // notice and click. Plain toasts dismiss in 5s as before.
+  // notice and click. Plain toasts dismiss in 5s as before. The dismiss
+  // timer resets whenever a coalesced duplicate bumps `lastBumpAt`, so a
+  // burst of identical errors keeps the toast alive long enough to read.
   const dismissMs = toast.action ? 8000 : 5000;
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -42,7 +44,7 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
     }, dismissMs);
 
     return () => clearTimeout(timer);
-  }, [toast.id, onDismiss, dismissMs]);
+  }, [toast.id, toast.lastBumpAt, onDismiss, dismissMs]);
 
   const getIcon = () => {
     switch (toast.type) {
@@ -77,7 +79,17 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onDismiss }) => {
       className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${getBgColor()} min-w-[300px] max-w-[500px] animate-in slide-in-from-right`}
     >
       {getIcon()}
-      <p className="flex-1 text-sm">{toast.message}</p>
+      <p className="flex-1 text-sm">
+        {toast.message}
+        {toast.count && toast.count > 1 && (
+          <span
+            aria-label={`${toast.count} times`}
+            className="ml-2 inline-flex items-center justify-center rounded-full bg-stone-800/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white tabular-nums"
+          >
+            ×{toast.count}
+          </span>
+        )}
+      </p>
       {showAction && toast.action && (
         <button
           onClick={() => {

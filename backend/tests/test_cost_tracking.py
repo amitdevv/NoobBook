@@ -88,7 +88,9 @@ class TestCalculateCost:
 
     def test_unknown_model_uses_sonnet_pricing(self):
         """Unknown model key falls back to sonnet pricing."""
-        assert _calculate_cost("opus", 1_000_000, 0) == pytest.approx(3.0)
+        # Use a clearly-fictitious model key — "opus" is a real entry in
+        # PRICING now, so it would no longer exercise the fallback path.
+        assert _calculate_cost("nonexistent-model", 1_000_000, 0) == pytest.approx(3.0)
 
 
 # ===========================================================================

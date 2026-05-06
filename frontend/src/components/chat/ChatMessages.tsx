@@ -10,7 +10,7 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Ghost, FileText, Copy, Check, DownloadSimple } from '@phosphor-icons/react';
+import { Ghost, FileText, Copy, Check, DownloadSimple, ArrowDown } from '@phosphor-icons/react';
 import type { Message } from '../../lib/api/chats';
 import { parseCitations } from '../../lib/citations';
 import { CitationBadge } from './CitationBadge';
@@ -26,6 +26,7 @@ import {
 } from '../ui/tooltip';
 import { copyToClipboard } from '@/lib/clipboard';
 import { createLogger } from '@/lib/logger';
+import { cn } from '@/lib/utils';
 
 const log = createLogger('chat-messages');
 
@@ -434,26 +435,106 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, projectId, studioAssetRe
 };
 
 /**
- * Loading Indicator
- * Educational Note: Shows when AI is processing/thinking
+ * Reading Beat — assistant "thinking" indicator.
+ *
+ * Replaces the generic three-bouncing-dots pattern with a Claude-style
+ * rotating phrase reel that matches NoobBook's literary character: the AI is
+ * a reader before it's a writer. The first beat is always "Reading your
+ * message…" (the literal action that just happened), then if the SSE delta
+ * still hasn't landed the indicator rotates through a curated pool of
+ * editorial phrases — each evoking the act of close reading.
+ *
+ * The amber underscan sweeping left→right is the signature beat — a finger
+ * tracing across a printed page. Unmounts the moment streamingAssistantContent
+ * becomes non-empty (parent's existing render condition handles the swap).
  */
-const LoadingIndicator: React.FC = () => (
-  <div className="flex justify-start">
-    <div className="max-w-[85%] flex gap-3">
-      <div className="flex-shrink-0 mt-1">
-        <Ghost size={28} weight="bold" className="text-primary" />
-      </div>
-      <div className="bg-muted/50 rounded-2xl rounded-tl-sm px-4 py-3">
-        <p className="text-xs font-medium text-muted-foreground mb-2">NoobBook</p>
-        <div className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-primary/60 animate-[bounce_1.4s_ease-in-out_infinite]" />
-          <span className="h-2 w-2 rounded-full bg-primary/60 animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
-          <span className="h-2 w-2 rounded-full bg-primary/60 animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
+const READING_OPENER = 'Reading your message';
+const THINKING_PHRASES = [
+  'Thinking it through',
+  'Tracing the threads',
+  'Marking up the margins',
+  'Cross-referencing sources',
+  'Considering the angles',
+  'Gathering thoughts',
+  'Turning it over',
+  'Sketching a reply',
+  'Mulling on it',
+  'Connecting the dots',
+  'Weighing the evidence',
+  'Untangling the question',
+];
+
+const PHASE_INTERVAL_MS = 2200;
+const OPENER_HOLD_MS = 1600;
+
+const ReadingIndicator: React.FC = () => {
+  // Shuffle the pool once per mount so each chat feels fresh; keep ordering
+  // stable across phase ticks within the same waiting window. We use a
+  // lazy-init useState rather than useMemo because shuffling pulls
+  // Math.random — the React compiler flags impure calls inside useMemo,
+  // but the lazy initializer is the canonical "run once at mount" hook.
+  const [queue] = useState(() => {
+    const pool = [...THINKING_PHRASES];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool;
+  });
+
+  const [step, setStep] = useState(0); // 0 = opener, 1+ = queue[step-1]
+
+  useEffect(() => {
+    const tick = window.setTimeout(
+      () => setStep((s) => s + 1),
+      step === 0 ? OPENER_HOLD_MS : PHASE_INTERVAL_MS,
+    );
+    return () => window.clearTimeout(tick);
+  }, [step]);
+
+  const phrase = step === 0 ? READING_OPENER : queue[(step - 1) % queue.length];
+
+  return (
+    <div
+      className="flex justify-start"
+      style={{ animation: 'reading-bubble-in 220ms ease-out both' }}
+      role="status"
+      aria-live="polite"
+      aria-label={`${phrase}…`}
+    >
+      <div className="max-w-[85%] flex gap-3">
+        <div
+          className="flex-shrink-0 mt-1"
+          style={{ animation: 'reading-breathe 2.4s ease-in-out infinite' }}
+        >
+          <Ghost size={28} weight="bold" className="text-primary" />
+        </div>
+        <div className="relative overflow-hidden rounded-2xl rounded-tl-sm bg-muted/50 px-4 py-3">
+          <p className="mb-1 text-xs font-medium text-muted-foreground">NoobBook</p>
+          <p
+            key={step}
+            className="font-serif text-[15px] italic leading-snug text-stone-600"
+            style={{ animation: 'reading-bubble-in 320ms ease-out both' }}
+          >
+            {phrase}
+            <span className="ml-0.5 inline-flex">
+              <span className="animate-[reading-breathe_1.4s_ease-in-out_infinite]">.</span>
+              <span className="animate-[reading-breathe_1.4s_ease-in-out_0.2s_infinite]">.</span>
+              <span className="animate-[reading-breathe_1.4s_ease-in-out_0.4s_infinite]">.</span>
+            </span>
+          </p>
+          {/* Underscan: a finger tracing across a page. */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px overflow-hidden">
+            <div
+              className="h-full w-1/3 bg-gradient-to-r from-transparent via-amber-500/70 to-transparent"
+              style={{ animation: 'reading-scan 2.4s ease-in-out infinite' }}
+            />
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 /**
  * ChatMessages Component - Memoized to prevent re-renders on parent state changes
@@ -477,6 +558,11 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
 
   // Track if user has manually scrolled away from bottom
   const userScrolledAwayRef = useRef(false);
+
+  // Mirror of userScrolledAwayRef for rendering the "Jump to latest" reading
+  // marker — refs don't trigger re-renders, so we keep a state copy that the
+  // scroll handler updates only on threshold crossings (not every pixel).
+  const [showJumpMarker, setShowJumpMarker] = useState(false);
 
   // Track previous message count to detect initial load
   const prevMessageCountRef = useRef(0);
@@ -515,16 +601,25 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
     // User is "back at bottom" if within 50px (with some tolerance)
     if (distanceFromBottom > 150) {
       userScrolledAwayRef.current = true;
+      if (!showJumpMarker) setShowJumpMarker(true);
     } else if (distanceFromBottom < 50) {
       userScrolledAwayRef.current = false;
+      if (showJumpMarker) setShowJumpMarker(false);
     }
   };
 
+  const jumpToLatest = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    userScrolledAwayRef.current = false;
+    setShowJumpMarker(false);
+  };
+
   return (
+    <div className="relative flex-1 min-h-0 min-w-0 w-full bg-white">
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden bg-white"
+      className="absolute inset-0 overflow-y-auto overflow-x-hidden"
     >
       <div className="pt-6 pb-2 px-6 space-y-4 w-full">
         {messages.filter((msg) => msg && msg.id).map((msg) => (
@@ -554,12 +649,40 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
           />
         )}
 
-        {/* Show loading indicator when sending */}
-        {sending && !streamingAssistantContent && <LoadingIndicator />}
+        {/* Reading Beat — fills the gap between Send and first SSE delta. */}
+        {sending && !streamingAssistantContent && <ReadingIndicator />}
 
         {/* Invisible element to scroll to */}
         <div ref={messagesEndRef} />
       </div>
+    </div>
+
+    {/* Reading marker — appears only when the user has scrolled away from the
+       latest message. Editorial styling: amber pill with serif label, breath
+       animation matches the Reading Beat so the chat surface feels coherent. */}
+    {showJumpMarker && (
+      <button
+        type="button"
+        onClick={jumpToLatest}
+        aria-label="Jump to latest message"
+        className={cn(
+          'group absolute bottom-4 right-5 z-10 inline-flex items-center gap-1.5',
+          'rounded-full border border-amber-200/80 bg-white/85 px-3 py-1.5',
+          'text-xs font-medium text-amber-800 shadow-[0_4px_14px_-4px_rgba(217,119,6,0.35)]',
+          'backdrop-blur-md transition-all duration-200',
+          'hover:border-amber-300 hover:bg-white hover:text-amber-900 hover:shadow-[0_6px_18px_-4px_rgba(217,119,6,0.45)]',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+        )}
+        style={{ animation: 'reading-bubble-in 240ms ease-out both' }}
+      >
+        <span className="font-serif italic tracking-tight">Jump to latest</span>
+        <ArrowDown
+          size={13}
+          weight="bold"
+          className="transition-transform duration-200 group-hover:translate-y-0.5"
+        />
+      </button>
+    )}
     </div>
   );
 });

@@ -20,7 +20,7 @@
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { Sheet, SheetContent, SheetTitle } from '../../ui/sheet';
 import { ScrollArea } from '../../ui/scroll-area';
-import { CircleNotch, FileX } from '@phosphor-icons/react';
+import { ArrowsClockwise, CircleNotch, DownloadSimple, FileX } from '@phosphor-icons/react';
 import {
   sourcesAPI,
   getSourceFileExtension,
@@ -227,9 +227,30 @@ export const SourcePreviewSheet: React.FC<SourcePreviewSheetProps> = ({
     }
     if (errorMsg) {
       return (
-        <div className="flex flex-col items-center justify-center py-16 text-stone-500">
-          <FileX size={28} className="mb-2 text-stone-400" />
-          <p className="text-sm">{errorMsg}</p>
+        <div className="flex flex-col items-center justify-center py-16 px-8 text-center text-stone-500">
+          <FileX size={32} className="mb-3 text-stone-400" />
+          <p className="font-serif text-base italic text-stone-700">{errorMsg}</p>
+          <p className="mt-1 text-xs text-stone-500">
+            The preview couldn't load. Try again, or grab the original file.
+          </p>
+          <div className="mt-5 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setRefetchKey((k) => k + 1)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50/70 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+            >
+              <ArrowsClockwise size={13} weight="bold" />
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:border-stone-300 hover:text-stone-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
+            >
+              <DownloadSimple size={13} weight="bold" />
+              Download original
+            </button>
+          </div>
         </div>
       );
     }

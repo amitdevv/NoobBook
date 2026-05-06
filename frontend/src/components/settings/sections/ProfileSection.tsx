@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { User, Crown, SignOut, Warning, ArrowsClockwise, ChartBar } from '@phosphor-icons/react';
+import { User, Crown, SignOut, Warning, ArrowsClockwise, ChartBar, CircleNotch } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { usersAPI } from '@/lib/api/settings';
@@ -123,6 +123,24 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
   onSignOut,
 }) => {
   const [signOutOpen, setSignOutOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  // Sign-out involves a network round-trip (revoke session) + redirect,
+  // which used to leave the dialog frozen with no feedback. Now we show
+  // a "Signing out…" state on the destructive button until the auth gate
+  // navigates away — failures keep the dialog open so the user knows.
+  const handleConfirmSignOut = async () => {
+    if (!onSignOut) return;
+    try {
+      setSigningOut(true);
+      await onSignOut();
+      // Auth gate will navigate; setSigningOut(false) is unnecessary on
+      // success and would race the unmount, so we skip it.
+    } catch {
+      setSigningOut(false);
+      setSignOutOpen(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -175,7 +193,10 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
             </Button>
           </div>
 
-          <AlertDialog open={signOutOpen} onOpenChange={setSignOutOpen}>
+          <AlertDialog
+            open={signOutOpen}
+            onOpenChange={(next) => !signingOut && setSignOutOpen(next)}
+          >
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center gap-2">
@@ -187,17 +208,26 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <Button variant="soft" onClick={() => setSignOutOpen(false)}>
+                <Button
+                  variant="soft"
+                  onClick={() => setSignOutOpen(false)}
+                  disabled={signingOut}
+                >
                   Cancel
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={() => {
-                    setSignOutOpen(false);
-                    onSignOut();
-                  }}
+                  onClick={handleConfirmSignOut}
+                  disabled={signingOut}
                 >
-                  Sign Out
+                  {signingOut ? (
+                    <>
+                      <CircleNotch size={14} className="mr-1.5 animate-spin" />
+                      Signing out…
+                    </>
+                  ) : (
+                    'Sign Out'
+                  )}
                 </Button>
               </AlertDialogFooter>
             </AlertDialogContent>

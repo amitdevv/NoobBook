@@ -1,0 +1,99 @@
+name: ci-backend
+
+# Pre-merge gate for the backend: syntax check + pytest. Tests use
+# mocks (see backend/tests/conftest.py) so no real services are
+# touched and no API keys are required.
+#
+# Safety notes for this PUBLIC repo:
+#   - Triggered by `pull_request` (NOT `pull_request_target`), so PRs
+#     from forks run with NO access to repository secrets.
+#   - The workflow reads no secrets. The SUPABASE_* values below are
+#     literal dummy strings, NOT secrets — they exist because several
+#     modules instantiate a Supabase client at import time (e.g.
+#     auth_service.py:372) and the SDK rejects malformed keys, even
+#     though every test patches the client with mocks.
+#   - Permissions are pinned to read-only at the workflow level.
+#   - Path filter: only runs when backend/** actually changes.
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile-check all .py files
+        # Cheap pre-flight before pytest spins up — catches syntax
+        # errors instantly without waiting for collection.
+        run: python -m compileall -q app
+
+      - name: Build dummy Supabase test creds
+        # Several modules construct a Supabase client at import time and
+        # the SDK validates the JWT format before any test mock can be
+        # applied. We need a structurally-valid JWT to satisfy that
+        # check — but we DON'T want the literal token bytes in the
+        # source file, because GitHub's secret scanner pattern-matches
+        # service_role JWTs and flags them as a "public leak" (false
+        # positive — these are unsigned, point at a non-existent host,
+        # and have no auth value). Building at runtime keeps the source
+        # clean and `::add-mask::` keeps the assembled value out of
+        # workflow logs.
+        run: |
+          set -euo pipefail
+          b64url() { printf '%s' "$1" | base64 | tr -d '=' | tr '+/' '-_' | tr -d '\n'; }
+          header=$(b64url '{"alg":"HS256","typ":"JWT"}')
+          anon_payload=$(b64url '{"role":"anon"}')
+          service_payload=$(b64url '{"role":"service_role"}')
+          # Signature is a fixed string — these tokens are never validated
+          # against a real JWT secret, only parsed for shape + role claim.
+          sig=$(b64url 'noobbook-ci-not-a-real-secret')
+          anon_jwt="$header.$anon_payload.$sig"
+          service_jwt="$header.$service_payload.$sig"
+          echo "::add-mask::$anon_jwt"
+          echo "::add-mask::$service_jwt"
+          {
+            echo "SUPABASE_ANON_KEY=$anon_jwt"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$service_jwt"
+          } >> "$GITHUB_ENV"
+
+      - name: Run pytest
+        run: pytest -q --maxfail=3
+        env:
+          FLASK_ENV: testing
+          PYTHONDONTWRITEBYTECODE: '1'
+          SUPABASE_URL: 'http://test.invalid'

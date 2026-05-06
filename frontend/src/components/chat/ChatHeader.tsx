@@ -147,11 +147,12 @@ export const ChatHeader: React.FC<ChatHeaderProps> = React.memo(({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2 px-2 py-1 bg-muted/50 rounded-md cursor-default min-w-[90px]">
-                    <div className="flex-1 space-y-0.5">
+                  <div className="flex items-center gap-2 px-2 py-1 bg-muted/50 rounded-md cursor-default sm:min-w-[90px]">
+                    <div className="flex-1 space-y-0.5 min-w-[44px]">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-medium text-muted-foreground tabular-nums">
-                          ${userUsage.current_spend.toFixed(2)}/${userUsage.cost_limit}
+                        <span className="text-[10px] font-medium text-muted-foreground tabular-nums whitespace-nowrap">
+                          <span className="hidden sm:inline">${userUsage.current_spend.toFixed(2)}/${userUsage.cost_limit}</span>
+                          <span className="sm:hidden">${userUsage.current_spend.toFixed(0)}/${userUsage.cost_limit}</span>
                         </span>
                       </div>
                       <div className="h-1 w-full bg-stone-200 rounded-full overflow-hidden">

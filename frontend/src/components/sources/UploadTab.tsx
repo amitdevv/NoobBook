@@ -111,7 +111,17 @@ export const UploadTab: React.FC<UploadTabProps> = ({
   };
 
   return (
-    <>
+    <div
+      // Sheet-wide drop target. The dashed zone below is the visual cue,
+      // but a drag anywhere inside the tab keeps it active and a drop
+      // anywhere lands in the same upload pipeline. Stops the
+      // "I dropped right next to the box and nothing happened" miss.
+      onDragEnter={handleDrag}
+      onDragLeave={handleDrag}
+      onDragOver={handleDrag}
+      onDrop={handleDrop}
+      className="relative"
+    >
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -122,17 +132,14 @@ export const UploadTab: React.FC<UploadTabProps> = ({
         accept={ACCEPTED_FILE_TYPES}
       />
 
-      {/* Drag & Drop Zone */}
+      {/* Drag & Drop Zone — purely visual now; drop logic lives on the
+          wrapper above so the entire tab area is a valid drop target. */}
       <div
         className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
           dragActive
             ? 'border-primary bg-primary/5'
             : 'border-muted-foreground/25'
         } ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
       >
         {uploading ? (
           <>
@@ -188,6 +195,6 @@ export const UploadTab: React.FC<UploadTabProps> = ({
           <AlertDescription>{validationError}</AlertDescription>
         </Alert>
       )}
-    </>
+    </div>
   );
 };
