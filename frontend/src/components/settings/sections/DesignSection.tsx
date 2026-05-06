@@ -13,6 +13,7 @@ import {
   Diamond,
   BookOpen,
   Sliders,
+  FileText,
 } from '@phosphor-icons/react';
 import {
   ColorsSection,
@@ -20,11 +21,12 @@ import {
   LogosSection,
   IconsSection,
   GuidelinesSection,
+  DesignSpecSection,
   FeatureSettingsSection,
 } from '../../brand/sections';
 import { BrandConfigProvider } from '@/components/brand/BrandConfigContext';
 
-type DesignTab = 'colors' | 'typography' | 'logos' | 'icons' | 'guidelines' | 'features';
+type DesignTab = 'colors' | 'typography' | 'logos' | 'icons' | 'guidelines' | 'spec' | 'features';
 
 interface TabItem {
   id: DesignTab;
@@ -38,6 +40,7 @@ const tabs: TabItem[] = [
   { id: 'logos', label: 'Logos', icon: <Image size={16} /> },
   { id: 'icons', label: 'Icons', icon: <Diamond size={16} /> },
   { id: 'guidelines', label: 'Guidelines', icon: <BookOpen size={16} /> },
+  { id: 'spec', label: 'Spec', icon: <FileText size={16} /> },
   { id: 'features', label: 'Features', icon: <Sliders size={16} /> },
 ];
 
@@ -102,6 +105,8 @@ export const DesignSection: React.FC = () => {
                     return <IconsSection />;
                   case 'guidelines':
                     return <GuidelinesSection />;
+                  case 'spec':
+                    return <DesignSpecSection />;
                   case 'features':
                     return <FeatureSettingsSection />;
                   default:
