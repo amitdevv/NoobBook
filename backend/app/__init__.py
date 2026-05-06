@@ -10,6 +10,7 @@ import os
 from flask import Flask, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import config
 from app.utils.logger import setup_logging
@@ -36,6 +37,18 @@ def create_app(config_name='development'):
     app.config.from_object(config[config_name])
     setup_logging(app.config.get('LOG_LEVEL', 'DEBUG'))
     config[config_name].init_app(app)
+
+    # Honor X-Forwarded-* headers when running behind Coolify's reverse
+    # proxy (nginx/Traefik terminates HTTPS, then forwards over plain
+    # HTTP to the backend container). Without this, request.host_url and
+    # request.scheme report the inner http:// origin, and any URL we
+    # generate from them — like Supabase signed URLs we hand back to
+    # the browser — gets blocked as mixed content from the https:// page.
+    # Trust exactly one level of proxy: the Coolify edge.
+    if config_name == 'production':
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app, x_proto=1, x_host=1, x_for=1, x_prefix=1
+        )
 
     # Ensure base directories exist before any routes access them
     from app.utils.path_utils import ensure_base_directories
