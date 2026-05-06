@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash, Clock, PencilSimple } from '@phosphor-icons/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -44,6 +44,19 @@ export const ProjectList: React.FC<ProjectListProps> = ({
   refreshTrigger = 0
 }) => {
   const [projects, setProjects] = useState<Project[]>([]);
+
+  // Sort by most-recently-opened so the project a user usually returns to
+  // floats to the top. Falls back to updated_at and finally created_at if
+  // last_accessed isn't populated yet (older rows from before that column
+  // was added). Projects whose timestamps are missing land at the bottom.
+  const sortedProjects = useMemo(() => {
+    const tsOf = (p: Project) => {
+      const t = p.last_accessed || p.updated_at || p.created_at;
+      const ms = t ? Date.parse(t) : 0;
+      return Number.isNaN(ms) ? 0 : ms;
+    };
+    return [...projects].sort((a, b) => tsOf(b) - tsOf(a));
+  }, [projects]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -148,8 +161,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({
         </CardContent>
       </Card>
 
-      {/* Existing Projects */}
-      {projects.map((project) => (
+      {/* Existing Projects, most-recently-opened first */}
+      {sortedProjects.map((project) => (
         <Card
           key={project.id}
           className="cursor-pointer hover:bg-stone-50 transition-colors"
