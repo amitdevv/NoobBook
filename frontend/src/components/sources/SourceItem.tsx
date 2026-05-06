@@ -182,14 +182,6 @@ const getStatusDisplay = (status: Source['status'], source?: Source) => {
         animate: true,
         tooltip: 'Embedding...',
       };
-    case 'uploaded':
-      // Queued — file is uploaded, waiting for processing to start.
-      return {
-        icon: CircleNotch,
-        color: 'text-stone-500',
-        animate: false,
-        tooltip: 'Waiting to process',
-      };
     case 'ready':
       return {
         icon: CheckCircle,

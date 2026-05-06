@@ -136,7 +136,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
       await onSignOut();
       // Auth gate will navigate; setSigningOut(false) is unnecessary on
       // success and would race the unmount, so we skip it.
-    } catch (_err) {
+    } catch {
       setSigningOut(false);
       setSignOutOpen(false);
     }

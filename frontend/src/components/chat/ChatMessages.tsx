@@ -469,15 +469,18 @@ const OPENER_HOLD_MS = 1600;
 
 const ReadingIndicator: React.FC = () => {
   // Shuffle the pool once per mount so each chat feels fresh; keep ordering
-  // stable across phase ticks within the same waiting window.
-  const queue = useMemo(() => {
+  // stable across phase ticks within the same waiting window. We use a
+  // lazy-init useState rather than useMemo because shuffling pulls
+  // Math.random — the React compiler flags impure calls inside useMemo,
+  // but the lazy initializer is the canonical "run once at mount" hook.
+  const [queue] = useState(() => {
     const pool = [...THINKING_PHRASES];
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
     return pool;
-  }, []);
+  });
 
   const [step, setStep] = useState(0); // 0 = opener, 1+ = queue[step-1]
 
