@@ -23,8 +23,14 @@ import io
 import logging
 from flask import request, jsonify, g, send_file
 from app.api.brand import brand_bp
+from app.config import prompt_loader
+from app.services.auth.rbac import require_admin
 from app.services.data_services import brand_asset_service, brand_config_service
+from app.services.data_services.brand_config_service import read_design_md_sample
+from app.services.integrations.claude import claude_service
 from app.services.integrations.supabase import storage_service
+from app.utils import claude_parsing_utils
+from app.utils.cost_tracking import record_user_only_usage
 
 logger = logging.getLogger(__name__)
 
@@ -454,6 +460,7 @@ def update_config():
             typography=data.get('typography'),
             spacing=data.get('spacing'),
             guidelines=data.get('guidelines'),
+            design_md=data.get('design_md'),
             best_practices=data.get('best_practices'),
             voice=data.get('voice'),
             feature_settings=data.get('feature_settings')
@@ -684,3 +691,181 @@ def update_feature_settings():
             "success": False,
             "error": f"Failed to update feature settings: {str(e)}"
         }), 500
+
+
+# =============================================================================
+# DESIGN.MD ENDPOINTS
+# =============================================================================
+# The long-form design specification lives alongside the structured brand-kit.
+# Studio agents pick it up automatically through brand_context_loader, so the
+# only surface area here is read / write / AI-bootstrap. Bootstrap drafts a
+# starting markdown blob for admin review — it does NOT persist on its own,
+# so the admin can edit before saving.
+
+_DESIGN_MD_MAX_CHARS = 32000
+
+
+@brand_bp.route('/brand/design', methods=['GET'])
+def get_design_md():
+    """
+    Return the saved design.md, or the bundled sample when never customized.
+
+    Distinct return shape vs the structured config so the frontend can show
+    "this is your bundled starting point" once and then "this is what you
+    saved" thereafter. Single DB lookup — sample is read from disk when
+    the column is NULL.
+    """
+    try:
+        user_id = g.user_id
+        config = brand_config_service.get_config(user_id)
+        stored = config.get("design_md")
+        is_sample = stored is None
+        content = read_design_md_sample() if is_sample else stored
+
+        return jsonify({
+            "success": True,
+            "design_md": content,
+            "is_sample": is_sample,
+        }), 200
+
+    except Exception as e:
+        logger.exception("Failed to load design.md for user")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@brand_bp.route('/brand/design/sample', methods=['GET'])
+def get_design_md_sample():
+    """
+    Return the bundled design.md template without persisting anything.
+
+    Used by the frontend's "Reset to template" action when the page hasn't
+    cached the sample locally — fetching this is cheaper and clearer than
+    round-tripping a clear-then-reload through the DB (which would also
+    destroy the user's saved spec, exactly the bug we want to avoid).
+    """
+    return jsonify({
+        "success": True,
+        "design_md": read_design_md_sample(),
+    }), 200
+
+
+@brand_bp.route('/brand/design', methods=['PUT'])
+@require_admin
+def update_design_md():
+    """
+    Save a new design.md spec for the workspace.
+
+    Empty string is allowed and means "explicitly cleared" — agents will see
+    no design.md block. Cap at 32k chars so a runaway paste doesn't blow up
+    the system prompt for every studio call.
+    """
+    try:
+        user_id = g.user_id
+        data = request.get_json() or {}
+
+        if "design_md" not in data:
+            return jsonify({"success": False, "error": "design_md is required"}), 400
+
+        content = data["design_md"]
+        if not isinstance(content, str):
+            return jsonify({"success": False, "error": "design_md must be a string"}), 400
+
+        if len(content) > _DESIGN_MD_MAX_CHARS:
+            return jsonify({
+                "success": False,
+                "error": f"design.md exceeds {_DESIGN_MD_MAX_CHARS} character limit",
+            }), 400
+
+        updated = brand_config_service.update_design_md(user_id, content)
+
+        return jsonify({
+            "success": True,
+            "config": updated,
+            "message": "Design specification saved",
+        }), 200
+
+    except Exception as e:
+        logger.exception("Failed to save design.md")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@brand_bp.route('/brand/design/bootstrap', methods=['POST'])
+@require_admin
+def bootstrap_design_md():
+    """
+    Draft an initial design.md from a few brand-description fields.
+
+    Returns the drafted markdown WITHOUT persisting — the admin reviews and
+    optionally edits in the UI before hitting Save (which calls PUT
+    /brand/design separately). Cost-tracked via project_id when available
+    so a workspace's bootstrap calls land somewhere visible.
+    """
+    try:
+        user_id = g.user_id
+        data = request.get_json() or {}
+
+        brand_name = (data.get("brand_name") or "").strip()
+        industry = (data.get("industry") or "").strip()
+        primary_color = (data.get("primary_color") or "").strip()
+        vibe = data.get("vibe") or []
+        if isinstance(vibe, str):
+            vibe = [v.strip() for v in vibe.split(",") if v.strip()]
+
+        if not brand_name:
+            return jsonify({"success": False, "error": "brand_name is required"}), 400
+
+        prompt_config = prompt_loader.get_prompt_config("design_md_bootstrap")
+        if not prompt_config:
+            return jsonify({
+                "success": False,
+                "error": "design_md_bootstrap prompt config not found",
+            }), 500
+
+        vibe_str = ", ".join(vibe) if vibe else "(not specified — pick something appropriate)"
+        user_message = (
+            f"Brand name: {brand_name}\n"
+            f"Industry: {industry or '(not specified)'}\n"
+            f"Vibe / personality: {vibe_str}\n"
+            f"Primary color: {primary_color or '(not specified — propose one)'}\n\n"
+            "Draft the full design.md now."
+        )
+
+        response = claude_service.send_message(
+            messages=[{"role": "user", "content": user_message}],
+            system_prompt=prompt_config["system_prompt"],
+            model=prompt_config["model"],
+            max_tokens=prompt_config["max_tokens"],
+            temperature=prompt_config["temperature"],
+            user_id=user_id,
+            tags=["brand", "design_md_bootstrap"],
+        )
+
+        markdown = claude_parsing_utils.extract_text(response).strip()
+        if not markdown:
+            return jsonify({
+                "success": False,
+                "error": "Bootstrap returned empty content; try again with more detail.",
+            }), 502
+
+        # Workspace-level admin call has no project to attribute to — but the
+        # cost still has to count against the admin's period spend so quotas
+        # apply. claude_service skips its own cost-tracking branch when
+        # project_id is missing, so we record manually here.
+        usage = response.get("usage") or {}
+        call_cost = record_user_only_usage(
+            user_id=user_id,
+            model=prompt_config["model"],
+            input_tokens=int(usage.get("input_tokens") or 0),
+            output_tokens=int(usage.get("output_tokens") or 0),
+        )
+
+        return jsonify({
+            "success": True,
+            "design_md": markdown,
+            "usage": usage,
+            "cost": call_cost,
+        }), 200
+
+    except Exception as e:
+        logger.exception("design.md bootstrap failed")
+        return jsonify({"success": False, "error": str(e)}), 500

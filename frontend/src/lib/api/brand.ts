@@ -200,11 +200,33 @@ export interface BrandConfig {
   typography: Typography;
   spacing: Spacing;
   guidelines?: string;
+  design_md?: string | null;
   best_practices: BestPractices;
   voice: BrandVoice;
   feature_settings: FeatureSettings;
   created_at: string;
   updated_at: string;
+}
+
+export interface DesignMdResponse {
+  success: boolean;
+  design_md: string;
+  is_sample: boolean;
+  error?: string;
+}
+
+export interface DesignMdBootstrapInput {
+  brand_name: string;
+  industry?: string;
+  vibe?: string[];
+  primary_color?: string;
+}
+
+export interface DesignMdBootstrapResponse {
+  success: boolean;
+  design_md: string;
+  usage?: { input_tokens?: number; output_tokens?: number };
+  error?: string;
 }
 
 // =============================================================================
@@ -345,6 +367,36 @@ export const brandAPI = {
    */
   updateFeatureSettings: (featureSettings: FeatureSettings) =>
     api.put<ConfigResponse>('/brand/config/features', { feature_settings: featureSettings }),
+
+  // =========================================================================
+  // DESIGN.MD SPEC
+  // =========================================================================
+
+  /**
+   * Get the saved design.md, or the bundled sample if never customized.
+   * `is_sample: true` lets the editor show a "this is a starting point" hint.
+   */
+  getDesignMd: () => api.get<DesignMdResponse>('/brand/design'),
+
+  /**
+   * Fetch the bundled template without touching the saved spec — used by
+   * "Reset to template" so the user's content isn't destroyed before they
+   * decide whether to Save the reset.
+   */
+  getDesignMdSample: () => api.get<{ success: boolean; design_md: string }>('/brand/design/sample'),
+
+  /**
+   * Save the design.md spec. Empty string clears it.
+   */
+  updateDesignMd: (designMd: string) =>
+    api.put<ConfigResponse>('/brand/design', { design_md: designMd }),
+
+  /**
+   * Draft a starting design.md from a few brand-description fields.
+   * The result is returned for review — call updateDesignMd separately to save.
+   */
+  bootstrapDesignMd: (input: DesignMdBootstrapInput) =>
+    api.post<DesignMdBootstrapResponse>('/brand/design/bootstrap', input),
 };
 
 // =============================================================================

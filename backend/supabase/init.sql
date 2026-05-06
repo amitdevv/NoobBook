@@ -308,6 +308,7 @@ CREATE TABLE IF NOT EXISTS brand_config (
     "section": "4rem"
   }'::jsonb,
   guidelines TEXT,
+  design_md TEXT,
   best_practices JSONB DEFAULT '{"dos": [], "donts": []}'::jsonb,
   voice JSONB DEFAULT '{"tone": "professional", "personality": [], "keywords": []}'::jsonb,
   feature_settings JSONB DEFAULT '{
