@@ -182,6 +182,14 @@ const getStatusDisplay = (status: Source['status'], source?: Source) => {
         animate: true,
         tooltip: 'Embedding...',
       };
+    case 'uploaded':
+      // Queued — file is uploaded, waiting for processing to start.
+      return {
+        icon: CircleNotch,
+        color: 'text-stone-500',
+        animate: false,
+        tooltip: 'Waiting to process',
+      };
     case 'ready':
       return {
         icon: CheckCircle,
@@ -199,6 +207,50 @@ const getStatusDisplay = (status: Source['status'], source?: Source) => {
     default:
       return null;
   }
+};
+
+/**
+ * SourceStageChip — small editorial pill showing the AI's current pass over
+ * a source. Reuses the `reading-breathe` keyframe from the chat surface so
+ * the visual language stays coherent across the app.
+ */
+const SourceStageChip: React.FC<{ status: Source['status'] }> = ({ status }) => {
+  if (status === 'ready') return null;
+
+  const config: Record<string, { label: string; classes: string; pulse: boolean }> = {
+    uploaded: {
+      label: 'Queued',
+      classes: 'border-stone-200 bg-stone-50 text-stone-600',
+      pulse: false,
+    },
+    processing: {
+      label: 'Reading',
+      classes: 'border-amber-200 bg-amber-50 text-amber-800',
+      pulse: true,
+    },
+    embedding: {
+      label: 'Indexing',
+      classes: 'border-sky-200 bg-sky-50 text-sky-700',
+      pulse: true,
+    },
+    error: {
+      label: 'Failed',
+      classes: 'border-rose-200 bg-rose-50 text-rose-700',
+      pulse: false,
+    },
+  };
+
+  const c = config[status];
+  if (!c) return null;
+
+  return (
+    <span
+      className={`inline-flex flex-shrink-0 items-center gap-1 rounded-full border px-1.5 py-0 text-[10px] font-medium leading-[14px] ${c.classes}`}
+      style={c.pulse ? { animation: 'reading-breathe 2.4s ease-in-out infinite' } : undefined}
+    >
+      {c.label}
+    </span>
+  );
 };
 
 export const SourceItem: React.FC<SourceItemProps> = ({
@@ -256,7 +308,7 @@ export const SourceItem: React.FC<SourceItemProps> = ({
     <div
       onClick={handleRowClick}
       className={`grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 p-2 rounded-lg hover:bg-accent group transition-colors ${
-        isActivelyWorking ? 'opacity-60' : ''
+        isActivelyWorking ? 'opacity-90' : ''
       } ${canView ? 'cursor-pointer' : ''}`}
     >
       {/* Icon Area - Shows category icon, transforms to menu on hover */}
@@ -327,20 +379,29 @@ export const SourceItem: React.FC<SourceItemProps> = ({
 
       {/* Source Info - truncates when panel is narrow, expands when resized */}
       <div className="overflow-hidden">
-        <p className="text-sm truncate" title={source.name}>
-          {source.name}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm truncate" title={source.name}>
+            {source.name}
+          </p>
+          {/* Stage chip — shows the AI's current pass over this source.
+             Editorial language ("Queued / Reading / Indexing / Failed")
+             matches the rest of NoobBook's voice and reads at a glance. */}
+          {source.status !== 'ready' && (
+            <SourceStageChip status={source.status} />
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <p className="text-xs text-muted-foreground">
             {formatFileSize(source.file_size)}
           </p>
-          {/* Status indicator text for non-ready states */}
-          {source.status !== 'ready' && statusDisplay && (
+          {/* For error state, surface the failure reason inline; healthy
+             stages already speak through the chip above. */}
+          {source.status === 'error' && statusDisplay && (
             <span
               className={`text-xs ${statusDisplay.color} truncate max-w-[140px]`}
               title={statusDisplay.tooltip}
             >
-              {source.status === 'error' ? 'Processing failed' : statusDisplay.tooltip}
+              {statusDisplay.tooltip}
             </span>
           )}
         </div>

@@ -134,7 +134,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   selectedSourceIds = [],
   onSelectedSourcesChange,
 }) => {
-  const { toasts, dismissToast, success, error, info } = useToast();
+  const { toasts, dismissToast, success, error, info, showToast } = useToast();
 
   // State
   const [sources, setSources] = useState<Source[]>([]);
@@ -339,13 +339,20 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     } catch (err: unknown) {
       log.error({ err }, 'failed to upload files');
       const errorMessage = err instanceof Error ? err.message : 'Upload failed';
-      // Check if it's an axios error with response data
+      // Pull the user-facing error out of an axios envelope when present.
+      let resolvedMessage = errorMessage;
       if (typeof err === 'object' && err !== null && 'response' in err) {
         const axiosErr = err as { response?: { data?: { error?: string } } };
-        error(axiosErr.response?.data?.error || errorMessage);
-      } else {
-        error(errorMessage);
+        resolvedMessage = axiosErr.response?.data?.error || errorMessage;
       }
+      // Inline Retry on the toast: one click re-runs the same upload batch
+      // without making the user re-pick files. Snapshot the original list
+      // so the closure stays stable even after `setUploading(false)`.
+      const retryFiles = fileArray;
+      showToast('error', resolvedMessage, {
+        label: 'Retry',
+        onClick: () => handleFileUpload(retryFiles),
+      });
     } finally {
       setUploading(false);
       setUploadProgress(null);
