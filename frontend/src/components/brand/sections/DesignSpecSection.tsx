@@ -99,7 +99,7 @@ export const DesignSpecSection: React.FC = () => {
       }
     } catch (err) {
       log.error({ err }, 'failed to load design.md');
-      showError({ title: 'Could not load design spec', description: 'Try refreshing.' });
+      showError('Could not load design spec. Try refreshing.');
     } finally {
       setLoading(false);
     }
@@ -121,10 +121,9 @@ export const DesignSpecSection: React.FC = () => {
 
   const handleSave = useCallback(async () => {
     if (overCap) {
-      showError({
-        title: 'Spec is too long',
-        description: `Trim to under ${formatNumber(TOKEN_HARD_CAP)} tokens (~${formatNumber(CHAR_HARD_CAP)} chars).`,
-      });
+      showError(
+        `Spec is too long. Trim to under ${formatNumber(TOKEN_HARD_CAP)} tokens (~${formatNumber(CHAR_HARD_CAP)} chars).`,
+      );
       return;
     }
     setSaving(true);
@@ -137,11 +136,11 @@ export const DesignSpecSection: React.FC = () => {
         if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
         savedFlashTimer.current = setTimeout(() => setSavedRecently(false), 1500);
       } else {
-        showError({ title: 'Save failed', description: data.error });
+        showError(data.error || 'Save failed');
       }
     } catch (err) {
       log.error({ err }, 'failed to save design.md');
-      showError({ title: 'Save failed', description: 'Could not save. Try again.' });
+      showError('Could not save. Try again.');
     } finally {
       setSaving(false);
     }
@@ -154,7 +153,7 @@ export const DesignSpecSection: React.FC = () => {
     // current saved content stays intact until they decide.
     if (sampleSnapshotRef.current) {
       setContent(sampleSnapshotRef.current);
-      showSuccess({ title: 'Reset to bundled template', description: 'Edit and Save when ready.' });
+      showSuccess('Reset to bundled template. Edit and Save when ready.');
       return;
     }
     void (async () => {
@@ -163,10 +162,10 @@ export const DesignSpecSection: React.FC = () => {
         if (!data.success) throw new Error('sample fetch failed');
         sampleSnapshotRef.current = data.design_md;
         setContent(data.design_md);
-        showSuccess({ title: 'Reset to bundled template', description: 'Edit and Save when ready.' });
+        showSuccess('Reset to bundled template. Edit and Save when ready.');
       } catch (err) {
         log.error({ err }, 'reset failed');
-        showError({ title: 'Reset failed', description: 'Could not load the template.' });
+        showError('Could not load the template.');
       }
     })();
   }, [showError, showSuccess]);
@@ -174,10 +173,7 @@ export const DesignSpecSection: React.FC = () => {
   const handleBootstrapResult = useCallback((markdown: string) => {
     setContent(markdown);
     setBootstrapOpen(false);
-    showSuccess({
-      title: 'Draft generated',
-      description: 'Review and Save when you\'re happy with it.',
-    });
+    showSuccess('Draft generated. Review and Save when you\'re happy with it.');
   }, [showSuccess]);
 
   return (

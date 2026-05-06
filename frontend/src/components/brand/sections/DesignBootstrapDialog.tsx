@@ -69,7 +69,7 @@ export const DesignBootstrapDialog: React.FC<DesignBootstrapDialogProps> = ({
   const handleSubmit = useCallback(async () => {
     const trimmed = brandName.trim();
     if (!trimmed) {
-      showError({ title: 'Brand name is required' });
+      showError('Brand name is required');
       return;
     }
 
@@ -83,14 +83,14 @@ export const DesignBootstrapDialog: React.FC<DesignBootstrapDialogProps> = ({
       });
 
       if (!data.success) {
-        showError({ title: 'Bootstrap failed', description: data.error });
+        showError(data.error || 'Bootstrap failed');
         return;
       }
       onResult(data.design_md);
       reset();
     } catch (err) {
       log.error({ err }, 'bootstrap call failed');
-      showError({ title: 'Bootstrap failed', description: 'Could not draft a spec. Try again.' });
+      showError('Could not draft a spec. Try again.');
     } finally {
       setSubmitting(false);
     }
