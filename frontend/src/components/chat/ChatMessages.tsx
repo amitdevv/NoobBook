@@ -10,7 +10,7 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Ghost, FileText, Copy, Check, DownloadSimple } from '@phosphor-icons/react';
+import { Ghost, FileText, Copy, Check, DownloadSimple, ArrowDown } from '@phosphor-icons/react';
 import type { Message } from '../../lib/api/chats';
 import { parseCitations } from '../../lib/citations';
 import { CitationBadge } from './CitationBadge';
@@ -26,6 +26,7 @@ import {
 } from '../ui/tooltip';
 import { copyToClipboard } from '@/lib/clipboard';
 import { createLogger } from '@/lib/logger';
+import { cn } from '@/lib/utils';
 
 const log = createLogger('chat-messages');
 
@@ -555,6 +556,11 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
   // Track if user has manually scrolled away from bottom
   const userScrolledAwayRef = useRef(false);
 
+  // Mirror of userScrolledAwayRef for rendering the "Jump to latest" reading
+  // marker — refs don't trigger re-renders, so we keep a state copy that the
+  // scroll handler updates only on threshold crossings (not every pixel).
+  const [showJumpMarker, setShowJumpMarker] = useState(false);
+
   // Track previous message count to detect initial load
   const prevMessageCountRef = useRef(0);
 
@@ -592,16 +598,25 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
     // User is "back at bottom" if within 50px (with some tolerance)
     if (distanceFromBottom > 150) {
       userScrolledAwayRef.current = true;
+      if (!showJumpMarker) setShowJumpMarker(true);
     } else if (distanceFromBottom < 50) {
       userScrolledAwayRef.current = false;
+      if (showJumpMarker) setShowJumpMarker(false);
     }
   };
 
+  const jumpToLatest = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    userScrolledAwayRef.current = false;
+    setShowJumpMarker(false);
+  };
+
   return (
+    <div className="relative flex-1 min-h-0 min-w-0 w-full bg-white">
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden bg-white"
+      className="absolute inset-0 overflow-y-auto overflow-x-hidden"
     >
       <div className="pt-6 pb-2 px-6 space-y-4 w-full">
         {messages.filter((msg) => msg && msg.id).map((msg) => (
@@ -637,6 +652,34 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
         {/* Invisible element to scroll to */}
         <div ref={messagesEndRef} />
       </div>
+    </div>
+
+    {/* Reading marker — appears only when the user has scrolled away from the
+       latest message. Editorial styling: amber pill with serif label, breath
+       animation matches the Reading Beat so the chat surface feels coherent. */}
+    {showJumpMarker && (
+      <button
+        type="button"
+        onClick={jumpToLatest}
+        aria-label="Jump to latest message"
+        className={cn(
+          'group absolute bottom-4 right-5 z-10 inline-flex items-center gap-1.5',
+          'rounded-full border border-amber-200/80 bg-white/85 px-3 py-1.5',
+          'text-xs font-medium text-amber-800 shadow-[0_4px_14px_-4px_rgba(217,119,6,0.35)]',
+          'backdrop-blur-md transition-all duration-200',
+          'hover:border-amber-300 hover:bg-white hover:text-amber-900 hover:shadow-[0_6px_18px_-4px_rgba(217,119,6,0.45)]',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+        )}
+        style={{ animation: 'reading-bubble-in 240ms ease-out both' }}
+      >
+        <span className="font-serif italic tracking-tight">Jump to latest</span>
+        <ArrowDown
+          size={13}
+          weight="bold"
+          className="transition-transform duration-200 group-hover:translate-y-0.5"
+        />
+      </button>
+    )}
     </div>
   );
 });

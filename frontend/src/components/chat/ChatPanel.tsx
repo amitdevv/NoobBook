@@ -774,6 +774,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       <>
         <ChatList
           chats={allChats}
+          sendingChatIds={sendingChatIds}
           onSelectChat={handleSelectChat}
           onDeleteChat={handleDeleteChat}
           onRenameChat={handleRenameChat}

@@ -23,6 +23,12 @@ import type { ChatMetadata } from '../../lib/api/chats';
 
 interface ChatListProps {
   chats: ChatMetadata[];
+  /**
+   * IDs of chats that are currently mid-stream (waiting on the assistant).
+   * Used to render a soft amber heartbeat next to those rows so users can see
+   * which conversation the AI is answering when they switch back to the list.
+   */
+  sendingChatIds?: Set<string>;
   onSelectChat: (chatId: string) => void;
   onDeleteChat: (chatId: string) => void;
   onRenameChat: (chatId: string, newTitle: string) => void;
@@ -50,6 +56,7 @@ const formatRelativeTime = (timestamp: string): string => {
 
 export const ChatList: React.FC<ChatListProps> = ({
   chats,
+  sendingChatIds,
   onSelectChat,
   onDeleteChat,
   onRenameChat,
@@ -144,10 +151,16 @@ export const ChatList: React.FC<ChatListProps> = ({
                 Try a different search term
               </p>
             </div>
-          ) : filteredChats.map((chat) => (
+          ) : filteredChats.map((chat) => {
+            const isSending = sendingChatIds?.has(chat.id) ?? false;
+            return (
             <div
               key={chat.id}
-              className="p-3 border rounded-lg hover:bg-accent transition-colors group"
+              className={
+                isSending
+                  ? 'p-3 border border-amber-200 bg-amber-50/40 rounded-lg hover:bg-amber-50 transition-colors group'
+                  : 'p-3 border rounded-lg hover:bg-accent transition-colors group'
+              }
             >
               <div className="flex items-start justify-between mb-1">
                 <div
@@ -155,8 +168,26 @@ export const ChatList: React.FC<ChatListProps> = ({
                   onClick={() => onSelectChat(chat.id)}
                 >
                   <div className="flex items-center gap-2">
-                    <Hash size={16} className="text-muted-foreground" />
+                    {isSending ? (
+                      <span
+                        aria-label="Assistant is replying"
+                        title="Assistant is replying"
+                        className="inline-flex h-2.5 w-2.5 flex-shrink-0 items-center justify-center"
+                      >
+                        <span
+                          className="h-2 w-2 rounded-full bg-amber-500"
+                          style={{ animation: 'reading-breathe 1.6s ease-in-out infinite' }}
+                        />
+                      </span>
+                    ) : (
+                      <Hash size={16} className="text-muted-foreground" />
+                    )}
                     <h3 className="font-medium text-sm">{chat.title}</h3>
+                    {isSending && (
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-amber-700/80 italic font-serif normal-case">
+                        replying
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -195,7 +226,8 @@ export const ChatList: React.FC<ChatListProps> = ({
                 {chat.message_count} messages
               </p>
             </div>
-          ))}
+            );
+          })}
         </div>
       </ScrollArea>
     </div>
