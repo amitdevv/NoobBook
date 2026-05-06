@@ -11,12 +11,62 @@ Files are organized in buckets:
 File paths follow the pattern: {project_id}/{source_id}/{filename}
 """
 import logging
+import os
 from typing import Optional, BinaryIO, List, Dict, Any, Union
 from pathlib import Path
 
 from app.services.integrations.supabase import get_supabase, is_supabase_enabled
 
 logger = logging.getLogger(__name__)
+
+
+def _rewrite_signed_url_for_browser(signed_url: Optional[str]) -> Optional[str]:
+    """
+    Swap the internal host on a Supabase signed URL for a browser-reachable
+    one so the PDF / image / audio preview actually loads.
+
+    Self-hosted Supabase signs URLs with whatever host is in SUPABASE_URL —
+    usually the internal Docker hostname like ``http://kong:8000``. The
+    browser can't resolve that, so the preview fails with a generic
+    "Failed to load …".
+
+    Resolution order for the public host:
+
+    1. The *current request's* origin (``request.host_url``). If we got
+       called inside an HTTP handler, the user's browser by definition
+       reached us at that origin — and our nginx config proxies
+       ``/storage/*`` to Kong on the same origin, so the same host serves
+       both API and storage. No config required.
+    2. ``SUPABASE_PUBLIC_URL`` env var, for callers outside the request
+       context (background jobs, CLI tasks).
+
+    No-op when the URL doesn't start with the internal host (already
+    public) — keeps local dev, where ``SUPABASE_URL=http://localhost:8000``
+    is already browser-reachable, working without changes.
+    """
+    if not signed_url:
+        return signed_url
+    internal = os.getenv("SUPABASE_URL")
+    if not internal or not signed_url.startswith(internal):
+        return signed_url
+
+    public: Optional[str] = None
+    try:
+        # Local import: avoid a hard Flask dependency at module load so
+        # this service stays usable in non-request contexts (workers).
+        from flask import request, has_request_context
+
+        if has_request_context():
+            public = (request.host_url or "").rstrip("/")
+    except Exception:  # pragma: no cover — defensive
+        public = None
+
+    if not public:
+        public = (os.getenv("SUPABASE_PUBLIC_URL") or "").rstrip("/")
+
+    if not public or public == internal:
+        return signed_url
+    return public + signed_url[len(internal):]
 
 
 # Bucket names
@@ -271,7 +321,7 @@ def get_raw_file_url(project_id: str, source_id: str, filename: str, expires_in:
 
     try:
         response = client.storage.from_(BUCKET_RAW).create_signed_url(path, expires_in)
-        return response.get("signedURL")
+        return _rewrite_signed_url_for_browser(response.get("signedURL"))
     except Exception as e:
         logger.error("Failed to get signed URL for %s: %s", path, e)
         return None
@@ -865,7 +915,7 @@ def get_studio_signed_url(
 
     try:
         response = client.storage.from_(BUCKET_STUDIO).create_signed_url(path, expires_in)
-        return response.get("signedURL")
+        return _rewrite_signed_url_for_browser(response.get("signedURL"))
     except Exception as e:
         logger.error("Failed to get signed URL for %s: %s", path, e)
         return None
@@ -954,7 +1004,7 @@ def get_ai_image_url(
 
     try:
         response = client.storage.from_(BUCKET_STUDIO).create_signed_url(path, expires_in)
-        return response.get("signedURL")
+        return _rewrite_signed_url_for_browser(response.get("signedURL"))
     except Exception as e:
         logger.error("Failed to get AI image URL for %s: %s", path, e)
         return None
@@ -1114,7 +1164,7 @@ def get_brand_asset_url(
 
     try:
         response = client.storage.from_(BUCKET_BRAND_ASSETS).create_signed_url(path, expires_in)
-        return response.get("signedURL")
+        return _rewrite_signed_url_for_browser(response.get("signedURL"))
     except Exception as e:
         logger.error("Failed to get brand asset signed URL for %s: %s", path, e)
         return None
