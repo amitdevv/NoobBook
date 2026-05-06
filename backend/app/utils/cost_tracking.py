@@ -407,6 +407,31 @@ def check_user_spending_limit(user_id: Optional[str]) -> Optional[str]:
         return None  # Fail open — don't block on errors
 
 
+def record_user_only_usage(
+    user_id: str,
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+) -> float:
+    """
+    Track an API call against a user's period spend without a project.
+
+    Workspace-level admin operations (e.g. design.md bootstrap) have no
+    project to attribute cost to, so they don't show up in per-project
+    cost dashboards. This still counts the call against the user's
+    spending limit / period_spend so it can't be abused to bypass quotas.
+
+    Returns the computed cost for the call (0.0 if untracked).
+    """
+    if not user_id:
+        return 0.0
+    model_key = _get_model_key(model)
+    cost = _calculate_cost(model_key, input_tokens, output_tokens)
+    if cost > 0:
+        record_user_period_spend(user_id, cost)
+    return cost
+
+
 def record_user_period_spend(user_id: Optional[str], call_cost: float) -> None:
     """
     Increment the user's period_spend after a successful API call.

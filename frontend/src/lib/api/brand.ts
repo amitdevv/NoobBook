@@ -379,6 +379,13 @@ export const brandAPI = {
   getDesignMd: () => api.get<DesignMdResponse>('/brand/design'),
 
   /**
+   * Fetch the bundled template without touching the saved spec — used by
+   * "Reset to template" so the user's content isn't destroyed before they
+   * decide whether to Save the reset.
+   */
+  getDesignMdSample: () => api.get<{ success: boolean; design_md: string }>('/brand/design/sample'),
+
+  /**
    * Save the design.md spec. Empty string clears it.
    */
   updateDesignMd: (designMd: string) =>

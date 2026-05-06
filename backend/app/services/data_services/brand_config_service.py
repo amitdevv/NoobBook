@@ -22,6 +22,15 @@ logger = logging.getLogger(__name__)
 _DESIGN_MD_SAMPLE_PATH = Path(__file__).resolve().parents[3] / "data" / "samples" / "design_md_sample.md"
 
 
+def read_design_md_sample() -> str:
+    """Return the bundled design.md template, or empty string if missing."""
+    try:
+        return _DESIGN_MD_SAMPLE_PATH.read_text(encoding="utf-8")
+    except OSError:
+        logger.warning("design.md sample missing at %s", _DESIGN_MD_SAMPLE_PATH)
+        return ""
+
+
 # Default brand configuration values
 DEFAULT_COLORS = {
     "primary": "#000000",
@@ -274,11 +283,7 @@ class BrandConfigService:
         config = self.get_config(user_id)
         stored = config.get("design_md")
         if stored is None:
-            try:
-                return _DESIGN_MD_SAMPLE_PATH.read_text(encoding="utf-8")
-            except OSError:
-                logger.warning("design.md sample missing at %s", _DESIGN_MD_SAMPLE_PATH)
-                return ""
+            return read_design_md_sample()
         return stored
 
     def update_best_practices(

@@ -148,27 +148,28 @@ export const DesignSpecSection: React.FC = () => {
   }, [content, overCap, showError]);
 
   const handleResetToSample = useCallback(() => {
+    // Always pull the bundled template directly (separate read-only endpoint)
+    // — never clear the saved spec just to "reset" the editor view. The admin
+    // still has to hit Save to actually persist the template, so their
+    // current saved content stays intact until they decide.
     if (sampleSnapshotRef.current) {
       setContent(sampleSnapshotRef.current);
-      setIsSample(true);
       showSuccess({ title: 'Reset to bundled template', description: 'Edit and Save when ready.' });
       return;
     }
-    // We don't have the sample cached (because the user already had a saved
-    // version). Re-fetch from the backend and force the sample fallback by
-    // clearing and reloading.
     void (async () => {
       try {
-        const cleared = await brandAPI.updateDesignMd('');
-        if (!cleared.data.success) throw new Error(cleared.data.error || 'clear failed');
-        await loadDesignMd();
-        showSuccess({ title: 'Reset to bundled template' });
+        const { data } = await brandAPI.getDesignMdSample();
+        if (!data.success) throw new Error('sample fetch failed');
+        sampleSnapshotRef.current = data.design_md;
+        setContent(data.design_md);
+        showSuccess({ title: 'Reset to bundled template', description: 'Edit and Save when ready.' });
       } catch (err) {
         log.error({ err }, 'reset failed');
-        showError({ title: 'Reset failed', description: 'Could not reload the template.' });
+        showError({ title: 'Reset failed', description: 'Could not load the template.' });
       }
     })();
-  }, [loadDesignMd, showError, showSuccess]);
+  }, [showError, showSuccess]);
 
   const handleBootstrapResult = useCallback((markdown: string) => {
     setContent(markdown);

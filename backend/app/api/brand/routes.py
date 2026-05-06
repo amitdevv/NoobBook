@@ -26,9 +26,11 @@ from app.api.brand import brand_bp
 from app.config import prompt_loader
 from app.services.auth.rbac import require_admin
 from app.services.data_services import brand_asset_service, brand_config_service
+from app.services.data_services.brand_config_service import read_design_md_sample
 from app.services.integrations.claude import claude_service
 from app.services.integrations.supabase import storage_service
 from app.utils import claude_parsing_utils
+from app.utils.cost_tracking import record_user_only_usage
 
 logger = logging.getLogger(__name__)
 
@@ -710,15 +712,15 @@ def get_design_md():
 
     Distinct return shape vs the structured config so the frontend can show
     "this is your bundled starting point" once and then "this is what you
-    saved" thereafter.
+    saved" thereafter. Single DB lookup — sample is read from disk when
+    the column is NULL.
     """
     try:
         user_id = g.user_id
         config = brand_config_service.get_config(user_id)
         stored = config.get("design_md")
         is_sample = stored is None
-
-        content = brand_config_service.get_design_md_or_sample(user_id)
+        content = read_design_md_sample() if is_sample else stored
 
         return jsonify({
             "success": True,
@@ -729,6 +731,22 @@ def get_design_md():
     except Exception as e:
         logger.exception("Failed to load design.md for user")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@brand_bp.route('/brand/design/sample', methods=['GET'])
+def get_design_md_sample():
+    """
+    Return the bundled design.md template without persisting anything.
+
+    Used by the frontend's "Reset to template" action when the page hasn't
+    cached the sample locally — fetching this is cheaper and clearer than
+    round-tripping a clear-then-reload through the DB (which would also
+    destroy the user's saved spec, exactly the bug we want to avoid).
+    """
+    return jsonify({
+        "success": True,
+        "design_md": read_design_md_sample(),
+    }), 200
 
 
 @brand_bp.route('/brand/design', methods=['PUT'])
@@ -829,10 +847,23 @@ def bootstrap_design_md():
                 "error": "Bootstrap returned empty content; try again with more detail.",
             }), 502
 
+        # Workspace-level admin call has no project to attribute to — but the
+        # cost still has to count against the admin's period spend so quotas
+        # apply. claude_service skips its own cost-tracking branch when
+        # project_id is missing, so we record manually here.
+        usage = response.get("usage") or {}
+        call_cost = record_user_only_usage(
+            user_id=user_id,
+            model=prompt_config["model"],
+            input_tokens=int(usage.get("input_tokens") or 0),
+            output_tokens=int(usage.get("output_tokens") or 0),
+        )
+
         return jsonify({
             "success": True,
             "design_md": markdown,
-            "usage": response.get("usage"),
+            "usage": usage,
+            "cost": call_cost,
         }), 200
 
     except Exception as e:
