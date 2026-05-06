@@ -9,11 +9,17 @@ The config is created on first access with sensible defaults and can be
 updated incrementally (e.g., update just colors without touching typography).
 """
 import logging
+from pathlib import Path
 from typing import Optional, Dict, Any
 
 from app.services.integrations.supabase import get_supabase, is_supabase_enabled
 
 logger = logging.getLogger(__name__)
+
+# Bundled design.md sample served when a workspace hasn't customized one yet.
+# NULL in DB → return this; empty string in DB → respect the admin's intent
+# to send nothing.
+_DESIGN_MD_SAMPLE_PATH = Path(__file__).resolve().parents[3] / "data" / "samples" / "design_md_sample.md"
 
 
 # Default brand configuration values
@@ -126,6 +132,7 @@ class BrandConfigService:
         typography: Optional[Dict[str, Any]] = None,
         spacing: Optional[Dict[str, Any]] = None,
         guidelines: Optional[str] = None,
+        design_md: Optional[str] = None,
         best_practices: Optional[Dict[str, Any]] = None,
         voice: Optional[Dict[str, Any]] = None,
         feature_settings: Optional[Dict[str, Any]] = None
@@ -162,6 +169,8 @@ class BrandConfigService:
             update_data["spacing"] = spacing
         if guidelines is not None:
             update_data["guidelines"] = guidelines
+        if design_md is not None:
+            update_data["design_md"] = design_md
         if best_practices is not None:
             update_data["best_practices"] = best_practices
         if voice is not None:
@@ -236,6 +245,41 @@ class BrandConfigService:
             Updated brand configuration
         """
         return self.update_config(user_id, guidelines=guidelines)
+
+    def update_design_md(
+        self,
+        user_id: str,
+        design_md: str
+    ) -> Dict[str, Any]:
+        """
+        Update just the long-form design.md spec.
+
+        Args:
+            user_id: The user UUID
+            design_md: New design.md markdown blob (empty string clears it)
+
+        Returns:
+            Updated brand configuration
+        """
+        return self.update_config(user_id, design_md=design_md)
+
+    def get_design_md_or_sample(self, user_id: str) -> str:
+        """
+        Return the saved design.md, or the bundled sample when unset.
+
+        NULL in DB means "never customized" — surface the sample so admins
+        see something concrete to edit. Empty string means "explicitly
+        cleared" — respect that and return empty.
+        """
+        config = self.get_config(user_id)
+        stored = config.get("design_md")
+        if stored is None:
+            try:
+                return _DESIGN_MD_SAMPLE_PATH.read_text(encoding="utf-8")
+            except OSError:
+                logger.warning("design.md sample missing at %s", _DESIGN_MD_SAMPLE_PATH)
+                return ""
+        return stored
 
     def update_best_practices(
         self,
@@ -355,6 +399,7 @@ class BrandConfigService:
             "typography": DEFAULT_TYPOGRAPHY,
             "spacing": DEFAULT_SPACING,
             "guidelines": None,
+            "design_md": None,
             "best_practices": DEFAULT_BEST_PRACTICES,
             "voice": DEFAULT_VOICE,
             "feature_settings": DEFAULT_FEATURE_SETTINGS

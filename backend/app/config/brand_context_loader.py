@@ -127,6 +127,15 @@ class BrandContextLoader:
             sections.append(guidelines_context)
             included_parts.append("guidelines")
 
+        # Add long-form design.md spec — this is the big one. When admins fill
+        # this out, it carries layout/component/voice rules the structured
+        # tokens above can't express. Skipped silently when empty so existing
+        # workspaces aren't penalized.
+        design_md_context = self._build_design_md_context(config)
+        if design_md_context:
+            sections.append(design_md_context)
+            included_parts.append("design_md")
+
         # Add best practices
         practices_context = self._build_practices_context(config)
         if practices_context:
@@ -298,6 +307,19 @@ class BrandContextLoader:
 
         lines.append("")
         return "\n".join(lines)
+
+    def _build_design_md_context(self, config: Dict[str, Any]) -> str:
+        """Build the long-form design.md spec section."""
+        design_md = (config.get("design_md") or "").strip()
+        if not design_md:
+            return ""
+
+        return "\n".join([
+            "### Design Specification",
+            "",
+            design_md,
+            "",
+        ])
 
     def _build_guidelines_context(self, config: Dict[str, Any]) -> str:
         """Build written guidelines context section."""
