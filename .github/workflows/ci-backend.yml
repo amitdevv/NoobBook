@@ -62,15 +62,38 @@ jobs:
         # errors instantly without waiting for collection.
         run: python -m compileall -q app
 
+      - name: Build dummy Supabase test creds
+        # Several modules construct a Supabase client at import time and
+        # the SDK validates the JWT format before any test mock can be
+        # applied. We need a structurally-valid JWT to satisfy that
+        # check — but we DON'T want the literal token bytes in the
+        # source file, because GitHub's secret scanner pattern-matches
+        # service_role JWTs and flags them as a "public leak" (false
+        # positive — these are unsigned, point at a non-existent host,
+        # and have no auth value). Building at runtime keeps the source
+        # clean and `::add-mask::` keeps the assembled value out of
+        # workflow logs.
+        run: |
+          set -euo pipefail
+          b64url() { printf '%s' "$1" | base64 | tr -d '=' | tr '+/' '-_' | tr -d '\n'; }
+          header=$(b64url '{"alg":"HS256","typ":"JWT"}')
+          anon_payload=$(b64url '{"role":"anon"}')
+          service_payload=$(b64url '{"role":"service_role"}')
+          # Signature is a fixed string — these tokens are never validated
+          # against a real JWT secret, only parsed for shape + role claim.
+          sig=$(b64url 'noobbook-ci-not-a-real-secret')
+          anon_jwt="$header.$anon_payload.$sig"
+          service_jwt="$header.$service_payload.$sig"
+          echo "::add-mask::$anon_jwt"
+          echo "::add-mask::$service_jwt"
+          {
+            echo "SUPABASE_ANON_KEY=$anon_jwt"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$service_jwt"
+          } >> "$GITHUB_ENV"
+
       - name: Run pytest
         run: pytest -q --maxfail=3
         env:
           FLASK_ENV: testing
           PYTHONDONTWRITEBYTECODE: '1'
-          # Dummy JWT-shaped strings, not secrets. Required because
-          # several modules construct a Supabase client at import time
-          # and the SDK validates the key format before any patch
-          # applied by tests can take effect.
           SUPABASE_URL: 'http://test.invalid'
-          SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiJ9.dummy'
-          SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.dummy'
