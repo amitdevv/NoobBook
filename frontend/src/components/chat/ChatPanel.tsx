@@ -75,6 +75,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const canonicalUserMessageReceivedRef = useRef(false);
   const assistantDeltaReceivedRef = useRef(false);
   const pendingTitleSyncRef = useRef<{ chatId: string; hasSeenNamingTask: boolean } | null>(null);
+  // Mirrors activeChat?.id so async callbacks (recoverChatFromServer) can
+  // check "is the user still on the originating chat?" *synchronously*
+  // without going through a setState updater — React 18's automatic
+  // batching means functional-updater side effects don't run before the
+  // line that reads them, which broke the previous guard pattern.
+  const activeChatIdRef = useRef<string | null>(null);
 
   // Sources state for header display
   const [sources, setSources] = useState<Source[]>([]);
@@ -198,6 +204,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   }, [activeChat, onSignalsChange]);
 
+  // Keep the activeChatId ref in sync — read-only mirror used by async
+  // recovery paths so they can compare current chat without racing with
+  // batched state updates.
+  useEffect(() => {
+    activeChatIdRef.current = activeChat?.id ?? null;
+  }, [activeChat?.id]);
+
   /**
    * Load per-chat cost/token breakdown whenever the active chat changes.
    * Refreshed again after each message via `loadChatCosts()` in the send flow.
@@ -272,6 +285,50 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     onCostsChange?.();
     return true;
   }, [onCostsChange]);
+
+  /**
+   * Refetch a chat's full state when SSE streaming ended without a terminal
+   * event (proxy truncation, network drop, etc.). Backend has already
+   * persisted whatever it produced, so we just need to surface it.
+   *
+   * Chat-id-aware: if the user has switched to a different chat by the
+   * time the refetch returns, the activeChat replacement and source-
+   * selection notification are skipped so the recovery doesn't yank
+   * them back to the chat they navigated away from.
+   *
+   * The "still on this chat?" check is read off `activeChatIdRef` (kept
+   * in sync via useEffect above) — synchronously and reliably. A prior
+   * version of this helper used a side effect inside a setActiveChat
+   * functional updater, which doesn't fire before the line that reads
+   * it under React 18 automatic batching (Greptile flagged this on
+   * PR #204). The functional updater on setActiveChat is still kept as
+   * defence-in-depth against a chat switch racing in between the ref
+   * check and the actual state commit.
+   */
+  const recoverChatFromServer = useCallback(
+    async (chatId: string, errorToastMessage?: string) => {
+      try {
+        const chat = await chatsAPI.getChat(projectId, chatId);
+        const stillActive = activeChatIdRef.current === chat.id;
+        if (stillActive) {
+          setActiveChat((prev) => {
+            if (!prev || prev.id !== chat.id) return prev;
+            return chat;
+          });
+          onActiveChatChange(chat.id, chat.selected_source_ids ?? []);
+        }
+        onCostsChange?.();
+        await loadUserUsage();
+      } catch (recoveryErr) {
+        log.error({ err: recoveryErr, chatId }, 'recovery refetch failed');
+        errorWithLogs(
+          errorToastMessage ||
+            'Connection dropped before the response arrived. Refresh to load it.',
+        );
+      }
+    },
+    [projectId, onActiveChatChange, onCostsChange, loadUserUsage, errorWithLogs],
+  );
 
   const reconcileChatMetadata = useCallback(async (chatId: string) => {
     try {
@@ -556,6 +613,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           onCostsChange?.();
           await reconcileChatMetadata(currentChat.id);
         }
+      } else {
+        // Stream closed cleanly but neither `assistant_done` nor `error`
+        // arrived. The most common cause is an upstream proxy (frontend
+        // nginx, Coolify Traefik) FIN'ing the connection during a long
+        // tool-use gap — the backend has already persisted the assistant
+        // message via main_chat_service, so a refetch surfaces it without
+        // re-running the model. Without this branch the UI stuck on the
+        // Reading Beat until the user manually refreshed (prod logs
+        // showed 407s / 523s / 658s streams driving the bug).
+        log.warn(
+          {
+            chatId: currentChat.id,
+            hadUserMessage: streamResult.hadUserMessage,
+            hadAssistantDelta: streamResult.hadAssistantDelta,
+          },
+          'stream ended without terminal event — recovering from server',
+        );
+        setStreamingAssistantContent('');
+        await recoverChatFromServer(currentChat.id);
       }
     } catch (err) {
       // Don't show error toast if user intentionally stopped
@@ -578,8 +654,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             errorWithLogs('Failed to send message');
           }
         } else {
-          log.error({ err }, 'failed to send message');
-          errorWithLogs('Failed to send message');
+          // Stream errored mid-flight after delivering partial events
+          // (canonical user_message and/or assistant_delta). Re-sending
+          // via the REST fallback would duplicate the user's message —
+          // recover by re-fetching the chat instead. The backend's
+          // exception handler in main_chat_service already persists an
+          // error-marked assistant message before the SSE error event,
+          // so the refetch surfaces either the partial response or a
+          // recorded failure the user can retry from.
+          log.warn({ err }, 'stream errored after partial events — recovering from server');
+          await recoverChatFromServer(currentChat.id, 'Failed to send message');
         }
       }
       setStreamingAssistantContent('');
