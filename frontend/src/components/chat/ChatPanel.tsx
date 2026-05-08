@@ -60,6 +60,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   // Chat state
   const [message, setMessage] = useState('');
+  // Inline image attachments (paste, drag-and-drop, or image-button picker).
+  // Cleared on send so the next message starts clean. Lives at panel level
+  // — not ChatInput — so optimistic-render / chat-switch logic can read it.
+  const [attachments, setAttachments] = useState<File[]>([]);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [showChatList, setShowChatList] = useState(false);
   const [allChats, setAllChats] = useState<ChatMetadata[]>([]);
@@ -470,9 +474,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
    * before the API call, so users see their message immediately.
    */
   const handleSend = async () => {
-    if (!message.trim() || !activeChat || sending) return;
+    if (!activeChat || sending) return;
+    // Send-enabled if EITHER the text is non-empty OR there's at least one
+    // attachment. Pure-attachment messages ("here's a screenshot, no
+    // caption") are valid — Claude still answers from the image alone.
+    if (!message.trim() && attachments.length === 0) return;
 
     const userMessage = message.trim();
+    const messageAttachments = attachments;
     const currentChat = activeChat;
     const sendingChatId = currentChat.id;
     const controller = new AbortController();
@@ -480,15 +489,48 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     canonicalUserMessageReceivedRef.current = false;
     assistantDeltaReceivedRef.current = false;
     setMessage('');
+    setAttachments([]);
     setRawMode(false);
     setStreamingAssistantContent('');
     onAddSendingChat(sendingChatId, activeChat.title);
 
-    // Optimistically add user message to UI immediately
+    // Optimistic user-message render. With attachments, the content is a
+    // typed-block list using local blob URLs so the screenshot appears in
+    // the bubble before the network roundtrip — replaceTempWithCanonical
+    // swaps in server-signed URLs once the backend persists.
+    //
+    // Memory management: each blob URL pins the underlying File data in
+    // browser memory until URL.revokeObjectURL() runs. We track the URLs
+    // created here and revoke them in three places: (a) when the canonical
+    // user message arrives with server-signed URLs (the local blobs are no
+    // longer rendered), (b) when the temp message is removed on send
+    // failure, (c) in the finally block as a defence-in-depth catch-all.
+    const optimisticBlobUrls: string[] = [];
+    const optimisticContent = messageAttachments.length
+      ? [
+          ...messageAttachments.map((file) => {
+            const blobUrl = URL.createObjectURL(file);
+            optimisticBlobUrls.push(blobUrl);
+            return {
+              type: 'image' as const,
+              url: blobUrl,
+              media_type: file.type,
+              filename: file.name,
+            };
+          }),
+          { type: 'text' as const, text: userMessage },
+        ]
+      : userMessage;
+    const revokeOptimisticBlobs = () => {
+      for (const url of optimisticBlobUrls.splice(0)) {
+        URL.revokeObjectURL(url);
+      }
+    };
+
     const tempUserMessage = {
       id: `temp-${Date.now()}`,
       role: 'user' as const,
-      content: userMessage,
+      content: optimisticContent,
       timestamp: new Date().toISOString(),
     };
 
@@ -518,6 +560,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           messages: alreadyPresent ? nextMessages : [...nextMessages.filter((msg) => msg.id !== tempUserMessage.id), canonicalUserMessage],
         };
       });
+      // The canonical message renders from server-signed URLs now, so the
+      // local blob URLs are no longer referenced by the DOM. Revoke to free
+      // the underlying File buffers.
+      revokeOptimisticBlobs();
     };
 
     const appendAssistantMessage = (assistantMessage: Chat['messages'][number]) => {
@@ -602,7 +648,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             receivedTerminalSync = applyChatSync(payload.sync);
           },
         },
-        controller.signal
+        controller.signal,
+        messageAttachments,
       );
 
       if (streamResult.terminalEvent) {
@@ -640,8 +687,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         log.info('Chat request stopped by user');
       } else {
         const shouldFallback = !canonicalUserMessageReceivedRef.current && !assistantDeltaReceivedRef.current;
+        // The REST fallback (chatsAPI.sendMessage) is text-only — it
+        // can't carry image attachments. If the user attached anything,
+        // skip the silent fallback and surface the error so they can
+        // re-paste/re-drop and retry. Falling back would silently drop
+        // the screenshot, producing a confusing answer to the visual
+        // question they asked.
+        const hasAttachments = messageAttachments.length > 0;
 
-        if (shouldFallback) {
+        if (shouldFallback && !hasAttachments) {
           try {
             const fallbackResult = await chatsAPI.sendMessage(projectId, currentChat.id, userMessage);
             applyFallbackResponse(fallbackResult);
@@ -653,6 +707,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             log.error({ err: fallbackError }, 'failed to send message via fallback');
             errorWithLogs('Failed to send message');
           }
+        } else if (shouldFallback && hasAttachments) {
+          log.warn('stream failed before user_message event with attachments — surfacing error so user can retry');
+          errorWithLogs('Failed to send message — please retry.');
         } else {
           // Stream errored mid-flight after delivering partial events
           // (canonical user_message and/or assistant_delta). Re-sending
@@ -679,6 +736,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     } finally {
       onRemoveSendingChat(sendingChatId);
       abortControllerRef.current = null;
+      // Defence-in-depth: if neither the success path nor any catch
+      // branch ran (shouldn't happen in normal control flow, but JS
+      // exception edges exist), still free the optimistic blob URLs.
+      // No-op if already revoked above.
+      revokeOptimisticBlobs();
     }
   };
 
@@ -904,11 +966,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         sending={sending}
         transcriptionConfigured={transcriptionConfigured}
         rawMode={rawMode}
+        attachments={attachments}
         onMessageChange={setMessage}
         onSend={handleSend}
         onStop={handleStop}
         onMicClick={handleMicClick}
         onToggleRawMode={() => setRawMode((prev) => !prev)}
+        onAttachmentsChange={setAttachments}
+        onAttachmentError={error}
       />
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
