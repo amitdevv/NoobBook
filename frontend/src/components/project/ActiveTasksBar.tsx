@@ -276,9 +276,18 @@ export const ActiveTasksBar: React.FC<ActiveTasksBarProps> = ({
               const optimisticDrop = (id: string) =>
                 setTasks((prev) => prev.filter((t) => t.id !== id));
 
+              // Confirm before firing the cancel. The Stop affordance is a
+              // small icon-only button at the row edge that swaps to a red
+              // StopCircle on hover — easy to hit by accident while pointing
+              // at the row to read its label, which silently kills the job.
+              // Once cancelled, PR #211's clobber-protection prevents the
+              // worker from writing status='ready' even if it finishes, and
+              // PR #215's filter hides the iteration from the studio-output
+              // tab — so an accidental click is unrecoverable.
               let handleCancel: ((taskId: string) => void) | undefined;
               if (task.type === 'source') {
                 handleCancel = async (sourceId) => {
+                  if (!window.confirm('Stop processing this source?\nProgress will be lost.')) return;
                   optimisticDrop(sourceId);
                   try {
                     await sourcesAPI.cancelProcessing(projectId, sourceId);
@@ -286,6 +295,7 @@ export const ActiveTasksBar: React.FC<ActiveTasksBarProps> = ({
                 };
               } else if (task.type === 'studio') {
                 handleCancel = async (jobId) => {
+                  if (!window.confirm('Stop this generation?\nProgress will be lost.')) return;
                   optimisticDrop(jobId);
                   try {
                     await cancelStudioJob(projectId, jobId);
