@@ -540,19 +540,25 @@ const ShareRow: React.FC<ShareRowProps> = ({ share, copied, onCopy, onRevoke, st
   const inactiveLabel = share.revoked_at ? 'Revoked' : 'Expired';
   const expiryLabel = formatExpiry(share);
 
-  // Per-row input ref — surfaces the full URL as selectable DOM text so
+  // Per-row button ref — surfaces the full URL as selectable DOM text so
   // users can manually copy (Cmd/Ctrl-C) when the Clipboard API path fails.
-  // The handler also auto-selects after a failed Copy click.
-  const urlInputRef = useRef<HTMLInputElement | null>(null);
-  // Memoised so the input doesn't see a fresh handler on every parent
+  // We render the URL as a wrapping <button> (not an <input>) so long URLs
+  // visibly wrap with `break-all` instead of being clipped or scrolling
+  // horizontally. Selecting all text uses the Range/Selection API.
+  const urlButtonRef = useRef<HTMLButtonElement | null>(null);
+  // Memoised so the button doesn't see a fresh handler on every parent
   // re-render. The ref is stable, so the callback has no dependencies.
   const selectUrl = useCallback(() => {
-    const el = urlInputRef.current;
+    const el = urlButtonRef.current;
     if (!el) return;
     el.focus();
-    // setSelectionRange is the cross-platform-safe variant; .select() flakes
-    // on some mobile browsers when the input has just received focus.
-    el.setSelectionRange(0, el.value.length);
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
   }, []);
 
   return (
@@ -566,7 +572,9 @@ const ShareRow: React.FC<ShareRowProps> = ({ share, copied, onCopy, onRevoke, st
       ].join(' ')}
     >
       <style>{shareRowKeyframes}</style>
-      <div className="flex items-center gap-3">
+      {/* items-start (not items-center) so the mode pill + actions sit at
+          the top of the row when the URL wraps to multiple lines. */}
+      <div className="flex items-start gap-3">
         {/* Mode pill */}
         <span
           className={[
@@ -584,39 +592,30 @@ const ShareRow: React.FC<ShareRowProps> = ({ share, copied, onCopy, onRevoke, st
           )}
         </span>
 
-        {/* URL + metadata. The URL is rendered as a read-only <input> (not a
-            <span>) so users can manually triple-click + copy on browsers
-            where the Clipboard API and its execCommand fallback both fail
-            (Safari iOS, strict Firefox, sandboxed iframes). The value is the
-            full URL with scheme — the input scrolls horizontally if needed,
-            but selection always covers the entire string. */}
+        {/* URL + metadata. The URL is rendered as a wrapping <button> so the
+            full link is visible — `break-all` lets long URLs wrap onto
+            multiple lines instead of being clipped or scrolling sideways.
+            Click selects all text via the Range/Selection API so users can
+            still Cmd/Ctrl-C manually when the Clipboard API path fails. */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-            <input
-              ref={urlInputRef}
-              readOnly
-              value={share.url}
+          <div className="flex items-start gap-2 text-[11px]">
+            <button
+              ref={urlButtonRef}
+              type="button"
               onClick={selectUrl}
               onFocus={selectUrl}
-              title={share.url}
-              // Unique per row so screen readers can distinguish multiple
-              // share inputs in the list — generic "Share link URL" alone
-              // produced identical accessible names for every row.
-              aria-label={`Share link URL: ${share.url}`}
-              // overflow-x-auto (NOT `truncate`) so the input scrolls
-              // horizontally for long URLs. `truncate` adds overflow:hidden
-              // which silently clips the text inside the input — selection
-              // still copies the full value, but a user clicking just to
-              // visually inspect the URL would only ever see the prefix.
-              className="flex-1 min-w-0 overflow-x-auto font-mono text-[11px] text-muted-foreground bg-transparent border-0 outline-none p-0 m-0 h-auto leading-normal focus-visible:ring-0 focus-visible:ring-offset-0 focus:text-foreground cursor-text"
-            />
+              title="Click to select"
+              className="flex-1 min-w-0 text-left break-all font-mono text-[11px] text-stone-700 dark:text-stone-300 hover:text-foreground transition-colors bg-transparent border-0 outline-none p-0 m-0 leading-relaxed focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:rounded cursor-text"
+            >
+              {share.url}
+            </button>
             {inactive && (
               <span className="flex-shrink-0 px-1.5 py-px rounded text-[10px] font-medium uppercase tracking-wide bg-stone-200/70 text-stone-700 dark:bg-stone-800/70 dark:text-stone-300">
                 {inactiveLabel}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
             <span className="inline-flex items-center gap-1">
               <Clock size={11} />
               {expiryLabel}
@@ -639,24 +638,23 @@ const ShareRow: React.FC<ShareRowProps> = ({ share, copied, onCopy, onRevoke, st
 
         {/* Actions */}
         <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Icon-only — the "Copy" / "Copied" label was redundant noise next
+              to the universally-recognised clipboard glyph. The check-mark
+              flash + toast already communicate success; aria-label keeps it
+              accessible to screen readers. */}
           <Button
             variant={copied ? 'secondary' : 'outline'}
-            size="sm"
+            size="icon"
             onClick={() => onCopy(share, selectUrl)}
             disabled={inactive}
-            className="h-7 px-2.5 gap-1.5 text-xs"
-            aria-label="Copy link"
+            className="h-7 w-7"
+            aria-label={copied ? 'Link copied' : 'Copy link'}
+            title={copied ? 'Copied' : 'Copy link'}
           >
             {copied ? (
-              <>
-                <CheckCircle size={13} weight="fill" className="text-primary" />
-                Copied
-              </>
+              <CheckCircle size={14} weight="fill" className="text-primary" />
             ) : (
-              <>
-                <Copy size={13} />
-                Copy
-              </>
+              <Copy size={14} />
             )}
           </Button>
           {!inactive && (
