@@ -39,10 +39,10 @@ export const FlashCardProgressIndicator: React.FC<FlashCardProgressIndicatorProp
             {currentFlashCardJob.progress || 'Starting...'}
           </p>
         </div>
+        {projectId && currentFlashCardJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
-    {projectId && currentFlashCardJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

@@ -45,10 +45,10 @@ export const PRDProgressIndicator: React.FC<PRDProgressIndicatorProps> = ({
             {currentPRDJob.total_sections > 0 && ` (${progress}%)`}
           </p>
         </div>
+        {projectId && currentPRDJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
-    {projectId && currentPRDJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

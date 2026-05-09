@@ -44,10 +44,10 @@ export const PresentationProgressIndicator: React.FC<PresentationProgressIndicat
             {progressText}
           </p>
         </div>
+        {projectId && currentPresentationJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
-    {projectId && currentPresentationJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

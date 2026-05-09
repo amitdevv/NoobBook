@@ -39,10 +39,10 @@ export const FlowDiagramProgressIndicator: React.FC<FlowDiagramProgressIndicator
             {currentFlowDiagramJob.progress || 'Starting...'}
           </p>
         </div>
+        {projectId && currentFlowDiagramJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
-    {projectId && currentFlowDiagramJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

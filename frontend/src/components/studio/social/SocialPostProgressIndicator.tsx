@@ -40,11 +40,11 @@ export const SocialPostProgressIndicator: React.FC<SocialPostProgressIndicatorPr
             {currentSocialPostJob.progress || 'Starting...'}
           </p>
         </div>
+        {projectId && currentSocialPostJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
       <PartialImagesPreview urls={currentSocialPostJob.partial_images} />
-    {projectId && currentSocialPostJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

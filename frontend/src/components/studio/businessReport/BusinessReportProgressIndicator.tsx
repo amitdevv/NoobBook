@@ -61,9 +61,9 @@ export const BusinessReportProgressIndicator: React.FC<BusinessReportProgressInd
         )}
       </div>
       <ChartBar size={12} className="text-teal-500 flex-shrink-0" />
-    {projectId && currentBusinessReportJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
+      {projectId && currentBusinessReportJob?.id && (
+        <StopHoldButton onConfirm={handleCancel} size="sm" />
+      )}
     </div>
   );
 };

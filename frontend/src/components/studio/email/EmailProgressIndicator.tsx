@@ -39,11 +39,11 @@ export const EmailProgressIndicator: React.FC<EmailProgressIndicatorProps> = ({
             {currentEmailJob.status_message || 'Starting...'}
           </p>
         </div>
+        {projectId && currentEmailJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
       <PartialImagesPreview urls={currentEmailJob.partial_images} />
-    {projectId && currentEmailJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

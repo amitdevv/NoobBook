@@ -38,10 +38,10 @@ export const ComponentProgressIndicator: React.FC<ComponentProgressIndicatorProp
             {currentComponentJob.status_message || 'Starting...'}
           </p>
         </div>
+        {projectId && currentComponentJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
-    {projectId && currentComponentJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

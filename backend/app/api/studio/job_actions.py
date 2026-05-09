@@ -39,7 +39,7 @@ The cancel intent is project-scoped via the existing `before_request`
 hook on `studio_bp` that calls `verify_project_access`. Cross-project
 cancels are not possible because `get_job` requires both ids match.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import jsonify
 
@@ -90,7 +90,10 @@ def cancel_studio_job(project_id: str, job_id: str):
     # the DB roundtrip below.
     task_service.cancel_tasks_for_target(job_id)
 
-    now_iso = datetime.utcnow().isoformat()
+    # `datetime.utcnow()` is deprecated in 3.12+ — use a timezone-aware
+    # value so the ISO string carries an explicit offset and matches what
+    # the rest of the studio_jobs callers store.
+    now_iso = datetime.now(timezone.utc).isoformat()
     updated = studio_index_service.update_job(
         project_id, job_id,
         status="cancelled",

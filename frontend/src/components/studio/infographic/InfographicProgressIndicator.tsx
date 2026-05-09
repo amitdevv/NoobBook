@@ -40,11 +40,11 @@ export const InfographicProgressIndicator: React.FC<InfographicProgressIndicator
             {currentInfographicJob.progress || 'Starting...'}
           </p>
         </div>
+        {projectId && currentInfographicJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
       <PartialImagesPreview urls={currentInfographicJob.partial_images} />
-    {projectId && currentInfographicJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

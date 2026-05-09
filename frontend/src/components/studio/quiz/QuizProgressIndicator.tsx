@@ -39,10 +39,10 @@ export const QuizProgressIndicator: React.FC<QuizProgressIndicatorProps> = ({
             {currentQuizJob.progress || 'Starting...'}
           </p>
         </div>
+        {projectId && currentQuizJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
-    {projectId && currentQuizJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

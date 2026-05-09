@@ -45,10 +45,10 @@ export const VideoProgressIndicator: React.FC<VideoProgressIndicatorProps> = ({
             </p>
           )}
         </div>
+        {projectId && currentVideoJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
-    {projectId && currentVideoJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

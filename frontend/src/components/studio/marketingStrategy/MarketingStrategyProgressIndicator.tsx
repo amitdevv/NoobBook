@@ -45,10 +45,10 @@ export const MarketingStrategyProgressIndicator: React.FC<MarketingStrategyProgr
             {currentMarketingStrategyJob.total_sections > 0 && ` (${progress}%)`}
           </p>
         </div>
+        {projectId && currentMarketingStrategyJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
-    {projectId && currentMarketingStrategyJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

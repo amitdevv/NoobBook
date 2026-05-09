@@ -39,11 +39,11 @@ export const AdProgressIndicator: React.FC<AdProgressIndicatorProps> = ({
             {currentAdJob.progress || 'Starting...'}
           </p>
         </div>
+        {projectId && currentAdJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
       <PartialImagesPreview urls={currentAdJob.partial_images} />
-    {projectId && currentAdJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

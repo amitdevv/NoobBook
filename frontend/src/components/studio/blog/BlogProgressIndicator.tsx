@@ -55,11 +55,11 @@ export const BlogProgressIndicator: React.FC<BlogProgressIndicatorProps> = ({ cu
           )}
         </div>
         <Article size={12} className="text-indigo-500 flex-shrink-0" />
+        {projectId && currentBlogJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
       <PartialImagesPreview urls={currentBlogJob?.partial_images} className="mt-0" />
-    {projectId && currentBlogJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

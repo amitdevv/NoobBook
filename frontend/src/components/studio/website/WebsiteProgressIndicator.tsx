@@ -40,11 +40,11 @@ export const WebsiteProgressIndicator: React.FC<WebsiteProgressIndicatorProps> =
             {currentWebsiteJob.status_message || 'Starting...'}
           </p>
         </div>
+        {projectId && currentWebsiteJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
       <PartialImagesPreview urls={currentWebsiteJob.partial_images} />
-    {projectId && currentWebsiteJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };

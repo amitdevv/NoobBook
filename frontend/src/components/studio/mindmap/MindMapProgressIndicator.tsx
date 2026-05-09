@@ -39,10 +39,10 @@ export const MindMapProgressIndicator: React.FC<MindMapProgressIndicatorProps> =
             {currentMindMapJob.progress || 'Starting...'}
           </p>
         </div>
+        {projectId && currentMindMapJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
-    {projectId && currentMindMapJob?.id && (
-      <StopHoldButton onConfirm={handleCancel} size="sm" />
-    )}
     </div>
   );
 };
