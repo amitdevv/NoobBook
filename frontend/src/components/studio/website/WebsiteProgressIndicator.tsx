@@ -7,16 +7,26 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { WebsiteJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 import { PartialImagesPreview } from '../shared/PartialImagesPreview';
 
 interface WebsiteProgressIndicatorProps {
   currentWebsiteJob: WebsiteJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const WebsiteProgressIndicator: React.FC<WebsiteProgressIndicatorProps> = ({
   currentWebsiteJob,
+  projectId,
 }) => {
   if (!currentWebsiteJob) return null;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentWebsiteJob?.id) return;
+    await cancelStudioJob(projectId, currentWebsiteJob.id);
+  };
 
   return (
     <div className="p-2 bg-purple-500/5 rounded-md border border-purple-500/20">
@@ -30,6 +40,9 @@ export const WebsiteProgressIndicator: React.FC<WebsiteProgressIndicatorProps> =
             {currentWebsiteJob.status_message || 'Starting...'}
           </p>
         </div>
+        {projectId && currentWebsiteJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
       <PartialImagesPreview urls={currentWebsiteJob.partial_images} />
     </div>

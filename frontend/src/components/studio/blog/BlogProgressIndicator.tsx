@@ -7,13 +7,17 @@
 import React from 'react';
 import { Article, Spinner } from '@phosphor-icons/react';
 import type { BlogJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 import { PartialImagesPreview } from '../shared/PartialImagesPreview';
 
 interface BlogProgressIndicatorProps {
   currentBlogJob: BlogJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
-export const BlogProgressIndicator: React.FC<BlogProgressIndicatorProps> = ({ currentBlogJob }) => {
+export const BlogProgressIndicator: React.FC<BlogProgressIndicatorProps> = ({ currentBlogJob, projectId }) => {
   // Determine progress message based on job state
   const getProgressMessage = () => {
     if (!currentBlogJob) return 'Starting blog post generation...';
@@ -27,6 +31,11 @@ export const BlogProgressIndicator: React.FC<BlogProgressIndicatorProps> = ({ cu
     }
 
     return status;
+  };
+
+  const handleCancel = async () => {
+    if (!projectId || !currentBlogJob?.id) return;
+    await cancelStudioJob(projectId, currentBlogJob.id);
   };
 
   return (
@@ -46,6 +55,9 @@ export const BlogProgressIndicator: React.FC<BlogProgressIndicatorProps> = ({ cu
           )}
         </div>
         <Article size={12} className="text-indigo-500 flex-shrink-0" />
+        {projectId && currentBlogJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
       <PartialImagesPreview urls={currentBlogJob?.partial_images} className="mt-0" />
     </div>

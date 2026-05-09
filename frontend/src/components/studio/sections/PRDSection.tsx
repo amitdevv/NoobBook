@@ -47,7 +47,7 @@ export const PRDSection: React.FC = () => {
   return (
     <>
       {isGeneratingPRD && (
-        <PRDProgressIndicator currentPRDJob={currentPRDJob} />
+        <PRDProgressIndicator currentPRDJob={currentPRDJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (

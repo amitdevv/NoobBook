@@ -48,7 +48,7 @@ export const QuizSection: React.FC = () => {
   return (
     <>
       {isGeneratingQuiz && (
-        <QuizProgressIndicator currentQuizJob={currentQuizJob} />
+        <QuizProgressIndicator currentQuizJob={currentQuizJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (

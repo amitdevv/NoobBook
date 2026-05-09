@@ -6,16 +6,26 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { EmailJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 import { PartialImagesPreview } from '../shared/PartialImagesPreview';
 
 interface EmailProgressIndicatorProps {
   currentEmailJob: EmailJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const EmailProgressIndicator: React.FC<EmailProgressIndicatorProps> = ({
   currentEmailJob,
+  projectId,
 }) => {
   if (!currentEmailJob) return null;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentEmailJob?.id) return;
+    await cancelStudioJob(projectId, currentEmailJob.id);
+  };
 
   return (
     <div className="p-2 bg-blue-500/5 rounded-md border border-blue-500/20 overflow-hidden">
@@ -29,6 +39,9 @@ export const EmailProgressIndicator: React.FC<EmailProgressIndicatorProps> = ({
             {currentEmailJob.status_message || 'Starting...'}
           </p>
         </div>
+        {projectId && currentEmailJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
       <PartialImagesPreview urls={currentEmailJob.partial_images} />
     </div>

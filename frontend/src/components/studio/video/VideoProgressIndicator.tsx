@@ -8,15 +8,25 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { VideoJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 
 interface VideoProgressIndicatorProps {
   currentVideoJob: VideoJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const VideoProgressIndicator: React.FC<VideoProgressIndicatorProps> = ({
   currentVideoJob,
+  projectId,
 }) => {
   if (!currentVideoJob) return null;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentVideoJob?.id) return;
+    await cancelStudioJob(projectId, currentVideoJob.id);
+  };
 
   return (
     <div className="p-2 bg-orange-500/5 rounded-md border border-orange-500/20">
@@ -35,6 +45,9 @@ export const VideoProgressIndicator: React.FC<VideoProgressIndicatorProps> = ({
             </p>
           )}
         </div>
+        {projectId && currentVideoJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
     </div>
   );

@@ -7,16 +7,26 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { InfographicJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 import { PartialImagesPreview } from '../shared/PartialImagesPreview';
 
 interface InfographicProgressIndicatorProps {
   currentInfographicJob: InfographicJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const InfographicProgressIndicator: React.FC<InfographicProgressIndicatorProps> = ({
   currentInfographicJob,
+  projectId,
 }) => {
   if (!currentInfographicJob) return null;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentInfographicJob?.id) return;
+    await cancelStudioJob(projectId, currentInfographicJob.id);
+  };
 
   return (
     <div className="p-2 bg-amber-500/5 rounded-md border border-amber-500/20 overflow-hidden">
@@ -30,6 +40,9 @@ export const InfographicProgressIndicator: React.FC<InfographicProgressIndicator
             {currentInfographicJob.progress || 'Starting...'}
           </p>
         </div>
+        {projectId && currentInfographicJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
       <PartialImagesPreview urls={currentInfographicJob.partial_images} />
     </div>

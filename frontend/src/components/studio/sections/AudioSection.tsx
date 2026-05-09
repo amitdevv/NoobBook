@@ -73,7 +73,7 @@ export const AudioSection: React.FC = () => {
       />
 
       {isGeneratingAudio && (
-        <AudioProgressIndicator currentAudioJob={currentAudioJob} />
+        <AudioProgressIndicator currentAudioJob={currentAudioJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (

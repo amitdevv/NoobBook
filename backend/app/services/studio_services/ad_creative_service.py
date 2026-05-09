@@ -75,6 +75,10 @@ class AdCreativeService:
             started_at=datetime.now().isoformat()
         )
 
+        # Cooperative cancellation breakpoint — abort cleanly if the user
+        # already clicked Stop before this background thread woke up.
+        studio_index_service.raise_if_cancelled(project_id, job_id)
+
         # Step 1: Build image prompts from the user's direction directly.
         # We used to ask Haiku to fan the user prompt out into three
         # different angles (hero / lifestyle / aspirational), but that

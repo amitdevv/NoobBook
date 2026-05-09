@@ -106,6 +106,11 @@ class AudioOverviewService:
             started_at=datetime.now().isoformat()
         )
 
+        # Cooperative cancellation breakpoint #1 — entry. If the user
+        # already clicked Stop between the API route accepting the job
+        # and this thread waking up, abort cleanly before doing any work.
+        studio_index_service.raise_if_cancelled(project_id, job_id)
+
         # Step 1: Get source metadata
         source = source_index_service.get_source_from_index(project_id, source_id)
         if not source:
@@ -173,6 +178,12 @@ class AudioOverviewService:
                 completed_at=datetime.now().isoformat()
             )
             return {"success": False, "error": "Script file not found in storage"}
+
+        # Cooperative cancellation breakpoint #4 — before TTS. ElevenLabs
+        # calls can run 10-30s for long scripts; without this, the worker
+        # would burn the full TTS spend even if the user clicked Stop
+        # before audio generation began.
+        studio_index_service.raise_if_cancelled(project_id, job_id)
 
         audio_result = tts_service.generate_audio_bytes(text=script_text)
 
@@ -315,6 +326,12 @@ class AudioOverviewService:
         max_iterations = 5 if not is_large else self.MAX_ITERATIONS
 
         for iteration in range(1, max_iterations + 1):
+            # Cooperative cancellation breakpoint #2/3 — top of script
+            # generation loop. Each iteration is a Claude call that can
+            # take 5-30s; the user's Stop click should not have to wait
+            # for the full call before taking effect.
+            studio_index_service.raise_if_cancelled(project_id, job_id)
+
             # Update progress
             studio_index_service.update_audio_job(
                 project_id, job_id,

@@ -52,7 +52,7 @@ export const WebsiteSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingWebsite && (
-        <WebsiteProgressIndicator currentWebsiteJob={currentWebsiteJob} />
+        <WebsiteProgressIndicator currentWebsiteJob={currentWebsiteJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (

@@ -7,15 +7,25 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { FlowDiagramJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 
 interface FlowDiagramProgressIndicatorProps {
   currentFlowDiagramJob: FlowDiagramJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const FlowDiagramProgressIndicator: React.FC<FlowDiagramProgressIndicatorProps> = ({
   currentFlowDiagramJob,
+  projectId,
 }) => {
   if (!currentFlowDiagramJob) return null;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentFlowDiagramJob?.id) return;
+    await cancelStudioJob(projectId, currentFlowDiagramJob.id);
+  };
 
   return (
     <div className="p-2 bg-cyan-500/5 rounded-md border border-cyan-500/20 overflow-hidden">
@@ -29,6 +39,9 @@ export const FlowDiagramProgressIndicator: React.FC<FlowDiagramProgressIndicator
             {currentFlowDiagramJob.progress || 'Starting...'}
           </p>
         </div>
+        {projectId && currentFlowDiagramJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
     </div>
   );

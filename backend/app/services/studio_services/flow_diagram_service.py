@@ -139,6 +139,10 @@ class FlowDiagramService:
             started_at=datetime.now().isoformat()
         )
 
+        # Cooperative cancellation breakpoint — abort cleanly if Stop
+        # already arrived between API accept and worker start.
+        studio_index_service.raise_if_cancelled(project_id, job_id)
+
         try:
             # Get source content (if source provided)
             source_name = "Direction Only"

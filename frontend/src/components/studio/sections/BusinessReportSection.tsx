@@ -48,7 +48,7 @@ export const BusinessReportSection: React.FC = () => {
   return (
     <>
       {isGeneratingBusinessReport && (
-        <BusinessReportProgressIndicator currentBusinessReportJob={currentBusinessReportJob} />
+        <BusinessReportProgressIndicator currentBusinessReportJob={currentBusinessReportJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (

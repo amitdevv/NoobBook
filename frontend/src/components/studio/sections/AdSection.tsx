@@ -53,7 +53,7 @@ export const AdSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingAd && (
-        <AdProgressIndicator currentAdJob={currentAdJob} />
+        <AdProgressIndicator currentAdJob={currentAdJob} projectId={projectId} />
       )}
 
       {hasAdSignal && savedAdJobs.map((job, i) => (

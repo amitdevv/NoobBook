@@ -100,6 +100,10 @@ class PresentationAgentExecutor:
             logger.info("Starting presentation agent for job %s", job_id[:8])
             temp_dir = None
             try:
+                # Cooperative cancellation breakpoint #1 — entry. Abort
+                # cleanly if Stop already arrived.
+                studio_index_service.raise_if_cancelled(project_id, job_id)
+
                 # Phase 1: Generate HTML slides (writes to Supabase Storage)
                 result = presentation_agent_service.generate_presentation(
                     project_id=project_id,
@@ -120,6 +124,12 @@ class PresentationAgentExecutor:
                 if not slide_files:
                     logger.warning("No slides to export for job %s", job_id[:8])
                     return
+
+                # Cooperative cancellation breakpoint #2 — between slide
+                # generation and the Playwright screenshot phase.
+                # Screenshots can take 30-60s; if Stop arrived during the
+                # Phase 1 Claude loop, this is the right place to bail.
+                studio_index_service.raise_if_cancelled(project_id, job_id)
 
                 # Update status
                 studio_index_service.update_presentation_job(
@@ -235,9 +245,14 @@ class PresentationAgentExecutor:
                     )
                     logger.error("PPTX export failed for job %s", job_id[:8])
 
+            except studio_index_service.StudioJobCancelled:
+                logger.info("Presentation job %s cancelled by user", job_id[:8])
+                studio_index_service.purge_job_storage(project_id, job_id)
+                # Fall through to finally for temp_dir cleanup.
+                return
             except Exception as e:
                 logger.exception("Presentation agent failed for job %s", job_id[:8])
-                # Update job on error
+                # Clobber matrix drops error → cancelled writes.
                 studio_index_service.update_presentation_job(
                     project_id, job_id,
                     status="error",

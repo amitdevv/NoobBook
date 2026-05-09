@@ -52,7 +52,7 @@ export const SocialSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingSocialPosts && (
-        <SocialPostProgressIndicator currentSocialPostJob={currentSocialPostJob} />
+        <SocialPostProgressIndicator currentSocialPostJob={currentSocialPostJob} projectId={projectId} />
       )}
 
       {hasSocialSignal && savedSocialPostJobs.map((job) => (

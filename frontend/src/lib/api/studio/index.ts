@@ -13,7 +13,41 @@ import { createLogger } from '@/lib/logger';
 const log = createLogger('studio-api');
 
 // Shared types
-export type JobStatus = 'pending' | 'processing' | 'ready' | 'error';
+//
+// `'cancelled'` is the user-initiated terminal state set by the cancel
+// route (POST /projects/<id>/studio/jobs/<id>/cancel). Every per-agent
+// pollJobStatus must treat it as terminal so the polling loop exits and
+// the section UI flips to the CancelledJobRow affordance with a
+// "Generate again" action.
+export type JobStatus = 'pending' | 'processing' | 'ready' | 'error' | 'cancelled';
+
+/** Response shape from the studio cancel route. */
+export interface CancelStudioJobResponse {
+  success: boolean;
+  /** Final status the row landed on. `'ready'` means the worker beat
+   *  the cancel and the result was preserved. */
+  status: JobStatus;
+  /** Set when the worker finished `ready` after the user clicked Stop
+   *  but before this route ran — UI should roll its optimistic
+   *  "cancelling" state back and surface a "kept the result" pill. */
+  late?: boolean;
+  job?: Record<string, unknown>;
+  error?: string;
+}
+
+/**
+ * Cancel an in-flight studio generation. Race-safe — see
+ * `backend/app/api/studio/job_actions.py` for the four status branches.
+ */
+export async function cancelStudioJob(
+  projectId: string,
+  jobId: string,
+): Promise<CancelStudioJobResponse> {
+  const response = await axios.post<CancelStudioJobResponse>(
+    `${API_BASE_URL}/projects/${projectId}/studio/jobs/${jobId}/cancel`,
+  );
+  return response.data;
+}
 
 /**
  * Response for API status checks (TTS, Gemini, etc.)
