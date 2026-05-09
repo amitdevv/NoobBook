@@ -63,24 +63,49 @@ class ChatService:
         Returns:
             List of chat metadata, sorted by most recent first
         """
+        # Only the RPC call itself is wrapped — type coercion below
+        # runs outside the try so a downstream bug doesn't get
+        # swallowed as "RPC failed, falling back".
+        rpc_response = None
         try:
             rpc_response = (
                 self.supabase
                 .rpc("list_chats_with_message_count", {"p_project_id": project_id})
                 .execute()
             )
+        except Exception as exc:  # noqa: BLE001 — narrowed below
+            # Distinguish "migration hasn't run yet" (expected, INFO) from
+            # actual operational errors (network, auth, quota — ERROR so
+            # monitoring picks them up). PostgREST returns code PGRST202
+            # for a missing RPC function; older Supabase stacks surface
+            # the underlying Postgres "function does not exist" instead.
+            msg = str(exc).lower()
+            is_missing_rpc = (
+                "pgrst202" in msg
+                or "could not find the function" in msg
+                or ("function" in msg and "does not exist" in msg)
+            )
+            if is_missing_rpc:
+                logger.info(
+                    "list_chats_with_message_count RPC not present yet; "
+                    "falling back to N+1 count loop. Run migration 00029.",
+                )
+            else:
+                logger.error(
+                    "list_chats_with_message_count RPC failed (%s: %s); "
+                    "falling back to N+1 count loop. Investigate — this is "
+                    "NOT the missing-function case.",
+                    type(exc).__name__, exc,
+                )
+
+        if rpc_response is not None:
             chats = rpc_response.data or []
             # RPC returns int8 (BIGINT). Coerce to plain int for JSON
-            # symmetry with create_chat's `message_count: 0`.
+            # symmetry with create_chat's `message_count: 0`. Non-RPC
+            # errors here would NOT be miscategorized as "RPC failed".
             for chat in chats:
                 chat["message_count"] = int(chat.get("message_count") or 0)
             return chats
-        except Exception as exc:  # noqa: BLE001 — fall back to safe path
-            logger.warning(
-                "list_chats_with_message_count RPC failed (%s); "
-                "falling back to N+1 count loop. Run migration 00029 to fix.",
-                exc,
-            )
 
         # Fallback: original N+1 path. Identical filter to the SQL.
         response = (
