@@ -51,7 +51,7 @@ export const InfographicSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingInfographic && (
-        <InfographicProgressIndicator currentInfographicJob={currentInfographicJob} />
+        <InfographicProgressIndicator currentInfographicJob={currentInfographicJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (

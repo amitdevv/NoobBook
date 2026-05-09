@@ -6,16 +6,26 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { AdJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 import { PartialImagesPreview } from '../shared/PartialImagesPreview';
 
 interface AdProgressIndicatorProps {
   currentAdJob: AdJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const AdProgressIndicator: React.FC<AdProgressIndicatorProps> = ({
   currentAdJob,
+  projectId,
 }) => {
   if (!currentAdJob) return null;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentAdJob?.id) return;
+    await cancelStudioJob(projectId, currentAdJob.id);
+  };
 
   return (
     <div className="p-2 bg-primary/5 rounded-md border border-primary/20 overflow-hidden">
@@ -31,6 +41,9 @@ export const AdProgressIndicator: React.FC<AdProgressIndicatorProps> = ({
         </div>
       </div>
       <PartialImagesPreview urls={currentAdJob.partial_images} />
+    {projectId && currentAdJob?.id && (
+      <StopHoldButton onConfirm={handleCancel} size="sm" />
+    )}
     </div>
   );
 };

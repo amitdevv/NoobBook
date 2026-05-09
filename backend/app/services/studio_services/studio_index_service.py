@@ -51,6 +51,92 @@ _TOP_COLUMNS = {
 }
 
 
+# ============================================================================
+# Cooperative cancellation primitives
+# ============================================================================
+
+class StudioJobCancelled(Exception):
+    """
+    Raised by `raise_if_cancelled` at agent breakpoints when a Stop request
+    has landed for the in-flight job. Distinct from generic Exception so
+    `with_failure_guard` can route it to the cleanup branch instead of the
+    error branch.
+    """
+
+
+def is_job_cancelled(project_id: str, job_id: str) -> bool:
+    """
+    True if a Stop request has landed for this job.
+
+    Two-source check:
+      1. ``task_service.is_target_cancelled(job_id)`` — in-memory hint set
+         by the cancel route. Microsecond-fast, lets the worker's first
+         breakpoint trip before the next DB poll lands.
+      2. ``studio_jobs.status == 'cancelled'`` — durable, survives process
+         restart. Falls back here only when the in-memory hint is False so
+         we don't pay for a DB read on every breakpoint in the happy path.
+    """
+    # Local import to dodge a circular: task_service imports nothing from
+    # this file, but our background_services package gets pulled in during
+    # app boot via auth flows that touch studio_index_service indirectly.
+    from app.services.background_services import task_service
+
+    if task_service.is_target_cancelled(job_id):
+        return True
+    row = get_job(project_id, job_id)
+    return bool(row and row.get("status") == "cancelled")
+
+
+def raise_if_cancelled(project_id: str, job_id: str) -> None:
+    """Convenience breakpoint — raise if Stop has landed, else no-op."""
+    if is_job_cancelled(project_id, job_id):
+        raise StudioJobCancelled(f"studio job {job_id} cancelled by user")
+
+
+def purge_job_storage(project_id: str, job_id: str) -> None:
+    """
+    Best-effort cleanup of a cancelled job's storage prefix.
+
+    Lists ``studio-outputs/<project_id>/<job_id>/`` and removes everything.
+    Never raises — storage failures during cleanup shouldn't bubble up
+    into the worker's exception handling. Logs and moves on.
+    """
+    try:
+        from app.services.integrations.supabase import storage_service
+
+        prefix = f"{project_id}/{job_id}"
+        client = storage_service._get_client()  # noqa: SLF001 — package-internal
+        bucket = client.storage.from_(storage_service.BUCKET_STUDIO)
+        listed = bucket.list(prefix, {"limit": 10000}) or []
+        # storage3 returns objects from the *immediate* prefix only; recurse
+        # into common nested subdirs so partial AI output lives die too.
+        paths_to_delete: List[str] = []
+        for entry in listed:
+            name = entry.get("name") if isinstance(entry, dict) else None
+            if not name:
+                continue
+            paths_to_delete.append(f"{prefix}/{name}")
+            # If this entry is itself a folder, fan out one level.
+            try:
+                nested = bucket.list(f"{prefix}/{name}", {"limit": 10000}) or []
+                for n in nested:
+                    nname = n.get("name") if isinstance(n, dict) else None
+                    if nname:
+                        paths_to_delete.append(f"{prefix}/{name}/{nname}")
+            except Exception:  # noqa: BLE001 — best-effort
+                pass
+        if paths_to_delete:
+            bucket.remove(paths_to_delete)
+            logger.info(
+                "Purged %d storage objects for cancelled studio job %s",
+                len(paths_to_delete), job_id,
+            )
+    except Exception as exc:  # noqa: BLE001 — never raise on cleanup
+        logger.warning(
+            "Storage purge failed for cancelled job %s: %s", job_id, exc,
+        )
+
+
 def _get_client():
     """Get Supabase client, raising error if not configured."""
     if not is_supabase_enabled():
@@ -126,6 +212,34 @@ def create_job(
         return None
 
 
+# Allowed transitions for the studio_jobs.status column. Every other
+# transition is silently dropped (current row returned unmodified, log at
+# INFO). The DB row's status is the single source of truth for whether a
+# job ended in `ready`, `error`, or `cancelled` — once any of those lands,
+# the column is frozen and concurrent late writes (e.g. worker writes
+# `ready` after the cancel route already wrote `cancelled`) cannot
+# overwrite it. Same-status writes are idempotent no-ops.
+_STATUS_TRANSITIONS: Dict[str, set] = {
+    "pending":    {"pending", "processing", "ready", "error", "cancelled"},
+    "processing": {"pending", "processing", "ready", "error", "cancelled"},
+    "ready":      {"ready"},
+    "error":      {"error"},
+    "cancelled":  {"cancelled"},
+}
+
+
+def _status_transition_allowed(from_status: Optional[str], to_status: str) -> bool:
+    """True if ``from_status -> to_status`` should commit. None counts as
+    pending (newly-created rows). Unknown statuses default to permissive
+    so a future status value doesn't silently break writes."""
+    if from_status is None:
+        return True
+    allowed = _STATUS_TRANSITIONS.get(from_status)
+    if allowed is None:
+        return True
+    return to_status in allowed
+
+
 def update_job(
     project_id: str,
     job_id: str,
@@ -142,10 +256,15 @@ def update_job(
 
     Returns:
         Updated job record (flattened) or None if not found
+
+    Race-safety: when ``status`` is being changed and the current row is
+    already in a terminal state (ready/error/cancelled), the write is
+    dropped instead of clobbering. The dropped transition is logged at
+    INFO; the caller still gets the current row back. This is what makes
+    the cancel route and a near-simultaneous worker `ready` write produce
+    a coherent final state instead of last-write-wins.
     """
     try:
-        client = _get_client()
-
         # Separate top-level columns from job_data fields
         top_level = {}
         job_data_updates = {}
@@ -160,9 +279,29 @@ def update_job(
                 else:
                     job_data_updates[k] = v
 
+        # If we're changing status, fetch current row first and apply the
+        # transition matrix. Pure job_data updates (no status change) skip
+        # this — they're additive and can't violate terminal-state safety.
+        # _get_client is intentionally deferred so a dropped write doesn't
+        # touch the Supabase client at all (cheaper, easier to test).
+        new_status = top_level.get("status")
+        current_for_data: Optional[Dict[str, Any]] = None
+        if new_status is not None:
+            current_for_data = get_job(project_id, job_id)
+            if not current_for_data:
+                return None
+            current_status = current_for_data.get("status")
+            if not _status_transition_allowed(current_status, new_status):
+                logger.info(
+                    "Studio job %s status transition dropped: %s -> %s "
+                    "(terminal state, write rejected)",
+                    job_id, current_status, new_status,
+                )
+                return current_for_data
+
         # Merge job_data updates via fetch-merge-update
         if job_data_updates:
-            current = get_job(project_id, job_id)
+            current = current_for_data or get_job(project_id, job_id)
             if not current:
                 return None
             # Rebuild current job_data (fields not in top-level columns)
@@ -179,6 +318,7 @@ def update_job(
         if not top_level:
             return get_job(project_id, job_id)
 
+        client = _get_client()
         response = (
             client.table("studio_jobs")
             .update(top_level)
@@ -218,6 +358,19 @@ def with_failure_guard(callable_func):
         job_id = kwargs.get("job_id")
         try:
             return callable_func(*args, **kwargs)
+        except StudioJobCancelled:
+            # User cancelled mid-generation. The cancel route already wrote
+            # status='cancelled' before we got here (and the clobber matrix
+            # would drop any 'error' write we tried to issue anyway). Best-
+            # effort cleanup of partial output, then swallow — task_service
+            # marks the background_tasks row cancelled separately.
+            logger.info(
+                "Studio job %s cancelled by user; running storage cleanup",
+                job_id,
+            )
+            if project_id and job_id:
+                purge_job_storage(project_id, job_id)
+            return None
         except Exception as exc:  # noqa: BLE001 — re-raised below
             logger.exception(
                 "Studio job %s (%s) crashed: %s",

@@ -134,6 +134,10 @@ class MindMapService:
             started_at=datetime.now().isoformat()
         )
 
+        # Cooperative cancellation breakpoint — abort cleanly if Stop
+        # already arrived between API accept and worker start.
+        studio_index_service.raise_if_cancelled(project_id, job_id)
+
         try:
             # Get source metadata
             source = source_index_service.get_source_from_index(project_id, source_id)

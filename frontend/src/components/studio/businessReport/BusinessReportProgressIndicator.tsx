@@ -7,12 +7,16 @@
 import React from 'react';
 import { ChartBar, Spinner } from '@phosphor-icons/react';
 import type { BusinessReportJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 
 interface BusinessReportProgressIndicatorProps {
   currentBusinessReportJob: BusinessReportJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
-export const BusinessReportProgressIndicator: React.FC<BusinessReportProgressIndicatorProps> = ({ currentBusinessReportJob }) => {
+export const BusinessReportProgressIndicator: React.FC<BusinessReportProgressIndicatorProps> = ({ currentBusinessReportJob, projectId }) => {
   // Determine progress message based on job state
   const getProgressMessage = () => {
     if (!currentBusinessReportJob) return 'Starting business report generation...';
@@ -36,6 +40,11 @@ export const BusinessReportProgressIndicator: React.FC<BusinessReportProgressInd
     return status;
   };
 
+  const handleCancel = async () => {
+    if (!projectId || !currentBusinessReportJob?.id) return;
+    await cancelStudioJob(projectId, currentBusinessReportJob.id);
+  };
+
   return (
     <div className="flex items-center gap-2 p-1.5 bg-teal-50 dark:bg-teal-950/30 rounded border border-teal-200 dark:border-teal-800/50">
       <div className="p-1 bg-teal-500/10 rounded">
@@ -52,6 +61,9 @@ export const BusinessReportProgressIndicator: React.FC<BusinessReportProgressInd
         )}
       </div>
       <ChartBar size={12} className="text-teal-500 flex-shrink-0" />
+    {projectId && currentBusinessReportJob?.id && (
+      <StopHoldButton onConfirm={handleCancel} size="sm" />
+    )}
     </div>
   );
 };

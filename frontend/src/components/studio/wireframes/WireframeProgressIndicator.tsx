@@ -7,15 +7,25 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { WireframeJob } from '@/lib/api/studio/wireframes';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 
 interface WireframeProgressIndicatorProps {
   currentWireframeJob: WireframeJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const WireframeProgressIndicator: React.FC<WireframeProgressIndicatorProps> = ({
   currentWireframeJob,
+  projectId,
 }) => {
   if (!currentWireframeJob) return null;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentWireframeJob?.id) return;
+    await cancelStudioJob(projectId, currentWireframeJob.id);
+  };
 
   return (
     <div className="p-2 bg-purple-500/5 rounded-md border border-purple-500/20 overflow-hidden">
@@ -29,6 +39,9 @@ export const WireframeProgressIndicator: React.FC<WireframeProgressIndicatorProp
             {currentWireframeJob.progress || 'Starting...'}
           </p>
         </div>
+        {projectId && currentWireframeJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
     </div>
   );

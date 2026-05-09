@@ -7,15 +7,25 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { FlashCardJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 
 interface FlashCardProgressIndicatorProps {
   currentFlashCardJob: FlashCardJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const FlashCardProgressIndicator: React.FC<FlashCardProgressIndicatorProps> = ({
   currentFlashCardJob,
+  projectId,
 }) => {
   if (!currentFlashCardJob) return null;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentFlashCardJob?.id) return;
+    await cancelStudioJob(projectId, currentFlashCardJob.id);
+  };
 
   return (
     <div className="p-2 bg-purple-500/5 rounded-md border border-purple-500/20 overflow-hidden">
@@ -30,6 +40,9 @@ export const FlashCardProgressIndicator: React.FC<FlashCardProgressIndicatorProp
           </p>
         </div>
       </div>
+    {projectId && currentFlashCardJob?.id && (
+      <StopHoldButton onConfirm={handleCancel} size="sm" />
+    )}
     </div>
   );
 };

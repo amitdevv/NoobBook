@@ -47,7 +47,7 @@ export const FlashCardSection: React.FC = () => {
   return (
     <>
       {isGeneratingFlashCards && (
-        <FlashCardProgressIndicator currentFlashCardJob={currentFlashCardJob} />
+        <FlashCardProgressIndicator currentFlashCardJob={currentFlashCardJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (

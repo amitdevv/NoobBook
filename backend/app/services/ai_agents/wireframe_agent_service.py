@@ -85,6 +85,10 @@ class WireframeAgentService:
             started_at=started_at.isoformat(),
         )
 
+        # Cooperative cancellation breakpoint — abort cleanly if Stop
+        # already arrived between API accept and worker start.
+        studio_index_service.raise_if_cancelled(project_id, job_id)
+
         logger.info("Starting wireframe agent job %s", job_id[:8])
 
         try:

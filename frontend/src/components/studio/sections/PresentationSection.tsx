@@ -52,7 +52,7 @@ export const PresentationSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingPresentation && (
-        <PresentationProgressIndicator currentPresentationJob={currentPresentationJob} />
+        <PresentationProgressIndicator currentPresentationJob={currentPresentationJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (

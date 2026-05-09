@@ -104,6 +104,10 @@ class BusinessReportAgentExecutor:
             """Background task to run the business report agent."""
             logger.info("Starting business report agent for job %s", job_id[:8])
             try:
+                # Cooperative cancellation breakpoint — abort cleanly if
+                # Stop already arrived.
+                studio_index_service.raise_if_cancelled(project_id, job_id)
+
                 business_report_agent_service.generate_business_report(
                     project_id=project_id,
                     source_id=source_id,
@@ -117,9 +121,13 @@ class BusinessReportAgentExecutor:
                     previous_markdown=previous_markdown,
                     previous_title=previous_title
                 )
+            except studio_index_service.StudioJobCancelled:
+                logger.info("Business report job %s cancelled by user", job_id[:8])
+                studio_index_service.purge_job_storage(project_id, job_id)
+                return
             except Exception as e:
                 logger.exception("Business report agent failed for job %s", job_id[:8])
-                # Update job on error
+                # Clobber matrix drops error → cancelled writes.
                 studio_index_service.update_business_report_job(
                     project_id, job_id,
                     status="error",

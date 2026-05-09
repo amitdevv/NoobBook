@@ -52,7 +52,7 @@ export const BlogSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingBlog && (
-        <BlogProgressIndicator currentBlogJob={currentBlogJob} />
+        <BlogProgressIndicator currentBlogJob={currentBlogJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (

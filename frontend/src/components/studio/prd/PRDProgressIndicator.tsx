@@ -7,13 +7,18 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { PRDJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 
 interface PRDProgressIndicatorProps {
   currentPRDJob: PRDJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const PRDProgressIndicator: React.FC<PRDProgressIndicatorProps> = ({
   currentPRDJob,
+  projectId,
 }) => {
   if (!currentPRDJob) return null;
 
@@ -21,6 +26,11 @@ export const PRDProgressIndicator: React.FC<PRDProgressIndicatorProps> = ({
   const progress = currentPRDJob.total_sections > 0
     ? Math.round((currentPRDJob.sections_written / currentPRDJob.total_sections) * 100)
     : 0;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentPRDJob?.id) return;
+    await cancelStudioJob(projectId, currentPRDJob.id);
+  };
 
   return (
     <div className="p-2 bg-amber-500/5 rounded-md border border-amber-500/20 overflow-hidden">
@@ -36,6 +46,9 @@ export const PRDProgressIndicator: React.FC<PRDProgressIndicatorProps> = ({
           </p>
         </div>
       </div>
+    {projectId && currentPRDJob?.id && (
+      <StopHoldButton onConfirm={handleCancel} size="sm" />
+    )}
     </div>
   );
 };

@@ -7,13 +7,18 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { PresentationJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 
 interface PresentationProgressIndicatorProps {
   currentPresentationJob: PresentationJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const PresentationProgressIndicator: React.FC<PresentationProgressIndicatorProps> = ({
   currentPresentationJob,
+  projectId,
 }) => {
   if (!currentPresentationJob) return null;
 
@@ -21,6 +26,11 @@ export const PresentationProgressIndicator: React.FC<PresentationProgressIndicat
   const progressText = currentPresentationJob.slides_created > 0
     ? `${currentPresentationJob.slides_created}/${currentPresentationJob.total_slides || '?'} slides`
     : currentPresentationJob.status_message || 'Starting...';
+
+  const handleCancel = async () => {
+    if (!projectId || !currentPresentationJob?.id) return;
+    await cancelStudioJob(projectId, currentPresentationJob.id);
+  };
 
   return (
     <div className="p-2 bg-amber-500/5 rounded-md border border-amber-500/20">
@@ -35,6 +45,9 @@ export const PresentationProgressIndicator: React.FC<PresentationProgressIndicat
           </p>
         </div>
       </div>
+    {projectId && currentPresentationJob?.id && (
+      <StopHoldButton onConfirm={handleCancel} size="sm" />
+    )}
     </div>
   );
 };

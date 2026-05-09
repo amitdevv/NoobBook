@@ -51,7 +51,7 @@ export const EmailSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingEmail && (
-        <EmailProgressIndicator currentEmailJob={currentEmailJob} />
+        <EmailProgressIndicator currentEmailJob={currentEmailJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (

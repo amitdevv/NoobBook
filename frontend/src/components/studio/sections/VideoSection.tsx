@@ -48,7 +48,7 @@ export const VideoSection: React.FC = () => {
   return (
     <>
       {isGeneratingVideo && (
-        <VideoProgressIndicator currentVideoJob={currentVideoJob} />
+        <VideoProgressIndicator currentVideoJob={currentVideoJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (

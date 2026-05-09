@@ -296,7 +296,7 @@ export const presentationsAPI = {
         return job;
       }
 
-      if (job.status === 'error') {
+      if (job.status === 'error' || job.status === 'cancelled') {
         return job;
       }
 

@@ -170,7 +170,7 @@ export const adsAPI = {
         onProgress(job);
       }
 
-      if (job.status === 'ready' || job.status === 'error') {
+      if (job.status === 'ready' || job.status === 'error' || job.status === 'cancelled') {
         return job;
       }
 

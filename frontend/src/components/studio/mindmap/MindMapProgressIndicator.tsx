@@ -7,15 +7,25 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { MindMapJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 
 interface MindMapProgressIndicatorProps {
   currentMindMapJob: MindMapJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const MindMapProgressIndicator: React.FC<MindMapProgressIndicatorProps> = ({
   currentMindMapJob,
+  projectId,
 }) => {
   if (!currentMindMapJob) return null;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentMindMapJob?.id) return;
+    await cancelStudioJob(projectId, currentMindMapJob.id);
+  };
 
   return (
     <div className="p-2 bg-blue-500/5 rounded-md border border-blue-500/20 overflow-hidden">
@@ -30,6 +40,9 @@ export const MindMapProgressIndicator: React.FC<MindMapProgressIndicatorProps> =
           </p>
         </div>
       </div>
+    {projectId && currentMindMapJob?.id && (
+      <StopHoldButton onConfirm={handleCancel} size="sm" />
+    )}
     </div>
   );
 };

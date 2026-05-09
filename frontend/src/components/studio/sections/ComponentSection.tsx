@@ -46,7 +46,7 @@ export const ComponentSection: React.FC = () => {
   return (
     <>
       {isGeneratingComponents && (
-        <ComponentProgressIndicator currentComponentJob={currentComponentJob} />
+        <ComponentProgressIndicator currentComponentJob={currentComponentJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (

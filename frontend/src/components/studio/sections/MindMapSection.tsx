@@ -47,7 +47,7 @@ export const MindMapSection: React.FC = () => {
   return (
     <>
       {isGeneratingMindMap && (
-        <MindMapProgressIndicator currentMindMapJob={currentMindMapJob} />
+        <MindMapProgressIndicator currentMindMapJob={currentMindMapJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (

@@ -7,15 +7,25 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { QuizJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 
 interface QuizProgressIndicatorProps {
   currentQuizJob: QuizJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const QuizProgressIndicator: React.FC<QuizProgressIndicatorProps> = ({
   currentQuizJob,
+  projectId,
 }) => {
   if (!currentQuizJob) return null;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentQuizJob?.id) return;
+    await cancelStudioJob(projectId, currentQuizJob.id);
+  };
 
   return (
     <div className="p-2 bg-orange-500/5 rounded-md border border-orange-500/20 overflow-hidden">
@@ -30,6 +40,9 @@ export const QuizProgressIndicator: React.FC<QuizProgressIndicatorProps> = ({
           </p>
         </div>
       </div>
+    {projectId && currentQuizJob?.id && (
+      <StopHoldButton onConfirm={handleCancel} size="sm" />
+    )}
     </div>
   );
 };

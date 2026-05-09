@@ -51,7 +51,7 @@ export const WireframeSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingWireframe && (
-        <WireframeProgressIndicator currentWireframeJob={currentWireframeJob} />
+        <WireframeProgressIndicator currentWireframeJob={currentWireframeJob} projectId={projectId} />
       )}
 
       {filteredJobs.map((job) => (
