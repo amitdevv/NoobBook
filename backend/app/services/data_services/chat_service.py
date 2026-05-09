@@ -62,17 +62,47 @@ class ChatService:
 
         chats = response.data or []
 
-        # Add message count for each chat
+        # Add message count for each chat. The count we expose to the UI
+        # mirrors the same filter `get_chat()` applies for display — so a
+        # chat with tool-use rounds doesn't read "4 messages" in the
+        # sidebar while the chat header shows 2 (the visible turn pair).
+        # See _is_displayable_message for the rules.
         for chat in chats:
-            count_response = (
+            msgs_response = (
                 self.supabase.table(self.messages_table)
-                .select("id", count="exact")
+                .select("role, content")
                 .eq("chat_id", chat["id"])
                 .execute()
             )
-            chat["message_count"] = count_response.count or 0
+            chat["message_count"] = sum(
+                1 for m in (msgs_response.data or []) if self._is_displayable_message(m)
+            )
 
         return chats
+
+    @staticmethod
+    def _is_displayable_message(msg: Dict[str, Any]) -> bool:
+        """
+        True if a message row should appear in the user-visible chat
+        transcript. Mirrors the filter `get_chat()` applies when building
+        `display_messages` (non-tool roles, non-list content, non-empty
+        text). Centralized so the sidebar count and the header count
+        can't drift apart.
+        """
+        if msg.get("role") not in ("user", "assistant"):
+            return False
+        content = msg.get("content")
+        # List-content rows are tool-chain intermediates (assistant
+        # tool_use envelopes and user tool_result wrappers).
+        if isinstance(content, list):
+            return False
+        if isinstance(content, dict):
+            text = content.get("text", "")
+        elif isinstance(content, str):
+            text = content
+        else:
+            text = str(content) if content else ""
+        return bool(text.strip())
 
     def create_chat(self, project_id: str, title: str = "New Chat") -> Dict[str, Any]:
         """
