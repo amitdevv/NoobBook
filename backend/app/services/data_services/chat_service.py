@@ -44,7 +44,18 @@ class ChatService:
         List all chats for a project.
 
         Educational Note: Returns metadata only (not full messages) for
-        efficient loading of chat lists in the UI.
+        efficient loading of chat lists in the UI. A single RPC
+        (`list_chats_with_message_count`, migration 00029) joins each
+        chat to its filtered message count in one round-trip — the
+        previous N+1 implementation made one count query per chat
+        (21 round-trips for 20 chats; dominant latency on dashboard
+        load with active chat history). The SQL filter mirrors
+        `_is_displayable_message` so the sidebar count never drifts
+        from what the chat header shows.
+
+        A Python fallback path remains for environments where the
+        migration hasn't run yet (e.g. local dev that skipped it),
+        with a `logger.warning` so the issue surfaces in logs.
 
         Args:
             project_id: The project UUID
@@ -52,6 +63,26 @@ class ChatService:
         Returns:
             List of chat metadata, sorted by most recent first
         """
+        try:
+            rpc_response = (
+                self.supabase
+                .rpc("list_chats_with_message_count", {"p_project_id": project_id})
+                .execute()
+            )
+            chats = rpc_response.data or []
+            # RPC returns int8 (BIGINT). Coerce to plain int for JSON
+            # symmetry with create_chat's `message_count: 0`.
+            for chat in chats:
+                chat["message_count"] = int(chat.get("message_count") or 0)
+            return chats
+        except Exception as exc:  # noqa: BLE001 — fall back to safe path
+            logger.warning(
+                "list_chats_with_message_count RPC failed (%s); "
+                "falling back to N+1 count loop. Run migration 00029 to fix.",
+                exc,
+            )
+
+        # Fallback: original N+1 path. Identical filter to the SQL.
         response = (
             self.supabase.table(self.table)
             .select("id, title, created_at, updated_at, costs")
@@ -61,12 +92,6 @@ class ChatService:
         )
 
         chats = response.data or []
-
-        # Add message count for each chat. The count we expose to the UI
-        # mirrors the same filter `get_chat()` applies for display — so a
-        # chat with tool-use rounds doesn't read "4 messages" in the
-        # sidebar while the chat header shows 2 (the visible turn pair).
-        # See _is_displayable_message for the rules.
         for chat in chats:
             msgs_response = (
                 self.supabase.table(self.messages_table)
@@ -77,7 +102,6 @@ class ChatService:
             chat["message_count"] = sum(
                 1 for m in (msgs_response.data or []) if self._is_displayable_message(m)
             )
-
         return chats
 
     @staticmethod
