@@ -100,8 +100,35 @@ def cancel_studio_job(project_id: str, job_id: str):
         completed_at=now_iso,
         cancelled_at=now_iso,  # stored inside job_data JSONB
     )
+
+    # Second race window: the worker may have written ready/error in the
+    # gap between our initial `get_job` (which saw `processing` and let
+    # us through) and the `update_job` above. The clobber matrix would
+    # then drop our cancelled write — `updated` reflects the worker's
+    # winning row, NOT a cancellation. Branch on the actual final status
+    # so the frontend never sees `{status:'cancelled'}` when the DB is
+    # something else.
+    final = updated or job
+    final_status = final.get("status")
+
+    if final_status == "ready":
+        return jsonify({
+            "success": True,
+            "status": "ready",
+            "late": True,
+            "job": final,
+        }), 200
+
+    if final_status == "error":
+        return jsonify({
+            "success": False,
+            "status": "error",
+            "job": final,
+        }), 409
+
+    # Normal cooperative cancel — DB row landed `cancelled` as expected.
     return jsonify({
         "success": True,
-        "status": "cancelled",
-        "job": updated or job,
+        "status": final_status or "cancelled",
+        "job": final,
     }), 200

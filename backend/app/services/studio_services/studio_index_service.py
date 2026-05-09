@@ -97,36 +97,72 @@ def purge_job_storage(project_id: str, job_id: str) -> None:
     """
     Best-effort cleanup of a cancelled job's storage prefix.
 
-    Lists ``studio-outputs/<project_id>/<job_id>/`` and removes everything.
+    Lists ``studio-outputs/<project_id>/<job_id>/`` and removes everything
+    underneath, recursively. Some agent paths nest more than one level
+    (presentation writes to ``slides/`` and ``screenshots/``;
+    ``slides/`` itself contains base-styles.css alongside per-slide HTML).
+    A bounded BFS catches all of them.
+
     Never raises — storage failures during cleanup shouldn't bubble up
     into the worker's exception handling. Logs and moves on.
     """
+    # Cap recursion depth + total visited prefixes so a buggy storage
+    # listing can't push us into an infinite walk. Real studio output
+    # trees are 2-3 levels deep at most.
+    MAX_DEPTH = 5
+    MAX_VISITED = 1000
+
     try:
         from app.services.integrations.supabase import storage_service
 
-        prefix = f"{project_id}/{job_id}"
         client = storage_service._get_client()  # noqa: SLF001 — package-internal
         bucket = client.storage.from_(storage_service.BUCKET_STUDIO)
-        listed = bucket.list(prefix, {"limit": 10000}) or []
-        # storage3 returns objects from the *immediate* prefix only; recurse
-        # into common nested subdirs so partial AI output lives die too.
+
+        root_prefix = f"{project_id}/{job_id}"
+        # BFS over storage prefixes. storage3.list() returns immediate
+        # children only — directory-like entries don't have "id" or
+        # "metadata" populated, while files do. We still attempt to
+        # recurse into anything we can't definitively classify; the
+        # nested list call simply returns [] for a real file.
         paths_to_delete: List[str] = []
-        for entry in listed:
-            name = entry.get("name") if isinstance(entry, dict) else None
-            if not name:
-                continue
-            paths_to_delete.append(f"{prefix}/{name}")
-            # If this entry is itself a folder, fan out one level.
+        queue: List[tuple] = [(root_prefix, 0)]
+        visited = 0
+
+        while queue and visited < MAX_VISITED:
+            current_prefix, depth = queue.pop(0)
+            visited += 1
             try:
-                nested = bucket.list(f"{prefix}/{name}", {"limit": 10000}) or []
-                for n in nested:
-                    nname = n.get("name") if isinstance(n, dict) else None
-                    if nname:
-                        paths_to_delete.append(f"{prefix}/{name}/{nname}")
+                entries = bucket.list(current_prefix, {"limit": 10000}) or []
             except Exception:  # noqa: BLE001 — best-effort
-                pass
+                continue
+            for entry in entries:
+                name = entry.get("name") if isinstance(entry, dict) else None
+                if not name:
+                    continue
+                child = f"{current_prefix}/{name}"
+                paths_to_delete.append(child)
+                # Heuristic: entries with no metadata + no id behave like
+                # directories. Recurse into them up to MAX_DEPTH.
+                is_likely_folder = (
+                    isinstance(entry, dict)
+                    and not entry.get("id")
+                    and not entry.get("metadata")
+                )
+                if is_likely_folder and depth < MAX_DEPTH:
+                    queue.append((child, depth + 1))
+
         if paths_to_delete:
-            bucket.remove(paths_to_delete)
+            # Supabase storage `remove` accepts a batch; chunk to stay
+            # safely under any per-call limit.
+            CHUNK = 200
+            for i in range(0, len(paths_to_delete), CHUNK):
+                try:
+                    bucket.remove(paths_to_delete[i : i + CHUNK])
+                except Exception as exc:  # noqa: BLE001 — best-effort
+                    logger.warning(
+                        "Partial storage purge failure for job %s: %s",
+                        job_id, exc,
+                    )
             logger.info(
                 "Purged %d storage objects for cancelled studio job %s",
                 len(paths_to_delete), job_id,
