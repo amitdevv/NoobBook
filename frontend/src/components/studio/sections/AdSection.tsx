@@ -53,14 +53,14 @@ export const AdSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingAd && (
-        <AdProgressIndicator currentAdJob={currentAdJob} />
+        <AdProgressIndicator currentAdJob={currentAdJob} projectId={projectId} />
       )}
 
       {hasAdSignal && savedAdJobs.map((job, i) => (
         <AdListItem
           key={job.id}
           job={job}
-          index={savedAdJobs.length - i}
+          iterationIndex={savedAdJobs.length - i}
           onClick={() => setViewingAdJob(job)}
           onDelete={() => handleAdDelete(job.id)}
         />

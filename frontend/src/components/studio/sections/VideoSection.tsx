@@ -48,13 +48,14 @@ export const VideoSection: React.FC = () => {
   return (
     <>
       {isGeneratingVideo && (
-        <VideoProgressIndicator currentVideoJob={currentVideoJob} />
+        <VideoProgressIndicator currentVideoJob={currentVideoJob} projectId={projectId} />
       )}
 
-      {filteredJobs.map((job) => (
+      {filteredJobs.map((job, i) => (
         <VideoListItem
           key={job.id}
           job={job}
+          iterationIndex={filteredJobs.length - i}
           onOpen={() => setViewingVideoJob(job)}
           onDownload={(e) => {
             e.stopPropagation();

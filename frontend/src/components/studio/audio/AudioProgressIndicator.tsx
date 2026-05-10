@@ -7,15 +7,25 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { AudioJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 
 interface AudioProgressIndicatorProps {
   currentAudioJob: AudioJob | null;
+  /** Project the job belongs to — used to wire the cancel API. */
+  projectId?: string;
 }
 
 export const AudioProgressIndicator: React.FC<AudioProgressIndicatorProps> = ({
   currentAudioJob,
+  projectId,
 }) => {
   if (!currentAudioJob) return null;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentAudioJob?.id) return;
+    await cancelStudioJob(projectId, currentAudioJob.id);
+  };
 
   return (
     <div className="p-2 bg-primary/5 rounded-md border border-primary/20 overflow-hidden">
@@ -29,6 +39,9 @@ export const AudioProgressIndicator: React.FC<AudioProgressIndicatorProps> = ({
             {currentAudioJob.progress || 'Starting...'}
           </p>
         </div>
+        {projectId && currentAudioJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
     </div>
   );

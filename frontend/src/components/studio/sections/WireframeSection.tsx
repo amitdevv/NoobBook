@@ -51,13 +51,14 @@ export const WireframeSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingWireframe && (
-        <WireframeProgressIndicator currentWireframeJob={currentWireframeJob} />
+        <WireframeProgressIndicator currentWireframeJob={currentWireframeJob} projectId={projectId} />
       )}
 
-      {filteredJobs.map((job) => (
+      {filteredJobs.map((job, i) => (
         <WireframeListItem
           key={job.id}
           job={job}
+          iterationIndex={filteredJobs.length - i}
           onClick={() => setViewingWireframeJob(job)}
           onDelete={() => handleWireframeDelete(job.id)}
         />

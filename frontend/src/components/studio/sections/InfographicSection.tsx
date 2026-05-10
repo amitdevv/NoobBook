@@ -51,13 +51,14 @@ export const InfographicSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingInfographic && (
-        <InfographicProgressIndicator currentInfographicJob={currentInfographicJob} />
+        <InfographicProgressIndicator currentInfographicJob={currentInfographicJob} projectId={projectId} />
       )}
 
-      {filteredJobs.map((job) => (
+      {filteredJobs.map((job, i) => (
         <InfographicListItem
           key={job.id}
           job={job}
+          iterationIndex={filteredJobs.length - i}
           onClick={() => setViewingInfographicJob(job)}
           onDelete={() => handleInfographicDelete(job.id)}
         />

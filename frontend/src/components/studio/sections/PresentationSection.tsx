@@ -52,13 +52,14 @@ export const PresentationSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingPresentation && (
-        <PresentationProgressIndicator currentPresentationJob={currentPresentationJob} />
+        <PresentationProgressIndicator currentPresentationJob={currentPresentationJob} projectId={projectId} />
       )}
 
-      {filteredJobs.map((job) => (
+      {filteredJobs.map((job, i) => (
         <PresentationListItem
           key={job.id}
           job={job}
+          iterationIndex={filteredJobs.length - i}
           onOpen={() => setViewingPresentationJob(job)}
           onDownload={(e) => {
             e.stopPropagation();

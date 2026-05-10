@@ -90,6 +90,12 @@ class VideoExecutor:
             """Background task to generate video."""
             logger.info("Starting video generation for job %s", job_id[:8])
             try:
+                # Cooperative cancellation breakpoint — abort if Stop
+                # already arrived. The except StudioJobCancelled below
+                # routes us to clean cleanup; the error path stays for
+                # genuine crashes.
+                studio_index_service.raise_if_cancelled(project_id, job_id)
+
                 video_service.generate_video(
                     project_id=project_id,
                     job_id=job_id,
@@ -101,9 +107,16 @@ class VideoExecutor:
                     edit_instructions=edit_instructions,
                     previous_prompt=previous_prompt
                 )
+            except studio_index_service.StudioJobCancelled:
+                logger.info("Video job %s cancelled by user", job_id[:8])
+                studio_index_service.purge_job_storage(project_id, job_id)
+                return
             except Exception as e:
                 logger.exception("Video generation failed for job %s", job_id[:8])
-                # Update job on error
+                # Update job on error. Clobber matrix in update_job will
+                # silently drop this write if a concurrent cancel already
+                # set status='cancelled', so we never overwrite a user's
+                # cancel with a misleading 'error'.
                 studio_index_service.update_video_job(
                     project_id, job_id,
                     status="error",

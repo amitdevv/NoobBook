@@ -51,13 +51,14 @@ export const FlowDiagramSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingFlowDiagram && (
-        <FlowDiagramProgressIndicator currentFlowDiagramJob={currentFlowDiagramJob} />
+        <FlowDiagramProgressIndicator currentFlowDiagramJob={currentFlowDiagramJob} projectId={projectId} />
       )}
 
-      {filteredJobs.map((job) => (
+      {filteredJobs.map((job, i) => (
         <FlowDiagramListItem
           key={job.id}
           job={job}
+          iterationIndex={filteredJobs.length - i}
           onClick={() => setViewingFlowDiagramJob(job)}
           onDelete={() => handleFlowDiagramDelete(job.id)}
         />

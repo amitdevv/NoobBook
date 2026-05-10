@@ -67,6 +67,10 @@ class MarketingStrategyAgentService:
             started_at=started_at
         )
 
+        # Cooperative cancellation breakpoint — abort cleanly if Stop
+        # already arrived between API accept and worker start.
+        studio_index_service.raise_if_cancelled(project_id, job_id)
+
         # Get source content (if source provided)
         source_content = ""
         if source_id:

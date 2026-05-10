@@ -7,16 +7,26 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { SocialPostJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 import { PartialImagesPreview } from '../shared/PartialImagesPreview';
 
 interface SocialPostProgressIndicatorProps {
   currentSocialPostJob: SocialPostJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const SocialPostProgressIndicator: React.FC<SocialPostProgressIndicatorProps> = ({
   currentSocialPostJob,
+  projectId,
 }) => {
   if (!currentSocialPostJob) return null;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentSocialPostJob?.id) return;
+    await cancelStudioJob(projectId, currentSocialPostJob.id);
+  };
 
   return (
     <div className="p-2 bg-cyan-500/5 rounded-md border border-cyan-500/20 overflow-hidden">
@@ -30,6 +40,9 @@ export const SocialPostProgressIndicator: React.FC<SocialPostProgressIndicatorPr
             {currentSocialPostJob.progress || 'Starting...'}
           </p>
         </div>
+        {projectId && currentSocialPostJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
       <PartialImagesPreview urls={currentSocialPostJob.partial_images} />
     </div>

@@ -460,7 +460,13 @@ const ChatPane: React.FC<ChatPaneProps> = ({
         </div>
       </header>
 
-      <div className="flex-1 min-h-0">
+      {/* flex flex-col here is load-bearing: ChatMessages's outer wrapper
+         is `relative flex-1 min-h-0` and its scroll viewport is positioned
+         `absolute inset-0`. Without a flex parent, the flex-1 on the
+         relative div doesn't claim height, the absolute viewport
+         collapses to 0×0, and 15 messages render into nothing — exactly
+         the empty pane the share view was showing. */}
+      <div className="flex-1 min-h-0 flex flex-col">
         <ChatMessages
           messages={chat.messages || []}
           sending={false}

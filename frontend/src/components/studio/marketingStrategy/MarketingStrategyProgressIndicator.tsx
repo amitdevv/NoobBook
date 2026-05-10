@@ -7,13 +7,18 @@
 import React from 'react';
 import { SpinnerGap } from '@phosphor-icons/react';
 import type { MarketingStrategyJob } from '@/lib/api/studio';
+import { cancelStudioJob } from '@/lib/api/studio';
+import { StopHoldButton } from '../shared/StopHoldButton';
 
 interface MarketingStrategyProgressIndicatorProps {
   currentMarketingStrategyJob: MarketingStrategyJob | null;
+  /** Project the job belongs to — wires the cancel API. */
+  projectId?: string;
 }
 
 export const MarketingStrategyProgressIndicator: React.FC<MarketingStrategyProgressIndicatorProps> = ({
   currentMarketingStrategyJob,
+  projectId,
 }) => {
   if (!currentMarketingStrategyJob) return null;
 
@@ -21,6 +26,11 @@ export const MarketingStrategyProgressIndicator: React.FC<MarketingStrategyProgr
   const progress = currentMarketingStrategyJob.total_sections > 0
     ? Math.round((currentMarketingStrategyJob.sections_written / currentMarketingStrategyJob.total_sections) * 100)
     : 0;
+
+  const handleCancel = async () => {
+    if (!projectId || !currentMarketingStrategyJob?.id) return;
+    await cancelStudioJob(projectId, currentMarketingStrategyJob.id);
+  };
 
   return (
     <div className="p-2 bg-emerald-500/5 rounded-md border border-emerald-500/20 overflow-hidden">
@@ -35,6 +45,9 @@ export const MarketingStrategyProgressIndicator: React.FC<MarketingStrategyProgr
             {currentMarketingStrategyJob.total_sections > 0 && ` (${progress}%)`}
           </p>
         </div>
+        {projectId && currentMarketingStrategyJob?.id && (
+          <StopHoldButton onConfirm={handleCancel} size="sm" />
+        )}
       </div>
     </div>
   );

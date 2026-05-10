@@ -99,6 +99,10 @@ class SocialPostsService:
             started_at=datetime.now().isoformat()
         )
 
+        # Cooperative cancellation breakpoint — abort cleanly if Stop
+        # already arrived between API accept and worker start.
+        studio_index_service.raise_if_cancelled(project_id, job_id)
+
         # Step 1: Generate copy and image prompts with Claude
         content_result = self._generate_content(
             project_id=project_id,

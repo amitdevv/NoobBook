@@ -51,13 +51,14 @@ export const EmailSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingEmail && (
-        <EmailProgressIndicator currentEmailJob={currentEmailJob} />
+        <EmailProgressIndicator currentEmailJob={currentEmailJob} projectId={projectId} />
       )}
 
-      {filteredJobs.map((job) => (
+      {filteredJobs.map((job, i) => (
         <EmailListItem
           key={job.id}
           job={job}
+          iterationIndex={filteredJobs.length - i}
           onClick={() => setViewingEmailJob(job)}
           onDelete={() => handleEmailDelete(job.id)}
         />

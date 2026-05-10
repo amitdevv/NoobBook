@@ -101,6 +101,11 @@ class BlogAgentExecutor:
             """Background task to run the blog agent."""
             logger.info("Starting blog agent for job %s", job_id[:8])
             try:
+                # Cooperative cancellation breakpoint — abort cleanly if
+                # Stop already arrived. Routes to StudioJobCancelled
+                # except below; cleanup happens in purge_job_storage.
+                studio_index_service.raise_if_cancelled(project_id, job_id)
+
                 blog_agent_service.generate_blog_post(
                     project_id=project_id,
                     source_id=source_id,
@@ -115,9 +120,15 @@ class BlogAgentExecutor:
                     previous_markdown=previous_markdown,
                     previous_title=previous_title
                 )
+            except studio_index_service.StudioJobCancelled:
+                logger.info("Blog job %s cancelled by user", job_id[:8])
+                studio_index_service.purge_job_storage(project_id, job_id)
+                return
             except Exception as e:
                 logger.exception("Blog agent failed for job %s", job_id[:8])
-                # Update job on error
+                # Update job on error. Clobber matrix in update_job will
+                # silently drop this write if a concurrent cancel set
+                # status='cancelled' first.
                 studio_index_service.update_blog_job(
                     project_id, job_id,
                     status="error",

@@ -73,13 +73,14 @@ export const AudioSection: React.FC = () => {
       />
 
       {isGeneratingAudio && (
-        <AudioProgressIndicator currentAudioJob={currentAudioJob} />
+        <AudioProgressIndicator currentAudioJob={currentAudioJob} projectId={projectId} />
       )}
 
-      {filteredJobs.map((job) => (
+      {filteredJobs.map((job, i) => (
         <AudioListItem
           key={job.id}
           job={job}
+          iterationIndex={filteredJobs.length - i}
           playingJobId={playingJobId}
           isPaused={isPaused}
           currentTime={currentTime}

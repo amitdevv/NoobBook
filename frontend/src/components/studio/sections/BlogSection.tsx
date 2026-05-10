@@ -52,13 +52,14 @@ export const BlogSection: React.FC = () => {
       <ConfigErrorBanner message={configError} />
 
       {isGeneratingBlog && (
-        <BlogProgressIndicator currentBlogJob={currentBlogJob} />
+        <BlogProgressIndicator currentBlogJob={currentBlogJob} projectId={projectId} />
       )}
 
-      {filteredJobs.map((job) => (
+      {filteredJobs.map((job, i) => (
         <BlogListItem
           key={job.id}
           job={job}
+          iterationIndex={filteredJobs.length - i}
           onOpen={() => setViewingBlogJob(job)}
           onDownload={(e) => {
             e.stopPropagation();

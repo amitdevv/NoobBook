@@ -48,13 +48,14 @@ export const BusinessReportSection: React.FC = () => {
   return (
     <>
       {isGeneratingBusinessReport && (
-        <BusinessReportProgressIndicator currentBusinessReportJob={currentBusinessReportJob} />
+        <BusinessReportProgressIndicator currentBusinessReportJob={currentBusinessReportJob} projectId={projectId} />
       )}
 
-      {filteredJobs.map((job) => (
+      {filteredJobs.map((job, i) => (
         <BusinessReportListItem
           key={job.id}
           job={job}
+          iterationIndex={filteredJobs.length - i}
           onOpen={() => setViewingBusinessReportJob(job)}
           onDownload={(e) => {
             e.stopPropagation();

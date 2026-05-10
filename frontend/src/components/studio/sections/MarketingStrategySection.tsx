@@ -47,13 +47,14 @@ export const MarketingStrategySection: React.FC = () => {
   return (
     <>
       {isGeneratingMarketingStrategy && (
-        <MarketingStrategyProgressIndicator currentMarketingStrategyJob={currentMarketingStrategyJob} />
+        <MarketingStrategyProgressIndicator currentMarketingStrategyJob={currentMarketingStrategyJob} projectId={projectId} />
       )}
 
-      {filteredJobs.map((job) => (
+      {filteredJobs.map((job, i) => (
         <MarketingStrategyListItem
           key={job.id}
           job={job}
+          iterationIndex={filteredJobs.length - i}
           onOpen={() => setViewingMarketingStrategyJob(job)}
           onDownload={(e) => {
             e.stopPropagation();

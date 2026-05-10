@@ -96,6 +96,10 @@ class EmailAgentExecutor:
             """Background task to run the email agent."""
             logger.info("Starting email agent for job %s", job_id[:8])
             try:
+                # Cooperative cancellation breakpoint — abort cleanly if
+                # Stop already arrived.
+                studio_index_service.raise_if_cancelled(project_id, job_id)
+
                 email_agent_service.generate_template(
                     project_id=project_id,
                     source_id=source_id,
@@ -106,9 +110,13 @@ class EmailAgentExecutor:
                     previous_markdown=previous_markdown,
                     previous_title=previous_title
                 )
+            except studio_index_service.StudioJobCancelled:
+                logger.info("Email job %s cancelled by user", job_id[:8])
+                studio_index_service.purge_job_storage(project_id, job_id)
+                return
             except Exception as e:
                 logger.exception("Email agent failed for job %s", job_id[:8])
-                # Update job on error
+                # Clobber matrix drops error → cancelled writes.
                 studio_index_service.update_email_job(
                     project_id, job_id,
                     status="error",
