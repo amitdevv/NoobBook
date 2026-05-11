@@ -64,11 +64,17 @@ def get_active_tasks(project_id: str):
             current_app.logger.warning(f"Error fetching sources for active tasks: {e}")
 
         # 2. Studio jobs in progress
+        # Tracks which studio_jobs.id values we've already emitted so the
+        # background_tasks pass below can dedupe by target_id (every studio
+        # agent emits both a studio_jobs row AND a background_tasks row via
+        # task_service.submit_task(target_id=job_id) — the bg row is
+        # internal plumbing and shouldn't render as a separate task).
+        studio_job_indices: dict[str, int] = {}
         try:
             supabase = get_supabase()
             jobs_response = (
                 supabase.table("studio_jobs")
-                .select("id, job_type, source_name, direction, status, progress, created_at")
+                .select("id, job_type, source_name, direction, status, progress, status_message, created_at")
                 .eq("project_id", project_id)
                 .in_("status", ["pending", "processing"])
                 .order("created_at", desc=False)
@@ -77,18 +83,17 @@ def get_active_tasks(project_id: str):
             for job in (jobs_response.data or []):
                 job_type = job.get("job_type", "unknown")
                 label = _format_job_type(job_type)
-                detail = job.get("direction") or "Generating..."
-                if job.get("source_name"):
-                    detail = job.get("source_name")
+                job_id = job.get("id")
 
+                studio_job_indices[job_id] = len(tasks)
                 tasks.append({
-                    "id": job.get("id"),
+                    "id": job_id,
                     "type": "studio",
                     "label": label,
-                    "detail": detail,
+                    "detail": _studio_job_detail(job),
                     "status": job.get("status"),
                     "progress": job.get("progress"),
-                    "target_id": job.get("id"),
+                    "target_id": job_id,
                     "created_at": job.get("created_at"),
                 })
         except Exception as e:
@@ -104,11 +109,19 @@ def get_active_tasks(project_id: str):
                 .order("created_at", desc=False)
                 .execute()
             )
-            # Only include bg tasks not already covered by sources/studio
-            existing_ids = {t["id"] for t in tasks}
             for task in (bg_response.data or []):
-                if task.get("id") in existing_ids:
+                target_id = task.get("target_id")
+                # If this bg task is the executor row for a studio job we've
+                # already emitted, merge a live message into the studio row's
+                # detail (when informative) and skip rendering as a separate
+                # row. This is what closes #235.
+                if target_id and target_id in studio_job_indices:
+                    bg_message = (task.get("message") or "").strip()
+                    if bg_message and bg_message.lower() != "processing...":
+                        studio_task = tasks[studio_job_indices[target_id]]
+                        studio_task["detail"] = bg_message
                     continue
+
                 task_type = task.get("task_type", "unknown")
                 tasks.append({
                     "id": task.get("id"),
@@ -117,7 +130,7 @@ def get_active_tasks(project_id: str):
                     "label": _format_task_type(task_type),
                     "detail": task.get("message") or "Processing...",
                     "status": task.get("status"),
-                    "target_id": task.get("target_id"),
+                    "target_id": target_id,
                     "target_type": task.get("target_type"),
                     "created_at": task.get("started_at") or task.get("created_at"),
                 })
@@ -133,6 +146,31 @@ def get_active_tasks(project_id: str):
     except Exception as e:
         current_app.logger.error(f"Error getting active tasks for project {project_id}: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+# Generic placeholders that the studio agents seed status_message with
+# before any real progress lands. Treated as not-yet-informative so the
+# detail line falls back to source_name / direction instead of a useless
+# "Initializing..." placeholder while the row is fresh.
+_GENERIC_STATUS_MESSAGES = {"", "initializing...", "initializing", "processing..."}
+
+
+def _studio_job_detail(job: dict) -> str:
+    """Build the detail line for an in-flight studio job row.
+
+    Prefers `status_message` from the agent (e.g. "Writing intro section…")
+    when it's informative, otherwise falls back to source name → direction
+    → generic placeholder. Keeps the user-visible row honest about what
+    the agent is actually doing right now.
+    """
+    status_message = (job.get("status_message") or "").strip()
+    if status_message and status_message.lower() not in _GENERIC_STATUS_MESSAGES:
+        return status_message
+    if job.get("source_name"):
+        return job["source_name"]
+    if job.get("direction"):
+        return job["direction"]
+    return "Generating..."
 
 
 def _format_job_type(job_type: str) -> str:
