@@ -342,7 +342,7 @@ def add_freshdesk_source_endpoint(project_id: str):
         {
             "name": "Support Tickets",   # optional display name
             "description": "Q1 tickets", # optional
-            "days_back": 30              # optional, default 30
+            "days_back": 90              # optional, default 90
         }
     """
     try:
@@ -352,7 +352,7 @@ def add_freshdesk_source_endpoint(project_id: str):
             project_id=project_id,
             name=data.get('name'),
             description=data.get('description', ''),
-            days_back=data.get('days_back', 30),
+            days_back=data.get('days_back', 90),
         )
 
         return jsonify({
@@ -420,7 +420,7 @@ def sync_freshdesk_source(project_id: str, source_id: str):
 
         data = request.get_json(silent=True) or {}
         mode = data.get('mode', 'incremental')
-        days_back = data.get('days_back', 30)
+        days_back = data.get('days_back', 90)
 
         task_service.submit_task(
             "freshdesk_sync", source_id,

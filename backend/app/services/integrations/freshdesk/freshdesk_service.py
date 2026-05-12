@@ -282,7 +282,7 @@ class FreshdeskService:
 
     def fetch_all_tickets_batched(
         self,
-        days_back: int = 30,
+        days_back: int = 90,
         batch_days: int = 5,
         cancel_check: Optional[Any] = None,
         on_progress: Optional[Any] = None,

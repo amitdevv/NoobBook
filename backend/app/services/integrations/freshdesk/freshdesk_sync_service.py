@@ -41,7 +41,7 @@ class FreshdeskSyncService:
         project_id: str,
         source_id: str,
         mode: str = "backfill",
-        days_back: int = 30,
+        days_back: int = 90,
     ) -> Dict[str, int]:
         """
         Sync tickets from Freshdesk into the local freshdesk_tickets table.
