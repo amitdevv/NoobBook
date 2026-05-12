@@ -219,6 +219,7 @@ class ClaudeService:
         user_id: Optional[str] = None,
         chat_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        enable_prompt_cache: bool = False,
     ) -> Dict[str, Any]:
         """
         Send messages to Claude and get a response.
@@ -267,6 +268,7 @@ class ClaudeService:
             tools=tools,
             tool_choice=tool_choice,
             extra_headers=extra_headers,
+            enable_prompt_cache=enable_prompt_cache,
         )
 
         # Make API call (wrapped in Opik parent trace with metadata if enabled)
@@ -287,6 +289,11 @@ class ClaudeService:
             trace_name=trace_name,
         )
 
+        # Cache fields are only populated when prompt caching is in play;
+        # default to 0 so non-cached calls behave exactly as before.
+        cache_creation_tokens = getattr(response.usage, "cache_creation_input_tokens", 0) or 0
+        cache_read_tokens = getattr(response.usage, "cache_read_input_tokens", 0) or 0
+
         # Track costs if project_id provided (also per-chat if chat_id set)
         if project_id:
             add_cost_usage(
@@ -294,7 +301,10 @@ class ClaudeService:
                 model=response.model,
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
+                user_id=user_id,
                 chat_id=chat_id,
+                cache_creation_tokens=cache_creation_tokens,
+                cache_read_tokens=cache_read_tokens,
             )
 
         # Return raw response data - all parsing happens in claude_parsing_utils
@@ -304,6 +314,8 @@ class ClaudeService:
             "usage": {
                 "input_tokens": response.usage.input_tokens,
                 "output_tokens": response.usage.output_tokens,
+                "cache_creation_input_tokens": cache_creation_tokens,
+                "cache_read_input_tokens": cache_read_tokens,
             },
             "stop_reason": response.stop_reason,
         }
@@ -323,6 +335,7 @@ class ClaudeService:
         user_id: Optional[str] = None,
         chat_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        enable_prompt_cache: bool = False,
     ) -> Dict[str, Any]:
         """
         Stream a Claude response and forward text deltas through a callback.
@@ -346,6 +359,7 @@ class ClaudeService:
             tools=tools,
             tool_choice=tool_choice,
             extra_headers=extra_headers,
+            enable_prompt_cache=enable_prompt_cache,
         )
 
         # Wrap streaming in Opik parent trace with metadata + retry
@@ -368,13 +382,19 @@ class ClaudeService:
         trace_input = {"prompt": last_user_msg, "model": model, "message_count": len(messages)}
         response = self._run_tracked(_do_stream, opik_kwargs=opik_kwargs, trace_input=trace_input, trace_name=trace_name)
 
+        cache_creation_tokens = getattr(response.usage, "cache_creation_input_tokens", 0) or 0
+        cache_read_tokens = getattr(response.usage, "cache_read_input_tokens", 0) or 0
+
         if project_id:
             add_cost_usage(
                 project_id=project_id,
                 model=response.model,
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
+                user_id=user_id,
                 chat_id=chat_id,
+                cache_creation_tokens=cache_creation_tokens,
+                cache_read_tokens=cache_read_tokens,
             )
 
         return {
@@ -383,6 +403,8 @@ class ClaudeService:
             "usage": {
                 "input_tokens": response.usage.input_tokens,
                 "output_tokens": response.usage.output_tokens,
+                "cache_creation_input_tokens": cache_creation_tokens,
+                "cache_read_input_tokens": cache_read_tokens,
             },
             "stop_reason": response.stop_reason,
         }
@@ -397,8 +419,21 @@ class ClaudeService:
         tools: Optional[List[Dict[str, Any]]],
         tool_choice: Optional[Dict[str, Any]],
         extra_headers: Optional[Dict[str, str]],
+        enable_prompt_cache: bool = False,
     ) -> Dict[str, Any]:
-        """Build the shared Anthropic request payload."""
+        """Build the shared Anthropic request payload.
+
+        When `enable_prompt_cache` is True, the system prompt is converted to
+        the structured block form and a `cache_control: {type: "ephemeral"}`
+        breakpoint is attached to it and to the last tool definition. This
+        opts the caller into Anthropic prompt caching, which bills subsequent
+        cache hits at 0.1× the normal input rate.
+
+        Note: Anthropic silently ignores cache_control on blocks below the
+        per-model minimum (~1024 tokens for Sonnet/Opus, ~2048 for Haiku).
+        Sub-minimum blocks are still served — just not cached — so this is
+        safe to enable broadly for the chat hot path.
+        """
         # Build API call parameters
         api_params = {
             "model": model,
@@ -408,13 +443,19 @@ class ClaudeService:
 
         # Add optional parameters only if provided
         if system_prompt:
-            api_params["system"] = system_prompt
+            api_params["system"] = (
+                _system_block_with_cache(system_prompt)
+                if enable_prompt_cache
+                else system_prompt
+            )
 
         if temperature != 0.2:  # Only set if not default
             api_params["temperature"] = temperature
 
         if tools:
-            api_params["tools"] = tools
+            api_params["tools"] = (
+                _tools_with_cache_breakpoint(tools) if enable_prompt_cache else tools
+            )
 
         if tool_choice:
             api_params["tool_choice"] = tool_choice
@@ -468,6 +509,48 @@ class ClaudeService:
         response = client.messages.count_tokens(**api_params)
 
         return response.input_tokens
+
+
+def _system_block_with_cache(system_prompt: str) -> List[Dict[str, Any]]:
+    """
+    Convert a plain string system prompt into Anthropic's structured-block
+    form with a cache_control breakpoint on it.
+
+    The Anthropic API accepts either form — `system="..."` or
+    `system=[{"type":"text", "text":"...", "cache_control":{...}}]` — and
+    cache_control only attaches to the block form.
+
+    Note: Anthropic enforces a minimum cacheable size (~1024 tokens for
+    Sonnet/Opus, ~2048 for Haiku). Smaller blocks are silently served
+    uncached — no error, no discount — so this helper is safe to apply
+    even to short prompts. See:
+    https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+    """
+    return [
+        {
+            "type": "text",
+            "text": system_prompt,
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+
+
+def _tools_with_cache_breakpoint(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Return a shallow-copy tools list with a cache_control breakpoint on the
+    last tool. The breakpoint covers every block up to and including itself,
+    so marking the last tool caches the entire tools array.
+
+    We never mutate the caller's tool dicts in place — chat builds the tools
+    list each turn from registries, and a sticky cache_control field would
+    leak into agents that share the same tool definitions but don't opt into
+    caching.
+    """
+    if not tools:
+        return tools
+    cached = list(tools)
+    cached[-1] = {**cached[-1], "cache_control": {"type": "ephemeral"}}
+    return cached
 
 
 # Singleton instance for easy import

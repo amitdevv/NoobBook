@@ -120,6 +120,7 @@ class UserService:
         # Surface spending fields from settings JSONB for the frontend table
         for user in users:
             settings = user.pop("settings", None) or {}
+            settings = self.maybe_reset_expired_spending_period(user["id"], settings)
             user["cost_limit"] = settings.get("cost_limit")
             user["reset_frequency"] = settings.get("reset_frequency")  # daily/weekly/monthly/null
             user["period_spend"] = settings.get("period_spend", 0.0)
@@ -171,6 +172,7 @@ class UserService:
         if resp.data:
             user = resp.data[0]
             settings = user.pop("settings", None) or {}
+            settings = self.maybe_reset_expired_spending_period(user_id, settings)
             user["cost_limit"] = settings.get("cost_limit")
             user["reset_frequency"] = settings.get("reset_frequency")
             user["period_spend"] = settings.get("period_spend", 0.0)
@@ -199,6 +201,50 @@ class UserService:
             .execute()
         )
         return bool(resp.data)
+
+    def maybe_reset_expired_spending_period(
+        self,
+        user_id: str,
+        settings: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Reset a user's period spend if their configured window has expired.
+
+        The reset is intentionally lazy, but this method is called from both
+        reads and writes so stale weekly/monthly spend does not linger until a
+        specific Claude code path happens to run.
+        """
+        current = dict(settings if settings is not None else self.get_user_settings_raw(user_id))
+        if not current.get("cost_limit") or not current.get("reset_frequency"):
+            return current
+
+        reset_frequency = current["reset_frequency"]
+        period_start = current.get("period_start")
+
+        from app.utils.spending_schedule import (
+            aligned_period_start_iso,
+            is_period_expired,
+        )
+
+        should_reset = not period_start or is_period_expired(period_start, reset_frequency)
+        if not should_reset:
+            return current
+
+        next_settings = {
+            **current,
+            "period_spend": 0.0,
+            "period_start": aligned_period_start_iso(reset_frequency),
+        }
+        if self.save_user_settings(user_id, next_settings):
+            logger.info(
+                "Reset expired %s spending period for user %s",
+                reset_frequency,
+                user_id,
+            )
+            return next_settings
+
+        logger.warning("Failed to persist expired spending-period reset for %s", user_id)
+        return next_settings
 
     def update_spending_config(
         self,
@@ -431,7 +477,7 @@ class UserService:
         project and chat cost updates. Only increments if the user has
         a cost_limit with a reset_frequency configured.
         """
-        settings = self.get_user_settings_raw(user_id)
+        settings = self.maybe_reset_expired_spending_period(user_id)
         if not settings.get("cost_limit") or not settings.get("reset_frequency"):
             return  # No period tracking configured
 
