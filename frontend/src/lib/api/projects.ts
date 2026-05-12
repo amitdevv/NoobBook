@@ -24,6 +24,10 @@ export interface ModelCostBreakdown {
   input_tokens: number;
   output_tokens: number;
   cost: number;
+  /** Anthropic prompt-cache tokens written. Billed at 1.25× input. */
+  cache_creation_tokens?: number;
+  /** Anthropic prompt-cache tokens read back. Billed at 0.10× input. */
+  cache_read_tokens?: number;
 }
 
 export interface CostTracking {
@@ -33,6 +37,14 @@ export interface CostTracking {
     sonnet: ModelCostBreakdown;
     haiku: ModelCostBreakdown;
   };
+  /** Net dollars saved via prompt caching (vs. uncached counterfactual). */
+  cache_savings?: number;
+  /** Image-generation usage, keyed by model. Always optional. */
+  images?: Record<string, {
+    count: number;
+    cost: number;
+    by_size_quality?: Record<string, { count: number; cost: number }>;
+  }>;
 }
 
 /**

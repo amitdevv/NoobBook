@@ -32,6 +32,7 @@ import { ArrowLeft, DotsThreeVertical, Plus, Trash, FolderOpen, Gear, CircleNotc
 import { Input } from '../ui/input';
 import { chatsAPI, type PromptConfig } from '../../lib/api/chats';
 import { projectsAPI, type CostTracking, type MemoryData } from '../../lib/api';
+import { ProjectUsageSection } from './ProjectUsageSection';
 import { ToastContainer } from '../ui/toast';
 import { useToast } from '../ui/use-toast';
 import { createLogger } from '@/lib/logger';
@@ -552,6 +553,11 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
           </DialogHeader>
 
           <div className="space-y-6 py-4">
+            {/* Usage & costs — same payload as the header chip, with cache savings + per-model breakdown */}
+            <ProjectUsageSection costs={costs} />
+
+            <div className="border-t" aria-hidden="true" />
+
             {/* All Prompts Section (View Only) */}
             <div className="space-y-3">
               <div>
