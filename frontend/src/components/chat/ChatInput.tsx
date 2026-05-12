@@ -143,22 +143,29 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   );
 
   // Drag-and-drop handlers on the wrapping pill container.
+  // Why: preventDefault must run unconditionally on dragenter/dragover or
+  // the browser refuses the drop entirely. We can't gate on
+  // `dataTransfer.types` including 'Files' here because some browsers
+  // (and most Linux file managers) only expose that flag on drop, not
+  // during dragover — checking it caused drag-drop to silently no-op.
+  // acceptFiles() filters by MIME, so non-image drops are still rejected
+  // cleanly with a toast.
+  const hasFiles = (e: React.DragEvent) =>
+    Array.from(e.dataTransfer.types || []).includes('Files');
+
   const handleDragEnter = useCallback((e: React.DragEvent) => {
-    if (!Array.from(e.dataTransfer.types || []).includes('Files')) return;
     e.preventDefault();
-    setDragDepth((d) => d + 1);
+    if (hasFiles(e)) setDragDepth((d) => d + 1);
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    if (!Array.from(e.dataTransfer.types || []).includes('Files')) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
-    if (!Array.from(e.dataTransfer.types || []).includes('Files')) return;
     e.preventDefault();
-    setDragDepth((d) => Math.max(0, d - 1));
+    if (hasFiles(e)) setDragDepth((d) => Math.max(0, d - 1));
   }, []);
 
   const handleDrop = useCallback(
