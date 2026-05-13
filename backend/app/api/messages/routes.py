@@ -295,9 +295,20 @@ def stream_message(project_id, chat_id):
     thread.start()
 
     def generate():
+        # Heartbeat keeps the SSE connection alive while long-running tools
+        # (e.g. FreshdeskAnalyzerAgent's 7-15 iterations) run silently between
+        # `emit()` calls. Without it, proxies (nginx/Coolify) drop the idle
+        # connection at ~60s, GeneratorExit fires, cancel_event is set, and
+        # the worker mislabels the response as "(stopped by user)". The colon
+        # prefix is an SSE comment — browsers ignore it but the bytes prevent
+        # idle-timeout.
         try:
             while True:
-                item = event_queue.get()
+                try:
+                    item = event_queue.get(timeout=15)
+                except queue.Empty:
+                    yield ": heartbeat\n\n"
+                    continue
                 if item is _STREAM_SENTINEL:
                     break
                 yield item
