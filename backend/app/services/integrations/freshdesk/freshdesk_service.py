@@ -69,6 +69,16 @@ class FreshdeskService:
         self._groups_cache: Dict[int, str] = {}
         self._products_cache: Dict[int, str] = {}
 
+        # Sticky "this API key can't read X" flags. Some customer-issued
+        # Freshdesk keys are scoped to /tickets only and lack /agents,
+        # /groups, /products read scopes. Without these flags every sync
+        # re-attempted the fetch and logged the same WARNING — typical
+        # prod load was a permission_denied warning every ~30 seconds.
+        # Reset on reload_config() so an actual key rotation re-probes.
+        self._agents_permission_denied: bool = False
+        self._groups_permission_denied: bool = False
+        self._products_permission_denied: bool = False
+
     def _load_config(self) -> None:
         """
         Lazy-load Freshdesk configuration from environment variables.
@@ -100,6 +110,12 @@ class FreshdeskService:
         self._agents_cache.clear()
         self._groups_cache.clear()
         self._products_cache.clear()
+        # Reset permission-denied flags so a key rotation re-probes the
+        # endpoints. If the new key has /agents read, the flag will stay
+        # False and caches will populate normally on the next sync.
+        self._agents_permission_denied = False
+        self._groups_permission_denied = False
+        self._products_permission_denied = False
 
     def is_configured(self) -> bool:
         """Check if Freshdesk credentials are configured."""
@@ -360,42 +376,92 @@ class FreshdeskService:
         Educational Note: Freshdesk tickets reference agents, groups, and products
         by numeric ID. We fetch these lookup tables once and cache them so we can
         resolve IDs to human-readable names during ticket transformation.
+
+        Permission-aware: if a previous sync already discovered the key
+        lacks read access for one of these endpoints, we skip the fetch
+        without re-attempting (and without re-logging). Resolvers below
+        fall back to "Unknown" / numeric ID when a cache is empty, which
+        is the existing behavior for empty-result responses anyway.
         """
         # Fetch agents (paginated, typically < 500)
         self._agents_cache.clear()
-        page = 1
-        while True:
-            result = self._make_request("agents", params={"page": page, "per_page": 100})
-            if not result["success"]:
-                logger.warning("Failed to fetch agents page %d: %s", page, result.get("error"))
-                break
-            agents = result.get("data", [])
-            if not agents:
-                break
-            for agent in agents:
-                agent_id = agent.get("id")
-                contact = agent.get("contact", {}) or {}
-                self._agents_cache[agent_id] = {
-                    "name": contact.get("name", "Unknown Agent"),
-                    "email": contact.get("email", ""),
-                }
-            if len(agents) < 100:
-                break
-            page += 1
+        if not self._agents_permission_denied:
+            page = 1
+            while True:
+                result = self._make_request("agents", params={"page": page, "per_page": 100})
+                if not result["success"]:
+                    if self._is_permission_denied(result):
+                        # First time we discover this: log once at INFO so
+                        # operators can see "agents read isn't granted"
+                        # without it becoming a per-sync WARNING. Future
+                        # syncs skip the fetch entirely via the flag.
+                        self._agents_permission_denied = True
+                        logger.info(
+                            "Freshdesk key lacks /agents read scope — "
+                            "tickets will resolve to numeric agent IDs. "
+                            "Grant 'View Agents' to populate agent names."
+                        )
+                    else:
+                        # A non-permission failure (rate limit, network, 5xx)
+                        # is worth a WARNING — operators may want to retry.
+                        logger.warning(
+                            "Failed to fetch agents page %d: %s",
+                            page, result.get("error"),
+                        )
+                    break
+                agents = result.get("data", [])
+                if not agents:
+                    break
+                for agent in agents:
+                    agent_id = agent.get("id")
+                    contact = agent.get("contact", {}) or {}
+                    self._agents_cache[agent_id] = {
+                        "name": contact.get("name", "Unknown Agent"),
+                        "email": contact.get("email", ""),
+                    }
+                if len(agents) < 100:
+                    break
+                page += 1
 
         # Fetch groups
         self._groups_cache.clear()
-        result = self._make_request("groups")
-        if result["success"]:
-            for group in result.get("data", []):
-                self._groups_cache[group.get("id")] = group.get("name", "Unknown Group")
+        if not self._groups_permission_denied:
+            result = self._make_request("groups")
+            if result["success"]:
+                for group in result.get("data", []):
+                    self._groups_cache[group.get("id")] = group.get("name", "Unknown Group")
+            elif self._is_permission_denied(result):
+                self._groups_permission_denied = True
+                logger.info(
+                    "Freshdesk key lacks /groups read scope — "
+                    "tickets will resolve to numeric group IDs."
+                )
+            else:
+                logger.warning("Failed to fetch groups: %s", result.get("error"))
 
         # Fetch products
         self._products_cache.clear()
-        result = self._make_request("products")
-        if result["success"]:
-            for product in result.get("data", []):
-                self._products_cache[product.get("id")] = product.get("name", "Unknown Product")
+        if not self._products_permission_denied:
+            result = self._make_request("products")
+            if result["success"]:
+                for product in result.get("data", []):
+                    self._products_cache[product.get("id")] = product.get("name", "Unknown Product")
+            elif self._is_permission_denied(result):
+                self._products_permission_denied = True
+                logger.info(
+                    "Freshdesk key lacks /products read scope — "
+                    "tickets will resolve to numeric product IDs."
+                )
+            else:
+                logger.warning("Failed to fetch products: %s", result.get("error"))
+
+    @staticmethod
+    def _is_permission_denied(result: Dict[str, Any]) -> bool:
+        """Detect the specific 403 case from _make_request's error string.
+        Kept as a string check (rather than threading the status code
+        through the result dict) so this fix doesn't touch the public
+        shape of _make_request and risk breaking other callers."""
+        return "Permission denied" in (result.get("error") or "")
 
         logger.info(
             "Freshdesk caches populated: %d agents, %d groups, %d products",
