@@ -19,10 +19,10 @@ import requests
 logger = logging.getLogger(__name__)
 
 _VALIDATION_ENDPOINTS = [
-    ("GET",  "https://api.elevenlabs.io/v1/user",                             "user info"),
-    ("POST", "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe", "speech-to-text"),
+    ("GET",  "https://api.elevenlabs.io/v1/user",                             "User info"),
+    ("POST", "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe", "Speech-to-text"),
     ("GET",  "https://api.elevenlabs.io/v1/models",                           "TTS models"),
-    ("GET",  "https://api.elevenlabs.io/v1/voices",                           "voices"),
+    ("GET",  "https://api.elevenlabs.io/v1/voices",                           "Voices"),
 ]
 
 
@@ -59,6 +59,7 @@ def validate_elevenlabs_key(api_key: str) -> Tuple[bool, str, bool]:
     Returns:
         (is_valid, message, warning)
         - warning=True means the key is authenticated but lacks required scopes
+        - message uses | as delimiter: "short summary|scope1,scope2" when warning=True
     """
     if not api_key:
         return False, "API key is empty", False
@@ -66,7 +67,7 @@ def validate_elevenlabs_key(api_key: str) -> Tuple[bool, str, bool]:
     missing_scopes = []
 
     for method, url, label in _VALIDATION_ENDPOINTS:
-        outcome, detail = _check_endpoint(method, url, api_key)
+        outcome, _ = _check_endpoint(method, url, api_key)
 
         if outcome == "ok":
             return True, f"Valid ElevenLabs key — {label} confirmed", False
@@ -77,15 +78,10 @@ def validate_elevenlabs_key(api_key: str) -> Tuple[bool, str, bool]:
         if outcome == "missing_permission":
             missing_scopes.append(label)
 
-        # errors → skip, try next endpoint
+        # network errors → skip, try next endpoint
 
     if missing_scopes:
-        scopes_str = ", ".join(missing_scopes)
-        return (
-            True,
-            f"Key authenticated but missing permissions: {scopes_str}. "
-            "Enable these scopes in the ElevenLabs dashboard.",
-            True,  # warning
-        )
+        scopes_str = ",".join(missing_scopes)
+        return True, f"Scoped key — grant missing permissions|{scopes_str}", True
 
     return False, "Could not reach ElevenLabs — check your network and try again", False

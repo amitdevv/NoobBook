@@ -24,6 +24,7 @@ import {
   Binoculars,
   ShieldCheck,
   Key,
+  Info,
 } from '@phosphor-icons/react';
 import {
   AlertDialog,
@@ -33,6 +34,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { settingsAPI } from '@/lib/api/settings';
 import type { ApiKey } from '@/lib/api/settings';
 import { useToast } from '@/components/ui/use-toast';
@@ -313,23 +320,57 @@ export const ApiKeysSection: React.FC = () => {
         {/* Description + validation feedback */}
         <div className="mt-2 space-y-1">
           <p className="text-[11px] text-stone-400 leading-relaxed">{apiKey.description}</p>
-          {validation?.message && (
-            <div className={`flex items-start gap-1.5 text-[11px] font-medium ${
-              !validation.valid
-                ? 'text-red-500'
-                : validation.warning
-                  ? 'text-amber-600'
-                  : 'text-green-600'
-            }`}>
-              {!validation.valid
-                ? <XCircle size={12} weight="fill" className="mt-px shrink-0" />
-                : validation.warning
-                  ? <WarningCircle size={12} weight="fill" className="mt-px shrink-0" />
-                  : <CheckCircle size={12} weight="fill" className="mt-px shrink-0" />
-              }
-              <span>{validation.message}</span>
-            </div>
-          )}
+          {validation?.message && (() => {
+            if (!validation.valid) {
+              return (
+                <div className="flex items-center gap-1.5 text-[11px] font-medium text-red-500">
+                  <XCircle size={12} weight="fill" className="shrink-0" />
+                  <span>{validation.message}</span>
+                </div>
+              );
+            }
+            if (validation.warning) {
+              // message format: "short summary|scope1,scope2,scope3"
+              const [summary, scopesRaw] = validation.message.split('|');
+              const scopes = scopesRaw ? scopesRaw.split(',') : [];
+              return (
+                <TooltipProvider delayDuration={100}>
+                  <div className="flex items-center gap-2">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-[11px] font-medium text-amber-700">
+                      <WarningCircle size={11} weight="fill" className="shrink-0" />
+                      <span>{summary}</span>
+                    </div>
+                    {scopes.length > 0 && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="text-amber-500 hover:text-amber-700 transition-colors">
+                            <Info size={13} weight="fill" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[240px]">
+                          <p className="text-[11px] font-semibold mb-1">Missing permissions</p>
+                          <ul className="space-y-0.5">
+                            {scopes.map(s => (
+                              <li key={s} className="text-[11px] text-muted-foreground">• {s}</li>
+                            ))}
+                          </ul>
+                          <p className="text-[11px] text-muted-foreground mt-1.5">
+                            Enable in the ElevenLabs dashboard → API Keys → Edit scopes.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                </TooltipProvider>
+              );
+            }
+            return (
+              <div className="flex items-center gap-1.5 text-[11px] font-medium text-green-600">
+                <CheckCircle size={12} weight="fill" className="shrink-0" />
+                <span>{validation.message}</span>
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
