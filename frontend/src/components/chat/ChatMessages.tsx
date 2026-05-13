@@ -553,7 +553,7 @@ const ReadingIndicator: React.FC<{ progressMessage?: string }> = ({ progressMess
 
   // Trim the ellipsis so the trailing animated dots aren't doubled.
   // Backend emits "Running ticket query…" and we append our own dots.
-  const trimmedProgress = progressMessage?.replace(/[…\.]+$/, '').trim();
+  const trimmedProgress = progressMessage?.replace(/[….]+$/, '').trim();
   const phrase = trimmedProgress
     ? trimmedProgress
     : step === 0 ? READING_OPENER : queue[(step - 1) % queue.length];
