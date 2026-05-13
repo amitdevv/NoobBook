@@ -37,6 +37,14 @@ interface ChatMessagesProps {
   projectId: string;
   streamingAssistantContent?: string;
   /**
+   * Live progress message emitted by the running tool (e.g. the
+   * Freshdesk analyzer announces "Running ticket query…" between SSE
+   * deltas). When set, the ReadingIndicator shows this instead of the
+   * generic rotating "Untangling the question…" phrases — concrete
+   * progress beats whimsy when the user is waiting 30+ seconds.
+   */
+  toolProgress?: string;
+  /**
    * Render in read-only mode (used by the shared-project view). Currently
    * a no-op for write affordances inside this component (the input + stop
    * live in ChatPanel), but accepted for API symmetry and reserved for
@@ -513,7 +521,7 @@ const THINKING_PHRASES = [
 const PHASE_INTERVAL_MS = 2200;
 const OPENER_HOLD_MS = 1600;
 
-const ReadingIndicator: React.FC = () => {
+const ReadingIndicator: React.FC<{ progressMessage?: string }> = ({ progressMessage }) => {
   // Shuffle the pool once per mount so each chat feels fresh; keep ordering
   // stable across phase ticks within the same waiting window. We use a
   // lazy-init useState rather than useMemo because shuffling pulls
@@ -530,15 +538,25 @@ const ReadingIndicator: React.FC = () => {
 
   const [step, setStep] = useState(0); // 0 = opener, 1+ = queue[step-1]
 
+  // Pause the rotating phrases when a real tool_progress is being shown
+  // — flipping a poetic phrase out of view every 2.2s while a concrete
+  // status sits in its place would feel jittery. The phrase resumes
+  // rotating from where it left off once the tool message clears.
   useEffect(() => {
+    if (progressMessage) return;
     const tick = window.setTimeout(
       () => setStep((s) => s + 1),
       step === 0 ? OPENER_HOLD_MS : PHASE_INTERVAL_MS,
     );
     return () => window.clearTimeout(tick);
-  }, [step]);
+  }, [step, progressMessage]);
 
-  const phrase = step === 0 ? READING_OPENER : queue[(step - 1) % queue.length];
+  // Trim the ellipsis so the trailing animated dots aren't doubled.
+  // Backend emits "Running ticket query…" and we append our own dots.
+  const trimmedProgress = progressMessage?.replace(/[…\.]+$/, '').trim();
+  const phrase = trimmedProgress
+    ? trimmedProgress
+    : step === 0 ? READING_OPENER : queue[(step - 1) % queue.length];
 
   return (
     <div
@@ -593,6 +611,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
   sending,
   projectId,
   streamingAssistantContent = '',
+  toolProgress,
   readOnly: _readOnly,
   studioAssetRewriter,
 }) => {
@@ -697,8 +716,12 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
           />
         )}
 
-        {/* Reading Beat — fills the gap between Send and first SSE delta. */}
-        {sending && !streamingAssistantContent && <ReadingIndicator />}
+        {/* Reading Beat — fills the gap between Send and first SSE delta.
+            If the running tool is emitting tool_progress events, show
+            those instead of the rotating poetic phrases. */}
+        {sending && !streamingAssistantContent && (
+          <ReadingIndicator progressMessage={toolProgress} />
+        )}
 
         {/* Invisible element to scroll to */}
         <div ref={messagesEndRef} />

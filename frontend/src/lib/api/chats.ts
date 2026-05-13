@@ -142,9 +142,17 @@ export interface SendMessageResponse {
   sync?: ChatSyncPayload | null;
 }
 
+export interface ToolProgressPayload {
+  agent: string;
+  message: string;
+  iteration?: number;
+  tool?: string;
+}
+
 export type ChatStreamEvent =
   | { type: 'user_message'; payload: Message }
   | { type: 'assistant_delta'; payload: { delta: string } }
+  | { type: 'tool_progress'; payload: ToolProgressPayload }
   | { type: 'assistant_done'; payload: { assistant_message: Message; sync?: ChatSyncPayload | null } }
   | { type: 'error'; payload: { message: string; assistant_message?: Message | null; sync?: ChatSyncPayload | null } };
 
@@ -152,6 +160,7 @@ export interface StreamMessageCallbacks {
   onEvent?: (event: ChatStreamEvent) => void;
   onUserMessage?: (message: Message) => void;
   onAssistantDelta?: (delta: string) => void;
+  onToolProgress?: (payload: ToolProgressPayload) => void;
   onAssistantDone?: (payload: { assistant_message: Message; sync?: ChatSyncPayload | null }) => void;
   onErrorEvent?: (payload: { message: string; assistant_message?: Message | null; sync?: ChatSyncPayload | null }) => void;
 }
@@ -196,6 +205,9 @@ class ChatsAPI {
       case 'assistant_delta':
         callbacks?.onAssistantDelta?.(event.payload.delta);
         break;
+      case 'tool_progress':
+        callbacks?.onToolProgress?.(event.payload);
+        break;
       case 'assistant_done':
         callbacks?.onAssistantDone?.(event.payload);
         break;
@@ -237,6 +249,12 @@ class ChatsAPI {
       case 'assistant_delta':
         state.hadAssistantDelta = true;
         this.notifyStreamEvent({ type: 'assistant_delta', payload }, callbacks);
+        break;
+      case 'tool_progress':
+        // Progress signals from inside a long-running agent (e.g. the
+        // Freshdesk analyzer doing 7-15 Claude+SQL iterations). Doesn't
+        // change terminal state — terminal is still assistant_done/error.
+        this.notifyStreamEvent({ type: 'tool_progress', payload }, callbacks);
         break;
       case 'assistant_done':
         state.terminalEvent = 'assistant_done';

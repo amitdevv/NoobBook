@@ -73,6 +73,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [exportingChat, setExportingChat] = useState(false);
   const [rawMode, setRawMode] = useState(false);
   const [streamingAssistantContent, setStreamingAssistantContent] = useState('');
+  // Latest tool_progress message — shown inside the ReadingIndicator
+  // while the assistant is silent (e.g. FreshdeskAgent iterating). Cleared
+  // when assistant text starts streaming or when the run finishes/errors.
+  const [toolProgress, setToolProgress] = useState<string>('');
   const [titleSyncPollKey, setTitleSyncPollKey] = useState(0);
   // AbortController for cancelling in-flight chat requests
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -508,6 +512,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setAttachments([]);
     setRawMode(false);
     setStreamingAssistantContent('');
+    setToolProgress('');
     onAddSendingChat(sendingChatId, activeChat.title);
 
     // Optimistic user-message render. With attachments, the content is a
@@ -694,13 +699,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           onUserMessage: replaceTempWithCanonicalUser,
           onAssistantDelta: (delta) => {
             assistantDeltaReceivedRef.current = true;
+            // Once real assistant text is flowing the tool_progress chip
+            // would just clutter the UI — content takes over the bubble.
+            setToolProgress('');
             setStreamingAssistantContent((prev) => prev + delta);
           },
+          onToolProgress: (payload) => {
+            setToolProgress(payload.message);
+          },
           onAssistantDone: (payload) => {
+            setToolProgress('');
             appendAssistantMessage(payload.assistant_message);
             receivedTerminalSync = applyChatSync(payload.sync);
           },
           onErrorEvent: (payload) => {
+            setToolProgress('');
             setStreamingAssistantContent('');
             if (payload.assistant_message) {
               appendAssistantMessage(payload.assistant_message);
@@ -797,6 +810,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       onRemoveSendingChat(sendingChatId);
       abortControllerRef.current = null;
       sendingLockRef.current = false;
+      // Belt-and-braces: also clear here in case onToolProgress fired
+      // after onErrorEvent (out-of-order arrivals on slow networks).
+      setToolProgress('');
       // Only revoke optimistic blob URLs if we never got a canonical
       // user message to attach them to (send-aborted, fallback-error,
       // user-cancelled). When the canonical did arrive, the merged
@@ -1021,6 +1037,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           sending={sending}
           projectId={projectId}
           streamingAssistantContent={streamingAssistantContent}
+          toolProgress={toolProgress}
         />
       )}
 

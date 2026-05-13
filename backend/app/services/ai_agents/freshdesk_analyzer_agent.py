@@ -8,7 +8,7 @@ return_ticket_analysis to terminate with structured output.
 
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from app.config import prompt_loader, tool_loader
 from app.services.integrations.claude import claude_service
@@ -31,11 +31,48 @@ class FreshdeskAnalyzerAgent:
             self._tools = tool_loader.load_tools_from_category("freshdesk_agent")
         return self._tools
 
-    def run(self, project_id: str, source_id: str, query: str, chat_id: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
+    @staticmethod
+    def _emit_progress(
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]],
+        message: str,
+        *,
+        iteration: Optional[int] = None,
+        tool: Optional[str] = None,
+    ) -> None:
+        """Emit a ``tool_progress`` SSE event if a callback is wired up.
+        Safe no-op when on_event is None (non-streaming send_message path).
+        The payload shape mirrors the events main_chat_service already
+        sends so the frontend handler can render them uniformly."""
+        if on_event is None:
+            return
+        try:
+            payload: Dict[str, Any] = {"agent": "freshdesk", "message": message}
+            if iteration is not None:
+                payload["iteration"] = iteration
+            if tool is not None:
+                payload["tool"] = tool
+            on_event("tool_progress", payload)
+        except Exception:
+            # A failure in event emission must not abort the agent run.
+            # The SSE queue may have a backpressure or the client may
+            # have disconnected — the agent can still complete and the
+            # full response will be persisted via main_chat_service.
+            logger.debug("tool_progress emit failed", exc_info=True)
+
+    def run(
+        self,
+        project_id: str,
+        source_id: str,
+        query: str,
+        chat_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+    ) -> Dict[str, Any]:
         """Run the Freshdesk analysis agentic loop.
         Always closes the DB connection on exit to prevent leaks."""
         execution_id = str(uuid.uuid4())[:8]
         logger.info("[FreshdeskAgent:%s] Starting analysis for source %s", execution_id, source_id)
+        self._emit_progress(on_event, "Connecting to Freshdesk tickets…")
 
         # Load config
         prompt_config = prompt_loader.get_prompt_config(self.AGENT_NAME)
@@ -104,6 +141,15 @@ class FreshdeskAnalyzerAgent:
 
             for iteration in range(1, self.MAX_ITERATIONS + 1):
                 logger.info("[FreshdeskAgent:%s] Iteration %d", execution_id, iteration)
+                # Per-iteration heartbeat. Tells the user "still working" even
+                # when the tool a given iteration runs is fast enough to not
+                # produce its own progress event below. Without this the user
+                # sees a 30-60s blank wait while Claude+SQL iterate silently.
+                self._emit_progress(
+                    on_event,
+                    f"Analyzing tickets (step {iteration})…",
+                    iteration=iteration,
+                )
 
                 response = claude_service.send_message(
                     messages=messages,
@@ -153,6 +199,31 @@ class FreshdeskAnalyzerAgent:
                     tool_name = block.get("name", "")
                     tool_input = block.get("input", {})
                     tool_id = block.get("id", "")
+
+                    # Emit a specific message per tool so the user sees
+                    # what's actually happening (querying / summarizing /
+                    # returning), not just generic "Analyzing…".
+                    if tool_name == "query_runner":
+                        self._emit_progress(
+                            on_event,
+                            "Running ticket query…",
+                            iteration=iteration,
+                            tool=tool_name,
+                        )
+                    elif tool_name == "schema_info":
+                        self._emit_progress(
+                            on_event,
+                            "Reading ticket schema…",
+                            iteration=iteration,
+                            tool=tool_name,
+                        )
+                    elif tool_name == self.TERMINATION_TOOL:
+                        self._emit_progress(
+                            on_event,
+                            "Compiling findings…",
+                            iteration=iteration,
+                            tool=tool_name,
+                        )
 
                     result, is_term = freshdesk_executor.execute_tool(
                         tool_name, tool_input, project_id, source_id,

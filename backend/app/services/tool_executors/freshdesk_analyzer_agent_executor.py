@@ -6,15 +6,28 @@ Formats the agent result for display in the chat response.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from app.services.ai_agents.freshdesk_analyzer_agent import freshdesk_analyzer_agent
 
 logger = logging.getLogger(__name__)
 
 
-def execute(project_id: str, source_id: str, query: str, chat_id: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
-    """Execute Freshdesk analysis and format result for chat."""
+def execute(
+    project_id: str,
+    source_id: str,
+    query: str,
+    chat_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+) -> Dict[str, Any]:
+    """Execute Freshdesk analysis and format result for chat.
+
+    ``on_event`` is optional and only used to emit live progress events
+    to the SSE stream so the user sees what the agent is doing instead
+    of a blank spinner for 30-60 seconds. Threaded through to the agent
+    so it can emit per-iteration `tool_progress` events.
+    """
     try:
         result = freshdesk_analyzer_agent.run(
             project_id=project_id,
@@ -22,6 +35,7 @@ def execute(project_id: str, source_id: str, query: str, chat_id: Optional[str] 
             query=query,
             chat_id=chat_id,
             user_id=user_id,
+            on_event=on_event,
         )
 
         if not result.get("success"):
