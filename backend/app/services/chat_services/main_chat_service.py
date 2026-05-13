@@ -593,11 +593,27 @@ class MainChatService:
                     content=serialized_content
                 )
 
-                # Execute each tool and add results
-                # Educational Note: We wrap each tool execution in try/except to ensure
-                # a tool_result is ALWAYS stored. Without this, if a tool throws an exception,
-                # the tool_use block is orphaned (no matching tool_result), which corrupts the
-                # message history and causes Claude API 400 errors on all future messages.
+                # Execute each tool and collect results, then persist them
+                # all in ONE user message at the end of the round.
+                #
+                # Critical: Claude API requires every matching tool_result
+                # for a single assistant tool_use round to live in ONE user
+                # message. Splitting them across multiple consecutive user
+                # rows produces a 400:
+                #   "messages.N.content.0: unexpected tool_use_id found in
+                #    tool_result blocks ... Each tool_result block must have
+                #    a corresponding tool_use block in the previous message."
+                # because the SECOND tool_result message's "previous message"
+                # is the FIRST tool_result message (not the assistant
+                # tool_use message), so Claude can't find the matching
+                # tool_use.
+                #
+                # Educational Note: We wrap each tool execution in try/except
+                # so a tool_result is ALWAYS produced. Without this, if a tool
+                # throws, the assistant's tool_use block is orphaned (no
+                # matching tool_result), which corrupts the message history
+                # and 400s on every future message.
+                tool_results_for_persist: List[Dict[str, Any]] = []
                 for tool_block in tool_use_blocks:
                     tool_id = tool_block.get("id")
                     tool_name = tool_block.get("name")
@@ -620,13 +636,21 @@ class MainChatService:
                         result = f"Tool execution failed: {str(tool_error)}"
                         is_error = True
 
-                    # Add tool result as user message (always, even on error)
-                    message_service.add_tool_result_message(
+                    tool_results_for_persist.append({
+                        "tool_use_id": tool_id,
+                        "result": result,
+                        "is_error": is_error,
+                    })
+
+                # One DB row containing every tool_result, in the same
+                # order as the assistant tool_use blocks above. This is the
+                # message Claude API expects to be the "previous message"
+                # when it next produces text or another tool_use round.
+                if tool_results_for_persist:
+                    message_service.add_tool_results_batch(
                         project_id=project_id,
                         chat_id=chat_id,
-                        tool_use_id=tool_id,
-                        result=result,
-                        is_error=is_error,
+                        tool_results=tool_results_for_persist,
                     )
 
                 # All tool_results are now persisted (so the message chain
@@ -718,6 +742,51 @@ class MainChatService:
                 friendly_error = "Rate limit reached. Please wait a moment and try again."
             elif "assistant message prefill" in error_str or "must end with a user message" in error_str:
                 friendly_error = "Something went wrong with the message sequence. Please try sending your message again."
+            elif "tool_use_id" in error_str or "tool_result" in error_str:
+                # Chain corruption — the persisted messages don't form a
+                # valid tool_use/tool_result alternation. Show the user
+                # an actionable path forward (start a fresh chat) and
+                # dump the role/content-shape of every message in the
+                # current chain so we can post-mortem from the log alone.
+                friendly_error = (
+                    "This chat's tool history got into a bad state. "
+                    "Start a new chat to continue — your sources stay attached."
+                )
+                try:
+                    chain_dump = [
+                        {
+                            "role": m.get("role"),
+                            "content_type": (
+                                "list" if isinstance(m.get("content"), list)
+                                else "dict" if isinstance(m.get("content"), dict)
+                                else "str"
+                            ),
+                            "block_types": (
+                                [b.get("type") for b in m["content"] if isinstance(b, dict)]
+                                if isinstance(m.get("content"), list) else None
+                            ),
+                            "tool_use_ids": (
+                                [b.get("id") for b in m["content"]
+                                 if isinstance(b, dict) and b.get("type") == "tool_use"]
+                                if isinstance(m.get("content"), list) else None
+                            ),
+                            "tool_result_ids": (
+                                [b.get("tool_use_id") for b in m["content"]
+                                 if isinstance(b, dict) and b.get("type") == "tool_result"]
+                                if isinstance(m.get("content"), list) else None
+                            ),
+                        }
+                        for m in message_service.get_messages(project_id, chat_id)
+                    ]
+                    logger.error(
+                        "Chat %s tool-chain corruption — API error: %s — chain shape: %s",
+                        chat_id, error_str, chain_dump,
+                    )
+                except Exception as dump_exc:
+                    logger.error(
+                        "Chat %s tool-chain corruption — API error: %s — chain dump failed: %s",
+                        chat_id, error_str, dump_exc,
+                    )
             else:
                 friendly_error = f"Sorry, I encountered an error: {error_str}"
 

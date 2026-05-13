@@ -348,28 +348,62 @@ class MessageService:
         is_error: bool = False
     ) -> Optional[Dict[str, Any]]:
         """
-        Add a tool result message to a chat.
+        Add a single-tool-result message. Convenience wrapper around
+        `add_tool_results_batch` for the legacy single-tool path.
 
-        Educational Note: After Claude requests a tool use, we need to
-        send back the result. This is a user message with tool_result content.
-        Uses claude_parsing_utils for content block building.
+        Prefer `add_tool_results_batch` when the upstream assistant
+        message contained more than one tool_use block — Claude API
+        requires ALL matching tool_results to live in the SAME user
+        message, not split across consecutive messages. Splitting causes
+        a 400: "unexpected tool_use_id found in tool_result blocks ...
+        Each tool_result block must have a corresponding tool_use block
+        in the previous message."
+        """
+        return self.add_tool_results_batch(
+            project_id=project_id,
+            chat_id=chat_id,
+            tool_results=[{
+                "tool_use_id": tool_use_id,
+                "result": result,
+                "is_error": is_error,
+            }],
+        )
+
+    def add_tool_results_batch(
+        self,
+        project_id: str,
+        chat_id: str,
+        tool_results: List[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Persist ALL tool_result blocks for one assistant tool_use round
+        as a SINGLE user message.
+
+        Educational Note: When Claude returns parallel tool_use blocks
+        (`assistant: [tool_use_A, tool_use_B]`), the Anthropic API
+        requires the response to be ONE user message containing every
+        matching tool_result (`user: [tool_result_A, tool_result_B]`).
+        Persisting them as two separate user rows means build_api_messages
+        sends two separate messages — Claude then sees the second
+        tool_result block has no preceding tool_use (its "previous
+        message" is now another tool_result-only user message) and rejects
+        with 400 invalid_request_error.
 
         Args:
-            project_id: The project UUID
-            chat_id: The chat UUID
-            tool_use_id: The ID from the tool_use block
-            result: The tool execution result
-            is_error: Whether the tool execution failed
-
-        Returns:
-            The created message dict
+            tool_results: list of dicts with keys
+                - tool_use_id (REQUIRED): matches the tool_use block's id
+                - result: the result content (string-coerced if not str)
+                - is_error: optional bool
         """
-        # Use claude_parsing_utils to build the tool_result content block
-        content = claude_parsing_utils.build_single_tool_result(
-            tool_use_id=tool_use_id,
-            result=str(result) if not isinstance(result, str) else result,
-            is_error=is_error
-        )
+        normalized = [
+            {
+                "tool_use_id": tr["tool_use_id"],
+                "result": str(tr["result"]) if not isinstance(tr.get("result"), str) else tr["result"],
+                "is_error": tr.get("is_error", False),
+            }
+            for tr in tool_results
+        ]
+        content = claude_parsing_utils.build_tool_result_content(normalized)
         return self.add_message(project_id, chat_id, "user", content)
 
     def build_api_messages(
