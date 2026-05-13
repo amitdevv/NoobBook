@@ -13,6 +13,7 @@ import {
   EyeSlash,
   Trash,
   Warning,
+  WarningCircle,
   CheckCircle,
   XCircle,
   CircleNotch,
@@ -43,6 +44,7 @@ interface ValidationState {
   [key: string]: {
     validating: boolean;
     valid?: boolean;
+    warning?: boolean;
     message?: string;
   };
 }
@@ -174,6 +176,7 @@ export const ApiKeysSection: React.FC = () => {
             [id]: {
               validating: false,
               valid: true,
+              warning: result.warning ?? false,
               message: result.message
             }
           }));
@@ -311,10 +314,19 @@ export const ApiKeysSection: React.FC = () => {
         <div className="mt-2 space-y-1">
           <p className="text-[11px] text-stone-400 leading-relaxed">{apiKey.description}</p>
           {validation?.message && (
-            <div className={`flex items-center gap-1.5 text-[11px] font-medium ${
-              validation.valid ? 'text-green-600' : 'text-red-500'
+            <div className={`flex items-start gap-1.5 text-[11px] font-medium ${
+              !validation.valid
+                ? 'text-red-500'
+                : validation.warning
+                  ? 'text-amber-600'
+                  : 'text-green-600'
             }`}>
-              {validation.valid ? <CheckCircle size={12} weight="fill" /> : <XCircle size={12} weight="fill" />}
+              {!validation.valid
+                ? <XCircle size={12} weight="fill" className="mt-px shrink-0" />
+                : validation.warning
+                  ? <WarningCircle size={12} weight="fill" className="mt-px shrink-0" />
+                  : <CheckCircle size={12} weight="fill" className="mt-px shrink-0" />
+              }
               <span>{validation.message}</span>
             </div>
           )}

@@ -472,13 +472,17 @@ def validate_api_key():
             }), 200
 
         # Validate based on key type
-        is_valid, message = _validate_key(key_id, value)
+        # Most validators return (is_valid, message); ElevenLabs returns (is_valid, message, warning)
+        result = _validate_key(key_id, value)
+        is_valid, message = result[0], result[1]
+        warning = result[2] if len(result) > 2 else False
 
         current_app.logger.info(f"Validation result for {key_id}: {is_valid} - {message}")
 
         return jsonify({
             'success': True,
             'valid': is_valid,
+            'warning': warning,
             'message': message
         }), 200
 
@@ -490,7 +494,7 @@ def validate_api_key():
         }), 500
 
 
-def _validate_key(key_id: str, value: str) -> tuple[bool, str]:
+def _validate_key(key_id: str, value: str) -> tuple:
     """
     Validate a specific API key using the appropriate validator.
 

@@ -27,6 +27,7 @@ export interface ApiKeyUpdate {
 
 export interface ValidationResult {
   valid: boolean;
+  warning?: boolean;
   message: string;
 }
 

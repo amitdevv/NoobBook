@@ -1,8 +1,16 @@
 """
 ElevenLabs API key validator.
 
-Educational Note: Validates ElevenLabs API keys by checking user info
-via the /user endpoint - a lightweight way to verify the key.
+Educational Note: ElevenLabs has two key formats:
+- Legacy keys: long hex strings, have broad permissions
+- Scoped keys (sk_ prefix): per-permission grants
+
+Validation strategy: try each endpoint the app actually uses.
+A `missing_permissions` 401 means the key IS authenticated — it just
+lacks that particular scope. Only `invalid_api_key` means a bad key.
+
+Returns a 3-tuple: (is_valid, message, warning)
+- warning=True when the key is real but missing required permissions
 """
 import logging
 from typing import Tuple
@@ -10,46 +18,74 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+_VALIDATION_ENDPOINTS = [
+    ("GET",  "https://api.elevenlabs.io/v1/user",                             "user info"),
+    ("POST", "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe", "speech-to-text"),
+    ("GET",  "https://api.elevenlabs.io/v1/models",                           "TTS models"),
+    ("GET",  "https://api.elevenlabs.io/v1/voices",                           "voices"),
+]
 
-def validate_elevenlabs_key(api_key: str) -> Tuple[bool, str]:
-    """
-    Validate an ElevenLabs API key by checking user info.
 
-    Educational Note: We use the /user endpoint which returns
-    user subscription info - a lightweight way to verify the key.
-
-    Args:
-        api_key: The API key to validate
-
-    Returns:
-        Tuple of (is_valid, message)
-    """
-    if not api_key or api_key == '':
-        return False, "API key is empty"
-
+def _check_endpoint(method: str, url: str, api_key: str) -> Tuple[str, str]:
+    """Return (outcome, detail). outcome: ok | missing_permission | invalid_key | error"""
     try:
-        # Check user info endpoint - lightweight validation
-        response = requests.get(
-            "https://api.elevenlabs.io/v1/user",
-            headers={"xi-api-key": api_key},
-            timeout=10
-        )
+        resp = requests.request(method, url, headers={"xi-api-key": api_key}, timeout=10)
 
-        if response.status_code == 200:
-            user_data = response.json()
-            # Extract subscription tier for more informative message
-            subscription = user_data.get('subscription', {})
-            tier = subscription.get('tier', 'unknown')
-            return True, f"Valid ElevenLabs API key (tier: {tier})"
-        elif response.status_code == 401:
-            return False, "Invalid API key - authentication failed"
-        elif response.status_code == 429:
-            return True, "Valid API key (rate limited)"
-        else:
-            return False, f"Validation failed: HTTP {response.status_code}"
+        if resp.status_code in (200, 201):
+            return "ok", resp.text
+
+        if resp.status_code == 429:
+            return "ok", "rate_limited"
+
+        if resp.status_code == 401:
+            detail = resp.json().get("detail", {})
+            status = detail.get("status") if isinstance(detail, dict) else None
+            if status == "missing_permissions":
+                return "missing_permission", detail.get("message", "")
+            return "invalid_key", detail.get("message", "") if isinstance(detail, dict) else str(detail)
+
+        return "error", f"HTTP {resp.status_code}"
 
     except requests.exceptions.Timeout:
-        return False, "Validation timed out - try again"
-    except requests.exceptions.RequestException as e:
-        logger.error("ElevenLabs validation error: %s: %s", type(e).__name__, e)
-        return False, f"Validation failed: {str(e)}"
+        return "error", "timeout"
+    except requests.exceptions.RequestException as exc:
+        return "error", str(exc)
+
+
+def validate_elevenlabs_key(api_key: str) -> Tuple[bool, str, bool]:
+    """
+    Validate an ElevenLabs API key.
+
+    Returns:
+        (is_valid, message, warning)
+        - warning=True means the key is authenticated but lacks required scopes
+    """
+    if not api_key:
+        return False, "API key is empty", False
+
+    missing_scopes = []
+
+    for method, url, label in _VALIDATION_ENDPOINTS:
+        outcome, detail = _check_endpoint(method, url, api_key)
+
+        if outcome == "ok":
+            return True, f"Valid ElevenLabs key — {label} confirmed", False
+
+        if outcome == "invalid_key":
+            return False, "Invalid API key — authentication failed", False
+
+        if outcome == "missing_permission":
+            missing_scopes.append(label)
+
+        # errors → skip, try next endpoint
+
+    if missing_scopes:
+        scopes_str = ", ".join(missing_scopes)
+        return (
+            True,
+            f"Key authenticated but missing permissions: {scopes_str}. "
+            "Enable these scopes in the ElevenLabs dashboard.",
+            True,  # warning
+        )
+
+    return False, "Could not reach ElevenLabs — check your network and try again", False
