@@ -25,6 +25,29 @@ UNSAFE_SQL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Strip single-quoted strings, double-quoted identifiers, line comments,
+# and block comments BEFORE the keyword check. Without this, legitimate
+# SQL like `WHERE description ILIKE '%customer wants to update plan%'`
+# gets rejected as "Only SELECT queries are allowed" because the word
+# `update` inside the string literal trips UNSAFE_SQL_RE. Each pattern
+# replaces the matched span with an empty token of the same kind so any
+# code that cares about lexical structure (none here today, but defensive)
+# stays balanced.
+_SQL_STRING_RE         = re.compile(r"'(?:''|[^'])*'", re.DOTALL)
+_SQL_QUOTED_IDENT_RE   = re.compile(r'"(?:""|[^"])*"', re.DOTALL)
+_SQL_BLOCK_COMMENT_RE  = re.compile(r"/\*.*?\*/", re.DOTALL)
+_SQL_LINE_COMMENT_RE   = re.compile(r"--[^\n]*")
+
+
+def _strip_sql_strings_and_comments(sql: str) -> str:
+    """Return `sql` with string literals and comments removed so the
+    keyword regex sees only real SQL tokens."""
+    sql = _SQL_STRING_RE.sub("''", sql)
+    sql = _SQL_QUOTED_IDENT_RE.sub('""', sql)
+    sql = _SQL_BLOCK_COMMENT_RE.sub("", sql)
+    sql = _SQL_LINE_COMMENT_RE.sub("", sql)
+    return sql
+
 FRESHDESK_SCHEMA = """
 freshdesk_tickets table columns:
 - ticket_id (BIGINT): Freshdesk ticket ID (unique)
@@ -199,12 +222,18 @@ class FreshdeskExecutor:
         if not sql:
             return {"success": False, "error": "sql_query is required"}
 
-        # Validate read-only
-        if UNSAFE_SQL_RE.search(sql):
+        # Validate read-only — but only against the SQL's actual tokens.
+        # Without stripping string literals first, queries that legitimately
+        # contain words like "update" inside a WHERE filter on description
+        # text get rejected and burn an agent iteration.
+        sql_for_check = _strip_sql_strings_and_comments(sql)
+        if UNSAFE_SQL_RE.search(sql_for_check):
             return {"success": False, "error": "Only SELECT queries are allowed"}
 
-        # Must reference freshdesk_tickets
-        if "freshdesk_tickets" not in sql.lower():
+        # Must reference freshdesk_tickets — same stripping applied so a
+        # mention inside a string literal doesn't satisfy this check
+        # (defense in depth; the RPC enforces this server-side too).
+        if "freshdesk_tickets" not in sql_for_check.lower():
             return {"success": False, "error": "Query must reference freshdesk_tickets table"}
 
         rpc_result = self._run_via_rpc(sql)
