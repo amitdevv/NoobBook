@@ -46,7 +46,8 @@ logger = logging.getLogger(__name__)
 
 # Top-level columns in the studio_jobs table (everything else goes into job_data JSONB)
 _TOP_COLUMNS = {
-    "status", "progress", "error_message", "started_at", "completed_at",
+    "status", "progress", "status_message", "error_message",
+    "started_at", "completed_at",
     "source_name", "direction", "source_id",
 }
 
@@ -229,6 +230,7 @@ def create_job(
             "direction": job_data.pop("direction", None),
             "status": job_data.pop("status", "pending"),
             "progress": job_data.pop("progress", None),
+            "status_message": job_data.pop("status_message", None),
             "error_message": job_data.pop("error", job_data.pop("error_message", None)),
             "started_at": job_data.pop("started_at", None),
             "completed_at": job_data.pop("completed_at", None),

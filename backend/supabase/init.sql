@@ -507,6 +507,7 @@ CREATE TABLE IF NOT EXISTS studio_jobs (
     direction TEXT,
     status TEXT NOT NULL DEFAULT 'pending',
     progress TEXT,
+    status_message TEXT,
     error_message TEXT,
     job_data JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
