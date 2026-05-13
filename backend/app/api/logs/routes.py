@@ -76,7 +76,7 @@ def _read_recent_lines(limit: int, levels: set[str]) -> list[dict[str, Any]]:
 
 
 @logs_bp.route("/logs/recent", methods=["GET"])
-@require_admin
+@require_auth
 def get_recent_logs():
     """Return last N error/warning lines as JSON. `?level=all` includes INFO/DEBUG."""
     try:
@@ -104,7 +104,7 @@ def get_recent_logs():
 
 
 @logs_bp.route("/logs/bundle", methods=["GET"])
-@require_admin
+@require_auth
 def download_bundle():
     """Return the support bundle as a ZIP attachment."""
     try:

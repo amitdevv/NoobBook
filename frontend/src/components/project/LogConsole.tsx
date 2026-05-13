@@ -38,6 +38,8 @@ interface LogConsoleProps {
   onCopy: () => void;
   onDownload: () => void;
   onClear: () => void;
+  /** Whether to show the destructive Clear logs button. Admins only; default true. */
+  canClear?: boolean;
   /**
    * Modal mode wraps its filters in a tinted-amber pressed state (matches
    * SharingModal's primary chip), page mode uses cream/amber that reads
@@ -59,6 +61,7 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
   onCopy,
   onDownload,
   onClear,
+  canClear = true,
   variant = 'page',
   panelMaxHeightClassName = 'max-h-[58vh]',
 }) => {
@@ -84,6 +87,7 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
         loading={loading}
         hasLines={lines.length > 0}
         confirmingClear={confirmingClear}
+        canClear={canClear}
       />
     </div>
   );
@@ -184,22 +188,25 @@ const ActionRow: React.FC<{
   loading: boolean;
   hasLines: boolean;
   confirmingClear: boolean;
-}> = ({ onClear, onCopy, onDownload, loading, hasLines, confirmingClear }) => (
+  canClear: boolean;
+}> = ({ onClear, onCopy, onDownload, loading, hasLines, confirmingClear, canClear }) => (
   <div className="flex items-center gap-2 flex-wrap">
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={onClear}
-      disabled={loading}
-      className={
-        confirmingClear
-          ? 'gap-2 text-rose-700 hover:text-rose-800'
-          : 'gap-2 text-stone-500 hover:text-stone-900'
-      }
-    >
-      <Trash size={14} />
-      {confirmingClear ? 'Click again to clear' : 'Clear logs'}
-    </Button>
+    {canClear && (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onClear}
+        disabled={loading}
+        className={
+          confirmingClear
+            ? 'gap-2 text-rose-700 hover:text-rose-800'
+            : 'gap-2 text-stone-500 hover:text-stone-900'
+        }
+      >
+        <Trash size={14} />
+        {confirmingClear ? 'Click again to clear' : 'Clear logs'}
+      </Button>
+    )}
     <Button
       variant="ghost"
       size="sm"

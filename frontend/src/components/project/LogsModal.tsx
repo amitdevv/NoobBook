@@ -30,9 +30,11 @@ import { useLogsState } from './useLogsState';
 interface LogsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Whether to show the Clear logs button. Admins only; default true for backward compat. */
+  canClear?: boolean;
 }
 
-export const LogsModal: React.FC<LogsModalProps> = ({ open, onOpenChange }) => {
+export const LogsModal: React.FC<LogsModalProps> = ({ open, onOpenChange, canClear = true }) => {
   const state = useLogsState({ active: open });
 
   return (
@@ -66,6 +68,7 @@ export const LogsModal: React.FC<LogsModalProps> = ({ open, onOpenChange }) => {
             onCopy={state.handleCopy}
             onDownload={state.handleDownload}
             onClear={state.handleClear}
+            canClear={canClear}
           />
         </div>
 

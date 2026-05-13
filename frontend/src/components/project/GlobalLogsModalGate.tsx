@@ -6,9 +6,9 @@
  * (or other deeply-nested component) request the logs view without
  * having to plumb open-state down through props or context.
  *
- * Only renders for admins — non-admin users dispatching the event get
- * no-op behavior, which is the correct fallback since the underlying
- * /logs/* endpoints are admin-gated server-side anyway.
+ * All authenticated users can view and download logs. The Clear action
+ * is admin-only and is hidden in the modal for non-admin users (the
+ * server also enforces this via @require_admin on POST /logs/clear).
  */
 import React, { useEffect, useState } from 'react';
 import { LogsModal } from './LogsModal';
@@ -22,12 +22,10 @@ export const GlobalLogsModalGate: React.FC<GlobalLogsModalGateProps> = ({ isAdmi
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (!isAdmin) return;
     const handler = () => setOpen(true);
     window.addEventListener(LOGS_OPEN_EVENT, handler);
     return () => window.removeEventListener(LOGS_OPEN_EVENT, handler);
-  }, [isAdmin]);
+  }, []);
 
-  if (!isAdmin) return null;
-  return <LogsModal open={open} onOpenChange={setOpen} />;
+  return <LogsModal open={open} onOpenChange={setOpen} canClear={isAdmin} />;
 };

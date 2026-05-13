@@ -68,7 +68,6 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   costsVersion,
   onRename,
   onSignOut,
-  isAdmin = false,
 }) => {
   const { toasts, dismissToast, error, success, errorWithLogs } = useToast();
 
@@ -403,7 +402,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
       {/* Right side - Actions */}
       <div className="flex items-center gap-2">
         <ShareButton projectId={project.id} projectName={project.name} />
-        {isAdmin && <LogsButton />}
+        <LogsButton />
 
         <Button
           variant="soft"
