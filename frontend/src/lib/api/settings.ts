@@ -123,6 +123,7 @@ class SettingsAPI {
       });
       return {
         valid: response.data.valid,
+        warning: response.data.warning ?? false,
         message: response.data.message
       };
     } catch (error) {
