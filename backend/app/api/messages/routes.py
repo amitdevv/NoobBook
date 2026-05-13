@@ -42,6 +42,18 @@ from app.services.integrations.supabase import storage_service
 
 _STREAM_SENTINEL = object()
 
+# In-flight registry: chat_ids that currently have a streaming worker
+# alive. A second POST for the same chat is rejected with 409 instead of
+# being allowed to spawn a parallel worker. Prod logs at 07:27:27 showed
+# two FreshdeskAgent instances (97c88b5c and b71721c2) starting in the
+# same second for the same chat — that's a second /messages/stream POST
+# landing while the first was still running. The frontend's send-lock
+# fix prevents the rapid-click case; this server-side guard is the
+# defense-in-depth for cross-tab, browser-retry, and any future caller
+# paths that bypass the UI lock.
+_in_flight_chats: set = set()
+_in_flight_lock = threading.Lock()
+
 # Inline chat-image attachment constraints. Anthropic's vision API caps
 # at 5MB per image and supports png/jpeg/webp/gif. We cap at 10 images
 # per message — more than enough for "drop a few screenshots" and keeps
@@ -205,13 +217,34 @@ def send_message(project_id, chat_id):
         if err is not None:
             return err
 
-        # Delegate all processing to main_chat_service
-        # This is the RAG + agentic loop entry point
-        result = main_chat_service.send_message(
-            project_id=project_id,
-            chat_id=chat_id,
-            user_message_text=user_message_payload,
-        )
+        # Same in-flight guard as the streaming route. Frontend's
+        # streamMessage→sendMessage fallback (ChatPanel.tsx:742) lands here
+        # when the stream fails before any event, so a stream that 502'd
+        # mid-tool-execution can land its worker AND the fallback's worker
+        # on the same chat in parallel without this check.
+        with _in_flight_lock:
+            if chat_id in _in_flight_chats:
+                current_app.logger.info(
+                    "Rejecting duplicate /messages for chat %s (already in flight)",
+                    chat_id,
+                )
+                return jsonify({
+                    'success': False,
+                    'error': 'A response is already in progress for this chat.',
+                }), 409
+            _in_flight_chats.add(chat_id)
+
+        try:
+            # Delegate all processing to main_chat_service
+            # This is the RAG + agentic loop entry point
+            result = main_chat_service.send_message(
+                project_id=project_id,
+                chat_id=chat_id,
+                user_message_text=user_message_payload,
+            )
+        finally:
+            with _in_flight_lock:
+                _in_flight_chats.discard(chat_id)
 
         return jsonify({
             'success': True,
@@ -244,6 +277,23 @@ def stream_message(project_id, chat_id):
     user_message_payload, err = _parse_message_request(project_id, chat_id)
     if err is not None:
         return err
+
+    # In-flight dedup. Acquire the slot atomically before parsing identity
+    # or starting the worker so two concurrent POSTs can't both pass the
+    # "is this chat in flight?" check. The slot is released in the worker's
+    # finally below; the failure path (claim rejected) returns 409 without
+    # touching identity/queue/threads.
+    with _in_flight_lock:
+        if chat_id in _in_flight_chats:
+            current_app.logger.info(
+                "Rejecting duplicate /messages/stream for chat %s (already in flight)",
+                chat_id,
+            )
+            return jsonify({
+                "success": False,
+                "error": "A response is already in progress for this chat. Wait for it to finish or press Stop.",
+            }), 409
+        _in_flight_chats.add(chat_id)
 
     identity = get_request_identity()
     user_id = identity.user_id
@@ -289,6 +339,13 @@ def stream_message(project_id, chat_id):
             app.logger.error(f"Error streaming message: {exc}")
             emit("error", {"message": str(exc)})
         finally:
+            # Release the in-flight slot BEFORE the sentinel so a follow-up
+            # POST (e.g. the user starting the next message the instant the
+            # current one finishes) doesn't race the slot's release. Order
+            # matters: removing from the set must be safe even if generate()
+            # has already torn down due to GeneratorExit.
+            with _in_flight_lock:
+                _in_flight_chats.discard(chat_id)
             event_queue.put(_STREAM_SENTINEL)
 
     thread = threading.Thread(target=worker, daemon=True)

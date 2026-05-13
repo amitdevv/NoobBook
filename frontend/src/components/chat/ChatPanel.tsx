@@ -76,6 +76,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [titleSyncPollKey, setTitleSyncPollKey] = useState(0);
   // AbortController for cancelling in-flight chat requests
   const abortControllerRef = useRef<AbortController | null>(null);
+  // Synchronous lock that prevents duplicate handleSend calls slipping past
+  // the React-state `sending` guard. setSendingChatIds is async — a rapid
+  // double-click (or programmatic re-submit from a keyboard handler firing
+  // alongside a click handler) can have both invocations read `sending=false`
+  // before the first setState commits. A ref toggled inside handleSend
+  // closes that window because ref writes are synchronous.
+  // Without this, prod logs show two FreshdeskAgent workers spawning at the
+  // same second for the same chat (97c88b5c + b71721c2 at 07:27:27).
+  const sendingLockRef = useRef(false);
   const canonicalUserMessageReceivedRef = useRef(false);
   const assistantDeltaReceivedRef = useRef(false);
   const pendingTitleSyncRef = useRef<{ chatId: string; hasSeenNamingTask: boolean } | null>(null);
@@ -474,11 +483,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
    * before the API call, so users see their message immediately.
    */
   const handleSend = async () => {
+    // Ref-based atomic guard. The React-state `sending` flag is set via
+    // onAddSendingChat below but doesn't reflect until the next render —
+    // a rapid second invocation in the same tick passes the `sending` check
+    // and slips through. The ref is set synchronously and released in the
+    // try/finally wrapper around the actual send work.
+    if (sendingLockRef.current) return;
     if (!activeChat || sending) return;
     // Send-enabled if EITHER the text is non-empty OR there's at least one
     // attachment. Pure-attachment messages ("here's a screenshot, no
     // caption") are valid — Claude still answers from the image alone.
     if (!message.trim() && attachments.length === 0) return;
+    sendingLockRef.current = true;
 
     const userMessage = message.trim();
     const messageAttachments = attachments;
@@ -780,6 +796,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     } finally {
       onRemoveSendingChat(sendingChatId);
       abortControllerRef.current = null;
+      sendingLockRef.current = false;
       // Only revoke optimistic blob URLs if we never got a canonical
       // user message to attach them to (send-aborted, fallback-error,
       // user-cancelled). When the canonical did arrive, the merged
