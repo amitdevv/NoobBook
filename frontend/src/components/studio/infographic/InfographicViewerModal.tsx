@@ -14,9 +14,10 @@ import {
 } from '../../ui/dialog';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
-import { ChartPieSlice, DownloadSimple, PencilSimple } from '@phosphor-icons/react';
+import { ChartPieSlice, PencilSimple } from '@phosphor-icons/react';
 import type { InfographicJob } from '@/lib/api/studio';
 import { getAuthUrl } from '@/lib/api/client';
+import { ImageLightbox, type LightboxImage } from '../shared/ImageLightbox';
 
 interface InfographicViewerModalProps {
   viewingInfographicJob: InfographicJob | null;
@@ -70,8 +71,31 @@ export const InfographicViewerModal: React.FC<InfographicViewerModalProps> = ({
   isGenerating,
   defaultEditInput,
 }) => {
+  // Keep the lightbox state as a single nullable LightboxImage (same
+  // shape as Blog / BusinessReport). Deriving `image` from the parent
+  // prop while keeping `open` as a separate boolean would let the two
+  // diverge: if the parent closes the infographic modal while the
+  // lightbox is up, ImageLightbox silently dismisses (because its open
+  // condition becomes false) without ever firing onClose, leaving the
+  // open flag true — and the next infographic job auto-opens the
+  // lightbox without user input.
+  const [lightboxImage, setLightboxImage] = useState<LightboxImage | null>(null);
+
   return (
-    <Dialog open={viewingInfographicJob !== null} onOpenChange={(open) => !open && onClose()}>
+   <>
+    <Dialog
+      open={viewingInfographicJob !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          // ImageLightbox is mounted as a sibling fragment, so the
+          // parent closing doesn't tear it down on its own. Clear
+          // lightboxImage explicitly so the enlarged view doesn't
+          // outlive the infographic modal it was opened from.
+          setLightboxImage(null);
+          onClose();
+        }
+      }}
+    >
       <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -94,31 +118,28 @@ export const InfographicViewerModal: React.FC<InfographicViewerModalProps> = ({
         {/* Infographic Image */}
         {viewingInfographicJob?.image_url && (
           <div className="py-4">
-            <div className="relative group rounded-lg overflow-hidden border bg-muted">
+            <button
+              type="button"
+              onClick={() => setLightboxImage({
+                url: getAuthUrl(viewingInfographicJob.image_url!),
+                alt: viewingInfographicJob.topic_title || 'Infographic',
+                filename: viewingInfographicJob.image?.filename,
+                caption: viewingInfographicJob.topic_title || undefined,
+              })}
+              aria-label={`Open full-size view of ${viewingInfographicJob.topic_title || 'infographic'}`}
+              className="relative group rounded-lg overflow-hidden border bg-muted cursor-zoom-in transition-shadow hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-500 w-full text-left"
+            >
               <img
                 src={getAuthUrl(viewingInfographicJob.image_url)}
                 alt={viewingInfographicJob.topic_title || 'Infographic'}
                 className="w-full h-auto object-contain"
               />
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="gap-1"
-                  onClick={() => {
-                    if (viewingInfographicJob?.image?.filename && viewingInfographicJob.image_url) {
-                      const link = document.createElement('a');
-                      link.href = getAuthUrl(viewingInfographicJob.image_url);
-                      link.download = viewingInfographicJob.image.filename;
-                      link.click();
-                    }
-                  }}
-                >
-                  <DownloadSimple size={14} />
-                  Download
-                </Button>
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                <span className="text-white text-xs font-medium tracking-wide bg-black/40 rounded-full px-3 py-1">
+                  Click to enlarge
+                </span>
               </div>
-            </div>
+            </button>
 
             {/* Key Sections */}
             {viewingInfographicJob.key_sections && viewingInfographicJob.key_sections.length > 0 && (
@@ -155,5 +176,12 @@ export const InfographicViewerModal: React.FC<InfographicViewerModalProps> = ({
         )}
       </DialogContent>
     </Dialog>
+
+    <ImageLightbox
+      open={lightboxImage !== null}
+      image={lightboxImage}
+      onClose={() => setLightboxImage(null)}
+    />
+   </>
   );
 };
