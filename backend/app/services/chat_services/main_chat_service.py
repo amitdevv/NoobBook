@@ -84,8 +84,14 @@ class MainChatService:
     operations and tool parsing.
     """
 
-    # Maximum tool iterations to prevent infinite loops
-    MAX_TOOL_ITERATIONS = 10
+    # Maximum tool iterations to prevent infinite loops.
+    # 25 gives multi-part questions (e.g. a Freshdesk analysis asking
+    # 6–8 distinct things at once) enough rounds for the model to run
+    # the sub-agent several times, store memory, and still narrate the
+    # answer. Each round is one full Claude call, so the worst-case
+    # spend per turn scales linearly — the synthesis fallback below
+    # caps the "burnt budget with no visible response" failure mode.
+    MAX_TOOL_ITERATIONS = 25
 
     def __init__(self):
         """Initialize the service."""
@@ -562,6 +568,11 @@ class MainChatService:
             # the response to the user, the tool_use is for background processing.
             # We accumulate text from all responses so we don't lose it.
             iteration = 0
+            # Track the most recent non-empty tool-result batch so we can
+            # surface it to the user if the synthesis fallback also fails
+            # to coax text out of Claude — sub-agent output is way more
+            # useful than the "I've processed your request." placeholder.
+            last_tool_results: List[Dict[str, Any]] = []
 
             while claude_parsing_utils.is_tool_use(response) and iteration < self.MAX_TOOL_ITERATIONS:
                 iteration += 1
@@ -652,6 +663,7 @@ class MainChatService:
                         chat_id=chat_id,
                         tool_results=tool_results_for_persist,
                     )
+                    last_tool_results = tool_results_for_persist
 
                 # All tool_results are now persisted (so the message chain
                 # stays valid: every tool_use has a matching tool_result).
@@ -734,6 +746,28 @@ class MainChatService:
                         "synthesis fallback failed for chat %s/%s: %s",
                         project_id, chat_id, synthesis_err,
                     )
+
+                # Last-resort: if Claude STILL didn't produce any text,
+                # surface the sub-agents' raw output so the user sees
+                # what their tokens actually paid for instead of the
+                # bare placeholder. Filter to non-error results with
+                # string content (e.g. the freshdesk / db / csv
+                # analyzers all return formatted Markdown content).
+                if not accumulated_text_parts and last_tool_results:
+                    surfaced: List[str] = []
+                    for tr in last_tool_results:
+                        if tr.get("is_error"):
+                            continue
+                        raw = tr.get("result")
+                        if isinstance(raw, str) and raw.strip():
+                            surfaced.append(raw.strip())
+                    if surfaced:
+                        accumulated_text_parts.append(
+                            "Here's what the analysis tools returned — I "
+                            "wasn't able to wrap it into a final summary, "
+                            "so ask a follow-up if you'd like me to dig in:\n\n"
+                            + "\n\n---\n\n".join(surfaced)
+                        )
 
             final_text = "\n\n".join(accumulated_text_parts) if accumulated_text_parts else ""
 
