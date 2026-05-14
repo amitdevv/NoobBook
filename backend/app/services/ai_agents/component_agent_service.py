@@ -298,7 +298,17 @@ class ComponentAgentService:
 
         for iteration in range(1, self.MAX_ITERATIONS + 1):
 
-            response = claude_service.send_message(
+            # Use streaming — Anthropic's SDK refuses non-streaming calls
+            # whose worst-case duration exceeds 10 minutes, and at
+            # `max_tokens=32000` on Opus 4.7 the upper bound trips that
+            # guard ("Streaming is required for operations that may take
+            # longer than 10 minutes" — see the SDK long-requests doc).
+            # `stream_message` returns the same `{content_blocks, usage,
+            # stop_reason, model}` shape `send_message` does, so the rest
+            # of the loop is unchanged. No `on_text_delta` callback is
+            # passed: the agent loop consumes the final response object,
+            # not partial deltas.
+            response = claude_service.stream_message(
                 messages=messages,
                 system_prompt=system_prompt,
                 model=config["model"],
@@ -306,7 +316,7 @@ class ComponentAgentService:
                 temperature=config["temperature"],
                 tools=tools["all_tools"] if isinstance(tools, dict) else tools,
                 tool_choice={"type": "any"},
-                project_id=project_id
+                project_id=project_id,
             )
 
             total_input_tokens += response["usage"]["input_tokens"]
