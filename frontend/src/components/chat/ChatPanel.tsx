@@ -98,6 +98,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   // batching means functional-updater side effects don't run before the
   // line that reads them, which broke the previous guard pattern.
   const activeChatIdRef = useRef<string | null>(null);
+  // Mirrors `activeChat?.messages?.length`. Read by `recoverChatFromServer`
+  // to detect when the server view is behind local optimistic state — done
+  // via a ref (rather than peeking inside a `setActiveChat` updater) so
+  // the read is genuinely side-effect-free and Strict Mode's double-invoke
+  // of state updaters can't corrupt the snapshot.
+  const activeChatMessageCountRef = useRef(0);
 
   // Sources state for header display
   const [sources, setSources] = useState<Source[]>([]);
@@ -144,12 +150,63 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   /**
-   * Load full chat data including all messages
+   * Merge a server-fetched chat into the local optimistic one, keeping any
+   * local messages the server doesn't yet know about.
+   *
+   * Why: the FIRST message of a fresh chat exposes a tight race between
+   * the server emitting `assistant_done` and committing `add_assistant_message`
+   * to the DB. If a recovery / refresh path fetches in that microsecond
+   * window, the server view has the user message but not the assistant
+   * reply — a flat `setActiveChat(chat)` would wipe the assistant text we
+   * just streamed in via `appendAssistantMessage`, and the user only sees
+   * the reply after a manual refresh. Merging keeps server messages as
+   * canonical (correct ids / timestamps) and appends any local-only
+   * messages (temp-* user messages mid-stream, optimistically-appended
+   * assistant messages that landed ahead of a slow recovery fetch).
+   */
+  const mergeChatPreservingLocal = useCallback(
+    (local: Chat | null, server: Chat): Chat => {
+      if (!local || local.id !== server.id) return server;
+      const serverIds = new Set(
+        server.messages.map((m) => m.id).filter((id): id is string => Boolean(id)),
+      );
+      const localOnly = local.messages.filter((m) => m.id && !serverIds.has(m.id));
+      if (localOnly.length === 0) return server;
+      if (import.meta.env.DEV) {
+        log.info(
+          { chatId: server.id, localOnlyIds: localOnly.map((m) => m.id) },
+          'mergeChatPreservingLocal: keeping local-only messages',
+        );
+      }
+      return {
+        ...server,
+        messages: [...server.messages, ...localOnly],
+      };
+    },
+    [],
+  );
+
+  /**
+   * Load full chat data including all messages.
+   *
+   * Guarded against the user being mid-send on this chat: a flat replace
+   * from the server would wipe the optimistic temp user message and the
+   * just-streamed assistant text. When `sendingLockRef` is held for this
+   * chat we merge instead of replacing.
    */
   const loadFullChat = async (chatId: string) => {
     try {
       const chat = await chatsAPI.getChat(projectId, chatId);
-      setActiveChat(chat);
+      const midSend = sendingLockRef.current && activeChatIdRef.current === chatId;
+      setActiveChat((prev) => {
+        if (import.meta.env.DEV) {
+          log.info(
+            { chatId, midSend, prevMessageCount: prev?.messages?.length, serverMessageCount: chat.messages.length },
+            'loadFullChat: setActiveChat',
+          );
+        }
+        return midSend ? mergeChatPreservingLocal(prev, chat) : chat;
+      });
       // Notify parent of per-chat source selection
       onActiveChatChange(chat.id, chat.selected_source_ids ?? []);
     } catch (err) {
@@ -221,12 +278,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   }, [activeChat, onSignalsChange]);
 
-  // Keep the activeChatId ref in sync — read-only mirror used by async
-  // recovery paths so they can compare current chat without racing with
-  // batched state updates.
+  // Keep the activeChatId + message-count refs in sync — read-only mirrors
+  // used by async recovery paths so they can compare current chat without
+  // racing with batched state updates.
   useEffect(() => {
     activeChatIdRef.current = activeChat?.id ?? null;
-  }, [activeChat?.id]);
+    activeChatMessageCountRef.current = activeChat?.messages?.length ?? 0;
+  }, [activeChat?.id, activeChat?.messages?.length]);
 
   /**
    * Load per-chat cost/token breakdown whenever the active chat changes.
@@ -324,13 +382,42 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
    */
   const recoverChatFromServer = useCallback(
     async (chatId: string, errorToastMessage?: string) => {
+      // Snapshot local message count from the dedicated ref. Reading it
+      // here (rather than peeking inside a `setActiveChat` updater) keeps
+      // the state updater pure — required for Strict Mode's intentional
+      // double-invoke, and just generally idiomatic React.
+      const localMessageCount =
+        activeChatIdRef.current === chatId ? activeChatMessageCountRef.current : 0;
+
       try {
-        const chat = await chatsAPI.getChat(projectId, chatId);
+        let chat = await chatsAPI.getChat(projectId, chatId);
+        // Up to 2 retries (400ms, 800ms) when the server appears behind
+        // local — covers the assistant-just-streamed-but-DB-not-flushed
+        // window. Three fetches total worst case.
+        const RECOVERY_RETRY_DELAYS_MS = [400, 800];
+        for (const delay of RECOVERY_RETRY_DELAYS_MS) {
+          if (chat.messages.length >= localMessageCount) break;
+          if (import.meta.env.DEV) {
+            log.info(
+              { chatId, serverCount: chat.messages.length, localCount: localMessageCount, delay },
+              'recoverChatFromServer: server behind local, retrying',
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          chat = await chatsAPI.getChat(projectId, chatId);
+        }
+
         const stillActive = activeChatIdRef.current === chat.id;
         if (stillActive) {
           setActiveChat((prev) => {
             if (!prev || prev.id !== chat.id) return prev;
-            return chat;
+            if (import.meta.env.DEV) {
+              log.info(
+                { chatId, prevCount: prev.messages.length, serverCount: chat.messages.length },
+                'recoverChatFromServer: setActiveChat (merge)',
+              );
+            }
+            return mergeChatPreservingLocal(prev, chat);
           });
           onActiveChatChange(chat.id, chat.selected_source_ids ?? []);
         }
@@ -338,13 +425,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         await loadUserUsage();
       } catch (recoveryErr) {
         log.error({ err: recoveryErr, chatId }, 'recovery refetch failed');
-        errorWithLogs(
-          errorToastMessage ||
-            'Connection dropped before the response arrived. Refresh to load it.',
-        );
+        // An explicit empty string from the caller silences the toast —
+        // used by the post-`assistant_done` defence-in-depth refetch,
+        // where the user already received a complete reply and a
+        // "Connection dropped" banner would be a confusing false alarm.
+        // `undefined` (the normal call shape) still gets the default message.
+        if (errorToastMessage !== '') {
+          errorWithLogs(
+            errorToastMessage ||
+              'Connection dropped before the response arrived. Refresh to load it.',
+          );
+        }
       }
     },
-    [projectId, onActiveChatChange, onCostsChange, loadUserUsage, errorWithLogs],
+    [projectId, onActiveChatChange, onCostsChange, loadUserUsage, errorWithLogs, mergeChatPreservingLocal],
   );
 
   const reconcileChatMetadata = useCallback(async (chatId: string) => {
@@ -644,7 +738,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       setActiveChat((prev) => {
         if (!prev) return null;
         const messagesWithoutTemp = prev.messages.filter((m) => m.id !== tempUserMessage.id);
-        if (messagesWithoutTemp.some((msg) => msg.id === assistantMessage.id)) {
+        const alreadyAppended = messagesWithoutTemp.some((msg) => msg.id === assistantMessage.id);
+        if (import.meta.env.DEV) {
+          log.info(
+            { chatId: prev.id, assistantId: assistantMessage.id, prevCount: prev.messages.length, alreadyAppended },
+            'appendAssistantMessage: setActiveChat',
+          );
+        }
+        if (alreadyAppended) {
           return { ...prev, messages: messagesWithoutTemp, updated_at: new Date().toISOString() };
         }
         return {
@@ -711,6 +812,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             setToolProgress('');
             appendAssistantMessage(payload.assistant_message);
             receivedTerminalSync = applyChatSync(payload.sync);
+            // Defence in depth: even after `assistant_done` and the
+            // happy-path append, schedule a silent merge-refetch ~500ms
+            // later. If anything in the next render cycle (a refetch
+            // racing the SSE handler, a `loadFullChat` flat-replace from
+            // an `openChatId` update, etc.) wiped the assistant message
+            // from local state, this brings it back from the DB without
+            // a visible flicker. Chat-id-aware: if the user navigated
+            // away by then, `recoverChatFromServer`'s `stillActive`
+            // check skips the update.
+            const recoveryChatId = currentChat.id;
+            setTimeout(() => {
+              // Pass an explicit empty string so a transient failure on
+              // this silent follow-up fetch doesn't surface a misleading
+              // "Connection dropped" toast — the user already saw the
+              // complete reply. recoverChatFromServer treats `""` as
+              // "skip the toast".
+              void recoverChatFromServer(recoveryChatId, '');
+            }, 500);
           },
           onErrorEvent: (payload) => {
             setToolProgress('');
