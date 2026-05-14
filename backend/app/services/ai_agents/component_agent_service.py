@@ -32,15 +32,56 @@ class ComponentAgentService:
 
     AGENT_NAME = "component_agent"
     MAX_ITERATIONS = 40
+    # Repo path to the frontend-design skill markdown. Loaded once at first
+    # use and prepended to every component-agent system prompt so the model
+    # always treats it as in-context guidance — no opt-in / feature flag.
+    SKILL_PATH = (
+        Path(__file__).resolve().parents[3] / "data" / "skills" / "frontend_design.md"
+    )
 
     def __init__(self):
         self._prompt_config = None
         self._tools = None
+        # Cache only successful reads. A FileNotFoundError leaves the cache
+        # as None so a later request will retry — important during partial
+        # rollouts where the worker boots before frontend_design.md lands
+        # on disk. We squelch the missing-file warning with a separate
+        # boolean so the log doesn't spam every iteration in that window.
+        self._skill_text: Optional[str] = None
+        self._skill_missing_warned: bool = False
 
     def _load_config(self) -> Dict[str, Any]:
         if self._prompt_config is None:
             self._prompt_config = prompt_loader.get_prompt_config("component_agent")
         return self._prompt_config
+
+    def _load_skill(self) -> str:
+        """Read the frontend-design skill markdown.
+
+        Successful reads are cached for the process lifetime. A missing
+        file is non-fatal and is NOT cached — so a delayed file deploy
+        (e.g. partial rollout where the python container started before
+        the markdown landed) recovers automatically on the next call.
+        The first missing-file event logs a warning; subsequent misses
+        are silent so we don't spam the log mid-run.
+        """
+        if self._skill_text is not None:
+            return self._skill_text
+        try:
+            text = self.SKILL_PATH.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            if not self._skill_missing_warned:
+                logger.warning(
+                    "frontend-design skill not found at %s — proceeding without it (will retry on next call)",
+                    self.SKILL_PATH,
+                )
+                self._skill_missing_warned = True
+            return ""
+        self._skill_text = text
+        # Clear the warned flag so a future loss-then-recovery sequence
+        # still produces an informative log if the file disappears again.
+        self._skill_missing_warned = False
+        return text
 
     def _load_tools(self) -> List[Dict[str, Any]]:
         if self._tools is None:
@@ -164,11 +205,28 @@ class ComponentAgentService:
         elif edit_instructions:
             user_message = user_message + f"\n\nADDITIONAL INSTRUCTIONS: {edit_instructions}"
 
+        # Always prepend the frontend-design skill markdown. It's a project-
+        # owned copy of Anthropic's claude-plugins-official frontend-design
+        # SKILL.md — kept under data/skills so it's part of the deployed
+        # build and reviewable in PRs. Prepended (not appended) so that
+        # downstream brand requirements + the prompt's component workflow
+        # rules can override the skill where they disagree (e.g. brand
+        # mandates Inter, skill prefers distinctive display fonts → brand
+        # wins because it appears later in the prompt).
+        system_prompt = config["system_prompt"]
+        skill_text = self._load_skill()
+        if skill_text:
+            system_prompt = (
+                "# Frontend-Design Skill (always-on)\n\n"
+                f"{skill_text}\n\n"
+                "---\n\n"
+                f"{system_prompt}"
+            )
+
         # Load brand context if configured for ads_creative feature
         brand_context = brand_context_loader.load_brand_context(
             project_id, "ads_creative", user_id=user_id
         )
-        system_prompt = config["system_prompt"]
         logo_info = None
         brand_colors = None
         brand_config = None
@@ -257,6 +315,43 @@ class ComponentAgentService:
             content_blocks = response.get("content_blocks", [])
             serialized_content = claude_parsing_utils.serialize_content_blocks(content_blocks)
             messages.append({"role": "assistant", "content": serialized_content})
+
+            # Truncation guard. When stop_reason == "max_tokens", the model
+            # was cut off mid-output and any tool_use it emitted may have an
+            # incomplete/partial JSON input. The previous behaviour was to
+            # call the executor anyway — which then read tool_input.get(
+            # "components", []) as [] and cheerfully marked the job
+            # status="ready" with zero components. We caught one such job
+            # (b6bbe1fd-...) at 16939 output tokens against a 16000 cap.
+            # Fail loudly here instead so the user sees an actionable
+            # error and can retry.
+            stop_reason = response.get("stop_reason")
+            if stop_reason == "max_tokens":
+                logger.warning(
+                    "component agent hit max_tokens at iteration %d "
+                    "(output=%d, cap=%d) — bailing before executor runs on truncated tool_use",
+                    iteration, response["usage"]["output_tokens"], config["max_tokens"],
+                )
+                truncation_error = {
+                    "success": False,
+                    "error_message": (
+                        "Generation was truncated — the model hit its output-token cap "
+                        "before finishing all variations. Try regenerating; if it happens "
+                        "again, simplify the request (fewer variations, simpler styles)."
+                    ),
+                    "iterations": iteration,
+                    "usage": {"input_tokens": total_input_tokens, "output_tokens": total_output_tokens},
+                }
+                studio_index_service.update_component_job(
+                    project_id, job_id,
+                    status="error",
+                    error_message=truncation_error["error_message"],
+                )
+                self._save_execution(
+                    project_id, execution_id, job_id, messages,
+                    truncation_error, started_at, source_id,
+                )
+                return truncation_error
 
             # Process tool calls
             tool_results = []
