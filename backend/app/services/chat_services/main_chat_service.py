@@ -685,10 +685,56 @@ class MainChatService:
                     accumulated_text_parts.append(response_text)
 
             # Step 6: Store final text response
-            # Combine all accumulated text
             # Educational Note: When Claude sends text + tool_use, the text comes first.
             # After tool execution, Claude may respond with more text OR empty (nothing to add).
             # We combine all text parts to show the complete response to the user.
+            cancelled = cancel_event is not None and cancel_event.is_set()
+
+            # If the agent loop ended without any narrated text — either
+            # because we hit MAX_TOOL_ITERATIONS while still in tool_use,
+            # or because Claude end_turned without emitting anything after
+            # a tool round — force one more call WITHOUT tools so the
+            # model can only produce prose. Prevents the
+            # "I've processed your request." placeholder from showing up
+            # while sub-agents produced rich tool_results that the user
+            # paid for but never sees. Sub-agents already persisted their
+            # tool_results via add_tool_results_batch, so build_api_messages
+            # gives the synthesis call the full context.
+            if not cancelled and not accumulated_text_parts:
+                logger.warning(
+                    "chat %s/%s: tool loop ended with no text "
+                    "(stop_reason=%s, iterations=%d) — forcing tool-less synthesis call",
+                    project_id, chat_id, response.get("stop_reason"), iteration,
+                )
+                try:
+                    synthesis_messages = message_service.build_api_messages(project_id, chat_id)
+                    synthesis_response, synthesis_text = self._call_claude(
+                        stream_text=stream_text,
+                        on_text_delta=on_text_delta,
+                        messages=synthesis_messages,
+                        system_prompt=system_prompt,
+                        model=prompt_config.get("model"),
+                        max_tokens=prompt_config.get("max_tokens"),
+                        temperature=prompt_config.get("temperature"),
+                        tools=None,
+                        project_id=project_id,
+                        user_id=resolved_user_id,
+                        chat_id=chat_id,
+                        tags=["chat", "synthesis_fallback"],
+                        enable_prompt_cache=False,
+                    )
+                    if synthesis_text.strip():
+                        accumulated_text_parts.append(synthesis_text)
+                        # Use the synthesis call's usage/model when persisting
+                        # below so the assistant message reflects the call
+                        # that actually produced the visible text.
+                        response = synthesis_response
+                except Exception as synthesis_err:
+                    logger.warning(
+                        "synthesis fallback failed for chat %s/%s: %s",
+                        project_id, chat_id, synthesis_err,
+                    )
+
             final_text = "\n\n".join(accumulated_text_parts) if accumulated_text_parts else ""
 
             # If the user clicked Stop while we were generating, persist a
@@ -698,7 +744,6 @@ class MainChatService:
             # intuitive narrative for the user. Without this guard the
             # half-finished stream still landed in DB and showed up alongside
             # the user's revised answer (the "2 responses" symptom).
-            cancelled = cancel_event is not None and cancel_event.is_set()
 
             if cancelled:
                 stopped_content = (
