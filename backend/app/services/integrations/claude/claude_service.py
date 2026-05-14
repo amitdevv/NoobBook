@@ -449,7 +449,13 @@ class ClaudeService:
                 else system_prompt
             )
 
-        if temperature != 0.2:  # Only set if not default
+        # Opus 4.7 dropped all sampling controls (`temperature`, `top_p`,
+        # `top_k`) — the API returns 400 ("`temperature` is deprecated for
+        # this model.") on any of them. We don't currently pass `top_p`/
+        # `top_k` anywhere, but `temperature` flows in from prompt configs,
+        # so strip it for the 4.7 family. Every other model keeps the prior
+        # "only emit if non-default" behaviour.
+        if not model.startswith("claude-opus-4-7") and temperature != 0.2:
             api_params["temperature"] = temperature
 
         if tools:
