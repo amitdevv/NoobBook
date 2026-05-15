@@ -251,10 +251,17 @@ class InsightService:
             )
             chat_id = chat["id"]
 
+            # Background refresh runs outside any HTTP request context, so
+            # main_chat_service can't resolve the active user from the
+            # request and would otherwise fall back to DEFAULT_USER_ID —
+            # which fails the brand_config FK and breaks the chat flow.
+            # Pass the saved owner explicitly so brand context, memory,
+            # and cost tracking all attribute to the right user.
             result = main_chat_service.send_message(
                 project_id=project_id,
                 chat_id=chat_id,
                 user_message_text=prompt,
+                user_id=insight["owner_user_id"],
             )
 
             assistant_text = _extract_assistant_text(result.get("assistant_message"))

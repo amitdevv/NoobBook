@@ -127,6 +127,34 @@ def get_supabase() -> Client:
     return SupabaseClient.get_client()
 
 
+def create_dedicated_client() -> Client:
+    """Create a fresh, non-shared Supabase Client.
+
+    Why: supabase-py stores the auth session ON the client object. Calling
+    `client.auth.sign_in_with_password(...)` flips that client's identity
+    to the just-signed-in user's JWT, and every subsequent `.table()` /
+    `.rpc()` call from THAT client now sends the user's JWT instead of
+    the service key. If `auth_service` shared the data singleton (it did
+    until 2026-05-16), a single sign-in would silently downgrade the
+    backend's role from `service_role` to `authenticated` — producing
+    permission errors on RLS-gated tables and RPCs that only service_role
+    is allowed to hit (e.g. `exec_freshdesk_query` after PR #266's
+    REVOKE).
+
+    Auth flows hold their own dedicated instance so this pollution stays
+    contained. Data calls keep using `get_supabase()` and the singleton's
+    identity stays as service_role.
+
+    Returns a NEW client every call; caller is expected to hold the
+    reference.
+    """
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+    if not supabase_url or not supabase_key:
+        raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_KEY (or ANON_KEY) must be set")
+    return create_client(supabase_url, supabase_key)
+
+
 def is_supabase_enabled() -> bool:
     """
     Check if Supabase integration is enabled.
