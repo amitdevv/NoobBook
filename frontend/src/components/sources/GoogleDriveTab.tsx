@@ -69,6 +69,10 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<GoogleFile | null>(null);
 
+  // Disconnect state
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
+
   const { success, error } = useToast();
   const {
     googleStatus: status,
@@ -204,6 +208,31 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
     loadFiles(false);
   };
 
+  const handleDisconnect = async () => {
+    setDisconnectDialogOpen(false);
+    setDisconnecting(true);
+    try {
+      const ok = await googleDriveAPI.disconnect();
+      if (ok) {
+        // Reset local state so a reconnect starts clean (no stale file list
+        // or breadcrumb leftover from the previous account).
+        setFiles([]);
+        nextPageTokenRef.current = null;
+        setNextPageToken(null);
+        setFolderStack([{ id: null, name: 'My Drive' }]);
+        setGoogleStatus({ configured: status.configured, connected: false, email: null });
+        success('Google Drive disconnected');
+      } else {
+        error('Failed to disconnect Google Drive');
+      }
+    } catch (err) {
+      log.error({ err }, 'failed to disconnect google');
+      error('Failed to disconnect Google Drive');
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
   // Not configured state — only an admin can fix this (it requires the
   // GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET env credentials to be set via
   // Admin Settings → API Keys), so we don't render a CTA here.
@@ -327,10 +356,49 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
         )}
       </ScrollArea>
 
-      {/* Footer info */}
-      <p className="text-xs text-muted-foreground">
-        Connected as {status.email}
-      </p>
+      {/* Footer info + disconnect */}
+      <div className="flex flex-col items-start gap-2">
+        <p className="text-xs text-muted-foreground">
+          Connected as {status.email}
+        </p>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setDisconnectDialogOpen(true)}
+          disabled={disconnecting}
+        >
+          {disconnecting ? (
+            <>
+              <CircleNotch size={14} className="mr-2 animate-spin" />
+              Disconnecting...
+            </>
+          ) : (
+            'Disconnect Google Drive'
+          )}
+        </Button>
+      </div>
+
+      {/* Disconnect Confirmation Dialog */}
+      <AlertDialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect Google Drive?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You'll need to sign in again to import new files. Sources that have
+              already been imported stay in your project.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDisconnect}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Disconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Import Confirmation Dialog */}
       <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
