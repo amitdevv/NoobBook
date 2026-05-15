@@ -24,8 +24,19 @@ class AuthService:
     """
 
     def __init__(self):
-        """Initialize the auth service with Supabase client."""
-        self.supabase: Client = get_supabase()
+        """Initialize the auth service with a DEDICATED Supabase client.
+
+        We must NOT share the data-path singleton here. supabase-py stores
+        the auth session on the client object, so calling
+        `sign_in_with_password()` flips its identity to the user's JWT and
+        every subsequent `.table()` / `.rpc()` call from that client sends
+        the user's bearer token instead of the service key. When the
+        singleton was shared, a sign-in silently downgraded backend role
+        from `service_role` to `authenticated`, breaking RPCs that PR #266
+        revoked from `authenticated` (notably `exec_freshdesk_query`).
+        """
+        from app.services.integrations.supabase.supabase_client import create_dedicated_client
+        self.supabase: Client = create_dedicated_client()
 
     def sign_up(self, email: str, password: str) -> Dict[str, Any]:
         """
