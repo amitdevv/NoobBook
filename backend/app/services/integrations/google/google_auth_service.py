@@ -20,7 +20,11 @@ Required Setup:
     1. Create project at https://console.cloud.google.com
     2. Enable Google Drive API
     3. Create OAuth 2.0 credentials (Web application)
-    4. Add http://localhost:5001/api/v1/google/callback as redirect URI
+    4. Add the callback URL as a redirect URI. The URL is derived from your
+       deployment's host + `<API_PREFIX>/google/callback` (e.g.
+       `http://localhost:5001/api/v1/google/callback` for local dev or
+       `https://your-domain.com/api/v1/google/callback` for prod). Override
+       explicitly with the `GOOGLE_REDIRECT_URI` env var if needed.
     5. Copy Client ID and Client Secret to Admin Settings
 
 Migration Note (2026-01):
@@ -34,6 +38,7 @@ import os
 from datetime import datetime
 from typing import Dict, Any, Optional, Tuple
 
+from flask import current_app, has_request_context, request
 from google.oauth2.credentials import Credentials
 
 logger = logging.getLogger(__name__)
@@ -61,13 +66,41 @@ class GoogleAuthService:
         'https://www.googleapis.com/auth/drive.readonly',
     ]
 
-    # Redirect URI for OAuth callback
-    # Educational Note: Must match exactly what's configured in Google Console
-    REDIRECT_URI = 'http://localhost:5001/api/v1/google/callback'
+    # Default redirect URI used when no request context is available and
+    # GOOGLE_REDIRECT_URI is not set (e.g. CLI invocations during tests).
+    # In production the real value is resolved per-request from the active
+    # host or the env override — see `_get_redirect_uri()`.
+    DEFAULT_REDIRECT_URI = 'http://localhost:5001/api/v1/google/callback'
 
     def __init__(self):
         """Initialize the Google Auth service."""
         self._supabase = None
+
+    def _get_redirect_uri(self) -> str:
+        """
+        Resolve the OAuth callback URI for the current deployment.
+
+        Resolution order:
+        1. `GOOGLE_REDIRECT_URI` env var (explicit operator override — must
+           match exactly what's registered in Google Cloud Console).
+        2. Derived from the active request's host + API prefix. Honors
+           X-Forwarded-* headers via ProxyFix, so it works behind Coolify /
+           Traefik / Kong without manual config.
+        3. Localhost fallback for off-request contexts (tests, CLI).
+
+        Google requires the redirect URI sent in `/auth` to match the one
+        sent in the token exchange exactly, which is why both `get_auth_url`
+        and `handle_callback` route through this single helper.
+        """
+        override = os.getenv('GOOGLE_REDIRECT_URI', '').strip()
+        if override:
+            return override
+
+        if has_request_context():
+            api_prefix = current_app.config.get('API_PREFIX', '/api/v1').rstrip('/')
+            return f"{request.host_url.rstrip('/')}{api_prefix}/google/callback"
+
+        return self.DEFAULT_REDIRECT_URI
 
     @property
     def supabase(self):
@@ -99,7 +132,7 @@ class GoogleAuthService:
                 'client_secret': client_secret,
                 'auth_uri': 'https://accounts.google.com/o/oauth2/auth',
                 'token_uri': 'https://oauth2.googleapis.com/token',
-                'redirect_uris': [self.REDIRECT_URI],
+                'redirect_uris': [self._get_redirect_uri()],
             }
         }
 
@@ -184,7 +217,7 @@ class GoogleAuthService:
         flow = Flow.from_client_config(
             client_config,
             scopes=self.SCOPES,
-            redirect_uri=self.REDIRECT_URI
+            redirect_uri=self._get_redirect_uri()
         )
 
         # Generate auth URL
@@ -228,7 +261,7 @@ class GoogleAuthService:
             flow = Flow.from_client_config(
                 client_config,
                 scopes=self.SCOPES,
-                redirect_uri=self.REDIRECT_URI
+                redirect_uri=self._get_redirect_uri()
             )
 
             # Exchange authorization code for tokens

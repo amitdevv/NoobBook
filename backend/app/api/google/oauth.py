@@ -25,11 +25,78 @@ Routes:
 - GET  /google/callback   - Handle OAuth callback (redirects)
 - POST /google/disconnect - Remove stored tokens
 """
+import html
+import json
 from typing import Optional
-from flask import jsonify, request, redirect, current_app
+from flask import jsonify, request, current_app, make_response
 from app.api.google import google_bp
 from app.services.integrations.google import google_auth_service
 from app.services.auth.rbac import get_request_identity
+
+
+def _render_callback_page(status: str, message: str = ''):
+    """
+    Render the OAuth completion page.
+
+    The callback is loaded inside a popup opened by the frontend's
+    `useGoogleConnect` hook. The page posts the result back to the
+    opener and self-closes; the opener's existing status poll is the
+    fallback if the browser blocks postMessage or window.close().
+
+    Origins for postMessage come from `CORS_ALLOWED_ORIGINS` so the
+    completion event is delivered to whichever frontend host the operator
+    has configured (works for local dev, Docker, and prod transparently).
+    Falls back to `*` when no origins are configured — acceptable because
+    the payload carries no secret material, just a status flag the opener
+    re-validates via `/google/status`.
+    """
+    message_safe = html.escape(message)
+    title = 'Google Drive connected' if status == 'success' else 'Google Drive sign-in failed'
+    fallback_copy = 'You can close this window.' if status == 'success' else 'Please try again from the app.'
+    origins = [o for o in (current_app.config.get('CORS_ALLOWED_ORIGINS') or []) if o and o.strip()] or ['*']
+    payload = {'type': 'noobbook:google-auth', 'status': status, 'message': message}
+
+    # JSON-escape, then neutralize sequences that could break out of the
+    # inline <script> tag. Without this, a `message` from Google's `error`
+    # query string containing `</script>` would close the script element
+    # mid-stream and execute attacker-controlled HTML. Belt-and-braces:
+    # the `message` is also html-escaped above for the visible <p> tag.
+    def _js_literal(obj):
+        return (
+            json.dumps(obj)
+            .replace('</', '<\\/')
+            .replace(' ', '\\u2028')
+            .replace(' ', '\\u2029')
+        )
+
+    body = f"""<!doctype html>
+<html><head><meta charset="utf-8"><title>Google Drive</title>
+<style>body{{font-family:system-ui,-apple-system,sans-serif;background:#f5f1eb;color:#1c1917;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center;padding:24px}}.card{{max-width:380px}}.muted{{color:#78716c;font-size:14px;margin-top:8px}}</style>
+</head><body><div class="card">
+<h2>{html.escape(title)}</h2>
+<p class="muted">{message_safe or html.escape(fallback_copy)}</p>
+</div>
+<script>
+(function () {{
+  var payload = {_js_literal(payload)};
+  var origins = {_js_literal(origins)};
+  try {{
+    if (window.opener && !window.opener.closed) {{
+      origins.forEach(function (o) {{
+        try {{ window.opener.postMessage(payload, o); }} catch (e) {{}}
+      }});
+    }}
+  }} catch (e) {{}}
+  // Give the opener a tick to receive the message before closing.
+  setTimeout(function () {{ try {{ window.close(); }} catch (e) {{}} }}, 200);
+}})();
+</script>
+</body></html>"""
+
+    response = make_response(body, 200 if status == 'success' else 400)
+    response.headers['Content-Type'] = 'text/html; charset=utf-8'
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 
 def _get_current_user_id() -> Optional[str]:
@@ -158,33 +225,33 @@ def google_callback():
     """
     try:
         # Check for error (user denied access)
-        error = request.args.get('error')
-        if error:
-            current_app.logger.warning(f"Google OAuth denied: {error}")
-            return redirect(f'http://localhost:5173?google_auth=error&message={error}')
+        oauth_error = request.args.get('error')
+        if oauth_error:
+            current_app.logger.warning("Google OAuth denied: %s", oauth_error)
+            return _render_callback_page('error', oauth_error)
 
         # Get authorization code
         code = request.args.get('code')
         if not code:
-            return redirect('http://localhost:5173?google_auth=error&message=No+authorization+code')
+            return _render_callback_page('error', 'No authorization code')
 
         # Get user_id from state parameter (for multi-user support)
         # State was set in get_auth_url() to identify which user initiated OAuth
-        user_id = request.args.get('state')
+        user_id = request.args.get('state') or None
 
         # Exchange code for tokens, passing user_id for storage
-        success, message = google_auth_service.handle_callback(code, user_id=user_id if user_id else None)
+        success, message = google_auth_service.handle_callback(code, user_id=user_id)
 
         if success:
-            current_app.logger.info(f"Google OAuth successful: {message}")
-            return redirect('http://localhost:5173?google_auth=success')
-        else:
-            current_app.logger.error(f"Google OAuth failed: {message}")
-            return redirect(f'http://localhost:5173?google_auth=error&message={message}')
+            current_app.logger.info("Google OAuth successful: %s", message)
+            return _render_callback_page('success', message)
+
+        current_app.logger.error("Google OAuth failed: %s", message)
+        return _render_callback_page('error', message)
 
     except Exception as e:
-        current_app.logger.error(f"Error in Google callback: {e}")
-        return redirect(f'http://localhost:5173?google_auth=error&message={str(e)}')
+        current_app.logger.error("Error in Google callback: %s", e)
+        return _render_callback_page('error', str(e))
 
 
 @google_bp.route('/google/disconnect', methods=['POST'])
