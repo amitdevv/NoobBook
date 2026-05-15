@@ -103,6 +103,13 @@ class TestBuildApiParamsCaching:
         params = self._build(enable_prompt_cache=False)
         assert params["system"] == "you are NoobBook"
         assert "cache_control" not in params["tools"][-1]
+        assert "cache_control" not in params
+
+    def test_caching_on_sets_top_level_cache_control(self):
+        """Top-level cache_control opts into Anthropic's automatic messages-array
+        breakpoint that slides forward as the conversation grows."""
+        params = self._build(enable_prompt_cache=True)
+        assert params["cache_control"] == {"type": "ephemeral"}
 
     def test_caching_on_wraps_system(self):
         params = self._build(enable_prompt_cache=True)
@@ -120,8 +127,14 @@ class TestBuildApiParamsCaching:
         # No tools key when tools is falsy, but system should still cache.
         assert "tools" not in params
         assert params["system"][0]["cache_control"] == {"type": "ephemeral"}
+        # Top-level messages-array breakpoint must still be set — it's
+        # independent of whether tools are present.
+        assert params["cache_control"] == {"type": "ephemeral"}
 
     def test_caching_on_with_no_system_does_not_crash(self):
         params = self._build(enable_prompt_cache=True, system_prompt=None)
         assert "system" not in params
         assert params["tools"][-1]["cache_control"] == {"type": "ephemeral"}
+        # Top-level messages-array breakpoint must still be set — it's
+        # independent of whether a system prompt is present.
+        assert params["cache_control"] == {"type": "ephemeral"}
