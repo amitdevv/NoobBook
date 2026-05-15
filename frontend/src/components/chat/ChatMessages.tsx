@@ -64,14 +64,17 @@ const formatMessageTime = (raw?: string): string => {
 const MessageTimestamp: React.FC<{ raw?: string; align: 'left' | 'right' }> = ({ raw, align }) => {
   const formatted = formatMessageTime(raw);
   if (!formatted) return null;
+  // Left-aligned (AI) timestamps need a left-pad equal to the Ghost
+  // avatar width + the flex gap inside AIMessage so the timestamp sits
+  // under the bubble rather than orphaned at the far-left under the
+  // avatar. Right-aligned (user) timestamps already line up with the
+  // bubble's right edge because the user bubble itself is right-aligned.
   return (
     <p
       className={cn(
-        'mt-1 text-[11px] text-muted-foreground/80 select-none',
-        align === 'right' ? 'text-right' : 'text-left'
+        'mt-0.5 text-[11px] text-muted-foreground/80 select-none leading-snug',
+        align === 'right' ? 'text-right' : 'text-left pl-10'
       )}
-      // Surface full ISO on hover so users can copy exact time if needed —
-      // the visible form is intentionally short to keep the chat tidy.
       title={raw}
     >
       {formatted}
