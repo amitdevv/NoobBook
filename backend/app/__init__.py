@@ -99,6 +99,14 @@ def create_app(config_name='development'):
         if path.startswith(f"{api_prefix}/share/"):
             return None
 
+        # Google's OAuth redirect lands here as a top-level browser GET with
+        # no Authorization header (Google initiates the request, the browser
+        # just follows the redirect). The user is identified by the `state`
+        # query parameter set when we minted the auth URL. The middleware
+        # would otherwise 401 every successful sign-in.
+        if path == f"{api_prefix}/google/callback":
+            return None
+
         identity = get_request_identity()
         if not identity.is_authenticated:
             return {"success": False, "error": "Authentication required"}, 401
