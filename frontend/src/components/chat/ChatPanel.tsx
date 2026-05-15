@@ -253,6 +253,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openChatId]);
 
+  // Refetch the active chat when something background writes to it
+  // (e.g. a saved-insight refresh appending a turn). Listening for a
+  // window event keeps ChatPanel decoupled from whatever fired the
+  // refresh; the event detail just carries the chat_id so we can
+  // skip refetches for chats the user isn't viewing.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ chatId?: string }>).detail;
+      if (detail?.chatId && detail.chatId === activeChatIdRef.current) {
+        loadFullChat(detail.chatId);
+      }
+    };
+    window.addEventListener('noobbook:chat:updated', handler);
+    return () => window.removeEventListener('noobbook:chat:updated', handler);
+    // loadFullChat is stable for our purposes (closes over projectId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /**
    * Refetch sources when sourcesVersion changes
    * Educational Note: This triggers when SourcesPanel notifies us that sources

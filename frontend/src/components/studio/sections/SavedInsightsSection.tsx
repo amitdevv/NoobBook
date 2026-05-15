@@ -56,10 +56,39 @@ export const SavedInsightsSection: React.FC = () => {
     loadInsights();
   }, [loadInsights]);
 
-  // Poll while any insight is refreshing so the latest result lands
-  // without a manual reload. Stops cleanly when nothing's running.
+  // Reload when a new insight is saved from the chat. SaveAsInsightButton
+  // dispatches this event so the new card appears immediately — without
+  // it, the section stays stale until the user reloads the page.
   useEffect(() => {
-    if (!insights.some((i) => i.is_running)) return;
+    const handler = () => loadInsights();
+    window.addEventListener('noobbook:insight:saved', handler);
+    return () => window.removeEventListener('noobbook:insight:saved', handler);
+  }, [loadInsights]);
+
+  // Poll while any insight is refreshing so the latest result lands
+  // without a manual reload. Stops cleanly when nothing's running. We
+  // also fan a `noobbook:chat:updated` event whenever an insight flips
+  // from running → not-running so ChatPanel can re-fetch the source
+  // chat if the user happens to be viewing it (the refresh appended a
+  // new turn to that chat).
+  const prevRunningRef = React.useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const running = new Set(insights.filter((i) => i.is_running).map((i) => i.id));
+    // Anything in prev but not in current = just finished.
+    prevRunningRef.current.forEach((id) => {
+      if (!running.has(id)) {
+        const finished = insights.find((i) => i.id === id);
+        const chatId = finished?.chat_id;
+        if (chatId) {
+          window.dispatchEvent(
+            new CustomEvent('noobbook:chat:updated', { detail: { chatId } }),
+          );
+        }
+      }
+    });
+    prevRunningRef.current = running;
+
+    if (running.size === 0) return;
     const interval = setInterval(loadInsights, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [insights, loadInsights]);
