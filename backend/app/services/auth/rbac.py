@@ -51,6 +51,12 @@ class RequestIdentity:
     email: Optional[str]
     role: str
     is_authenticated: bool
+    # True only when the JWT carries an operator-verified mailbox claim.
+    # Defaults to False so non-JWT identity sources (single-user fallback,
+    # legacy callers constructing this manually) never accidentally
+    # signal verified ownership. Consumed by share gating to decide
+    # whether to trust the email claim for invite matching.
+    email_verified: bool = False
 
     @property
     def is_admin(self) -> bool:
@@ -102,8 +108,7 @@ def get_request_identity() -> RequestIdentity:
 
     Priority:
     1) Supabase Auth JWT (Authorization: Bearer <jwt>) if Supabase configured
-    2) Explicit dev headers (X-NoobBook-User-Id / X-NoobBook-Role)
-    3) Single-user fallback (DEFAULT_USER_ID as admin)
+    2) Single-user fallback (DEFAULT_USER_ID as admin/user depending on NOOBBOOK_AUTH_REQUIRED)
 
     Per-request caching: result is stashed on Flask's `g` so multiple
     callers within the same request (the before_request hook,
@@ -142,6 +147,19 @@ def _resolve_identity() -> RequestIdentity:
                 )
                 user_id = claims.get("sub")
                 email = claims.get("email")
+                # Trust ONLY `email_confirmed_at` — it's set server-side
+                # by GoTrue when the user completes email verification
+                # and ends up in the JWT's signed claims, NOT writable
+                # by the user. `user_metadata.email_verified` maps to
+                # `raw_user_meta_data` which any authenticated caller
+                # can overwrite via `auth.updateUser({data: {...}})`, so
+                # treating it as a verification signal is a forgeable
+                # gate. Top-level `email_verified` is non-standard in
+                # GoTrue v2 and not consistently populated, so we don't
+                # honour it either. If `email_confirmed_at` isn't in the
+                # token, default to False and rely on the slow path
+                # (auth.get_user()) below for an authoritative check.
+                email_verified = bool(claims.get("email_confirmed_at"))
                 if user_id:
                     role = _load_role_from_users_table(str(user_id)) or ROLE_USER
                     return RequestIdentity(
@@ -149,6 +167,7 @@ def _resolve_identity() -> RequestIdentity:
                         email=str(email) if email else None,
                         role=role,
                         is_authenticated=True,
+                        email_verified=email_verified,
                     )
             except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
                 # Local decode rejected — fall through to network path
@@ -165,6 +184,18 @@ def _resolve_identity() -> RequestIdentity:
             user = getattr(user_resp, "user", None) or user_resp
             user_id = getattr(user, "id", None) or (user.get("id") if isinstance(user, dict) else None)
             email = getattr(user, "email", None) or (user.get("email") if isinstance(user, dict) else None)
+            # GoTrue marks verified mailboxes with a non-null
+            # `email_confirmed_at` timestamp. Some client versions also
+            # expose `email_verified` directly — accept either.
+            confirmed_at = (
+                getattr(user, "email_confirmed_at", None)
+                or (user.get("email_confirmed_at") if isinstance(user, dict) else None)
+            )
+            email_verified = bool(
+                confirmed_at
+                or getattr(user, "email_verified", False)
+                or (user.get("email_verified") if isinstance(user, dict) else False)
+            )
             if user_id:
                 role = _load_role_from_users_table(user_id) or ROLE_USER
                 return RequestIdentity(
@@ -172,23 +203,18 @@ def _resolve_identity() -> RequestIdentity:
                     email=str(email) if email else None,
                     role=role,
                     is_authenticated=True,
+                    email_verified=email_verified,
                 )
         except Exception:
-            pass  # Fall through to dev/single-user mode
+            pass  # Fall through to single-user mode
 
-    # 2) Dev headers (useful until full auth UI is wired)
-    header_user_id = (request.headers.get("X-NoobBook-User-Id") or "").strip()
-    header_role = (request.headers.get("X-NoobBook-Role") or "").strip().lower()
-    if header_user_id:
-        role = header_role if header_role in _VALID_ROLES else (_load_role_from_users_table(header_user_id) or ROLE_USER)
-        return RequestIdentity(
-            user_id=header_user_id,
-            email=None,
-            role=role,
-            is_authenticated=True,
-        )
-
-    # 3) Single-user fallback
+    # Single-user fallback. The previous dev-headers branch
+    # (X-NoobBook-User-Id / X-NoobBook-Role) was removed — it
+    # unconditionally trusted the caller's claimed identity which
+    # broke the share-route invariant that unauthenticated callers
+    # cannot fork into another user's workspace. Local development
+    # should use a real JWT (GoTrue sign-in) or the single-user
+    # fallback below.
     auth_required = is_auth_required()
     fallback_role = ROLE_ADMIN if not auth_required else ROLE_USER
     return RequestIdentity(
@@ -196,6 +222,7 @@ def _resolve_identity() -> RequestIdentity:
         email=None,
         role=fallback_role,
         is_authenticated=False,
+        email_verified=False,
     )
 
 
