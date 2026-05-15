@@ -99,16 +99,18 @@ class GoogleDriveService:
         'application/vnd.google-apps.folder',
     ]
 
-    def __init__(self):
-        """Initialize the Google Drive service."""
-        self._service_cache = {}  # Cache per user_id
-
     def _get_service(self, user_id: Optional[str] = None):
         """
-        Get or create the Google Drive API service.
+        Build a fresh Google Drive API service per call.
 
-        Educational Note: We lazy-load the service to avoid errors
-        when credentials aren't available yet.
+        We intentionally do NOT cache the service: googleapiclient is
+        built on httplib2 which is not gevent-safe. Sharing one service
+        object across concurrent requests under gevent surfaces as
+        "This socket is already used by another greenlet" — the second
+        in-flight greenlet collides with the first on the shared
+        httplib2 connection. A fresh service per request gives each
+        request its own httplib2.Http and side-steps the issue. Cost is
+        cheap: googleapiclient v2 uses static discovery (no network).
 
         Args:
             user_id: Optional user ID for multi-user support
@@ -119,13 +121,7 @@ class GoogleDriveService:
         creds = google_auth_service.get_credentials(user_id=user_id)
         if not creds:
             return None
-
-        # Build service (cache per user_id for reuse)
-        cache_key = user_id or '_default'
-        if cache_key not in self._service_cache:
-            self._service_cache[cache_key] = build('drive', 'v3', credentials=creds)
-
-        return self._service_cache[cache_key]
+        return build('drive', 'v3', credentials=creds, cache_discovery=False)
 
     def is_connected(self, user_id: Optional[str] = None) -> bool:
         """Check if Google Drive is connected and accessible."""

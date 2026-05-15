@@ -5,7 +5,7 @@
  * Features: folder navigation, pagination (Load More), client-side search.
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { ScrollArea } from '../ui/scroll-area';
@@ -50,6 +50,11 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  // Mirror of nextPageToken used inside loadFiles. Keeping the token out of
+  // loadFiles' useCallback deps stops the file-list useEffect from looping:
+  // each call writes a new token → would otherwise recreate loadFiles →
+  // re-fire the effect → fetch again, ten times a second.
+  const nextPageTokenRef = useRef<string | null>(null);
 
   // Search state (client-side filtering)
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,6 +68,10 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
   const [importing, setImporting] = useState<string | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<GoogleFile | null>(null);
+
+  // Disconnect state
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
 
   const { success, error } = useToast();
   const {
@@ -92,6 +101,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
     if (freshLoad) {
       setLoading(true);
       setFiles([]);
+      nextPageTokenRef.current = null;
       setNextPageToken(null);
     } else {
       setLoadingMore(true);
@@ -102,7 +112,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
       const result = await googleDriveAPI.listFiles(
         currentFolder.id || undefined,
         50,
-        freshLoad ? undefined : nextPageToken || undefined
+        freshLoad ? undefined : nextPageTokenRef.current || undefined
       );
 
       if (result.success) {
@@ -111,6 +121,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
         } else {
           setFiles(prev => [...prev, ...result.files]);
         }
+        nextPageTokenRef.current = result.next_page_token;
         setNextPageToken(result.next_page_token);
       } else {
         error(result.error || 'Failed to load files');
@@ -122,7 +133,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [folderStack, nextPageToken, error]);
+  }, [folderStack, error]);
 
   // Load Google status on mount
   useEffect(() => {
@@ -195,6 +206,31 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
 
   const handleLoadMore = () => {
     loadFiles(false);
+  };
+
+  const handleDisconnect = async () => {
+    setDisconnectDialogOpen(false);
+    setDisconnecting(true);
+    try {
+      const ok = await googleDriveAPI.disconnect();
+      if (ok) {
+        // Reset local state so a reconnect starts clean (no stale file list
+        // or breadcrumb leftover from the previous account).
+        setFiles([]);
+        nextPageTokenRef.current = null;
+        setNextPageToken(null);
+        setFolderStack([{ id: null, name: 'My Drive' }]);
+        setGoogleStatus({ configured: status.configured, connected: false, email: null });
+        success('Google Drive disconnected');
+      } else {
+        error('Failed to disconnect Google Drive');
+      }
+    } catch (err) {
+      log.error({ err }, 'failed to disconnect google');
+      error('Failed to disconnect Google Drive');
+    } finally {
+      setDisconnecting(false);
+    }
   };
 
   // Not configured state — only an admin can fix this (it requires the
@@ -320,10 +356,49 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
         )}
       </ScrollArea>
 
-      {/* Footer info */}
-      <p className="text-xs text-muted-foreground">
-        Connected as {status.email}
-      </p>
+      {/* Footer info + disconnect */}
+      <div className="flex flex-col items-start gap-2">
+        <p className="text-xs text-muted-foreground">
+          Connected as {status.email}
+        </p>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setDisconnectDialogOpen(true)}
+          disabled={disconnecting}
+        >
+          {disconnecting ? (
+            <>
+              <CircleNotch size={14} className="mr-2 animate-spin" />
+              Disconnecting...
+            </>
+          ) : (
+            'Disconnect Google Drive'
+          )}
+        </Button>
+      </div>
+
+      {/* Disconnect Confirmation Dialog */}
+      <AlertDialog open={disconnectDialogOpen} onOpenChange={setDisconnectDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect Google Drive?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You'll need to sign in again to import new files. Sources that have
+              already been imported stay in your project.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDisconnect}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Disconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Import Confirmation Dialog */}
       <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
