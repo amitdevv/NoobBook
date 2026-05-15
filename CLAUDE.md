@@ -326,7 +326,7 @@ All API keys are stored in `backend/.env` (not database) and managed via the Set
 **Google Drive**:
 - `GET /google/status` - Check if configured and connected
 - `GET /google/auth` - Get OAuth authorization URL
-- `GET /google/callback` - Handle OAuth callback (redirects to frontend)
+- `GET /google/callback` - Handle OAuth callback (renders a self-closing popup that postMessages the opener)
 - `POST /google/disconnect` - Remove stored tokens
 - `GET /google/files` - List files (supports `folder_id`, `page_size`, `page_token`)
 - `POST /projects/{id}/sources/google-import` - Import file to sources
@@ -339,9 +339,11 @@ All API keys are stored in `backend/.env` (not database) and managed via the Set
 
 Import files from Google Drive. OAuth 2.0 flow with `drive.readonly` scope. Tokens stored per-user in Supabase `users.google_tokens` column, auto-refresh on expiry. Google Workspace exports: Docs→DOCX, Sheets→CSV, Slides→PPTX.
 
-**Setup**: Create OAuth credentials in Google Cloud Console, add redirect URI `http://localhost/api/v1/google/callback` (Docker) or `http://localhost:5001/api/v1/google/callback` (local dev).
+**Setup**: Create OAuth credentials in Google Cloud Console. The callback URL is derived from your deployment's host + API prefix — `http://localhost:5001/api/v1/google/callback` for local dev, `http://localhost/api/v1/google/callback` for Docker, `https://<your-domain>/api/v1/google/callback` for prod. Override with `GOOGLE_REDIRECT_URI` env var when the registered URI must differ from what the backend computes.
 
 **Multi-user Support**: Each user has their own Google Drive connection. The OAuth state parameter carries user_id for proper token association.
+
+**Connect UX**: `useGoogleConnect()` opens the consent popup, then listens for a postMessage from the callback page (fast path) and falls back to polling `/google/status` (slow path). The callback page renders `oauth.py:_render_callback_page()` HTML that calls `window.opener.postMessage(...)` then `window.close()`.
 
 ## Voice Input (ElevenLabs)
 

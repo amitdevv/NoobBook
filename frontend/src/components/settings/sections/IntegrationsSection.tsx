@@ -39,6 +39,7 @@ import type { DatabaseType, McpAuthType, McpTransport } from '@/lib/api/settings
 import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
 import { useIntegrations } from '@/contexts/IntegrationsContext';
+import { useGoogleConnect } from '@/hooks/useGoogleConnect';
 
 const log = createLogger('integrations-section');
 
@@ -65,9 +66,11 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
     removeMcpConnection,
     patchMcpConnection,
   } = useIntegrations();
+  const { connect: connectGoogle, isConnecting: googleConnecting } = useGoogleConnect();
   const [dbCreating, setDbCreating] = useState(false);
   const [dbValidating, setDbValidating] = useState(false);
-  const [googleMutating, setGoogleMutating] = useState(false);
+  const [googleDisconnecting, setGoogleDisconnecting] = useState(false);
+  const googleMutating = googleConnecting || googleDisconnecting;
   const [showDbUri, setShowDbUri] = useState(false);
   const [dbValidation, setDbValidation] = useState<{ valid?: boolean; message?: string }>({});
   const [dbForm, setDbForm] = useState<{
@@ -114,53 +117,10 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
   const [deleteMcpId, setDeleteMcpId] = useState<string | null>(null);
   const [disconnectGoogleOpen, setDisconnectGoogleOpen] = useState(false);
 
-  const { success, error, info } = useToast();
-
-  const handleGoogleConnect = async () => {
-    setGoogleMutating(true);
-    try {
-      const authUrl = await googleDriveAPI.getAuthUrl();
-      if (!authUrl) {
-        error('Failed to get Google auth URL. Check your credentials.');
-        setGoogleMutating(false);
-        return;
-      }
-
-      window.open(authUrl, '_blank', 'width=500,height=600');
-      info('Complete authentication in the new window');
-      // Keep the button disabled while polling runs so a second click cannot
-      // spawn a parallel interval. Button re-enables on success, timeout, or
-      // any poll error.
-      const pollInterval = setInterval(async () => {
-        try {
-          const status = await googleDriveAPI.getStatus();
-          if (status.connected) {
-            clearInterval(pollInterval);
-            clearTimeout(timeoutId);
-            setGoogleStatus(status);
-            setGoogleMutating(false);
-            success(`Connected as ${status.email}`);
-          }
-        } catch (pollErr) {
-          log.error({ err: pollErr }, 'google poll failed');
-          clearInterval(pollInterval);
-          clearTimeout(timeoutId);
-          setGoogleMutating(false);
-        }
-      }, 2000);
-      const timeoutId = setTimeout(() => {
-        clearInterval(pollInterval);
-        setGoogleMutating(false);
-      }, 120000);
-    } catch (err) {
-      log.error({ err }, 'failed to connect Google');
-      error('Failed to connect Google Drive');
-      setGoogleMutating(false);
-    }
-  };
+  const { success, error } = useToast();
 
   const handleGoogleDisconnect = async () => {
-    setGoogleMutating(true);
+    setGoogleDisconnecting(true);
     try {
       const disconnected = await googleDriveAPI.disconnect();
       if (disconnected) {
@@ -173,7 +133,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
       log.error({ err }, 'failed to disconnect Google');
       error('Failed to disconnect Google Drive');
     } finally {
-      setGoogleMutating(false);
+      setGoogleDisconnecting(false);
     }
   };
 
@@ -430,7 +390,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
               <Button
                 variant="default"
                 size="sm"
-                onClick={handleGoogleConnect}
+                onClick={connectGoogle}
                 disabled={googleLoading || googleMutating || !googleStatus.configured}
               >
                 {googleLoading || googleMutating ? (

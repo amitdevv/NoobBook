@@ -23,7 +23,6 @@ import {
   GoogleDriveLogo,
   ArrowLeft,
   CircleNotch,
-  Gear,
   MagnifyingGlass,
 } from '@phosphor-icons/react';
 import { googleDriveAPI, type GoogleFile } from '@/lib/api/settings';
@@ -31,6 +30,7 @@ import { useToast } from '../ui/use-toast';
 import { DriveItem } from './drive';
 import { createLogger } from '@/lib/logger';
 import { useIntegrations } from '@/contexts/IntegrationsContext';
+import { useGoogleConnect } from '@/hooks/useGoogleConnect';
 
 const log = createLogger('google-drive-tab');
 
@@ -70,6 +70,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
     ensureGoogleStatus,
     setGoogleStatus,
   } = useIntegrations();
+  const { connect: connectGoogle, isConnecting } = useGoogleConnect();
 
   const loadStatus = useCallback(async () => {
     setLoading(true);
@@ -196,36 +197,44 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
     loadFiles(false);
   };
 
-  // Not configured state
+  // Not configured state — only an admin can fix this (it requires the
+  // GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET env credentials to be set via
+  // Admin Settings → API Keys), so we don't render a CTA here.
   if (!loading && !status.configured) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <GoogleDriveLogo size={48} weight="duotone" className="text-muted-foreground mb-4" />
         <h3 className="font-medium mb-2">Google Drive Not Configured</h3>
-        <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-          Add your Google Client ID and Client Secret in Admin Settings to enable Google Drive
-          integration.
+        <p className="text-sm text-muted-foreground max-w-sm">
+          An administrator needs to add Google OAuth credentials in Admin Settings → API Keys
+          before this integration can be used.
         </p>
-        <Button variant="soft" size="sm">
-          <Gear size={16} className="mr-2" />
-          Open Settings
-        </Button>
       </div>
     );
   }
 
-  // Not connected state
+  // Not connected state — fire the OAuth popup inline so the user doesn't
+  // have to detour through Admin Settings just to authorise their account.
   if (!loading && !status.connected) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <GoogleDriveLogo size={48} weight="duotone" className="text-primary mb-4" />
         <h3 className="font-medium mb-2">Connect Google Drive</h3>
         <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-          Connect your Google account in Admin Settings to import files from Google Drive.
+          Sign in with your Google account to browse and import files from Drive.
         </p>
-        <Button variant="soft" size="sm">
-          <Gear size={16} className="mr-2" />
-          Open Settings
+        <Button onClick={connectGoogle} disabled={isConnecting} size="sm">
+          {isConnecting ? (
+            <>
+              <CircleNotch size={16} className="mr-2 animate-spin" />
+              Waiting for sign-in...
+            </>
+          ) : (
+            <>
+              <GoogleDriveLogo size={16} className="mr-2" />
+              Connect Google Drive
+            </>
+          )}
         </Button>
       </div>
     );
