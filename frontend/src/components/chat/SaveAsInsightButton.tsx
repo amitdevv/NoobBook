@@ -68,6 +68,10 @@ export const SaveAsInsightButton: React.FC<Props> = ({ projectId, chatId, prompt
         chat_id: chatId,
       });
       if (created) {
+        // Notify the Studio panel's SavedInsightsSection so the new card
+        // appears immediately — without this it stays invisible until the
+        // user reloads the page (no save → list signal otherwise).
+        window.dispatchEvent(new CustomEvent('noobbook:insight:saved'));
         success('Saved as a recurring insight');
         setOpen(false);
       } else {
