@@ -194,12 +194,89 @@ def is_share_usable(row: Dict[str, Any]) -> bool:
     return _is_active(row)
 
 
-def email_invited(row: Dict[str, Any], email: Optional[str]) -> bool:
-    """For invited mode: check that the viewer's email is in the allow-list.
-    Public mode always returns True (mode-mismatch is the caller's job)."""
+def viewer_invited(
+    row: Dict[str, Any],
+    viewer_user_id: Optional[str],
+    viewer_email: Optional[str],
+    email_verified: bool,
+) -> bool:
+    """Check whether a viewer is allowed through an invited-mode share.
+
+    UUID-first with lazy email→user_id promotion. The historical
+    plain-email check was only safe when the JWT email claim was
+    operator-verified — with ``ENABLE_EMAIL_AUTOCONFIRM=true`` it
+    wasn't, which let any signed-up attacker spoof an invitee by
+    choosing their own email at signup.
+
+    Resolution order:
+
+    1. If ``viewer_user_id`` is already in ``invited_user_ids`` →
+       allow. Fast path, no DB write. This is the only path future
+       requests hit after first claim.
+    2. Else if ``email_verified=True`` and ``viewer_email`` is in
+       ``invited_emails`` → allow and lazily promote: move the
+       invitee from the email list to the user_id list in one
+       atomic update. One-time per invitee.
+    3. Else → deny.
+
+    Public-mode rows always return True (mode-mismatch is the caller's
+    concern).
+    """
     if row.get("mode") == "public":
         return True
-    if not email:
+
+    invited_user_ids = row.get("invited_user_ids") or []
+    if viewer_user_id and viewer_user_id in invited_user_ids:
+        return True
+
+    # Email fallback path — strictly gated on a verified mailbox.
+    if not (email_verified and viewer_email and viewer_user_id):
         return False
-    invited = row.get("invited_emails") or []
-    return email.strip().lower() in {e.lower() for e in invited if e}
+
+    normalized = viewer_email.strip().lower()
+    invited_emails = row.get("invited_emails") or []
+    matched_email = next(
+        (e for e in invited_emails if e and e.lower() == normalized),
+        None,
+    )
+    if not matched_email:
+        return False
+
+    # Promote: remove the matched email, add the user_id. Atomic
+    # server-side via the `promote_share_invitee` RPC (migration 00036)
+    # — using array_remove / array_append on the live row, not a
+    # Python-side read-modify-write. This is what prevents two
+    # concurrent invitees from clobbering each other's promotion and
+    # leaving one of them stranded outside both arrays.
+    #
+    # Best-effort: if the RPC call fails (network blip / RLS / migration
+    # not yet applied) we still grant access for THIS request. The next
+    # request from the same invitee will retry the promotion. We never
+    # cache a failed promotion in memory so retries stay correct.
+    try:
+        client = _client()
+        client.rpc(
+            "promote_share_invitee",
+            {
+                "p_share_id": row["id"],
+                "p_email": matched_email,
+                "p_user_id": viewer_user_id,
+            },
+        ).execute()
+    except Exception as e:
+        logger.warning(
+            "viewer_invited: failed to promote invitee email→user_id for share %s: %s",
+            row.get("id"), e,
+        )
+
+    return True
+
+
+def email_invited(row: Dict[str, Any], email: Optional[str]) -> bool:  # pragma: no cover
+    """Deprecated — kept as a no-arg-compatible shim so any out-of-tree
+    callers fail loudly with a clear stack rather than silently passing
+    the old plain-email gate. Real call sites use ``viewer_invited``."""
+    raise NotImplementedError(
+        "share_service.email_invited has been replaced by viewer_invited; "
+        "callers must pass viewer_user_id and email_verified."
+    )
