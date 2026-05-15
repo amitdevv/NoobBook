@@ -438,7 +438,11 @@ class ClaudeService:
         api_params = {
             "model": model,
             "max_tokens": max_tokens,
-            "messages": messages,
+            "messages": (
+                _messages_with_cache_breakpoint(messages)
+                if enable_prompt_cache
+                else messages
+            ),
         }
 
         # Add optional parameters only if provided
@@ -466,17 +470,15 @@ class ClaudeService:
         if tool_choice:
             api_params["tool_choice"] = tool_choice
 
-        # Automatic prompt caching for the messages array. Setting
-        # `cache_control` at the top level tells Anthropic to place a cache
-        # breakpoint on the last cacheable block of `messages` and slide
-        # that breakpoint forward as the conversation/loop grows — so each
-        # turn after the first reads the prior turns from cache instead of
-        # paying full input price. Stacks with the explicit breakpoints on
-        # `system` and the last tool above; budget goes 2-of-4 → 3-of-4.
-        # 5-min TTL (default ephemeral) is enough for chat sessions and
-        # in-flight agentic loops; 1h would double write cost for no win.
-        if enable_prompt_cache:
-            api_params["cache_control"] = {"type": "ephemeral"}
+        # Prompt-caching of the messages array is now handled by
+        # `_messages_with_cache_breakpoint()` above — it attaches a
+        # cache_control breakpoint to the last content block of the
+        # last message. A previous draft passed `cache_control` as a
+        # TOP-LEVEL kwarg here, which Anthropic's SDK rejects with
+        # `Messages.create() got an unexpected keyword argument
+        # 'cache_control'` on every released version. The per-block
+        # breakpoint pattern is the canonical Anthropic prompt-caching
+        # API and works on every SDK version since caching launched.
 
         # Add extra headers for beta features (e.g., web_fetch)
         if extra_headers:
@@ -551,6 +553,45 @@ def _system_block_with_cache(system_prompt: str) -> List[Dict[str, Any]]:
             "cache_control": {"type": "ephemeral"},
         }
     ]
+
+
+def _messages_with_cache_breakpoint(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Return a shallow-copy messages list with a `cache_control: ephemeral`
+    breakpoint on the last content block of the last message.
+
+    Anthropic prompt caching attaches breakpoints to individual content
+    blocks, not to the top-level request. Marking the last block of the
+    last message caches the entire prefix (system + tools + every prior
+    message) up to and including that point. As the conversation/loop
+    grows, callers rebuild this list each turn so the breakpoint slides
+    forward naturally — no sticky cache_control left on now-historical
+    blocks.
+
+    Plain-string content is converted to block form so the cache_control
+    field has somewhere to attach. Empty / unrecognised content shapes
+    are returned unmodified — caching is best-effort.
+    """
+    if not messages:
+        return messages
+
+    cached = list(messages)
+    last_msg = dict(cached[-1])
+    content = last_msg.get("content")
+
+    if isinstance(content, str):
+        last_msg["content"] = [
+            {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}
+        ]
+    elif isinstance(content, list) and content:
+        new_content = list(content)
+        new_content[-1] = {**new_content[-1], "cache_control": {"type": "ephemeral"}}
+        last_msg["content"] = new_content
+    else:
+        return messages  # nothing to attach to — best-effort skip
+
+    cached[-1] = last_msg
+    return cached
 
 
 def _tools_with_cache_breakpoint(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
