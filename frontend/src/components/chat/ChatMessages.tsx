@@ -86,6 +86,11 @@ interface ChatMessagesProps {
   messages: Message[];
   sending: boolean;
   projectId: string;
+  /**
+   * Active chat id — passed into `SaveAsInsightButton` so an insight
+   * saved from a chat refreshes into THIS chat, not a fresh one.
+   */
+  chatId?: string | null;
   streamingAssistantContent?: string;
   /**
    * Live progress message emitted by the running tool (e.g. the
@@ -661,6 +666,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
   messages,
   sending,
   projectId,
+  chatId,
   streamingAssistantContent = '',
   toolProgress,
   readOnly: _readOnly,
@@ -756,7 +762,11 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
               )}
               {isUser && userPromptText && (
                 <div className="flex justify-end mt-1">
-                  <SaveAsInsightButton projectId={projectId} prompt={userPromptText} />
+                  <SaveAsInsightButton
+                    projectId={projectId}
+                    chatId={chatId ?? null}
+                    prompt={userPromptText}
+                  />
                 </div>
               )}
               <MessageTimestamp raw={msg.timestamp} align={isUser ? 'right' : 'left'} />

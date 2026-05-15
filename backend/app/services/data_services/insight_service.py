@@ -55,16 +55,22 @@ class InsightService:
         title: str,
         prompt: str,
         cadence: str,
+        chat_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         if cadence not in CADENCE_INTERVALS:
             raise ValueError(f"Invalid cadence {cadence!r}; expected 'daily' or 'weekly'")
-        row = {
+        row: Dict[str, Any] = {
             "project_id": project_id,
             "owner_user_id": owner_user_id,
             "title": title.strip() or prompt[:60].strip(),
             "prompt": prompt.strip(),
             "cadence": cadence,
         }
+        # chat_id is optional — created insights from a live chat carry it
+        # so refresh writes additional turns into that same chat. Legacy
+        # rows (no chat_id) get one lazily on first refresh.
+        if chat_id:
+            row["chat_id"] = chat_id
         response = self.supabase.table(self.TABLE).insert(row).execute()
         if not response.data:
             raise RuntimeError("Failed to create saved insight")
@@ -243,13 +249,29 @@ class InsightService:
             project_id = insight["project_id"]
             prompt = insight["prompt"]
 
-            # Fresh chat per refresh keeps the runs auditable and avoids
-            # any context carry-over from previous turns.
-            chat = chat_service.create_chat(
-                project_id,
-                title=f"Insight refresh: {insight['title'][:50]}",
-            )
-            chat_id = chat["id"]
+            # Reuse the insight's persistent chat so every refresh
+            # appends a turn to the same conversation — users get a
+            # natural visual history of how the answer evolves over
+            # weeks. Lazy-create on the first refresh of legacy rows
+            # (rows created before chat_id existed) and persist the
+            # new chat_id back so future refreshes follow suit.
+            chat_id = insight.get("chat_id")
+            if chat_id:
+                chat = chat_service.get_chat(project_id, chat_id)
+                if not chat:
+                    # The source chat was deleted; bootstrap a new one
+                    # and adopt it. Saving the result of one orphaned
+                    # refresh is better than failing the insight forever.
+                    chat_id = None
+            if not chat_id:
+                chat = chat_service.create_chat(
+                    project_id,
+                    title=insight["title"][:50] or "Saved insight",
+                )
+                chat_id = chat["id"]
+                self.supabase.table(self.TABLE).update({"chat_id": chat_id}).eq(
+                    "id", insight_id
+                ).execute()
 
             # Background refresh runs outside any HTTP request context, so
             # main_chat_service can't resolve the active user from the

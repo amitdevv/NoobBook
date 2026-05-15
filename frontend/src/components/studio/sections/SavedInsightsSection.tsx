@@ -1,30 +1,18 @@
 /**
  * SavedInsightsSection — auto-refreshing chat prompts in the Studio panel.
  *
- * A saved insight is a user prompt that the backend re-runs daily or
- * weekly. This section lists them with their latest result and lets the
- * user trigger a manual refresh or delete one. Creation happens from the
- * chat surface (the "Save as insight" button on user messages); this
- * section is read-and-manage only.
+ * Renders compact library-card rows for each saved insight. Clicking a
+ * card opens a 520px detail sheet with full markdown rendering, refresh,
+ * and a button that jumps to the source chat for full history.
  *
- * Hidden when there are no saved insights so we don't add empty noise
- * to the Studio panel.
+ * Hidden when there are no saved insights so we don't add empty noise to
+ * the Studio panel. Polls every 15s while any insight is mid-refresh so
+ * the latest result lands without a manual reload.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ArrowsClockwise,
-  CircleNotch,
-  Lightbulb,
-  Trash,
-  Warning,
-} from '@phosphor-icons/react';
+import { Lightbulb } from '@phosphor-icons/react';
 import { useStudioContext } from '../studio-hooks';
-import {
-  insightsAPI,
-  type SavedInsight,
-  type InsightCadence,
-} from '@/lib/api/insights';
-import { Button } from '@/components/ui/button';
+import { insightsAPI, type SavedInsight } from '@/lib/api/insights';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,26 +25,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
+import { InsightCard } from '../savedInsights/InsightCard';
+import { InsightDetailSheet } from '../savedInsights/InsightDetailSheet';
 
 const log = createLogger('saved-insights-section');
 
 const POLL_INTERVAL_MS = 15_000;
-
-const cadenceLabel = (c: InsightCadence) => (c === 'daily' ? 'Daily' : 'Weekly');
-
-const formatLastRun = (iso: string | null): string => {
-  if (!iso) return 'Not run yet';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'Not run yet';
-  const diffMs = Date.now() - d.getTime();
-  const mins = Math.round(diffMs / 60_000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
-};
 
 export const SavedInsightsSection: React.FC = () => {
   const { projectId } = useStudioContext();
@@ -64,7 +38,7 @@ export const SavedInsightsSection: React.FC = () => {
 
   const [insights, setInsights] = useState<SavedInsight[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [openInsightId, setOpenInsightId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<SavedInsight | null>(null);
 
   const loadInsights = useCallback(async () => {
@@ -82,8 +56,8 @@ export const SavedInsightsSection: React.FC = () => {
     loadInsights();
   }, [loadInsights]);
 
-  // Poll while any insight is currently running so the user sees the new
-  // result land without a manual reload. Stops when no row is running.
+  // Poll while any insight is refreshing so the latest result lands
+  // without a manual reload. Stops cleanly when nothing's running.
   useEffect(() => {
     if (!insights.some((i) => i.is_running)) return;
     const interval = setInterval(loadInsights, POLL_INTERVAL_MS);
@@ -94,8 +68,8 @@ export const SavedInsightsSection: React.FC = () => {
     async (insight: SavedInsight) => {
       const ok = await insightsAPI.refresh(projectId, insight.id);
       if (ok) {
-        // Optimistically flip is_running so the spinner shows; the next
-        // poll picks up the canonical state from the backend.
+        // Optimistically flip is_running so the spinner shows immediately;
+        // the poll picks up the canonical state from the backend.
         setInsights((prev) =>
           prev.map((row) => (row.id === insight.id ? { ...row, is_running: true } : row)),
         );
@@ -111,6 +85,7 @@ export const SavedInsightsSection: React.FC = () => {
     if (!pendingDelete) return;
     const insight = pendingDelete;
     setPendingDelete(null);
+    if (openInsightId === insight.id) setOpenInsightId(null);
     const ok = await insightsAPI.remove(projectId, insight.id);
     if (ok) {
       setInsights((prev) => prev.filter((row) => row.id !== insight.id));
@@ -118,97 +93,55 @@ export const SavedInsightsSection: React.FC = () => {
     } else {
       error('Could not delete insight');
     }
-  }, [pendingDelete, projectId, success, error]);
+  }, [pendingDelete, projectId, openInsightId, success, error]);
+
+  // Switching to the source chat lives on ProjectWorkspace — we fire a
+  // window event it listens for. Keeps the studio decoupled from the
+  // chat panel's internals.
+  const handleJumpToChat = useCallback((insight: SavedInsight) => {
+    if (!insight.chat_id) return;
+    window.dispatchEvent(
+      new CustomEvent('noobbook:chat:open', { detail: { chatId: insight.chat_id } }),
+    );
+    setOpenInsightId(null);
+  }, []);
+
+  const openInsight = insights.find((i) => i.id === openInsightId) || null;
 
   if (!loaded || insights.length === 0) {
     return null;
   }
 
   return (
-    <section className="space-y-2">
+    <section className="space-y-2.5">
       <div className="flex items-center gap-2 px-1">
         <Lightbulb size={16} weight="bold" className="text-amber-600" />
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-700">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700">
           Saved Insights
         </h3>
+        <span className="text-[11px] text-stone-400">{insights.length}</span>
       </div>
 
       <div className="space-y-2">
-        {insights.map((insight) => {
-          const isExpanded = expandedId === insight.id;
-          return (
-            <div
-              key={insight.id}
-              className="rounded-lg border border-stone-200 bg-white p-3 text-sm"
-            >
-              <div className="flex items-start gap-2">
-                <button
-                  type="button"
-                  onClick={() => setExpandedId(isExpanded ? null : insight.id)}
-                  className="flex-1 min-w-0 text-left"
-                >
-                  <div className="font-medium text-stone-800 truncate">
-                    {insight.title}
-                  </div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">
-                    {cadenceLabel(insight.cadence)} · {formatLastRun(insight.last_run_at)}
-                    {insight.last_error && (
-                      <span className="ml-2 inline-flex items-center gap-1 text-destructive">
-                        <Warning size={12} weight="bold" />
-                        last refresh failed
-                      </span>
-                    )}
-                  </div>
-                </button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRefresh(insight)}
-                  disabled={insight.is_running}
-                  title="Refresh now"
-                  className="h-7 w-7 p-0"
-                >
-                  {insight.is_running ? (
-                    <CircleNotch size={14} className="animate-spin" />
-                  ) : (
-                    <ArrowsClockwise size={14} />
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setPendingDelete(insight)}
-                  title="Delete insight"
-                  className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                >
-                  <Trash size={14} />
-                </Button>
-              </div>
-
-              {isExpanded && (
-                <div className="mt-3 space-y-2 border-t border-stone-100 pt-2">
-                  <div>
-                    <div className="text-xs font-medium text-stone-500">Prompt</div>
-                    <p className="mt-0.5 text-xs text-stone-700 whitespace-pre-wrap">
-                      {insight.prompt}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="text-xs font-medium text-stone-500">
-                      {insight.last_error ? 'Last error' : 'Last result'}
-                    </div>
-                    <p className="mt-0.5 text-xs text-stone-700 whitespace-pre-wrap">
-                      {insight.last_error
-                        ? insight.last_error
-                        : insight.last_result || 'No result yet — refresh to populate.'}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {insights.map((insight) => (
+          <InsightCard
+            key={insight.id}
+            insight={insight}
+            onOpen={(i) => setOpenInsightId(i.id)}
+            onRefresh={handleRefresh}
+            onDelete={(i) => setPendingDelete(i)}
+            onJumpToChat={handleJumpToChat}
+          />
+        ))}
       </div>
+
+      <InsightDetailSheet
+        insight={openInsight}
+        open={!!openInsight}
+        onOpenChange={(open) => !open && setOpenInsightId(null)}
+        onRefresh={handleRefresh}
+        onJumpToChat={handleJumpToChat}
+      />
 
       <AlertDialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
         <AlertDialogContent>
@@ -216,7 +149,7 @@ export const SavedInsightsSection: React.FC = () => {
             <AlertDialogTitle>Delete saved insight?</AlertDialogTitle>
             <AlertDialogDescription>
               This stops the scheduled refresh and removes the stored result.
-              The chats that were already run stay intact.
+              The chat where it was saved stays intact.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

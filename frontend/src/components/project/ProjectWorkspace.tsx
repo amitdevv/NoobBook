@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { SourcesPanel } from '../sources';
 import { ChatPanel } from '../chat';
@@ -111,6 +111,18 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
     // Reset after a tick so clicking "Open" on the same chat again works
     setTimeout(() => setOpenChatId(null), 100);
   }, []);
+
+  // Cross-panel hook: any descendant (e.g. SavedInsightsSection in the
+  // Studio panel) can fire `noobbook:chat:open` to switch the chat panel
+  // to a specific chat. Keeps the studio decoupled from ProjectWorkspace.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ chatId?: string }>).detail;
+      if (detail?.chatId) handleOpenChat(detail.chatId);
+    };
+    window.addEventListener('noobbook:chat:open', handler);
+    return () => window.removeEventListener('noobbook:chat:open', handler);
+  }, [handleOpenChat]);
 
   return (
     <div className="h-screen flex flex-col bg-background">

@@ -36,10 +36,12 @@ const log = createLogger('save-as-insight');
 
 interface Props {
   projectId: string;
+  /** Chat this prompt came from; refreshes will append into this same chat. */
+  chatId: string | null;
   prompt: string;
 }
 
-export const SaveAsInsightButton: React.FC<Props> = ({ projectId, prompt }) => {
+export const SaveAsInsightButton: React.FC<Props> = ({ projectId, chatId, prompt }) => {
   const trimmed = prompt.trim();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -63,6 +65,7 @@ export const SaveAsInsightButton: React.FC<Props> = ({ projectId, prompt }) => {
         title: title.trim() || trimmed.slice(0, 60),
         prompt: trimmed,
         cadence,
+        chat_id: chatId,
       });
       if (created) {
         success('Saved as a recurring insight');

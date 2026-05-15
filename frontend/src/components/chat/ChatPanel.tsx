@@ -1155,6 +1155,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           messages={activeChat?.messages || []}
           sending={sending}
           projectId={projectId}
+          chatId={activeChat?.id ?? null}
           streamingAssistantContent={streamingAssistantContent}
           toolProgress={toolProgress}
         />
