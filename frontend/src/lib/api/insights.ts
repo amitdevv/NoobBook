@@ -20,8 +20,11 @@ export interface SavedInsight {
   title: string;
   prompt: string;
   cadence: InsightCadence;
+  /** Chat the insight refreshes into. Refreshes append turns to this chat. */
+  chat_id: string | null;
   last_run_at: string | null;
   last_result: string | null;
+  /** Mirror of `chat_id` after the latest refresh — kept for backwards compat. */
   last_chat_id: string | null;
   last_error: string | null;
   is_running: boolean;
@@ -33,6 +36,8 @@ export interface CreateInsightInput {
   title?: string;
   prompt: string;
   cadence: InsightCadence;
+  /** Chat to associate with this insight so refreshes append turns to it. */
+  chat_id?: string | null;
 }
 
 export const insightsAPI = {

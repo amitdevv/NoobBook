@@ -68,6 +68,7 @@ def create_insight(project_id: str):
     prompt = (data.get("prompt") or "").strip()
     cadence = (data.get("cadence") or "weekly").strip()
     title = (data.get("title") or prompt[:60]).strip()
+    chat_id = (data.get("chat_id") or None) or None
     if not prompt:
         return jsonify({"success": False, "error": "Prompt is required"}), 400
     if cadence not in ("daily", "weekly"):
@@ -79,6 +80,7 @@ def create_insight(project_id: str):
             title=title,
             prompt=prompt,
             cadence=cadence,
+            chat_id=chat_id,
         )
         return jsonify({"success": True, "insight": insight}), 201
     except Exception as exc:
