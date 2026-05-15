@@ -921,13 +921,22 @@ class MainChatService:
         project_id: str,
         chat_id: str,
         user_message_text: UserMessagePayload,
+        *,
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Process a user message and return saved messages plus sync metadata."""
+        """Process a user message and return saved messages plus sync metadata.
+
+        `user_id` is required when calling from background contexts (e.g.
+        the saved-insight scheduler) where `has_request_context()` is
+        False and the fallback to DEFAULT_USER_ID would otherwise produce
+        a bogus UUID that fails the brand_config FK constraint.
+        """
         return self._run_message_flow(
             project_id=project_id,
             chat_id=chat_id,
             user_message_text=user_message_text,
             stream_text=False,
+            user_id=user_id,
         )
 
     def stream_message(
