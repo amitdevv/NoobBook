@@ -5,7 +5,7 @@
  * Features: folder navigation, pagination (Load More), client-side search.
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { ScrollArea } from '../ui/scroll-area';
@@ -50,6 +50,11 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  // Mirror of nextPageToken used inside loadFiles. Keeping the token out of
+  // loadFiles' useCallback deps stops the file-list useEffect from looping:
+  // each call writes a new token → would otherwise recreate loadFiles →
+  // re-fire the effect → fetch again, ten times a second.
+  const nextPageTokenRef = useRef<string | null>(null);
 
   // Search state (client-side filtering)
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,6 +97,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
     if (freshLoad) {
       setLoading(true);
       setFiles([]);
+      nextPageTokenRef.current = null;
       setNextPageToken(null);
     } else {
       setLoadingMore(true);
@@ -102,7 +108,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
       const result = await googleDriveAPI.listFiles(
         currentFolder.id || undefined,
         50,
-        freshLoad ? undefined : nextPageToken || undefined
+        freshLoad ? undefined : nextPageTokenRef.current || undefined
       );
 
       if (result.success) {
@@ -111,6 +117,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
         } else {
           setFiles(prev => [...prev, ...result.files]);
         }
+        nextPageTokenRef.current = result.next_page_token;
         setNextPageToken(result.next_page_token);
       } else {
         error(result.error || 'Failed to load files');
@@ -122,7 +129,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [folderStack, nextPageToken, error]);
+  }, [folderStack, error]);
 
   // Load Google status on mount
   useEffect(() => {
