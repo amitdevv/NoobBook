@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 
+from app.services.integrations.google.oauth_state import sign_state
 from app.services.integrations.supabase import get_supabase
 
 
@@ -214,6 +215,13 @@ class GoogleAuthService:
         # Use provided user_id or get default for single-user mode
         effective_user_id = user_id or self._get_default_user_id()
 
+        # Refuse to mint a flow with no user attached. sign_state would
+        # reject anyway (its UUID column is NOT NULL); returning None
+        # here lets the route surface a clean 400 instead of a 500.
+        if not effective_user_id:
+            logger.warning("get_auth_url called with no user_id (no default user)")
+            return None
+
         flow = Flow.from_client_config(
             client_config,
             scopes=self.SCOPES,
@@ -223,12 +231,16 @@ class GoogleAuthService:
         # Generate auth URL
         # access_type='offline' ensures we get a refresh token
         # prompt='consent' forces consent screen to ensure refresh token
-        # state parameter carries user_id for the callback
+        # state is HMAC-signed + nonce-protected so the callback can
+        # verify it really came from a flow WE started (no CSRF where
+        # someone tricks a victim into pasting an OAuth URL that links
+        # the attacker's Google account to the victim's row).
+        signed_state = sign_state(effective_user_id)
         auth_url, _ = flow.authorization_url(
             access_type='offline',
             prompt='consent',
             include_granted_scopes='true',
-            state=effective_user_id or ''  # Pass user_id in state for callback
+            state=signed_state,
         )
 
         return auth_url
