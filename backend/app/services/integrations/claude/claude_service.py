@@ -143,6 +143,7 @@ class ClaudeService:
         self,
         project_id: Optional[str] = None,
         user_id: Optional[str] = None,
+        user_email: Optional[str] = None,
         chat_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
@@ -153,6 +154,11 @@ class ClaudeService:
             metadata["project_id"] = project_id
         if user_id:
             metadata["user_id"] = user_id
+        if user_email:
+            # Stand-in for a backend audit log: lets us answer "which user
+            # made this call?" from the Opik dashboard until the real audit
+            # log table ships.
+            metadata["user_email"] = user_email
         if metadata:
             kwargs["metadata"] = metadata
         if chat_id:
@@ -160,6 +166,21 @@ class ClaudeService:
         if tags:
             kwargs["tags"] = tags
         return kwargs
+
+    @staticmethod
+    def _resolve_user_email(user_email: Optional[str]) -> Optional[str]:
+        """Auto-fill user_email from the current request identity when caller
+        didn't pass one. Background threads fall through to None cleanly —
+        `get_request_identity()` already returns a sentinel with email=None
+        outside a request context."""
+        if user_email is not None:
+            return user_email
+        try:
+            from app.services.auth.rbac import get_request_identity
+            ident = get_request_identity()
+            return ident.email if ident.is_authenticated else None
+        except Exception:
+            return None
 
     def _run_tracked(
         self,
@@ -217,6 +238,7 @@ class ClaudeService:
         extra_headers: Optional[Dict[str, str]] = None,
         project_id: Optional[str] = None,
         user_id: Optional[str] = None,
+        user_email: Optional[str] = None,
         chat_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
         enable_prompt_cache: bool = False,
@@ -272,7 +294,14 @@ class ClaudeService:
         )
 
         # Make API call (wrapped in Opik parent trace with metadata if enabled)
-        opik_kwargs = self._build_opik_kwargs(project_id=project_id, user_id=user_id, chat_id=chat_id, tags=tags)
+        user_email = self._resolve_user_email(user_email)
+        opik_kwargs = self._build_opik_kwargs(
+            project_id=project_id,
+            user_id=user_id,
+            user_email=user_email,
+            chat_id=chat_id,
+            tags=tags,
+        )
         # Show the last user message as trace input for quick scanning in the dashboard
         last_user_msg = next(
             (m.get("content", "") for m in reversed(messages) if m.get("role") == "user"),
@@ -333,6 +362,7 @@ class ClaudeService:
         project_id: Optional[str] = None,
         on_text_delta: Optional[Callable[[str], None]] = None,
         user_id: Optional[str] = None,
+        user_email: Optional[str] = None,
         chat_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
         enable_prompt_cache: bool = False,
@@ -372,7 +402,14 @@ class ClaudeService:
                     return stream.get_final_message()
             return self._call_with_retry(_stream_once)
 
-        opik_kwargs = self._build_opik_kwargs(project_id=project_id, user_id=user_id, chat_id=chat_id, tags=tags)
+        user_email = self._resolve_user_email(user_email)
+        opik_kwargs = self._build_opik_kwargs(
+            project_id=project_id,
+            user_id=user_id,
+            user_email=user_email,
+            chat_id=chat_id,
+            tags=tags,
+        )
         last_user_msg = next(
             (m.get("content", "") for m in reversed(messages) if m.get("role") == "user"),
             "",
