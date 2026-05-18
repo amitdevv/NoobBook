@@ -10,6 +10,7 @@ Key Design Decisions:
 - Flexible: Accepts variable parameters for different use cases
 - Reusable: Can be called from main chat, subagents, RAG pipeline, etc.
 """
+import contextvars
 import logging
 import os
 import time
@@ -25,6 +26,29 @@ logger = logging.getLogger(__name__)
 _RATE_LIMIT_CODES = (429, 529)  # rate limit + overloaded
 _SERVER_ERROR_CODES = (500, 502, 503)
 _MAX_RETRIES = 3
+
+# ContextVar carrying the signed-in user's email for the current logical
+# call. Routes that dispatch Claude calls into worker threads (e.g. the
+# SSE chat endpoint) lose Flask's request context at the thread boundary,
+# so `get_request_identity()` returns the unauthenticated sentinel inside
+# the worker. Those callers should set this var at the worker's entry
+# point via `set_current_user_email(...)` before invoking any Claude API.
+# `_resolve_user_email` consults it as a fallback when the request-context
+# lookup yields nothing. ContextVar (not threading.local) so we stay
+# forwards-compatible with an asyncio migration.
+_current_user_email: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "noobbook_current_user_email", default=None
+)
+
+
+def set_current_user_email(email: Optional[str]) -> None:
+    """Stash the current user's email for the active execution context so
+    Claude calls running outside a Flask request context (worker threads,
+    background tasks) can still tag Opik traces with it.
+
+    Idempotent and safe to call with None (clears the value). Per-thread
+    scoping: setting in one thread does not leak to other threads."""
+    _current_user_email.set(email)
 
 
 class ClaudeService:
@@ -169,16 +193,30 @@ class ClaudeService:
 
     @staticmethod
     def _resolve_user_email(user_email: Optional[str]) -> Optional[str]:
-        """Auto-fill user_email from the current request identity when caller
-        didn't pass one. Background threads fall through to None cleanly —
-        `get_request_identity()` already returns a sentinel with email=None
-        outside a request context."""
+        """Auto-fill user_email when caller didn't pass one explicitly.
+
+        Resolution order:
+          1. Explicit kwarg from the caller (highest priority).
+          2. Flask request context — `get_request_identity().email`.
+             Works when Claude is called directly from a route handler.
+          3. ContextVar `_current_user_email` — set by route workers
+             that dispatch Claude calls into a thread without a Flask
+             request context (e.g. SSE chat streaming).
+
+        Falls through to None if none of those yield a value. Best-effort
+        throughout; any exception in the lookup chain returns None rather
+        than failing the Claude call."""
         if user_email is not None:
             return user_email
         try:
             from app.services.auth.rbac import get_request_identity
             ident = get_request_identity()
-            return ident.email if ident.is_authenticated else None
+            if ident.is_authenticated and ident.email:
+                return ident.email
+        except Exception:
+            pass
+        try:
+            return _current_user_email.get()
         except Exception:
             return None
 
