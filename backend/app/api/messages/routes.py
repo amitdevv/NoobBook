@@ -37,6 +37,7 @@ from werkzeug.utils import secure_filename
 from app.api.messages import messages_bp
 from app.services.chat_services import main_chat_service
 from app.services.auth.rbac import get_request_identity
+from app.services.integrations.claude.claude_service import set_current_user_email
 from app.services.integrations.supabase import storage_service
 
 
@@ -297,6 +298,10 @@ def stream_message(project_id, chat_id):
 
     identity = get_request_identity()
     user_id = identity.user_id
+    # Capture email here (request context is alive); we'll re-stash it
+    # inside the worker thread below so Opik traces still get tagged
+    # after we leave the Flask request scope.
+    user_email = identity.email if identity.is_authenticated else None
     app = current_app._get_current_object()
     # Bounded so the worker can't accumulate hundreds of KB of unread events
     # after the client disconnects. 512 is well above the steady-state size
@@ -324,6 +329,11 @@ def stream_message(project_id, chat_id):
             app.logger.warning("SSE queue full — dropping event %s", event_name)
 
     def worker() -> None:
+        # Re-stash user_email inside the worker thread so claude_service
+        # can tag Opik traces even though Flask's request context doesn't
+        # cross the thread boundary. ContextVars are per-thread, so this
+        # only affects this worker.
+        set_current_user_email(user_email)
         try:
             main_chat_service.stream_message(
                 project_id=project_id,
