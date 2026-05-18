@@ -37,7 +37,10 @@ from werkzeug.utils import secure_filename
 from app.api.messages import messages_bp
 from app.services.chat_services import main_chat_service
 from app.services.auth.rbac import get_request_identity
-from app.services.integrations.claude.claude_service import set_current_user_email
+from app.services.integrations.claude.claude_service import (
+    set_current_user_email,
+    tag_chat_thread,
+)
 from app.services.integrations.supabase import storage_service
 
 
@@ -334,6 +337,10 @@ def stream_message(project_id, chat_id):
         # cross the thread boundary. ContextVars are per-thread, so this
         # only affects this worker.
         set_current_user_email(user_email)
+        # Fire-and-forget: tag the Opik thread with user identity once per
+        # chat so the thread list is filterable by user. Deduped in
+        # claude_service so repeated sends in the same chat are cheap.
+        tag_chat_thread(chat_id=chat_id, user_email=user_email, project_id=project_id)
         try:
             main_chat_service.stream_message(
                 project_id=project_id,

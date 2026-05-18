@@ -13,6 +13,7 @@ Key Design Decisions:
 import contextvars
 import logging
 import os
+import threading
 import time
 from typing import Optional, List, Dict, Any, Callable
 import anthropic
@@ -689,3 +690,80 @@ def _tools_with_cache_breakpoint(tools: List[Dict[str, Any]]) -> List[Dict[str, 
 
 # Singleton instance for easy import
 claude_service = ClaudeService()
+
+
+# In-process dedupe so repeat sends in the same chat session don't keep
+# re-issuing the same tag update against Opik. Bounded by chat count
+# in this process — fine for our scale.
+_tagged_threads: set = set()
+_tagged_threads_lock = threading.Lock()
+
+
+def tag_chat_thread(
+    chat_id: Optional[str],
+    user_email: Optional[str],
+    project_id: Optional[str] = None,
+) -> None:
+    """Tag the Opik thread for this chat with user identity so the thread
+    list is filterable by user without drilling into each trace.
+
+    Why a separate call: Opik's `update_thread` REST API supports tags but
+    not arbitrary metadata. `update_current_trace(metadata=...)` only writes
+    to the trace, not the parent thread record. This bridges that gap.
+
+    Fire-and-forget: spawns a daemon thread that sleeps briefly (waiting for
+    the Opik trace batch to flush so the thread record exists upstream),
+    then calls `update_thread` with `tags_to_add`. Never raises into the
+    caller. Deduped per (chat_id, user_email) per process — tag operations
+    are idempotent on Opik's side, but skipping the network round trip when
+    we've already done it is free."""
+    if not chat_id or not user_email:
+        return
+    key = (chat_id, user_email)
+    with _tagged_threads_lock:
+        if key in _tagged_threads:
+            return
+        _tagged_threads.add(key)
+
+    def _run() -> None:
+        try:
+            # Opik's trace uploader batches with a ~5s default window. The
+            # thread record is created server-side when the first trace
+            # carrying that thread_id is ingested, so we wait long enough
+            # to cover the worst-case batch flush plus a little slack.
+            time.sleep(8)
+            import opik
+
+            client = opik.Opik()
+            project_name = os.getenv("OPIK_PROJECT_NAME", "NoobBook")
+            threads = client.search_threads(
+                project_name=project_name,
+                filter_string=f'id = "{chat_id}"',
+                max_results=1,
+            )
+            if not threads:
+                # Trace flush hasn't happened yet — un-dedupe so the next
+                # message in this chat retries. Avoids permanently giving
+                # up because of a timing race.
+                with _tagged_threads_lock:
+                    _tagged_threads.discard(key)
+                return
+            thread_model_id = getattr(threads[0], "thread_model_id", None)
+            if not thread_model_id:
+                return
+            tags = [f"user:{user_email}"]
+            if project_id:
+                tags.append(f"project:{project_id}")
+            client.rest_client.traces.update_thread(
+                thread_model_id=thread_model_id,
+                tags_to_add=tags,
+            )
+        except Exception as exc:
+            # Never let observability tagging break a chat. Un-dedupe so a
+            # transient Opik outage doesn't permanently swallow tagging for
+            # this chat.
+            logger.debug("Opik thread tag failed (chat=%s): %s", chat_id, exc)
+            with _tagged_threads_lock:
+                _tagged_threads.discard(key)
+
+    threading.Thread(target=_run, daemon=True, name=f"opik-tag-{chat_id[:8]}").start()
