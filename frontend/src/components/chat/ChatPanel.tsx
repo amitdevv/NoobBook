@@ -25,7 +25,7 @@ import { ChatEmptyState } from './ChatEmptyState';
 import { RawMessageView } from './RawMessageView';
 import { exportChatAsPdf } from '@/lib/exportChatPdf';
 import { createLogger } from '@/lib/logger';
-import { API_BASE_URL } from '@/lib/api/client';
+import { API_BASE_URL, extractServerError } from '@/lib/api/client';
 
 const log = createLogger('chat-panel');
 
@@ -915,11 +915,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             }
           } catch (fallbackError) {
             log.error({ err: fallbackError }, 'failed to send message via fallback');
-            errorWithLogs('Failed to send message');
+            errorWithLogs(extractServerError(fallbackError, 'Failed to send message'));
           }
         } else if (shouldFallback && hasAttachments) {
           log.warn('stream failed before user_message event with attachments — surfacing error so user can retry');
-          errorWithLogs('Failed to send message — please retry.');
+          errorWithLogs(extractServerError(err, 'Failed to send message — please retry.'));
         } else {
           // Stream errored mid-flight after delivering partial events
           // (canonical user_message and/or assistant_delta). Re-sending
@@ -963,9 +963,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   /**
-   * Stop the current in-flight chat request
+   * Stop the current in-flight chat request.
+   *
+   * Order matters: signal the server BEFORE aborting the fetch. The server
+   * marker is what makes the difference between "(stopped by user)" and the
+   * generic recovery path on the backend (Symptom 9 fix). If the POST fails
+   * we still abort — the worst case becomes "the message gets persisted as a
+   * normal response instead of labeled stopped", which is fine.
    */
   const handleStop = () => {
+    if (activeChat) {
+      // Fire-and-forget. stopMessage swallows its own errors.
+      void chatsAPI.stopMessage(projectId, activeChat.id);
+    }
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;

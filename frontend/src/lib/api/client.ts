@@ -30,11 +30,34 @@ export const api = axios.create({
   },
 });
 
+// Per-request correlation ID. The backend stamps every log record with this
+// (see app/utils/logger.py:_RequestIdFilter), and echoes it back in the
+// X-Request-Id response header. When the user reports "I was logged out at
+// 14:32", the req_id printed alongside any failed-request log in DevTools
+// is the single grep key the support engineer needs in backend.log.
+function _newRequestId(): string {
+  // crypto.randomUUID is available in all browsers we ship to; the fallback
+  // covers older WebView environments (e.g. embedded Slack browser) so we
+  // never throw at request time.
+  try {
+    return (globalThis.crypto?.randomUUID?.() || '').replace(/-/g, '').slice(0, 16)
+      || Math.random().toString(36).slice(2, 18);
+  } catch {
+    return Math.random().toString(36).slice(2, 18);
+  }
+}
+
 const attachAuthHeader = (config: InternalAxiosRequestConfig) => {
   const token = getAccessToken();
   if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // Attach a fresh req_id per request so every retry / refresh gets its own.
+  // If a caller has already set one (e.g. a tracing wrapper) we honour it.
+  config.headers = config.headers || {};
+  if (!config.headers['X-Request-Id']) {
+    config.headers['X-Request-Id'] = _newRequestId();
   }
   return config;
 };
@@ -155,7 +178,14 @@ async function handle401Error(error: AxiosError, retryWith: typeof api | typeof 
     // normal API-error toast (not a "you're logged out" experience).
   }
 
-  log.error({ status, data: error.response?.data }, 'API response error');
+  // req_id from the response header (or the request header if the server
+  // never replied). With this on the error line, a support engineer can grep
+  // it directly in backend.log via the admin Logs viewer.
+  const reqId =
+    (error.response?.headers as Record<string, string> | undefined)?.['x-request-id']
+    || (originalRequest?.headers?.['X-Request-Id'] as string | undefined)
+    || '-';
+  log.error({ status, reqId, data: error.response?.data }, 'API response error');
   return Promise.reject(error);
 }
 
@@ -192,3 +222,27 @@ export function getAuthUrl(url: string): string {
 }
 
 export { API_BASE_URL };
+
+
+/**
+ * Pull a user-facing message out of an API error, preferring the server's
+ * `error` / `message` field when present. Falls back to the given default.
+ *
+ * Use this at toast call-sites that currently look like
+ *     errorWithLogs('Failed to send message')
+ * — replace with
+ *     errorWithLogs(extractServerError(err, 'Failed to send message'))
+ * so the user sees the actual reason ("Database unreachable — check the
+ * connection URI", "Claude rate limit reached", etc.) when the backend
+ * supplies one.
+ */
+export function extractServerError(err: unknown, fallback: string): string {
+  if (!err) return fallback;
+  // Axios shape
+  const axiosErr = err as AxiosError<{ error?: string; message?: string }>;
+  const fromAxios = axiosErr.response?.data?.error || axiosErr.response?.data?.message;
+  if (typeof fromAxios === 'string' && fromAxios.trim()) return fromAxios.trim();
+  // Fetch / generic Error shape
+  if (err instanceof Error && err.message && err.message !== 'Network Error') return err.message;
+  return fallback;
+}

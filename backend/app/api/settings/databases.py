@@ -19,6 +19,7 @@ from app.api.settings import settings_bp
 from app.services.auth.rbac import require_admin
 from app.services.data_services.database_connection_service import database_connection_service, DEFAULT_USER_ID
 from app.services.auth.rbac import get_request_identity
+from app.utils.error_responses import error_response
 
 
 @settings_bp.route("/settings/databases", methods=["GET"])
@@ -34,8 +35,7 @@ def list_databases():
         )
         return jsonify({"success": True, "databases": connections, "count": len(connections)}), 200
     except Exception as e:
-        current_app.logger.error(f"Error listing databases: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return error_response(e, default_log="Error listing databases")
 
 
 @settings_bp.route("/settings/databases", methods=["POST"])
@@ -75,8 +75,7 @@ def create_database():
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 400
     except Exception as e:
-        current_app.logger.error(f"Error creating database connection: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return error_response(e, default_log="Error creating database connection")
 
 
 @settings_bp.route("/settings/databases/<connection_id>", methods=["DELETE"])
@@ -90,8 +89,7 @@ def delete_database(connection_id: str):
             return jsonify({"success": False, "error": "Database connection not found"}), 404
         return jsonify({"success": True, "message": "Database connection deleted"}), 200
     except Exception as e:
-        current_app.logger.error(f"Error deleting database connection {connection_id}: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return error_response(e, default_log=f"Error deleting database connection {connection_id}")
 
 
 @settings_bp.route("/settings/databases/<connection_id>/visibility", methods=["PATCH"])
@@ -112,8 +110,7 @@ def update_database_visibility(connection_id: str):
 
         return jsonify({"success": True, "database": updated}), 200
     except Exception as e:
-        current_app.logger.error(f"Error updating database visibility {connection_id}: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return error_response(e, default_log=f"Error updating database visibility {connection_id}")
 
 
 @settings_bp.route("/settings/databases/validate", methods=["POST"])

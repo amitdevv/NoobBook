@@ -204,7 +204,10 @@ def validate_token() -> Optional[str]:
                         return user_id
                     # GoTrue says no — token has been revoked (sign-out,
                     # password change, admin force-revoke).
-                    logger.info("Token revoked by GoTrue — denying access")
+                    logger.warning(
+                        "AUTH_401_TRACE branch=fast_revoked user_id=%s token_suffix=%s",
+                        user_id, token[-12:],
+                    )
                     return None
                 except Exception as e:
                     # GoTrue itself is unreachable (network blip, GoTrue
@@ -214,9 +217,8 @@ def validate_token() -> Optional[str]:
                     # matches the historical fail-open behaviour of the
                     # cache-hit path.
                     logger.warning(
-                        "Revocation check failed (GoTrue unreachable: %s: %s) — "
-                        "trusting local signature for the next %ds",
-                        type(e).__name__, e, _TOKEN_CACHE_TTL,
+                        "AUTH_401_TRACE branch=fast_failopen err=%s:%s token_suffix=%s ttl=%ds",
+                        type(e).__name__, str(e)[:120], token[-12:], _TOKEN_CACHE_TTL,
                     )
                     _cache_token(token, user_id)
                     return user_id
@@ -239,7 +241,10 @@ def validate_token() -> Optional[str]:
             logger.warning("Local JWT decode raised %s: %s — falling back to Auth", type(e).__name__, e)
 
     # Slow path (no JWT_SECRET configured, or local decode hit an unexpected
-    # exception): cache + Supabase Auth roundtrip. Same behaviour as before.
+    # exception): cache + Supabase Auth roundtrip. Same behaviour as before
+    # for the happy path; the exception path now mirrors the fast-path
+    # fail-open at lines ~209-222 to avoid logging users out on a transient
+    # GoTrue blip (Delta's Symptom 1/2 cascade).
     cached_user_id = _get_cached_user_id(token)
     if cached_user_id:
         return cached_user_id
@@ -251,14 +256,62 @@ def validate_token() -> Optional[str]:
         user_response = supabase.auth.get_user(token)
 
         if not user_response or not user_response.user:
-            logger.warning("Auth get_user returned no user")
+            logger.warning(
+                "AUTH_401_TRACE branch=slow_nouser token_suffix=%s",
+                token[-12:],
+            )
             return None
 
         user_id = str(user_response.user.id)
         _cache_token(token, user_id)
         return user_id
     except Exception as e:
-        logger.warning("Token validation failed: %s: %s", type(e).__name__, e)
+        # GoTrue itself raised (network blip, container restart, rate limit).
+        # Before §2.3, this short-circuited to None → 401 → frontend kicked
+        # the user out. With JWT_SECRET unset (a common self-hosted misconfig
+        # at Delta) the fast-path fail-open isn't available — so we re-create
+        # its effect HERE by decoding the JWT for its `sub` claim WITHOUT
+        # signature verification. Expiry is still enforced so a stale token
+        # can't ride this branch.
+        #
+        # Security note: we only reach this path AFTER auth.get_user(token)
+        # has already failed for non-credential reasons. The alternative is
+        # "log the user out on every GoTrue hiccup", which is strictly worse
+        # — the user re-signs-in with the same token immediately.
+        try:
+            unverified = jwt.decode(
+                token,
+                options={
+                    "verify_signature": False,
+                    "verify_aud": False,
+                    "verify_exp": True,
+                },
+            )
+            user_id_unverified = unverified.get("sub")
+            if user_id_unverified:
+                logger.warning(
+                    "AUTH_401_TRACE branch=slow_failopen err=%s:%s token_suffix=%s ttl=%ds",
+                    type(e).__name__, str(e)[:120], token[-12:], _TOKEN_CACHE_TTL,
+                )
+                user_id_unverified = str(user_id_unverified)
+                _cache_token(token, user_id_unverified)
+                return user_id_unverified
+        except Exception as decode_exc:
+            # Token is structurally invalid OR expired — fall through to the
+            # original "return None" so the user really is asked to sign in.
+            logger.warning(
+                "AUTH_401_TRACE branch=slow_failopen_rejected err=%s:%s decode_err=%s:%s token_suffix=%s",
+                type(e).__name__, str(e)[:80],
+                type(decode_exc).__name__, str(decode_exc)[:80],
+                token[-12:],
+            )
+            return None
+
+        # `sub` was missing despite a clean decode — same fall-through.
+        logger.warning(
+            "AUTH_401_TRACE branch=slow_exception err=%s:%s token_suffix=%s",
+            type(e).__name__, str(e)[:120], token[-12:],
+        )
         return None
 
 

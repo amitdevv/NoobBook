@@ -49,22 +49,19 @@ class TaskService:
 
     def __init__(self):
         """Initialize the task service."""
-        # Thread pool for executing tasks
-        # Educational Note: ThreadPoolExecutor manages a pool of worker threads
-        # Tasks are queued and executed as threads become available
         self._executor = ThreadPoolExecutor(max_workers=self.MAX_WORKERS)
-
-        # Lock for thread-safe operations
         self._lock = threading.Lock()
-
-        # Track running futures (for potential cancellation)
         self._futures: Dict[str, Future] = {}
-
-        # Track cancelled tasks - workers check this to stop early
         self._cancelled_tasks: set = set()
 
-        # Clean up any stale tasks from previous runs
-        self._cleanup_stale_tasks()
+        # Stale-task cleanup must run exactly ONCE per container boot, not
+        # per gunicorn worker. With multiple workers, a recycling worker
+        # would otherwise mark tasks running on its peers as "failed".
+        # entrypoint.sh runs the cleanup explicitly before gunicorn starts;
+        # workers skip it unless RUN_STALE_TASK_CLEANUP=1 is set.
+        import os
+        if os.getenv("RUN_STALE_TASK_CLEANUP") == "1":
+            self._cleanup_stale_tasks()
 
     def _cleanup_stale_tasks(self) -> None:
         """
@@ -160,8 +157,18 @@ class TaskService:
                 return result
 
             except Exception as e:
-                # Update status to failed
+                # Full traceback for post-mortem.
                 logger.exception("Task %s failed (%s for %s): %s", task_id, task_type, target_id, e)
+                # Structured prefix for the admin Logs viewer + bundle. Without
+                # a req_id (background threads have no Flask request context),
+                # task_id is the correlation key — when a user reports "my
+                # source got stuck in processing", an admin can grep
+                # `BACKGROUND_TASK_FAIL target=<source_id>` and find the
+                # exact failure.
+                logger.warning(
+                    "BACKGROUND_TASK_FAIL task_id=%s task_type=%s target_id=%s err=%s:%s",
+                    task_id, task_type, target_id, type(e).__name__, str(e)[:200],
+                )
                 self._update_task(
                     task_id,
                     status="failed",

@@ -519,6 +519,30 @@ class ChatsAPI {
   }
 
   /**
+   * Tell the backend that the user explicitly clicked Stop.
+   *
+   * Why this exists: the SSE generator can't distinguish "user clicked Stop"
+   * from "proxy idle-timeout closed the connection" without a side-channel
+   * signal. Both produce a Python GeneratorExit. Before this endpoint,
+   * proxy timeouts mislabeled real responses as "(stopped by user)" — Delta's
+   * Symptom 9. We POST this BEFORE calling abort() on the AbortController
+   * so the marker is in the server-side set when GeneratorExit fires.
+   *
+   * Idempotent + non-blocking: failures are swallowed so the abort() that
+   * follows still runs (the worst case is the response gets labeled as a
+   * proxy-disconnect — still better than the old behaviour).
+   */
+  async stopMessage(projectId: string, chatId: string): Promise<void> {
+    try {
+      await axios.post(
+        `${API_BASE_URL}/projects/${projectId}/chats/${chatId}/messages/stop`
+      );
+    } catch (error) {
+      log.warn({ err: error }, 'failed to signal stop (proceeding with abort)');
+    }
+  }
+
+  /**
    * Get per-chat cost and token breakdown.
    * Educational Note: Mirrors projectsAPI.getCosts but scoped to a single chat.
    */

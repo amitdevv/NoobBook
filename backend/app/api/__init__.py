@@ -23,10 +23,77 @@ Authentication: A before_request hook on api_bp validates JWT tokens
 for ALL routes except /auth/* endpoints. This protects every endpoint
 without needing @require_auth on each route.
 """
+import logging
+import re
+import time
+import uuid
+
 from flask import Blueprint, request, jsonify, g
 
 # Create the main API blueprint
 api_bp = Blueprint('api', __name__)
+
+logger = logging.getLogger(__name__)
+
+# =============================================================================
+# Request-ID + timing middleware (§1.4 + §1.5)
+# =============================================================================
+# Every request gets a UUID-shaped correlation ID. The frontend axios client
+# generates one via `crypto.randomUUID()` and sends it as `X-Request-Id`; if
+# absent we mint one server-side. The ID is stamped onto every log record by
+# `_RequestIdFilter` in `app/utils/logger.py` so a frontend bug report
+# (containing the req_id from DevTools) can be grepped directly in
+# backend.log. The ID is also echoed back in the response so the frontend can
+# print it.
+#
+# Run BEFORE `authenticate_request` so even unauthenticated requests (a 401
+# from `before_request` itself) carry a req_id — which is exactly the case we
+# need most often when debugging spontaneous logouts.
+
+_REQ_ID_HEADER = "X-Request-Id"
+# Strict allowlist: hex / alphanumeric / dash / underscore only. Anything
+# else gets rejected and we mint a fresh server-side ID. Without this, a
+# malicious client could pass `abc]: spoofed-log-line [req:fake` and inject
+# fake log content via the format-string interpolation (the M2 finding from
+# code-review). 1..64 chars matches the previous max length.
+_REQ_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+@api_bp.before_request
+def _attach_request_id():
+    """Mint or accept a per-request correlation ID and start the latency timer.
+
+    Registered BEFORE `authenticate_request` so 401 responses still carry the
+    req_id (the most common case we need to correlate).
+    """
+    incoming = request.headers.get(_REQ_ID_HEADER, "").strip()
+    if incoming and _REQ_ID_RE.fullmatch(incoming):
+        g.req_id = incoming
+    else:
+        g.req_id = uuid.uuid4().hex[:16]  # 16 hex chars = 64 bits = plenty
+    g._t0 = time.monotonic()
+
+
+@api_bp.after_request
+def _emit_request_id_and_timing(response):
+    """Echo X-Request-Id back to the client and log slow paths (§1.5)."""
+    req_id = getattr(g, "req_id", None)
+    if req_id:
+        response.headers[_REQ_ID_HEADER] = req_id
+
+    t0 = getattr(g, "_t0", None)
+    if t0 is not None:
+        elapsed = time.monotonic() - t0
+        # 1.0s threshold catches the failure modes we care about (DB connect
+        # timeout, slow Claude calls, GoTrue blips) without flooding the log
+        # with normal sub-second requests.
+        if elapsed > 1.0:
+            logger.warning(
+                "SLOW_REQUEST method=%s path=%s status=%s elapsed=%.2fs",
+                request.method, request.path, response.status_code, elapsed,
+            )
+    return response
+
 
 # =============================================================================
 # Authentication - Protect all routes except /auth/*
@@ -98,6 +165,7 @@ from app.api.brand import brand_bp
 from app.api.share import share_bp
 from app.api.logs import logs_bp
 from app.api.insights import insights_bp
+from app.api.debug import debug_bp
 
 # Register nested blueprints with the main api blueprint
 # No url_prefix needed - routes already have full paths
@@ -115,3 +183,4 @@ api_bp.register_blueprint(brand_bp)
 api_bp.register_blueprint(share_bp)
 api_bp.register_blueprint(logs_bp)
 api_bp.register_blueprint(insights_bp)
+api_bp.register_blueprint(debug_bp)

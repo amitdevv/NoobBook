@@ -16,6 +16,26 @@ LOG_DIR: Path | None = None
 LOG_FILE: Path | None = None
 
 
+class _RequestIdFilter(logging.Filter):
+    """Inject the current request's correlation ID onto every LogRecord.
+
+    Why: without this, a frontend bug report ("logged out at 14:32") has no
+    way to find the corresponding backend log line. The req_id is set by the
+    before_request hook in `app/api/__init__.py`. For records emitted outside
+    Flask request context (startup, background ThreadPoolExecutor workers,
+    CLI helpers) the placeholder "-" is used so the format string still
+    renders cleanly.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not hasattr(record, "req_id"):
+            # Lazy import — logger.py must stay importable without Flask
+            # (some test paths and CLI helpers touch this before app init).
+            from app.utils.request_context import get_request_id
+            record.req_id = get_request_id()
+        return True
+
+
 def setup_logging(log_level: str = "DEBUG") -> None:
     """
     Configure the root logger with a human-readable format.
@@ -33,15 +53,22 @@ def setup_logging(log_level: str = "DEBUG") -> None:
 
     level = getattr(logging, log_level.upper(), logging.DEBUG)
 
+    # The `[req:%(req_id)s]` segment is what makes frontend-↔-backend
+    # correlation possible. The matching parser at
+    # `app/api/logs/routes.py:_LINE_RE` accepts both the new and the old
+    # shape so already-rotated archives still display in the admin UI.
     formatter = logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        "%(asctime)s [%(levelname)s] %(name)s [req:%(req_id)s]: %(message)s",
         datefmt="%H:%M:%S",
     )
+
+    req_id_filter = _RequestIdFilter()
 
     handlers: list[logging.Handler] = []
 
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(formatter)
+    stream_handler.addFilter(req_id_filter)
     handlers.append(stream_handler)
 
     # File handler. Imported lazily so logger.py stays importable without
@@ -61,6 +88,7 @@ def setup_logging(log_level: str = "DEBUG") -> None:
             encoding="utf-8",
         )
         file_handler.setFormatter(formatter)
+        file_handler.addFilter(req_id_filter)
         handlers.append(file_handler)
     except Exception as exc:  # noqa: BLE001 — file handler is best-effort
         # Don't crash startup if the volume isn't writable — stdout still

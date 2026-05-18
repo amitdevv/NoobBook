@@ -39,6 +39,7 @@ from app.api.sources import sources_bp
 from app.services.source_services import SourceService
 from app.services.auth.rbac import get_request_identity
 from app.services.auth import require_permission
+from app.utils.error_responses import error_response
 
 # Initialize service
 source_service = SourceService()
@@ -324,8 +325,7 @@ def add_database_source(project_id: str):
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
-        current_app.logger.error(f"Error adding database source: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(e, default_log="Error adding database source")
 
 
 @sources_bp.route('/projects/<project_id>/sources/freshdesk', methods=['POST'])

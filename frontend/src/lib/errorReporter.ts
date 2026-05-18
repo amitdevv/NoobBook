@@ -58,6 +58,21 @@ function handleError(event: ErrorEvent) {
   });
 }
 
+function extractRequestId(reason: unknown): string | undefined {
+  // AxiosError shape — the request-id middleware echoes our X-Request-Id
+  // back as a response header. With this in the rejection report, an admin
+  // can grep the same req_id in backend.log via the Logs viewer and find
+  // the matching server-side trace line.
+  const r = reason as
+    | { response?: { headers?: Record<string, string> }; config?: { headers?: Record<string, string> } }
+    | undefined;
+  const fromResponse = r?.response?.headers?.['x-request-id'];
+  if (typeof fromResponse === 'string' && fromResponse) return fromResponse;
+  const fromRequest = r?.config?.headers?.['X-Request-Id'];
+  if (typeof fromRequest === 'string' && fromRequest) return fromRequest;
+  return undefined;
+}
+
 function handleRejection(event: PromiseRejectionEvent) {
   const reason = event.reason;
   let message = 'unhandledrejection';
@@ -73,6 +88,12 @@ function handleRejection(event: PromiseRejectionEvent) {
     } catch {
       // leave default
     }
+  }
+  const reqId = extractRequestId(reason);
+  if (reqId) {
+    // Tag the message body so the backend log line carries it through
+    // /logs/client without needing a payload-schema change.
+    message = `[req:${reqId}] ${message}`;
   }
   enqueue({ message, stack });
 }

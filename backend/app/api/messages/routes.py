@@ -29,19 +29,23 @@ Routes:
 import json
 import queue
 import threading
+import time
 import uuid
+from datetime import datetime, timezone
 from typing import Any, List, Tuple, Union
 
 from flask import jsonify, request, current_app, Response, stream_with_context
 from werkzeug.utils import secure_filename
 from app.api.messages import messages_bp
 from app.services.chat_services import main_chat_service
+from app.services.data_services.chat_service import chat_service
 from app.services.auth.rbac import get_request_identity
 from app.services.integrations.claude.claude_service import (
     set_current_user_email,
     tag_chat_thread,
 )
 from app.services.integrations.supabase import storage_service
+from app.utils.error_responses import error_response
 
 
 _STREAM_SENTINEL = object()
@@ -55,6 +59,11 @@ _STREAM_SENTINEL = object()
 # fix prevents the rapid-click case; this server-side guard is the
 # defense-in-depth for cross-tab, browser-retry, and any future caller
 # paths that bypass the UI lock.
+#
+# Caveat: this set is per-gunicorn-worker. With workers > 1 the dedup
+# only catches duplicates that happen to hash to the same worker.
+# That's a pre-existing limitation; the §2.1 marker uses Supabase
+# instead precisely to avoid this trap.
 _in_flight_chats: set = set()
 _in_flight_lock = threading.Lock()
 
@@ -264,11 +273,7 @@ def send_message(project_id, chat_id):
             'error': str(e)
         }), 404
     except Exception as e:
-        current_app.logger.error(f"Error sending message: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return error_response(e, default_log="Error sending message")
 
 
 @messages_bp.route('/projects/<project_id>/chats/<chat_id>/messages/stream', methods=['POST'])
@@ -311,13 +316,22 @@ def stream_message(project_id, chat_id):
     # of an in-flight stream (a few dozen events queued at most), so a normal
     # slow consumer just back-pressures the worker via the blocking put.
     event_queue: "queue.Queue[object]" = queue.Queue(maxsize=512)
-    # Cancel flag — set when the SSE generator is closed (client disconnect /
-    # frontend AbortController). Plumbed into the chat service so the
-    # assistant message isn't persisted after the user clicks Stop. Without
-    # this, Flask's stream_with_context keeps the worker thread running and
-    # we'd write the half-baked response to DB, producing the "two answers
-    # on resend" symptom Neel reported.
+    # Two flags, distinct semantics:
+    #
+    # - cancel_event: short-circuit signal for the agent loop. Set when EITHER
+    #   the user clicked Stop OR the proxy/browser closed the SSE connection.
+    #   In both cases the worker should stop persisting tool calls and final
+    #   text — without this, Flask's stream_with_context keeps the worker
+    #   thread running and we'd write a half-baked response (the "two answers
+    #   on resend" symptom).
+    #
+    # - user_stop_event: labeling signal. Set ONLY when /messages/stop was
+    #   posted (the user explicitly clicked Stop in the UI). Drives the
+    #   "(stopped by user)" suffix in main_chat_service. Without this flag,
+    #   a proxy idle-timeout (Coolify/nginx) silently mislabeled real
+    #   responses as user-stopped — that's Delta's Symptom 9.
     cancel_event = threading.Event()
+    user_stop_event = threading.Event()
 
     def emit(event_name: str, payload: dict) -> None:
         # After the client has disconnected, nothing reads the queue — drop
@@ -349,6 +363,7 @@ def stream_message(project_id, chat_id):
                 user_id=user_id,
                 on_event=emit,
                 cancel_event=cancel_event,
+                user_stop_event=user_stop_event,
             )
         except ValueError as exc:
             emit("error", {"message": str(exc)})
@@ -363,10 +378,30 @@ def stream_message(project_id, chat_id):
             # has already torn down due to GeneratorExit.
             with _in_flight_lock:
                 _in_flight_chats.discard(chat_id)
+            # No explicit clear of chats.user_stopped_at: the freshness
+            # check in GeneratorExit (stop-timestamp > stream-start) means
+            # a stale value from a previous message never triggers a
+            # false positive on the next stream.
             event_queue.put(_STREAM_SENTINEL)
 
     thread = threading.Thread(target=worker, daemon=True)
     thread.start()
+
+    # Tracking state for SSE_CLOSE_TRACE — answers the central question
+    # behind Symptom 9 ("stopped by user when not actually stopped"):
+    # was the disconnect a proxy timeout (elapsed >> 0, heartbeats fired)
+    # or a real user abort (elapsed ~0, no heartbeats needed)?
+    #
+    # `stream_started_wallclock` is the wall-clock anchor we compare
+    # against `chats.user_stopped_at` to decide whether a /stop signal
+    # arrived DURING this stream (real user-stop) or was left over from
+    # a previous message (stale — ignore). monotonic() is used for
+    # latency math because it's immune to clock jumps; wall-clock is
+    # used for the cross-row comparison because that's what the DB has.
+    stream_started_at = time.monotonic()
+    stream_started_wallclock = datetime.now(timezone.utc)
+    last_event_at = stream_started_at
+    heartbeat_count = 0
 
     def generate():
         # Heartbeat keeps the SSE connection alive while long-running tools
@@ -376,20 +411,61 @@ def stream_message(project_id, chat_id):
         # the worker mislabels the response as "(stopped by user)". The colon
         # prefix is an SSE comment — browsers ignore it but the bytes prevent
         # idle-timeout.
+        nonlocal last_event_at, heartbeat_count
         try:
             while True:
                 try:
                     item = event_queue.get(timeout=15)
                 except queue.Empty:
+                    heartbeat_count += 1
                     yield ": heartbeat\n\n"
                     continue
                 if item is _STREAM_SENTINEL:
                     break
+                last_event_at = time.monotonic()
                 yield item
         except GeneratorExit:
-            # Client disconnected (browser navigation, AbortController, etc.).
-            # Tell the worker to stop persisting before re-raising so Flask
-            # can clean up the response.
+            # Connection closed for one of three reasons:
+            #   1. User explicitly clicked Stop in the UI (POST /messages/stop
+            #      wrote chats.user_stopped_at = NOW()).
+            #   2. The user navigated away or closed the tab (browser
+            #      aborts the fetch).
+            #   3. The proxy (Coolify/nginx) gave up on an idle SSE
+            #      connection despite our 15s heartbeats.
+            #
+            # cancel_event is set in all three cases — the worker stops
+            # persisting. user_stop_event is set ONLY in case 1, so the
+            # final assistant message only gets the "(stopped by user)"
+            # label when that's actually what happened.
+            #
+            # Cross-worker correctness: chats.user_stopped_at is in
+            # Supabase, so the POST /messages/stop on worker A and the
+            # SSE worker on worker B see the same source of truth. The
+            # in-process set we used pre-H2 only worked when workers=1.
+            # Freshness check: a stop timestamp from BEFORE this stream
+            # started is from a previous message — ignore it (M1 race).
+            user_stopped_at_iso = chat_service.get_user_stopped_at(chat_id)
+            was_user_stop = False
+            if user_stopped_at_iso:
+                try:
+                    user_stopped_at = datetime.fromisoformat(
+                        user_stopped_at_iso.replace("Z", "+00:00")
+                    )
+                    was_user_stop = user_stopped_at > stream_started_wallclock
+                except (ValueError, TypeError):
+                    # Malformed timestamp — conservative default: not user-stop.
+                    was_user_stop = False
+            if was_user_stop:
+                user_stop_event.set()
+            now = time.monotonic()
+            app.logger.warning(
+                "SSE_CLOSE_TRACE chat=%s reason=%s elapsed_total=%.2fs "
+                "elapsed_since_last_event=%.2fs heartbeats_sent=%d",
+                chat_id,
+                "user_stop" if was_user_stop else "connection_dropped",
+                now - stream_started_at,
+                now - last_event_at, heartbeat_count,
+            )
             cancel_event.set()
             raise
 
@@ -400,3 +476,37 @@ def stream_message(project_id, chat_id):
         "X-Accel-Buffering": "no",
     }
     return Response(stream_with_context(generate()), headers=headers)
+
+
+@messages_bp.route('/projects/<project_id>/chats/<chat_id>/messages/stop', methods=['POST'])
+def stop_message(project_id, chat_id):
+    """
+    Explicit "user clicked Stop" signal.
+
+    Writes `chats.user_stopped_at = NOW()` (scoped to project_id, so a
+    user can't poison another tenant's chat). When the SSE GeneratorExit
+    fires immediately after — because the frontend also aborts the
+    AbortController — the worker reads `user_stopped_at` and compares
+    against its own stream-start wall-clock to decide whether to apply
+    the "(stopped by user)" label.
+
+    The DB is the source of truth because gunicorn workers don't share
+    memory: POST /messages/stop and POST /messages/stream commonly land
+    on different workers. The pre-H2 in-process set worked only when
+    workers=1.
+
+    Idempotent — repeated POSTs just rewrite the timestamp. 404 when the
+    project doesn't own the chat (the SQL WHERE clause filters cross-
+    project writes; mirrors the verify_project_access blueprint hook on
+    messages_bp at the chat level).
+    """
+    try:
+        updated = chat_service.mark_user_stopped(project_id, chat_id)
+    except Exception as e:
+        return error_response(e, default_log=f"Error marking chat {chat_id} as user-stopped")
+    if not updated:
+        return jsonify({
+            "success": False,
+            "error": "Chat not found or not accessible.",
+        }), 404
+    return jsonify({"success": True}), 200
