@@ -266,57 +266,47 @@ def validate_token() -> Optional[str]:
         _cache_token(token, user_id)
         return user_id
     except Exception as e:
-        # GoTrue itself raised (network blip, container restart, rate limit).
-        # Before §2.3, this short-circuited to None → 401 → frontend kicked
-        # the user out. With JWT_SECRET unset (a common self-hosted misconfig
-        # at Delta) the fast-path fail-open isn't available — so we re-create
-        # its effect HERE by decoding the JWT for its `sub` claim WITHOUT
-        # signature verification. Expiry is still enforced so a stale token
-        # can't ride this branch.
-        #
-        # Security note: we only reach this path AFTER auth.get_user(token)
-        # has already failed for non-credential reasons. The alternative is
-        # "log the user out on every GoTrue hiccup", which is strictly worse
-        # — the user re-signs-in with the same token immediately.
-        try:
-            # algorithms=[...] is required by PyJWT 3.x and emits a deprecation
-            # warning in some 2.x builds when omitted, even with
-            # verify_signature=False (signature isn't actually verified here —
-            # we just need PyJWT to forward-compile cleanly). Both supabase
-            # GoTrue and our own JWT_SECRET use HS256; RS256 is included as
-            # belt-and-braces for any future migration to asymmetric keys.
-            unverified = jwt.decode(
-                token,
-                algorithms=["HS256", "RS256"],
-                options={
-                    "verify_signature": False,
-                    "verify_aud": False,
-                    "verify_exp": True,
-                },
-            )
-            user_id_unverified = unverified.get("sub")
-            if user_id_unverified:
-                logger.warning(
-                    "AUTH_401_TRACE branch=slow_failopen err=%s:%s token_suffix=%s ttl=%ds",
-                    type(e).__name__, str(e)[:120], token[-12:], _TOKEN_CACHE_TTL,
+        # GoTrue raised (network blip, container restart, rate limit). To avoid
+        # logging real users out on a transient outage we fail-open — but only
+        # if we can locally verify the JWT signature. Without signature verify,
+        # any attacker can forge `sub=<victim_uuid>` and impersonate any user
+        # for the duration of the outage, so accepting unsigned tokens here is
+        # not safe.
+        if _JWT_SECRET:
+            try:
+                verified = jwt.decode(
+                    token,
+                    _JWT_SECRET,
+                    algorithms=["HS256"],
+                    options={"verify_aud": False, "verify_exp": True},
                 )
-                user_id_unverified = str(user_id_unverified)
-                _cache_token(token, user_id_unverified)
-                return user_id_unverified
-        except Exception as decode_exc:
-            # Token is structurally invalid OR expired — fall through to the
-            # original "return None" so the user really is asked to sign in.
-            logger.warning(
-                "AUTH_401_TRACE branch=slow_failopen_rejected err=%s:%s decode_err=%s:%s token_suffix=%s",
-                type(e).__name__, str(e)[:80],
-                type(decode_exc).__name__, str(decode_exc)[:80],
-                token[-12:],
-            )
-            return None
+                user_id_verified = verified.get("sub")
+                if user_id_verified:
+                    user_id_verified = str(user_id_verified)
+                    logger.warning(
+                        "AUTH_401_TRACE branch=slow_failopen_verified err=%s:%s token_suffix=%s ttl=%ds",
+                        type(e).__name__, str(e)[:120], token[-12:], _TOKEN_CACHE_TTL,
+                    )
+                    _cache_token(token, user_id_verified)
+                    return user_id_verified
+            except Exception as decode_exc:
+                logger.warning(
+                    "AUTH_401_TRACE branch=slow_failopen_rejected err=%s:%s decode_err=%s:%s token_suffix=%s",
+                    type(e).__name__, str(e)[:80],
+                    type(decode_exc).__name__, str(decode_exc)[:80],
+                    token[-12:],
+                )
+                return None
 
-        # `sub` was missing despite a clean decode — same fall-through.
-        logger.warning(
-            "AUTH_401_TRACE branch=slow_exception err=%s:%s token_suffix=%s",
+        # JWT_SECRET not configured: we cannot verify the signature locally,
+        # so we fail closed. Genuine users with a recently-validated token are
+        # still served from the cache above (line ~248); only callers whose
+        # cache entry has expired (or who never had one) see a 401. Operators
+        # running self-hosted Supabase should set JWT_SECRET to opt back into
+        # signature-verified fail-open during outages.
+        logger.error(
+            "AUTH_401_TRACE branch=slow_failclosed err=%s:%s token_suffix=%s — "
+            "JWT_SECRET unset, refusing to accept unverified token",
             type(e).__name__, str(e)[:120], token[-12:],
         )
         return None
