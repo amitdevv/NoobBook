@@ -528,14 +528,29 @@ class ChatsAPI {
    * Symptom 9. We POST this BEFORE calling abort() on the AbortController
    * so the marker is in the server-side set when GeneratorExit fires.
    *
-   * Idempotent + non-blocking: failures are swallowed so the abort() that
-   * follows still runs (the worst case is the response gets labeled as a
-   * proxy-disconnect — still better than the old behaviour).
+   * Bounded wait: `timeout: 1500ms` is what makes this safe to await from
+   * `ChatPanel.handleStop`. Without it, if Supabase is unreachable (the
+   * exact burst-load scenario this whole PR exists to handle), the
+   * backend's `mark_user_stopped` Supabase write hangs for the OS socket
+   * default (30-120s on Linux). Awaiting that would freeze handleStop
+   * — and the abort() that comes after — for up to two minutes, during
+   * which the SSE stream keeps running and the worker keeps burning
+   * Claude tokens on a request the user has already cancelled.
+   *
+   * 1.5s is a comfortable upper bound for healthy Supabase: production
+   * round-trips are 50-200ms typical. If we exceed 1.5s, the catch
+   * block fires, handleStop's await unblocks, and abort() runs. Worst
+   * case: the assistant message gets labeled "connection_dropped"
+   * instead of "stopped by user" — UX wart, not data loss.
+   *
+   * Idempotent — repeated calls just overwrite chats.user_stopped_at.
    */
   async stopMessage(projectId: string, chatId: string): Promise<void> {
     try {
       await axios.post(
-        `${API_BASE_URL}/projects/${projectId}/chats/${chatId}/messages/stop`
+        `${API_BASE_URL}/projects/${projectId}/chats/${chatId}/messages/stop`,
+        undefined,
+        { timeout: 1500 },
       );
     } catch (error) {
       log.warn({ err: error }, 'failed to signal stop (proceeding with abort)');
