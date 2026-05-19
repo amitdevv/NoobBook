@@ -136,6 +136,17 @@ def create_app(config_name='development'):
     except Exception as exc:
         app.logger.warning("Failed to start insight scheduler: %s", exc)
 
+    # Start the log housekeeping scheduler. Daemon thread; one tick every
+    # hour; clears the rotating log files once a week (admin can disable
+    # via Settings → Logs → "Auto-clear logs weekly").
+    try:
+        from app.services.background_services.log_housekeeping_scheduler import (
+            log_housekeeping_scheduler,
+        )
+        log_housekeeping_scheduler.start()
+    except Exception as exc:
+        app.logger.warning("Failed to start log housekeeping scheduler: %s", exc)
+
     # Log successful initialization
     app.logger.info(f"✅ {app.config['APP_NAME']} backend initialized successfully")
 

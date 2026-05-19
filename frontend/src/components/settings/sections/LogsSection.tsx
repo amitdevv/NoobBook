@@ -7,11 +7,87 @@
  * what they're sharing.
  *
  * Behavior + content all come from `useLogsState` and `LogConsole` so
- * the modal and this section can never drift out of sync.
+ * the modal and this section can never drift out of sync. This file
+ * additionally hosts the admin-only "Auto-clear logs weekly" toggle
+ * since the housekeeping setting is global, not per-user.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { LogConsole } from '@/components/project/LogConsole';
 import { useLogsState } from '@/components/project/useLogsState';
+import { DownloadLogsConfirmDialog } from '@/components/project/DownloadLogsConfirmDialog';
+import { logsAPI, type LogHousekeeping } from '@/lib/api/logs';
+import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/components/ui/use-toast';
+import { createLogger } from '@/lib/logger';
+import { getAdminMode } from '@/lib/adminMode';
+
+const log = createLogger('logs-section');
+
+const LogHousekeepingCard: React.FC = () => {
+  const { success, error } = useToast();
+  const [config, setConfig] = useState<LogHousekeeping | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await logsAPI.getHousekeeping();
+        if (!cancelled) setConfig(res);
+      } catch (e) {
+        log.warn({ err: e }, 'failed to load housekeeping config');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleToggle = async (next: boolean) => {
+    if (!config) return;
+    setSaving(true);
+    try {
+      const updated = await logsAPI.setHousekeeping({ weekly_clear_enabled: next });
+      setConfig(updated);
+      success(next ? 'Weekly log auto-clear enabled' : 'Weekly log auto-clear disabled');
+    } catch (e) {
+      log.error({ err: e }, 'failed to update housekeeping');
+      error('Could not update log housekeeping setting');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-md border border-stone-200 bg-white p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-medium text-stone-900">
+            Auto-clear logs weekly
+          </h3>
+          <p className="mt-1 text-xs text-stone-600 max-w-prose">
+            Truncates the rotating <code>backend.log</code> files and removes
+            archives once every 7 days so the deployment doesn&apos;t accrue
+            stale diagnostics indefinitely.
+          </p>
+          {config?.last_run_at && (
+            <p className="mt-2 text-xs text-stone-500">
+              Last cleared automatically: {new Date(config.last_run_at).toLocaleString()}
+            </p>
+          )}
+        </div>
+        <Switch
+          // PUT /logs/housekeeping is admin-only — disable for non-admins
+          // so they can still see the card's last-cleared timestamp without
+          // clicking into a confusing 403.
+          checked={config?.weekly_clear_enabled ?? false}
+          disabled={!config || saving || !getAdminMode()}
+          onCheckedChange={handleToggle}
+        />
+      </div>
+    </div>
+  );
+};
 
 export const LogsSection: React.FC = () => {
   const state = useLogsState({ active: true });
@@ -28,6 +104,8 @@ export const LogsSection: React.FC = () => {
         </p>
       </header>
 
+      <LogHousekeepingCard />
+
       <LogConsole
         variant="page"
         panelMaxHeightClassName="max-h-[58vh]"
@@ -41,6 +119,15 @@ export const LogsSection: React.FC = () => {
         onCopy={state.handleCopy}
         onDownload={state.handleDownload}
         onClear={state.handleClear}
+      />
+
+      <DownloadLogsConfirmDialog
+        open={state.downloadDialogOpen}
+        onOpenChange={state.setDownloadDialogOpen}
+        deleteAfterDownload={state.deleteAfterDownload}
+        onDeleteAfterDownloadChange={state.setDeleteAfterDownload}
+        onConfirm={state.confirmDownload}
+        canDelete={state.canDeleteLogs}
       />
     </div>
   );

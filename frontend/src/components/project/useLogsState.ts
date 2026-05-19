@@ -9,11 +9,12 @@
  * The two callers differ only in chrome (Dialog vs settings page
  * layout) — every interaction is delegated here.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { logsAPI, type LogLine } from '@/lib/api/logs';
 import { copyToClipboard } from '@/lib/clipboard';
 import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
+import { getAdminMode } from '@/lib/adminMode';
 
 const log = createLogger('logs-state');
 
@@ -31,12 +32,24 @@ interface UseLogsStateOpts {
 }
 
 export function useLogsState({ active = true }: UseLogsStateOpts = {}) {
+  // /logs/clear is admin-only on the backend (a non-admin's POST would
+  // 403). Surface the same gate to the UI so the "Delete logs after
+  // download" checkbox only renders for admins — non-admins still see
+  // the confirmation dialog but without the destructive option.
+  const canDeleteLogs = getAdminMode();
   const { toasts, dismissToast, success, error } = useToast();
   const [lines, setLines] = useState<LogLine[]>([]);
   const [filter, setFilter] = useState<LevelFilter>('errors');
   const [loading, setLoading] = useState(false);
   const [logFilePresent, setLogFilePresent] = useState(true);
   const [confirmingClear, setConfirmingClear] = useState(false);
+
+  // Download-bundle confirmation dialog state. Lives in this hook (not
+  // in LogsModal/LogsSection) so both surfaces share the same flow.
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [deleteAfterDownload, setDeleteAfterDownload] = useState(false);
+  // Snapshot of the persisted value so we only PUT when the user changed it.
+  const persistedDeleteAfterDownload = useRef<boolean>(false);
 
   const loadLines = useCallback(async () => {
     setLoading(true);
@@ -58,6 +71,29 @@ export function useLogsState({ active = true }: UseLogsStateOpts = {}) {
     loadLines();
   }, [active, loadLines]);
 
+  // Load the user's "auto-delete on download" preference once the
+  // surface activates so the checkbox is pre-set the first time the
+  // download dialog opens. Skipped for non-admins: they can't delete
+  // logs so the preference would be inert and the GET is wasted work.
+  useEffect(() => {
+    if (!active || !canDeleteLogs) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const prefs = await logsAPI.getPreferences();
+        if (cancelled) return;
+        persistedDeleteAfterDownload.current = prefs.auto_delete_on_download;
+        setDeleteAfterDownload(prefs.auto_delete_on_download);
+      } catch (e) {
+        // Non-fatal — checkbox just stays unchecked.
+        log.warn({ err: e }, 'failed to load log preferences');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [active, canDeleteLogs]);
+
   const formatLines = useMemo(
     () =>
       lines
@@ -76,14 +112,56 @@ export function useLogsState({ active = true }: UseLogsStateOpts = {}) {
     else error('Could not copy. Select the text manually.');
   }, [lines, formatLines, success, error]);
 
+  /**
+   * Open the download confirmation dialog instead of starting the
+   * download immediately. The actual download + (optional) clear runs in
+   * `confirmDownload` once the user clicks the dialog's Download button.
+   */
   const handleDownload = useCallback(() => {
-    // Browser download via anchor; getAuthUrl puts the JWT in the query
-    // string because <a download> can't set Authorization headers.
+    setDownloadDialogOpen(true);
+  }, []);
+
+  const confirmDownload = useCallback(async () => {
+    setDownloadDialogOpen(false);
+
+    // Start the browser download via anchor (JWT in the query string).
     const a = document.createElement('a');
     a.href = logsAPI.bundleUrl();
     a.rel = 'noopener';
     a.click();
-  }, []);
+
+    // Persist the checkbox state if it changed. Fire-and-forget — a
+    // preference write failure shouldn't block the bundle download.
+    // Skipped for non-admins since they can't act on the preference
+    // anyway (and the backend write succeeds but is then unused).
+    if (canDeleteLogs && deleteAfterDownload !== persistedDeleteAfterDownload.current) {
+      logsAPI
+        .setPreferences({ auto_delete_on_download: deleteAfterDownload })
+        .then(() => {
+          persistedDeleteAfterDownload.current = deleteAfterDownload;
+        })
+        .catch((e) => {
+          log.warn({ err: e }, 'failed to persist log preference');
+        });
+    }
+
+    // If the user opted in, wait briefly so the browser has time to
+    // begin streaming the ZIP, then clear the server-side logs. The
+    // canDeleteLogs guard is defense-in-depth — the checkbox is hidden
+    // for non-admins so deleteAfterDownload should already be false.
+    if (canDeleteLogs && deleteAfterDownload) {
+      window.setTimeout(async () => {
+        try {
+          await logsAPI.clear();
+          success('Logs cleared from server');
+          await loadLines();
+        } catch (e) {
+          log.error({ err: e }, 'failed to clear logs after download');
+          error('Could not clear logs after download');
+        }
+      }, 1500);
+    }
+  }, [deleteAfterDownload, loadLines, success, error]);
 
   const handleClear = useCallback(async () => {
     if (!confirmingClear) {
@@ -117,6 +195,13 @@ export function useLogsState({ active = true }: UseLogsStateOpts = {}) {
     handleCopy,
     handleDownload,
     handleClear,
+    // Download confirmation dialog state.
+    downloadDialogOpen,
+    setDownloadDialogOpen,
+    deleteAfterDownload,
+    setDeleteAfterDownload,
+    confirmDownload,
+    canDeleteLogs,
     // Toast plumbing — the consumer mounts <ToastContainer /> with these.
     toasts,
     dismissToast,
