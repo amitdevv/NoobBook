@@ -17,6 +17,9 @@ from app.api.logs import logs_bp
 from app.api.logs.bundle import build_bundle
 from app.api.logs.redaction import redact_line
 from app.services.auth.rbac import require_admin, require_auth
+from app.services.data_services.user_service import get_user_service
+from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+from app.services.log_service import clear_logs as clear_logs_service
 from app.utils import logger as logger_module
 
 logger = logging.getLogger(__name__)
@@ -124,34 +127,163 @@ def download_bundle():
 
 
 @logs_bp.route("/logs/clear", methods=["POST"])
-@require_admin
+@require_auth
 def clear_logs():
     """Truncate the active log file and remove rotated archives.
 
-    Useful when the admin wants a clean window before reproducing a bug
-    so the bundle they ship contains only the relevant noise.
+    Gated `require_auth` (not `require_admin`) because the matching
+    `/logs/bundle` download is `require_auth` too — any user who can pull
+    the logs can also wipe them in this single-tenant deployment. The
+    audit log records who triggered the clear so a wipe is still
+    attributable.
     """
-    log_file = logger_module.LOG_FILE
-    if log_file is None or not log_file.parent.exists():
-        return jsonify({"success": True, "cleared": 0, "message": "no log file"}), 200
+    initiator = getattr(g, "user_id", None) or "user"
+    result = clear_logs_service(initiator=str(initiator))
+    if not result.get("success"):
+        return jsonify(result), 500
+    return jsonify(result), 200
 
-    cleared = 0
+
+# ---------------------------------------------------------------------------
+# Per-user "auto-delete on download" preference
+# ---------------------------------------------------------------------------
+
+_AUTO_DELETE_SETTINGS_KEY = "auto_delete_logs_on_download"
+
+
+@logs_bp.route("/logs/preferences", methods=["GET"])
+@require_auth
+def get_log_preferences():
+    """Return the current user's log-related preferences.
+
+    Right now only `auto_delete_on_download` — drives the pre-check of the
+    "Delete logs from server after download" checkbox in the bundle dialog.
+    """
+    user_id = getattr(g, "user_id", None)
+    if not user_id:
+        return jsonify({"success": False, "error": "missing user"}), 401
+    if not is_supabase_enabled():
+        return jsonify({"success": True, "auto_delete_on_download": False}), 200
+    settings = get_user_service().get_user_settings_raw(user_id)
+    return jsonify(
+        {
+            "success": True,
+            "auto_delete_on_download": bool(settings.get(_AUTO_DELETE_SETTINGS_KEY, False)),
+        }
+    ), 200
+
+
+@logs_bp.route("/logs/preferences", methods=["PUT"])
+@require_auth
+def update_log_preferences():
+    """Persist the user's log-download preferences in users.settings."""
+    user_id = getattr(g, "user_id", None)
+    if not user_id:
+        return jsonify({"success": False, "error": "missing user"}), 401
+    payload = request.get_json(silent=True) or {}
+    if "auto_delete_on_download" not in payload:
+        return jsonify(
+            {"success": False, "error": "auto_delete_on_download is required"}
+        ), 400
+    value = bool(payload.get("auto_delete_on_download"))
+    if not is_supabase_enabled():
+        # Best-effort no-op in self-hosted setups without Supabase auth.
+        return jsonify({"success": True, "auto_delete_on_download": value}), 200
+    saved = get_user_service().set_settings_key(
+        user_id, _AUTO_DELETE_SETTINGS_KEY, value
+    )
+    if not saved:
+        return jsonify({"success": False, "error": "could not persist preference"}), 500
+    return jsonify({"success": True, "auto_delete_on_download": value}), 200
+
+
+# ---------------------------------------------------------------------------
+# Global "auto-clear logs weekly" admin toggle
+# ---------------------------------------------------------------------------
+
+_HOUSEKEEPING_DEFAULT = {"weekly_clear_enabled": True, "last_run_at": None}
+
+
+def _read_housekeeping() -> dict[str, Any]:
+    if not is_supabase_enabled():
+        return dict(_HOUSEKEEPING_DEFAULT)
     try:
-        if log_file.exists():
-            log_file.write_text("", encoding="utf-8")
-            cleared += 1
-        for archive in log_file.parent.glob(f"{log_file.name}.*"):
-            try:
-                archive.unlink()
-                cleared += 1
-            except OSError as exc:
-                logger.warning("Could not delete archive %s: %s", archive, exc)
+        client = get_supabase()
+        resp = (
+            client.table("app_settings")
+            .select("log_housekeeping")
+            .eq("id", True)
+            .limit(1)
+            .execute()
+        )
     except Exception as exc:
-        logger.exception("Failed to clear logs")
-        return jsonify({"success": False, "error": str(exc)}), 500
+        logger.warning("Could not read app_settings.log_housekeeping: %s", exc)
+        return dict(_HOUSEKEEPING_DEFAULT)
+    rows = resp.data or []
+    if not rows:
+        return dict(_HOUSEKEEPING_DEFAULT)
+    return {**_HOUSEKEEPING_DEFAULT, **(rows[0].get("log_housekeeping") or {})}
 
-    logger.info("Log files cleared by admin (%d files)", cleared)
-    return jsonify({"success": True, "cleared": cleared}), 200
+
+@logs_bp.route("/logs/housekeeping", methods=["GET"])
+@require_auth
+def get_log_housekeeping():
+    """Return the global weekly-clear configuration.
+
+    Read is open to any authenticated user so non-admin users can still
+    see *when* the next auto-clear is due before they download a bundle.
+    """
+    config = _read_housekeeping()
+    return jsonify(
+        {
+            "success": True,
+            "weekly_clear_enabled": bool(config.get("weekly_clear_enabled", True)),
+            "last_run_at": config.get("last_run_at"),
+        }
+    ), 200
+
+
+@logs_bp.route("/logs/housekeeping", methods=["PUT"])
+@require_admin
+def update_log_housekeeping():
+    """Admin-only toggle of the weekly auto-clear scheduler."""
+    if not is_supabase_enabled():
+        return jsonify({"success": False, "error": "supabase not configured"}), 503
+    payload = request.get_json(silent=True) or {}
+    if "weekly_clear_enabled" not in payload:
+        return jsonify(
+            {"success": False, "error": "weekly_clear_enabled is required"}
+        ), 400
+    enabled = bool(payload.get("weekly_clear_enabled"))
+
+    config = _read_housekeeping()
+    new_value = {**config, "weekly_clear_enabled": enabled}
+    try:
+        client = get_supabase()
+        resp = (
+            client.table("app_settings")
+            .update({"log_housekeeping": new_value})
+            .eq("id", True)
+            .execute()
+        )
+    except Exception as exc:
+        logger.exception("Failed to update app_settings.log_housekeeping")
+        return jsonify({"success": False, "error": str(exc)}), 500
+    if not resp.data:
+        return jsonify({"success": False, "error": "no app_settings row"}), 500
+    initiator = getattr(g, "user_id", None) or "admin"
+    logger.info(
+        "Weekly log auto-clear toggled %s by %s",
+        "ENABLED" if enabled else "DISABLED",
+        initiator,
+    )
+    return jsonify(
+        {
+            "success": True,
+            "weekly_clear_enabled": enabled,
+            "last_run_at": new_value.get("last_run_at"),
+        }
+    ), 200
 
 
 @logs_bp.route("/logs/client", methods=["POST"])

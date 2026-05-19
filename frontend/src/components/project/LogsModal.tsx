@@ -26,6 +26,7 @@ import { Bug } from '@phosphor-icons/react';
 import { ToastContainer } from '../ui/toast';
 import { LogConsole } from './LogConsole';
 import { useLogsState } from './useLogsState';
+import { DownloadLogsConfirmDialog } from './DownloadLogsConfirmDialog';
 
 interface LogsModalProps {
   open: boolean;
@@ -73,6 +74,14 @@ export const LogsModal: React.FC<LogsModalProps> = ({ open, onOpenChange, canCle
         </div>
 
         <ToastContainer toasts={state.toasts} onDismiss={state.dismissToast} />
+
+        <DownloadLogsConfirmDialog
+          open={state.downloadDialogOpen}
+          onOpenChange={state.setDownloadDialogOpen}
+          deleteAfterDownload={state.deleteAfterDownload}
+          onDeleteAfterDownloadChange={state.setDeleteAfterDownload}
+          onConfirm={state.confirmDownload}
+        />
       </DialogContent>
     </Dialog>
   );
