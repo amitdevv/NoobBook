@@ -279,8 +279,15 @@ def validate_token() -> Optional[str]:
         # "log the user out on every GoTrue hiccup", which is strictly worse
         # — the user re-signs-in with the same token immediately.
         try:
+            # algorithms=[...] is required by PyJWT 3.x and emits a deprecation
+            # warning in some 2.x builds when omitted, even with
+            # verify_signature=False (signature isn't actually verified here —
+            # we just need PyJWT to forward-compile cleanly). Both supabase
+            # GoTrue and our own JWT_SECRET use HS256; RS256 is included as
+            # belt-and-braces for any future migration to asymmetric keys.
             unverified = jwt.decode(
                 token,
+                algorithms=["HS256", "RS256"],
                 options={
                     "verify_signature": False,
                     "verify_aud": False,
