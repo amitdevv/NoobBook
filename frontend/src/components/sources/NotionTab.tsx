@@ -21,7 +21,6 @@ import { Input } from '../ui/input';
 import { sourcesAPI, type NotionPickerItem } from '../../lib/api/sources';
 import { useToast } from '../ui/use-toast';
 import { createLogger } from '@/lib/logger';
-import { NotionSetupGuide } from './NotionSetupGuide';
 
 const log = createLogger('notion-tab');
 
@@ -164,16 +163,14 @@ export const NotionTab: React.FC<NotionTabProps> = ({ projectId, isAtLimit, onAd
 
   if (!configured) {
     return (
-      <div className="py-6 space-y-5">
-        <div className="flex flex-col items-center text-center">
-          <NotionLogo size={48} weight="duotone" className="text-muted-foreground mb-3" />
-          <h3 className="font-medium mb-1">Notion Not Configured</h3>
-          <p className="text-sm text-muted-foreground max-w-sm">
-            Notion needs a one-time setup before pages and databases can be
-            imported. Follow the steps below to get connected.
-          </p>
-        </div>
-        <NotionSetupGuide variant="full" />
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <NotionLogo size={48} weight="duotone" className="text-muted-foreground mb-4" />
+        <h3 className="font-medium mb-2">Notion Not Configured</h3>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          An administrator needs to add the Notion integration token in
+          Admin Settings → API Keys (<code>NOTION_API_KEY</code>) before
+          this can be used.
+        </p>
       </div>
     );
   }
@@ -230,11 +227,10 @@ export const NotionTab: React.FC<NotionTabProps> = ({ projectId, isAtLimit, onAd
             <CircleNotch size={20} className="animate-spin text-muted-foreground" />
           </div>
         ) : results.length === 0 ? (
-          <div className="py-6 px-4 space-y-4">
-            <p className="text-sm text-muted-foreground text-center">
-              No Notion {filter === 'all' ? 'pages or databases' : `${filter}s`} found.
-            </p>
-            <NotionSetupGuide variant="sharing" />
+          <div className="text-sm text-muted-foreground text-center py-8 px-4">
+            No Notion {filter === 'all' ? 'pages or databases' : `${filter}s`} found.
+            Make sure your Notion integration has been shared with the workspace
+            you want to import from.
           </div>
         ) : (
           <ul className="divide-y">
