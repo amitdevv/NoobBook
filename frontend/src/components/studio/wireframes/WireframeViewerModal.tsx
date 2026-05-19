@@ -5,7 +5,7 @@
  * Supports iterative editing via an edit input bar.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,8 +13,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PencilSimple } from '@phosphor-icons/react';
-import { WireframeViewer } from './WireframeViewer';
 import type { WireframeJob } from '@/lib/api/studio/wireframes';
+
+// WireframeViewer pulls in @excalidraw/excalidraw (~1.2 MB minified —
+// the largest single dep in the dep graph). Defer until the modal opens.
+// Pre-fix, every user downloaded excalidraw on first page load even if
+// they never viewed a wireframe.
+const WireframeViewer = lazy(() =>
+  import('./WireframeViewer').then((m) => ({ default: m.WireframeViewer })),
+);
 
 interface WireframeViewerModalProps {
   job: WireframeJob | null;
@@ -79,7 +86,15 @@ export const WireframeViewerModal: React.FC<WireframeViewerModalProps> = ({
 
         {/* Wireframe viewer - Excalidraw needs explicit non-zero dimensions */}
         <div style={{ flex: 1, height: 'calc(92vh - 50px)', width: '100%' }}>
-          <WireframeViewer elements={job.elements} />
+          <Suspense
+            fallback={
+              <div className="h-full flex items-center justify-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+              </div>
+            }
+          >
+            <WireframeViewer elements={job.elements} />
+          </Suspense>
         </div>
 
         {/* Edit input */}

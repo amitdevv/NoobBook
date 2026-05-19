@@ -5,7 +5,7 @@
  * Supports iterative editing via an edit input bar.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,8 +13,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PencilSimple } from '@phosphor-icons/react';
-import { FlowDiagramViewer } from './FlowDiagramViewer';
 import type { FlowDiagramJob } from '@/lib/api/studio';
+
+// FlowDiagramViewer pulls in mermaid (~500 KB minified). Defer until the
+// modal opens — pre-fix, every user paid for mermaid up-front even when
+// they never opened a flow diagram. After this split, the chunk only
+// loads when the user clicks a flow diagram tile.
+const FlowDiagramViewer = lazy(() =>
+  import('./FlowDiagramViewer').then((m) => ({ default: m.FlowDiagramViewer })),
+);
 
 interface FlowDiagramViewerModalProps {
   job: FlowDiagramJob | null;
@@ -81,10 +88,18 @@ export const FlowDiagramViewerModal: React.FC<FlowDiagramViewerModalProps> = ({
 
         {/* Full diagram viewer area */}
         <div className="flex-1 overflow-hidden">
-          <FlowDiagramViewer
-            mermaidSyntax={job.mermaid_syntax}
-            description={job.description || undefined}
-          />
+          <Suspense
+            fallback={
+              <div className="h-full flex items-center justify-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+              </div>
+            }
+          >
+            <FlowDiagramViewer
+              mermaidSyntax={job.mermaid_syntax}
+              description={job.description || undefined}
+            />
+          </Suspense>
         </div>
 
         {/* Edit input */}

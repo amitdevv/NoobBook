@@ -5,7 +5,7 @@
  * and manages chat state and API interactions.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Sparkle } from '@phosphor-icons/react';
 import axios from 'axios';
 import { Skeleton } from '../ui/skeleton';
@@ -22,7 +22,11 @@ import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { ChatList } from './ChatList';
 import { ChatEmptyState } from './ChatEmptyState';
-import { RawMessageView } from './RawMessageView';
+// RawMessageView pulls in react-syntax-highlighter — sizeable, and only
+// used when the user toggles into Raw debug mode (rare). Defer until then.
+const RawMessageView = lazy(() =>
+  import('./RawMessageView').then((m) => ({ default: m.RawMessageView })),
+);
 import { exportChatAsPdf } from '@/lib/exportChatPdf';
 import { createLogger } from '@/lib/logger';
 import { API_BASE_URL, extractServerError } from '@/lib/api/client';
@@ -1222,7 +1226,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       />
 
       {rawMode && activeChat ? (
-        <RawMessageView projectId={projectId} chatId={activeChat.id} />
+        <Suspense
+          fallback={
+            <div className="flex-1 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+            </div>
+          }
+        >
+          <RawMessageView projectId={projectId} chatId={activeChat.id} />
+        </Suspense>
       ) : (
         <ChatMessages
           messages={activeChat?.messages || []}

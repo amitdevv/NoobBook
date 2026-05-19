@@ -1,22 +1,49 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
-import { Dashboard, CreateProjectDialog } from './components/dashboard';
-import { ProjectWorkspace } from './components/project';
+import { CreateProjectDialog } from './components/dashboard';
 
 import { projectsAPI } from './lib/api';
-import { AuthPage } from './components/auth/AuthPage';
 import { authAPI } from './lib/api/auth';
 import { createLogger } from '@/lib/logger';
 import { PermissionsProvider } from './contexts/PermissionsContext';
 import { IntegrationsProvider } from './contexts/IntegrationsContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { ShareWorkspace } from './components/share/ShareWorkspace';
 import { GlobalLogsModalGate } from './components/project/GlobalLogsModalGate';
 import { setAdminMode, SESSION_EXPIRED_EVENT } from './lib/adminMode';
 import { useToast } from './components/ui/use-toast';
 import { ToastContainer } from './components/ui/toast';
 import { TutorialProvider } from './contexts/TutorialContext';
 import { OnboardingTutorial } from './components/onboarding';
+
+// Route-level code-splitting — each lazy-loaded chunk only downloads when
+// its route is visited. Pre-PR, Dashboard visitors paid for ProjectWorkspace
+// + ChatPanel + StudioPanel + SourcesPanel + all transitive heavy deps
+// (mermaid, excalidraw, blocknote, jspdf) up front. After this split,
+// they only download the Dashboard chunk + the small entry shell. Pattern
+// matches the existing precedent at
+// `components/sources/preview/SourcePreviewSheet.tsx:39-46`.
+//
+// CreateProjectDialog stays eager — it's tiny and used immediately on
+// Dashboard for the "+ New Project" button.
+const Dashboard = lazy(() =>
+  import('./components/dashboard/Dashboard').then((m) => ({ default: m.Dashboard })),
+);
+const ProjectWorkspace = lazy(() =>
+  import('./components/project/ProjectWorkspace').then((m) => ({ default: m.ProjectWorkspace })),
+);
+const AuthPage = lazy(() =>
+  import('./components/auth/AuthPage').then((m) => ({ default: m.AuthPage })),
+);
+const ShareWorkspace = lazy(() =>
+  import('./components/share/ShareWorkspace').then((m) => ({ default: m.ShareWorkspace })),
+);
+
+/** Shared full-screen spinner — matches the auth-ready fallback below. */
+const FullScreenSpinner = () => (
+  <div className="h-screen flex items-center justify-center bg-background">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+  </div>
+);
 
 const log = createLogger('app');
 
@@ -288,11 +315,7 @@ function App() {
   }, []);
 
   if (!authReady) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
+    return <FullScreenSpinner />;
   }
 
   // Share viewer routes are reachable without a JWT (public share links).
@@ -303,7 +326,13 @@ function App() {
     typeof window !== 'undefined' && window.location.pathname.startsWith('/share/');
 
   if (authRequired && !isAuthenticated && !isShareRoute) {
-    return <AuthPage onAuthenticated={refreshAuth} />;
+    // AuthPage is now lazy — wrap in Suspense so its chunk load shows the
+    // spinner rather than blank screen.
+    return (
+      <Suspense fallback={<FullScreenSpinner />}>
+        <AuthPage onAuthenticated={refreshAuth} />
+      </Suspense>
+    );
   }
 
   return (
@@ -311,43 +340,49 @@ function App() {
       <PermissionsProvider>
         <IntegrationsProvider>
           <BrowserRouter>
-            <Routes>
-            {/* Shared project (read-only). Mounted before /projects so
-                public-link viewers don't need a JWT to reach it. */}
-            <Route path="/share/:token" element={<ShareWorkspace />} />
+            {/* One Suspense boundary wraps all routes — every <Route> below
+                has a lazy-loaded element. The first navigation to each route
+                shows FullScreenSpinner while the chunk downloads; subsequent
+                navigations are instant (browser cache). */}
+            <Suspense fallback={<FullScreenSpinner />}>
+              <Routes>
+              {/* Shared project (read-only). Mounted before /projects so
+                  public-link viewers don't need a JWT to reach it. */}
+              <Route path="/share/:token" element={<ShareWorkspace />} />
 
-            {/* Project Workspace - URL-based routing */}
-            <Route
-              path="/projects/:projectId"
-              element={
-                <ProjectWorkspaceRoute
-                  setRefreshTrigger={setRefreshTrigger}
-                  isAuthenticated={isAuthenticated}
-                  isAdmin={isAdmin}
-                  onSignOut={handleSignOut}
-                />
-              }
-            />
+              {/* Project Workspace - URL-based routing */}
+              <Route
+                path="/projects/:projectId"
+                element={
+                  <ProjectWorkspaceRoute
+                    setRefreshTrigger={setRefreshTrigger}
+                    isAuthenticated={isAuthenticated}
+                    isAdmin={isAdmin}
+                    onSignOut={handleSignOut}
+                  />
+                }
+              />
 
-            {/* Dashboard - Home/root route */}
-            <Route
-              path="*"
-              element={
-                <AppContent
-                  showCreateDialog={showCreateDialog}
-                  setShowCreateDialog={setShowCreateDialog}
-                  refreshTrigger={refreshTrigger}
-                  setRefreshTrigger={setRefreshTrigger}
-                  isAdmin={isAdmin}
-                  isAuthenticated={isAuthenticated}
-                  onSignOut={handleSignOut}
-                  userId={userId}
-                  userEmail={userEmail}
-                  userRole={userRole}
-                />
-              }
-            />
-            </Routes>
+              {/* Dashboard - Home/root route */}
+              <Route
+                path="*"
+                element={
+                  <AppContent
+                    showCreateDialog={showCreateDialog}
+                    setShowCreateDialog={setShowCreateDialog}
+                    refreshTrigger={refreshTrigger}
+                    setRefreshTrigger={setRefreshTrigger}
+                    isAdmin={isAdmin}
+                    isAuthenticated={isAuthenticated}
+                    onSignOut={handleSignOut}
+                    userId={userId}
+                    userEmail={userEmail}
+                    userRole={userRole}
+                  />
+                }
+              />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
           {/* Single shared LogsModal mounted at the App root. Any toast
               that calls `errorWithLogs(...)` dispatches a window event
