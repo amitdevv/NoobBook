@@ -71,10 +71,12 @@ def _format_db_row(row: Dict[str, Any], row_body: str) -> str:
     title_value = ""
     other_props: List[Tuple[str, Any]] = []
     for k, v in props.items():
-        if isinstance(v, str) and not title_value:
-            # The first non-empty string is most likely the title; we keep
-            # heuristic-free behavior — just dump everything below.
+        if isinstance(v, str) and v and not title_value:
+            # Promote the first non-empty string property to the H1 title
+            # and *skip* re-emitting it in the Properties list below — otherwise
+            # the row's title would appear twice in every embedded page.
             title_value = v
+            continue
         other_props.append((k, v))
 
     header = f"# {title_value}" if title_value else "# (untitled row)"
@@ -163,7 +165,7 @@ def process_notion(
     source_id: str,
     source: Dict[str, Any],
     raw_file_path: Path,
-    source_service,
+    source_service: Any,
 ) -> Dict[str, Any]:
     """
     Process a Notion source by fetching live content and embedding it.

@@ -50,6 +50,17 @@ export const NotionTab: React.FC<NotionTabProps> = ({ projectId, isAtLimit, onAd
   // Debounce the search box so we don't fire on every keystroke.
   const debounceRef = useRef<number | null>(null);
 
+  // Clear any pending debounce on unmount so a search that fires after the
+  // sheet closes doesn't call setState on an unmounted component.
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {

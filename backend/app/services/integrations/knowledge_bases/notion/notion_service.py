@@ -331,12 +331,25 @@ class NotionService:
         if filter_type:
             payload["filter"] = {"value": filter_type, "property": "object"}
 
-        ok, raw_results, err = self._paginate_post('search', payload, page_size=min(limit, 100))
-        if not ok:
-            return {"success": False, "error": err or "Notion search failed"}
-
-        # Truncate to caller's requested limit after pagination so partial pages
-        # don't get over-fetched in pathological cases.
+        # Walk pages but bail as soon as we've collected `limit` results so a
+        # caller asking for 50 rows doesn't pull down 5000 just to discard 4950.
+        raw_results: List[Dict[str, Any]] = []
+        cursor: Optional[str] = None
+        for _ in range(MAX_PAGINATION_PAGES):
+            body: Dict[str, Any] = dict(payload)
+            body["page_size"] = min(limit, 100)
+            if cursor:
+                body["start_cursor"] = cursor
+            resp = self._make_request('search', method='POST', json_data=body)
+            if not resp.get("success"):
+                return {"success": False, "error": resp.get("error") or "Notion search failed"}
+            data = resp["data"]
+            raw_results.extend(data.get("results", []) or [])
+            if len(raw_results) >= limit or not data.get("has_more"):
+                break
+            cursor = data.get("next_cursor")
+            if not cursor:
+                break
         raw_results = raw_results[:limit]
 
         formatted_results: List[Dict[str, Any]] = []
