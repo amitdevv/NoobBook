@@ -246,19 +246,39 @@ def get_api_keys():
         }
     """
     try:
+        # One Supabase round-trip up front so we know which keys are in the
+        # persistent store vs only injected by the host (Coolify / compose).
+        # The distinction tells the UI whether to render a "Pinned by
+        # deployment" badge and disable the input.
+        from app.services.app_settings.api_key_store import api_key_store
+        db_keys = set(api_key_store.load_all().keys())
+
         api_keys = []
         for key_config in API_KEYS_CONFIG:
-            value = env_service.get_key(key_config['id'])
+            key_id = key_config['id']
+            value = env_service.get_key(key_id)
             masked_value = env_service.mask_key(value) if value else ''
 
+            in_db = key_id in db_keys
+            if not value:
+                source = 'unset'
+            elif in_db:
+                source = 'db'
+            else:
+                # Value is present in os.environ but the store doesn't have
+                # it — it was injected by the host environment and the UI
+                # cannot override it from here.
+                source = 'env'
+
             api_keys.append({
-                'id': key_config['id'],
+                'id': key_id,
                 'name': key_config['name'],
                 'description': key_config['description'],
                 'category': key_config['category'],
                 'required': key_config.get('required', False),
                 'value': masked_value,
-                'is_set': bool(value)
+                'is_set': bool(value),
+                'source': source,
             })
 
         return jsonify({

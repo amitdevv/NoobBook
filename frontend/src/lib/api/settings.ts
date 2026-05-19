@@ -18,6 +18,15 @@ export interface ApiKey {
   required?: boolean;
   value: string;
   is_set: boolean;
+  /**
+   * Where the current value came from. Older backends won't send this; treat
+   * undefined as the legacy default (editable).
+   *  - 'env':   injected by the host environment (docker-compose / Coolify).
+   *             Pinned — the UI cannot override or delete it from here.
+   *  - 'db':    persisted in Supabase via the UI — editable + deletable.
+   *  - 'unset': no value anywhere.
+   */
+  source?: 'env' | 'db' | 'unset';
 }
 
 export interface ApiKeyUpdate {
