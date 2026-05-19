@@ -161,7 +161,7 @@ export function useLogsState({ active = true }: UseLogsStateOpts = {}) {
         }
       }, 1500);
     }
-  }, [deleteAfterDownload, loadLines, success, error]);
+  }, [canDeleteLogs, deleteAfterDownload, loadLines, success, error]);
 
   const handleClear = useCallback(async () => {
     if (!confirmingClear) {

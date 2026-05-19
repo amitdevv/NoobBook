@@ -52,6 +52,15 @@ const LogHousekeepingCard: React.FC = () => {
       success(next ? 'Weekly log auto-clear enabled' : 'Weekly log auto-clear disabled');
     } catch (e) {
       log.error({ err: e }, 'failed to update housekeeping');
+      // 409 from the backend means the scheduler bumped last_run_at between
+      // our read and write. Re-fetch so the Switch snaps back to the real
+      // server state instead of lingering on the value the user attempted.
+      try {
+        const latest = await logsAPI.getHousekeeping();
+        setConfig(latest);
+      } catch (refreshErr) {
+        log.warn({ err: refreshErr }, 'failed to re-fetch housekeeping after error');
+      }
       error('Could not update log housekeeping setting');
     } finally {
       setSaving(false);
