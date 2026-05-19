@@ -95,6 +95,80 @@ type RefreshOutcome = 'success' | 'transient' | 'permanent';
 
 let refreshPromise: Promise<RefreshOutcome> | null = null;
 
+// ---------- Cross-tab refresh coordination ----------
+// The `refreshPromise` above dedups concurrent refreshes WITHIN a single tab.
+// When the same user is signed into NoobBook from multiple tabs / browsers
+// (production logs from 2026-05-18 captured Chrome-Mac + Firefox-Mac +
+// Chrome-Linux on the same Supabase user-id), each tab's `refreshPromise`
+// is independent. They race each other on the same refresh-token chain,
+// GoTrue rotates on whichever POST arrives first, and the loser gets
+// `refresh_token_already_used` → HTTP 401. Without cross-tab coordination
+// the loser then runs handlePermanentFailure → user kicked to login.
+//
+// Coordination strategy:
+//   - PROACTIVE: before firing /auth/refresh, check whether another tab
+//     just refreshed within `CROSS_TAB_FRESHNESS_MS`. If yes, skip the
+//     POST entirely — localStorage already has fresh tokens.
+//   - REACTIVE (load-bearing): if our /auth/refresh returns 401/403, check
+//     the same window. If yes, the 401 is a rotation-race loss, not a
+//     real auth failure — return 'success' (the winning tab's tokens are
+//     in localStorage) instead of 'permanent' (logout).
+//
+// Transport: BroadcastChannel('noobbook-auth') primary, `storage` event
+// fallback (Safari < 15.4 lacks BroadcastChannel). Both update the same
+// module-level timestamp.
+
+type AuthBroadcastMessage = { type: 'refresh_succeeded'; at: number };
+
+const AUTH_BROADCAST_CHANNEL = 'noobbook-auth';
+// Picked so the window covers: typical /auth/refresh round-trips are
+// 120–150 ms in production; we want comfortable margin for slow
+// connections without trusting hour-old refreshes from hibernated tabs.
+const CROSS_TAB_FRESHNESS_MS = 2_000;
+
+let lastOtherTabRefreshAt = 0;
+
+const authChannel: BroadcastChannel | null =
+  typeof BroadcastChannel !== 'undefined'
+    ? new BroadcastChannel(AUTH_BROADCAST_CHANNEL)
+    : null;
+
+if (authChannel) {
+  authChannel.addEventListener('message', (ev) => {
+    const msg = ev.data as AuthBroadcastMessage | undefined;
+    if (msg?.type === 'refresh_succeeded') {
+      lastOtherTabRefreshAt = msg.at;
+    }
+  });
+}
+
+// Storage-event fallback. Browsers fire `storage` on every tab EXCEPT the
+// one that performed the setItem — exactly the cross-tab notification
+// semantics we want, and the path Safari < 15.4 takes since it lacks
+// BroadcastChannel.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (ev) => {
+    if (ev.key === 'noobbook.access_token' && ev.newValue) {
+      lastOtherTabRefreshAt = Date.now();
+    }
+  });
+}
+
+function broadcastRefreshSucceeded(): void {
+  if (!authChannel) return;
+  authChannel.postMessage({
+    type: 'refresh_succeeded',
+    at: Date.now(),
+  } satisfies AuthBroadcastMessage);
+}
+
+function anotherTabRefreshedRecently(): boolean {
+  return (
+    Date.now() - lastOtherTabRefreshAt < CROSS_TAB_FRESHNESS_MS &&
+    !!getAccessToken()
+  );
+}
+
 async function tryRefreshToken(): Promise<RefreshOutcome> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
@@ -104,12 +178,21 @@ async function tryRefreshToken(): Promise<RefreshOutcome> {
     return 'permanent';
   }
 
+  // Proactive cross-tab dedup. Another tab broadcast a successful refresh
+  // within the last CROSS_TAB_FRESHNESS_MS — trust it and skip the
+  // network call entirely. localStorage already has the new tokens.
+  if (anotherTabRefreshedRecently()) {
+    log.info('refresh: skipping POST — another tab refreshed recently');
+    return 'success';
+  }
+
   try {
     const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {
       refresh_token: refreshToken,
     });
     if (data?.success && data.session?.access_token) {
       setSession(data.session.access_token, data.session.refresh_token);
+      broadcastRefreshSucceeded();
       return 'success';
     }
     // 200 OK but no usable session in the body — treat as permanent. The
@@ -121,6 +204,20 @@ async function tryRefreshToken(): Promise<RefreshOutcome> {
   } catch (err) {
     const status = (err as AxiosError).response?.status;
     if (status === 401 || status === 403) {
+      // Reactive cross-tab dedup — the load-bearing fix.
+      // GoTrue's rotation is "first POST wins". If our POST lost to
+      // another tab, the response is 401 with error_code
+      // refresh_token_already_used. But the winning tab has already
+      // written fresh tokens to localStorage, so we are NOT actually
+      // de-authenticated — adopt their tokens instead of bouncing the
+      // user to the login screen.
+      if (anotherTabRefreshedRecently()) {
+        log.warn(
+          { status },
+          'refresh: lost rotation race against another tab — using their tokens',
+        );
+        return 'success';
+      }
       log.warn({ status }, 'refresh token rejected — session expired');
       handlePermanentFailure();
       return 'permanent';
@@ -236,6 +333,19 @@ export { API_BASE_URL };
  * connection URI", "Claude rate limit reached", etc.) when the backend
  * supplies one.
  */
+// Test-only exports. Bundlers tree-shake unused exports in production
+// builds, so leaving this unguarded keeps the test surface stable across
+// dev/test/prod without conditional logic. Only consumed by
+// `src/lib/api/__tests__/client.test.ts`.
+export const __test = {
+  tryRefreshToken,
+  anotherTabRefreshedRecently,
+  resetCrossTabState: () => {
+    lastOtherTabRefreshAt = 0;
+  },
+};
+
+
 export function extractServerError(err: unknown, fallback: string): string {
   if (!err) return fallback;
   // Axios shape
