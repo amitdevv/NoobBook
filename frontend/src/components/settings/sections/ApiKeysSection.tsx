@@ -236,6 +236,10 @@ export const ApiKeysSection: React.FC = () => {
     const isModified = !!modifiedKeys[apiKey.id];
     const isConfigured = apiKey.is_set && !isModified;
     const validation = validationState[apiKey.id];
+    // 'env' = pinned by the host (docker-compose / Coolify). Input + Validate
+    // + Delete are all disabled because the UI cannot override or remove a
+    // host-injected value — the operator has to change it in deployment env.
+    const isPinned = apiKey.source === 'env';
 
     return (
       <div
@@ -265,6 +269,14 @@ export const ApiKeysSection: React.FC = () => {
                 Active
               </span>
             )}
+            {isPinned && (
+              <span
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-stone-700 bg-stone-200 px-2 py-0.5 rounded-full"
+                title="This key is set via the host environment and can't be changed from the UI."
+              >
+                Pinned by deployment
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
             <button
@@ -278,9 +290,9 @@ export const ApiKeysSection: React.FC = () => {
             <button
               type="button"
               onClick={() => setDeleteConfirmId(apiKey.id)}
-              disabled={!apiKey.value && !apiKey.is_set}
+              disabled={(!apiKey.value && !apiKey.is_set) || isPinned}
               className="p-1.5 rounded-md text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Delete key"
+              title={isPinned ? 'Pinned by deployment — change in host environment' : 'Delete key'}
             >
               <Trash size={15} />
             </button>
@@ -291,16 +303,17 @@ export const ApiKeysSection: React.FC = () => {
         <div className="flex gap-2">
           <Input
             type={showApiKeys[apiKey.id] ? 'text' : 'password'}
-            placeholder={`Enter ${apiKey.name} key...`}
+            placeholder={isPinned ? 'Set via host environment' : `Enter ${apiKey.name} key...`}
             value={modifiedKeys[apiKey.id] !== undefined ? modifiedKeys[apiKey.id] : apiKey.value}
             onChange={(e) => updateApiKey(apiKey.id, e.target.value)}
-            className="font-mono text-[12px] flex-1 h-9 bg-white border-stone-200 focus:border-amber-400"
+            disabled={isPinned}
+            className="font-mono text-[12px] flex-1 h-9 bg-white border-stone-200 focus:border-amber-400 disabled:bg-stone-50 disabled:cursor-not-allowed"
           />
           <Button
             variant="default"
             size="sm"
             onClick={() => validateApiKey(apiKey.id)}
-            disabled={!modifiedKeys[apiKey.id] || modifiedKeys[apiKey.id].includes('***') || validation?.validating}
+            disabled={isPinned || !modifiedKeys[apiKey.id] || modifiedKeys[apiKey.id].includes('***') || validation?.validating}
             className="h-9 px-3.5 text-[12px] font-semibold min-w-[115px]"
           >
             {validation?.validating ? (
@@ -320,6 +333,13 @@ export const ApiKeysSection: React.FC = () => {
         {/* Description + validation feedback */}
         <div className="mt-2 space-y-1">
           <p className="text-[11px] text-stone-400 leading-relaxed">{apiKey.description}</p>
+          {isPinned && (
+            <p className="text-[11px] text-stone-500 leading-relaxed">
+              This key is set via the host environment (docker-compose /
+              Coolify) and can&apos;t be changed from the UI. Update it in
+              your deployment env and restart the backend to pick up changes.
+            </p>
+          )}
           {validation?.message && (() => {
             if (!validation.valid) {
               return (

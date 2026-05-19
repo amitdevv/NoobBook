@@ -38,6 +38,18 @@ def create_app(config_name='development'):
     setup_logging(app.config.get('LOG_LEVEL', 'DEBUG'))
     config[config_name].init_app(app)
 
+    # Hydrate runtime env vars from persisted API keys (Supabase). Build-time
+    # env wins for anything explicitly set by docker-compose / Coolify; this
+    # only fills in keys the operator left blank, so UI saves survive
+    # container restarts. Wrapped so a Supabase outage doesn't block boot —
+    # the operator still gets the app up enough to surface the issue in
+    # Admin Settings.
+    try:
+        from app.services.app_settings.api_key_store import api_key_store
+        api_key_store.hydrate_environ()
+    except Exception as exc:  # noqa: BLE001
+        app.logger.warning("API key hydration skipped: %s", exc)
+
     # Honor X-Forwarded-* headers when running behind Coolify's reverse
     # proxy (nginx/Traefik terminates HTTPS, then forwards over plain
     # HTTP to the backend container). Without this, request.host_url and

@@ -98,12 +98,18 @@ export const AddSourcesSheet: React.FC<AddSourcesSheetProps> = ({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-[500px] sm:w-[600px]">
-        <SheetHeader>
+      {/* flex-col + a flex-1 overflow-y-auto body so long content (e.g. the
+          full Notion setup guide) scrolls inside the sheet instead of
+          getting clipped below the viewport. */}
+      <SheetContent
+        side="left"
+        className="w-[500px] sm:w-[600px] flex flex-col h-full"
+      >
+        <SheetHeader className="flex-shrink-0">
           <SheetTitle>Add sources</SheetTitle>
         </SheetHeader>
 
-        <div className="mt-6">
+        <div className="mt-6 flex-1 overflow-y-auto pr-1 -mr-1">
           <p className="text-sm text-muted-foreground mb-4">
             Sources let NoobBook base its responses on the information that
             matters most to you. ({sourcesCount}/{MAX_SOURCES} used)
