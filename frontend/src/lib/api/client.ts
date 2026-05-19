@@ -30,11 +30,34 @@ export const api = axios.create({
   },
 });
 
+// Per-request correlation ID. The backend stamps every log record with this
+// (see app/utils/logger.py:_RequestIdFilter), and echoes it back in the
+// X-Request-Id response header. When the user reports "I was logged out at
+// 14:32", the req_id printed alongside any failed-request log in DevTools
+// is the single grep key the support engineer needs in backend.log.
+function _newRequestId(): string {
+  // crypto.randomUUID is available in all browsers we ship to; the fallback
+  // covers older WebView environments (e.g. embedded Slack browser) so we
+  // never throw at request time.
+  try {
+    return (globalThis.crypto?.randomUUID?.() || '').replace(/-/g, '').slice(0, 16)
+      || Math.random().toString(36).slice(2, 18);
+  } catch {
+    return Math.random().toString(36).slice(2, 18);
+  }
+}
+
 const attachAuthHeader = (config: InternalAxiosRequestConfig) => {
   const token = getAccessToken();
   if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // Attach a fresh req_id per request so every retry / refresh gets its own.
+  // If a caller has already set one (e.g. a tracing wrapper) we honour it.
+  config.headers = config.headers || {};
+  if (!config.headers['X-Request-Id']) {
+    config.headers['X-Request-Id'] = _newRequestId();
   }
   return config;
 };
@@ -72,6 +95,80 @@ type RefreshOutcome = 'success' | 'transient' | 'permanent';
 
 let refreshPromise: Promise<RefreshOutcome> | null = null;
 
+// ---------- Cross-tab refresh coordination ----------
+// The `refreshPromise` above dedups concurrent refreshes WITHIN a single tab.
+// When the same user is signed into NoobBook from multiple tabs / browsers
+// (production logs from 2026-05-18 captured Chrome-Mac + Firefox-Mac +
+// Chrome-Linux on the same Supabase user-id), each tab's `refreshPromise`
+// is independent. They race each other on the same refresh-token chain,
+// GoTrue rotates on whichever POST arrives first, and the loser gets
+// `refresh_token_already_used` → HTTP 401. Without cross-tab coordination
+// the loser then runs handlePermanentFailure → user kicked to login.
+//
+// Coordination strategy:
+//   - PROACTIVE: before firing /auth/refresh, check whether another tab
+//     just refreshed within `CROSS_TAB_FRESHNESS_MS`. If yes, skip the
+//     POST entirely — localStorage already has fresh tokens.
+//   - REACTIVE (load-bearing): if our /auth/refresh returns 401/403, check
+//     the same window. If yes, the 401 is a rotation-race loss, not a
+//     real auth failure — return 'success' (the winning tab's tokens are
+//     in localStorage) instead of 'permanent' (logout).
+//
+// Transport: BroadcastChannel('noobbook-auth') primary, `storage` event
+// fallback (Safari < 15.4 lacks BroadcastChannel). Both update the same
+// module-level timestamp.
+
+type AuthBroadcastMessage = { type: 'refresh_succeeded'; at: number };
+
+const AUTH_BROADCAST_CHANNEL = 'noobbook-auth';
+// Picked so the window covers: typical /auth/refresh round-trips are
+// 120–150 ms in production; we want comfortable margin for slow
+// connections without trusting hour-old refreshes from hibernated tabs.
+const CROSS_TAB_FRESHNESS_MS = 2_000;
+
+let lastOtherTabRefreshAt = 0;
+
+const authChannel: BroadcastChannel | null =
+  typeof BroadcastChannel !== 'undefined'
+    ? new BroadcastChannel(AUTH_BROADCAST_CHANNEL)
+    : null;
+
+if (authChannel) {
+  authChannel.addEventListener('message', (ev) => {
+    const msg = ev.data as AuthBroadcastMessage | undefined;
+    if (msg?.type === 'refresh_succeeded') {
+      lastOtherTabRefreshAt = msg.at;
+    }
+  });
+}
+
+// Storage-event fallback. Browsers fire `storage` on every tab EXCEPT the
+// one that performed the setItem — exactly the cross-tab notification
+// semantics we want, and the path Safari < 15.4 takes since it lacks
+// BroadcastChannel.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (ev) => {
+    if (ev.key === 'noobbook.access_token' && ev.newValue) {
+      lastOtherTabRefreshAt = Date.now();
+    }
+  });
+}
+
+function broadcastRefreshSucceeded(): void {
+  if (!authChannel) return;
+  authChannel.postMessage({
+    type: 'refresh_succeeded',
+    at: Date.now(),
+  } satisfies AuthBroadcastMessage);
+}
+
+function anotherTabRefreshedRecently(): boolean {
+  return (
+    Date.now() - lastOtherTabRefreshAt < CROSS_TAB_FRESHNESS_MS &&
+    !!getAccessToken()
+  );
+}
+
 async function tryRefreshToken(): Promise<RefreshOutcome> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
@@ -81,12 +178,21 @@ async function tryRefreshToken(): Promise<RefreshOutcome> {
     return 'permanent';
   }
 
+  // Proactive cross-tab dedup. Another tab broadcast a successful refresh
+  // within the last CROSS_TAB_FRESHNESS_MS — trust it and skip the
+  // network call entirely. localStorage already has the new tokens.
+  if (anotherTabRefreshedRecently()) {
+    log.info('refresh: skipping POST — another tab refreshed recently');
+    return 'success';
+  }
+
   try {
     const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {
       refresh_token: refreshToken,
     });
     if (data?.success && data.session?.access_token) {
       setSession(data.session.access_token, data.session.refresh_token);
+      broadcastRefreshSucceeded();
       return 'success';
     }
     // 200 OK but no usable session in the body — treat as permanent. The
@@ -98,6 +204,20 @@ async function tryRefreshToken(): Promise<RefreshOutcome> {
   } catch (err) {
     const status = (err as AxiosError).response?.status;
     if (status === 401 || status === 403) {
+      // Reactive cross-tab dedup — the load-bearing fix.
+      // GoTrue's rotation is "first POST wins". If our POST lost to
+      // another tab, the response is 401 with error_code
+      // refresh_token_already_used. But the winning tab has already
+      // written fresh tokens to localStorage, so we are NOT actually
+      // de-authenticated — adopt their tokens instead of bouncing the
+      // user to the login screen.
+      if (anotherTabRefreshedRecently()) {
+        log.warn(
+          { status },
+          'refresh: lost rotation race against another tab — using their tokens',
+        );
+        return 'success';
+      }
       log.warn({ status }, 'refresh token rejected — session expired');
       handlePermanentFailure();
       return 'permanent';
@@ -155,7 +275,14 @@ async function handle401Error(error: AxiosError, retryWith: typeof api | typeof 
     // normal API-error toast (not a "you're logged out" experience).
   }
 
-  log.error({ status, data: error.response?.data }, 'API response error');
+  // req_id from the response header (or the request header if the server
+  // never replied). With this on the error line, a support engineer can grep
+  // it directly in backend.log via the admin Logs viewer.
+  const reqId =
+    (error.response?.headers as Record<string, string> | undefined)?.['x-request-id']
+    || (originalRequest?.headers?.['X-Request-Id'] as string | undefined)
+    || '-';
+  log.error({ status, reqId, data: error.response?.data }, 'API response error');
   return Promise.reject(error);
 }
 
@@ -192,3 +319,57 @@ export function getAuthUrl(url: string): string {
 }
 
 export { API_BASE_URL };
+
+
+/**
+ * Pull a user-facing message out of an API error, preferring the server's
+ * `error` / `message` field when present. Falls back to the given default.
+ *
+ * Use this at toast call-sites that currently look like
+ *     errorWithLogs('Failed to send message')
+ * — replace with
+ *     errorWithLogs(extractServerError(err, 'Failed to send message'))
+ * so the user sees the actual reason ("Database unreachable — check the
+ * connection URI", "Claude rate limit reached", etc.) when the backend
+ * supplies one.
+ */
+// Test-only exports. Defense-in-depth against accidental imports from
+// production code: in non-test/dev builds the methods are no-ops, so an
+// `import { __test } from '@/lib/api/client'` in app code TypeScript-
+// compiles AND keeps the test type contract, but can't actually mutate
+// production state. Vite still tree-shakes the active branch.
+//
+// `MODE` is set by Vite — `'test'` during vitest, `'production'` for
+// `npm run build`, `'development'` for `npm run dev`. We expose internals
+// in test and development; production gets harmless stubs.
+const _is_test_or_dev =
+  import.meta.env.MODE === 'test' || import.meta.env.MODE === 'development';
+
+export const __test = _is_test_or_dev
+  ? {
+      tryRefreshToken,
+      anotherTabRefreshedRecently,
+      resetCrossTabState: () => {
+        lastOtherTabRefreshAt = 0;
+      },
+    }
+  : {
+      tryRefreshToken: (): Promise<RefreshOutcome> =>
+        Promise.resolve('permanent' as RefreshOutcome),
+      anotherTabRefreshedRecently: () => false,
+      resetCrossTabState: () => {
+        /* no-op in production */
+      },
+    };
+
+
+export function extractServerError(err: unknown, fallback: string): string {
+  if (!err) return fallback;
+  // Axios shape
+  const axiosErr = err as AxiosError<{ error?: string; message?: string }>;
+  const fromAxios = axiosErr.response?.data?.error || axiosErr.response?.data?.message;
+  if (typeof fromAxios === 'string' && fromAxios.trim()) return fromAxios.trim();
+  // Fetch / generic Error shape
+  if (err instanceof Error && err.message && err.message !== 'Network Error') return err.message;
+  return fallback;
+}

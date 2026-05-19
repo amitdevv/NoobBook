@@ -481,6 +481,7 @@ class MainChatService:
         on_text_delta: Optional[Callable[[str], None]] = None,
         on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         cancel_event: Optional["object"] = None,
+        user_stop_event: Optional["object"] = None,
     ) -> Dict[str, Any]:
         """
         Shared chat runner for both non-streaming and streaming flows.
@@ -771,15 +772,22 @@ class MainChatService:
 
             final_text = "\n\n".join(accumulated_text_parts) if accumulated_text_parts else ""
 
-            # If the user clicked Stop while we were generating, persist a
-            # stub assistant message marked as interrupted instead of the
-            # full response. The chat history then reads as
-            # "question → (stopped) → next question → answer", which is the
-            # intuitive narrative for the user. Without this guard the
-            # half-finished stream still landed in DB and showed up alongside
-            # the user's revised answer (the "2 responses" symptom).
-
-            if cancelled:
+            # Two cancellation flavours, each persisted differently:
+            #
+            # 1. EXPLICIT user-stop (user_stop_event set) — keep the original
+            #    UX: persist a stub marked "(stopped by user)" so the chat
+            #    reads "question → (stopped) → next question → answer". Same
+            #    behaviour as before the §2.1 fix.
+            #
+            # 2. CONNECTION drop (cancel_event set but user_stop_event NOT
+            #    set) — proxy idle-timeout or tab closed. Persist whatever
+            #    text actually accumulated, with a structured log line so an
+            #    admin can audit "are we losing responses to proxy timeouts?"
+            #    The frontend's recoverChatFromServer path picks the message
+            #    up on the next render. Before §2.1 this case was mislabeled
+            #    "(stopped by user)" — Delta's Symptom 9.
+            user_stopped = user_stop_event is not None and user_stop_event.is_set()
+            if cancelled and user_stopped:
                 stopped_content = (
                     final_text + "\n\n_(stopped by user)_"
                     if final_text.strip()
@@ -793,6 +801,44 @@ class MainChatService:
                     tokens=response.get("usage"),
                 )
                 # No on_event emit — the SSE generator is already closed.
+            elif cancelled:
+                # Proxy / connection drop, NOT a user-initiated stop.
+                #
+                # If we accumulated real text before the drop, persist it as a
+                # normal assistant message so the frontend's
+                # recoverChatFromServer surfaces real content instead of a
+                # mislabeled stub.
+                #
+                # If we accumulated NOTHING (proxy dropped during the initial
+                # Claude latency, before any deltas streamed), do NOT persist
+                # a bogus "I've processed your request." reply — that would
+                # break the conversation flow with an answer that has nothing
+                # to do with the user's question. Leave the user-side message
+                # without an assistant reply; the user can re-send.
+                if final_text.strip():
+                    logger.warning(
+                        "PROXY_DISCONNECT_PERSIST chat=%s content_len=%d "
+                        "iterations=%d — persisting partial response (proxy "
+                        "or browser closed the SSE connection before "
+                        "assistant_done could fire).",
+                        chat_id, len(final_text), iteration,
+                    )
+                    assistant_msg = message_service.add_assistant_message(
+                        project_id=project_id,
+                        chat_id=chat_id,
+                        content=final_text,
+                        model=response.get("model"),
+                        tokens=response.get("usage"),
+                    )
+                else:
+                    logger.warning(
+                        "PROXY_DISCONNECT_NO_CONTENT chat=%s iterations=%d "
+                        "— skipping persist; no assistant text accumulated "
+                        "before disconnect (user can re-send their question).",
+                        chat_id, iteration,
+                    )
+                    assistant_msg = None
+                # No on_event emit — generator already closed.
             else:
                 assistant_msg = message_service.add_assistant_message(
                     project_id=project_id,
@@ -948,8 +994,17 @@ class MainChatService:
         user_id: Optional[str] = None,
         on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         cancel_event: Optional["object"] = None,
+        user_stop_event: Optional["object"] = None,
     ) -> Dict[str, Any]:
-        """Process a user message while streaming assistant text deltas."""
+        """Process a user message while streaming assistant text deltas.
+
+        cancel_event: short-circuit signal for the agent loop. Set on EITHER
+        explicit user-stop or any connection close.
+        user_stop_event: labeling signal. Set ONLY when the user explicitly
+        clicked Stop (POST /messages/stop). Drives the "(stopped by user)"
+        suffix; without it, a proxy idle-timeout was mislabeled the same way
+        as a real user-stop — Delta's Symptom 9.
+        """
         return self._run_message_flow(
             project_id=project_id,
             chat_id=chat_id,
@@ -963,6 +1018,7 @@ class MainChatService:
             ),
             on_event=on_event,
             cancel_event=cancel_event,
+            user_stop_event=user_stop_event,
         )
 
     def _generate_and_update_chat_title(

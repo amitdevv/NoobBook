@@ -204,7 +204,10 @@ def validate_token() -> Optional[str]:
                         return user_id
                     # GoTrue says no — token has been revoked (sign-out,
                     # password change, admin force-revoke).
-                    logger.info("Token revoked by GoTrue — denying access")
+                    logger.warning(
+                        "AUTH_401_TRACE branch=fast_revoked user_id=%s token_suffix=%s",
+                        user_id, token[-12:],
+                    )
                     return None
                 except Exception as e:
                     # GoTrue itself is unreachable (network blip, GoTrue
@@ -214,9 +217,8 @@ def validate_token() -> Optional[str]:
                     # matches the historical fail-open behaviour of the
                     # cache-hit path.
                     logger.warning(
-                        "Revocation check failed (GoTrue unreachable: %s: %s) — "
-                        "trusting local signature for the next %ds",
-                        type(e).__name__, e, _TOKEN_CACHE_TTL,
+                        "AUTH_401_TRACE branch=fast_failopen err=%s:%s token_suffix=%s ttl=%ds",
+                        type(e).__name__, str(e)[:120], token[-12:], _TOKEN_CACHE_TTL,
                     )
                     _cache_token(token, user_id)
                     return user_id
@@ -239,7 +241,10 @@ def validate_token() -> Optional[str]:
             logger.warning("Local JWT decode raised %s: %s — falling back to Auth", type(e).__name__, e)
 
     # Slow path (no JWT_SECRET configured, or local decode hit an unexpected
-    # exception): cache + Supabase Auth roundtrip. Same behaviour as before.
+    # exception): cache + Supabase Auth roundtrip. Same behaviour as before
+    # for the happy path; the exception path now mirrors the fast-path
+    # fail-open at lines ~209-222 to avoid logging users out on a transient
+    # GoTrue blip (Delta's Symptom 1/2 cascade).
     cached_user_id = _get_cached_user_id(token)
     if cached_user_id:
         return cached_user_id
@@ -251,14 +256,59 @@ def validate_token() -> Optional[str]:
         user_response = supabase.auth.get_user(token)
 
         if not user_response or not user_response.user:
-            logger.warning("Auth get_user returned no user")
+            logger.warning(
+                "AUTH_401_TRACE branch=slow_nouser token_suffix=%s",
+                token[-12:],
+            )
             return None
 
         user_id = str(user_response.user.id)
         _cache_token(token, user_id)
         return user_id
     except Exception as e:
-        logger.warning("Token validation failed: %s: %s", type(e).__name__, e)
+        # GoTrue raised (network blip, container restart, rate limit). To avoid
+        # logging real users out on a transient outage we fail-open — but only
+        # if we can locally verify the JWT signature. Without signature verify,
+        # any attacker can forge `sub=<victim_uuid>` and impersonate any user
+        # for the duration of the outage, so accepting unsigned tokens here is
+        # not safe.
+        if _JWT_SECRET:
+            try:
+                verified = jwt.decode(
+                    token,
+                    _JWT_SECRET,
+                    algorithms=["HS256"],
+                    options={"verify_aud": False, "verify_exp": True},
+                )
+                user_id_verified = verified.get("sub")
+                if user_id_verified:
+                    user_id_verified = str(user_id_verified)
+                    logger.warning(
+                        "AUTH_401_TRACE branch=slow_failopen_verified err=%s:%s token_suffix=%s ttl=%ds",
+                        type(e).__name__, str(e)[:120], token[-12:], _TOKEN_CACHE_TTL,
+                    )
+                    _cache_token(token, user_id_verified)
+                    return user_id_verified
+            except Exception as decode_exc:
+                logger.warning(
+                    "AUTH_401_TRACE branch=slow_failopen_rejected err=%s:%s decode_err=%s:%s token_suffix=%s",
+                    type(e).__name__, str(e)[:80],
+                    type(decode_exc).__name__, str(decode_exc)[:80],
+                    token[-12:],
+                )
+                return None
+
+        # JWT_SECRET not configured: we cannot verify the signature locally,
+        # so we fail closed. Genuine users with a recently-validated token are
+        # still served from the cache above (line ~248); only callers whose
+        # cache entry has expired (or who never had one) see a 401. Operators
+        # running self-hosted Supabase should set JWT_SECRET to opt back into
+        # signature-verified fail-open during outages.
+        logger.error(
+            "AUTH_401_TRACE branch=slow_failclosed err=%s:%s token_suffix=%s — "
+            "JWT_SECRET unset, refusing to accept unverified token",
+            type(e).__name__, str(e)[:120], token[-12:],
+        )
         return None
 
 

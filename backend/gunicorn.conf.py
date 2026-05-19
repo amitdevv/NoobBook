@@ -1,32 +1,22 @@
 """
 Gunicorn configuration for NoobBook production deployment.
-
-Educational Note: Gunicorn is a production-grade WSGI server that replaces
-Flask's built-in Werkzeug dev server. Key differences:
-- Werkzeug: single-process, no crash recovery, not designed for real traffic
-- Gunicorn + gevent: handles hundreds of concurrent connections via greenlets
-  (cooperative multitasking), auto-restarts crashed workers, proper timeouts
-
-We use gevent-websocket worker class because Flask-SocketIO needs WebSocket
-support. With gevent, a single worker can handle many concurrent I/O-bound
-requests (Claude API calls, Supabase queries) without blocking.
 """
 import os
 
-# Bind to the configured port (default 5001)
 bind = f"0.0.0.0:{os.getenv('PORT', '5001')}"
 
-# Flask-SocketIO requires exactly 1 worker when not using a message queue
-# (like Redis). This is fine because gevent handles concurrency via greenlets,
-# not OS processes. One gevent worker can serve hundreds of concurrent requests.
-workers = 1
+# Multiple workers so a single blocking job (PDF batch, Playwright launch,
+# ffmpeg, LibreOffice subprocess) cannot wedge the entire backend.
+# Flask-SocketIO is initialized but no @socketio.on / socketio.emit handlers
+# are registered, so cross-worker state coordination isn't required and
+# raising workers above 1 is safe. Override via GUNICORN_WORKERS env var.
+workers = int(os.getenv("GUNICORN_WORKERS", "4"))
 
-# GeventWebSocketWorker supports both regular HTTP and WebSocket connections.
-# It calls monkey.patch_all() automatically in each worker's init_process()
-# before the app is loaded — no manual monkey-patching needed in app code.
-# NOTE: Do NOT set preload_app = True. That would monkey-patch the master
-# process before forking, breaking signal handling and graceful shutdown.
 worker_class = "geventwebsocket.gunicorn.workers.GeventWebSocketWorker"
+
+# Concurrent greenlets per worker. With 4 workers x 200 = 800 concurrent
+# in-flight requests possible.
+worker_connections = int(os.getenv("GUNICORN_WORKER_CONNECTIONS", "200"))
 
 # Request timeout: if a worker doesn't respond within this time, Gunicorn
 # kills and restarts it. 600s gives long Claude tool loops AND gigabyte

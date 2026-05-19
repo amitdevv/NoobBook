@@ -246,3 +246,68 @@ def is_supabase_enabled() -> bool:
     cases where Supabase is not yet configured during initial setup.
     """
     return SupabaseClient.is_configured()
+
+
+def check_singleton_identity() -> dict:
+    """Introspect the data-singleton client's Authorization header.
+
+    Powers `GET /api/v1/debug/supabase-state`. The fad1921 fix isolated
+    the auth verifier so gotrue's on_auth_state_change listener can no
+    longer flip the data singleton's Authorization header — but only
+    after a container restart. This helper lets an operator confirm in
+    one HTTP call whether their running process is still polluted (still
+    needs a restart) without `docker exec`.
+
+    Returns a dict with:
+      - is_polluted: True if the singleton's Authorization header is
+        NOT pinned to SUPABASE_SERVICE_KEY.
+      - auth_header_prefix: first 30 chars of the actual header (for
+        eyeballing — never logs the full token).
+      - expected_prefix: first 30 chars of the expected header.
+      - reason: short human-readable explanation when polluted/unknown.
+    """
+    if SupabaseClient._instance is None:
+        return {
+            "is_polluted": None,
+            "reason": "Singleton not yet initialized.",
+            "auth_header_prefix": "",
+            "expected_prefix": "",
+        }
+
+    service_key = os.getenv("SUPABASE_SERVICE_KEY") or ""
+    if not service_key:
+        return {
+            "is_polluted": None,
+            "reason": "SUPABASE_SERVICE_KEY not set — cannot verify identity.",
+            "auth_header_prefix": "",
+            "expected_prefix": "",
+        }
+
+    expected = f"Bearer {service_key}"
+    try:
+        actual = (
+            SupabaseClient._instance.postgrest.session.headers.get(
+                "Authorization", ""
+            )
+            or ""
+        )
+    except Exception as exc:  # noqa: BLE001 — best-effort introspection
+        return {
+            "is_polluted": None,
+            "reason": f"Could not read singleton headers: {type(exc).__name__}",
+            "auth_header_prefix": "",
+            "expected_prefix": expected[:30],
+        }
+
+    return {
+        "is_polluted": actual != expected,
+        "auth_header_prefix": actual[:30],
+        "expected_prefix": expected[:30],
+        "reason": (
+            "Authorization header has been flipped off service_role — "
+            "restart the backend container to clear the pollution "
+            "(see commit fad1921)."
+            if actual != expected
+            else "Singleton identity is pinned to service_role as expected."
+        ),
+    }
