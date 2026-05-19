@@ -28,6 +28,10 @@ interface DownloadLogsConfirmDialogProps {
   deleteAfterDownload: boolean;
   onDeleteAfterDownloadChange: (next: boolean) => void;
   onConfirm: () => void;
+  /** When false, the "delete after download" checkbox is hidden. The
+   * `/logs/clear` endpoint is admin-only, so non-admins should never
+   * see (and certainly never check) this destructive option. */
+  canDelete?: boolean;
 }
 
 export const DownloadLogsConfirmDialog: React.FC<DownloadLogsConfirmDialogProps> = ({
@@ -36,6 +40,7 @@ export const DownloadLogsConfirmDialog: React.FC<DownloadLogsConfirmDialogProps>
   deleteAfterDownload,
   onDeleteAfterDownloadChange,
   onConfirm,
+  canDelete = true,
 }) => {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -49,21 +54,23 @@ export const DownloadLogsConfirmDialog: React.FC<DownloadLogsConfirmDialogProps>
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <label className="flex items-start gap-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-3 cursor-pointer">
-          <Checkbox
-            checked={deleteAfterDownload}
-            onCheckedChange={(value) => onDeleteAfterDownloadChange(value === true)}
-            className="mt-0.5"
-          />
-          <span className="text-sm leading-snug text-stone-700">
-            <span className="font-medium text-stone-900 block">
-              Delete logs from server after download
+        {canDelete && (
+          <label className="flex items-start gap-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-3 cursor-pointer">
+            <Checkbox
+              checked={deleteAfterDownload}
+              onCheckedChange={(value) => onDeleteAfterDownloadChange(value === true)}
+              className="mt-0.5"
+            />
+            <span className="text-sm leading-snug text-stone-700">
+              <span className="font-medium text-stone-900 block">
+                Delete logs from server after download
+              </span>
+              Frees disk space on the deployment. The bundle in your downloads
+              folder is your only copy after this. Your choice is remembered
+              for next time.
             </span>
-            Frees disk space on the deployment. The bundle in your downloads
-            folder is your only copy after this. Your choice is remembered
-            for next time.
-          </span>
-        </label>
+          </label>
+        )}
 
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>

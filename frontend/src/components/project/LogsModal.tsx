@@ -81,6 +81,7 @@ export const LogsModal: React.FC<LogsModalProps> = ({ open, onOpenChange, canCle
           deleteAfterDownload={state.deleteAfterDownload}
           onDeleteAfterDownloadChange={state.setDeleteAfterDownload}
           onConfirm={state.confirmDownload}
+          canDelete={state.canDeleteLogs}
         />
       </DialogContent>
     </Dialog>

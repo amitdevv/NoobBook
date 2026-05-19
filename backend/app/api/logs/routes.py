@@ -127,17 +127,22 @@ def download_bundle():
 
 
 @logs_bp.route("/logs/clear", methods=["POST"])
-@require_auth
+@require_admin
 def clear_logs():
     """Truncate the active log file and remove rotated archives.
 
-    Gated `require_auth` (not `require_admin`) because the matching
-    `/logs/bundle` download is `require_auth` too — any user who can pull
-    the logs can also wipe them in this single-tenant deployment. The
-    audit log records who triggered the clear so a wipe is still
-    attributable.
+    Admin-only: read (`/logs/bundle`) and destroy are asymmetric — any
+    authenticated user can pull a copy of the logs, but only admins can
+    permanently wipe the server-side diagnostic history (which may be
+    the only evidence of a crash or security incident affecting other
+    users). The audit log records which admin triggered the clear.
+
+    Surfaced to non-admins in the UI via the "Delete logs from server
+    after download" checkbox — that path is gated by this same endpoint,
+    so the checkbox is a no-op for non-admins (frontend hides it; if
+    they bypass the UI, this returns 403).
     """
-    initiator = getattr(g, "user_id", None) or "user"
+    initiator = getattr(g, "user_id", None) or "admin"
     result = clear_logs_service(initiator=str(initiator))
     if not result.get("success"):
         return jsonify(result), 500

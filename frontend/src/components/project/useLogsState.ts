@@ -14,6 +14,7 @@ import { logsAPI, type LogLine } from '@/lib/api/logs';
 import { copyToClipboard } from '@/lib/clipboard';
 import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
+import { getAdminMode } from '@/lib/adminMode';
 
 const log = createLogger('logs-state');
 
@@ -31,6 +32,11 @@ interface UseLogsStateOpts {
 }
 
 export function useLogsState({ active = true }: UseLogsStateOpts = {}) {
+  // /logs/clear is admin-only on the backend (a non-admin's POST would
+  // 403). Surface the same gate to the UI so the "Delete logs after
+  // download" checkbox only renders for admins — non-admins still see
+  // the confirmation dialog but without the destructive option.
+  const canDeleteLogs = getAdminMode();
   const { toasts, dismissToast, success, error } = useToast();
   const [lines, setLines] = useState<LogLine[]>([]);
   const [filter, setFilter] = useState<LevelFilter>('errors');
@@ -67,9 +73,10 @@ export function useLogsState({ active = true }: UseLogsStateOpts = {}) {
 
   // Load the user's "auto-delete on download" preference once the
   // surface activates so the checkbox is pre-set the first time the
-  // download dialog opens.
+  // download dialog opens. Skipped for non-admins: they can't delete
+  // logs so the preference would be inert and the GET is wasted work.
   useEffect(() => {
-    if (!active) return;
+    if (!active || !canDeleteLogs) return;
     let cancelled = false;
     (async () => {
       try {
@@ -85,7 +92,7 @@ export function useLogsState({ active = true }: UseLogsStateOpts = {}) {
     return () => {
       cancelled = true;
     };
-  }, [active]);
+  }, [active, canDeleteLogs]);
 
   const formatLines = useMemo(
     () =>
@@ -125,7 +132,9 @@ export function useLogsState({ active = true }: UseLogsStateOpts = {}) {
 
     // Persist the checkbox state if it changed. Fire-and-forget — a
     // preference write failure shouldn't block the bundle download.
-    if (deleteAfterDownload !== persistedDeleteAfterDownload.current) {
+    // Skipped for non-admins since they can't act on the preference
+    // anyway (and the backend write succeeds but is then unused).
+    if (canDeleteLogs && deleteAfterDownload !== persistedDeleteAfterDownload.current) {
       logsAPI
         .setPreferences({ auto_delete_on_download: deleteAfterDownload })
         .then(() => {
@@ -137,8 +146,10 @@ export function useLogsState({ active = true }: UseLogsStateOpts = {}) {
     }
 
     // If the user opted in, wait briefly so the browser has time to
-    // begin streaming the ZIP, then clear the server-side logs.
-    if (deleteAfterDownload) {
+    // begin streaming the ZIP, then clear the server-side logs. The
+    // canDeleteLogs guard is defense-in-depth — the checkbox is hidden
+    // for non-admins so deleteAfterDownload should already be false.
+    if (canDeleteLogs && deleteAfterDownload) {
       window.setTimeout(async () => {
         try {
           await logsAPI.clear();
@@ -190,6 +201,7 @@ export function useLogsState({ active = true }: UseLogsStateOpts = {}) {
     deleteAfterDownload,
     setDeleteAfterDownload,
     confirmDownload,
+    canDeleteLogs,
     // Toast plumbing — the consumer mounts <ToastContainer /> with these.
     toasts,
     dismissToast,

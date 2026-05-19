@@ -123,6 +123,7 @@ export const LogsSection: React.FC = () => {
         deleteAfterDownload={state.deleteAfterDownload}
         onDeleteAfterDownloadChange={state.setDeleteAfterDownload}
         onConfirm={state.confirmDownload}
+        canDelete={state.canDeleteLogs}
       />
     </div>
   );

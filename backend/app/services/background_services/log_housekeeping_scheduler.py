@@ -72,24 +72,32 @@ def _read_housekeeping_row() -> Optional[Dict[str, Any]]:
     return rows[0].get("log_housekeeping") or {}
 
 
-def _try_update_last_run(previous_last_run: Optional[str], new_value: str) -> bool:
+def _try_update_last_run(
+    previous_last_run: Optional[str],
+    new_value: str,
+    weekly_enabled: bool,
+) -> bool:
     """
     Bump `last_run_at` only if it still matches what we read at the top of
     the tick. Returns True if our row was the one we updated (we own this
     clear), False otherwise (another tick beat us to it).
+
+    `weekly_enabled` is the value we observed at the top of the tick. We
+    write it back verbatim AND gate the UPDATE on the same value so a
+    concurrent admin "disable" between our read and our write wins the
+    race — our update affects 0 rows and the scheduler skips the clear,
+    preserving the admin's intent. The earlier implementation hardcoded
+    `weekly_clear_enabled=True` here, which silently re-enabled the
+    toggle whenever the admin flipped it off mid-tick.
     """
     if not is_supabase_enabled():
         return False
     try:
         client = get_supabase()
-        # Use jsonb_set so we don't have to round-trip the whole JSONB blob
-        # and risk clobbering a concurrent admin write to weekly_clear_enabled.
-        # Conditional WHERE on the previous last_run_at is what gives us the
-        # idempotent "first writer wins" semantic.
         query = client.table("app_settings").update(
             {
                 "log_housekeeping": {
-                    "weekly_clear_enabled": True,
+                    "weekly_clear_enabled": weekly_enabled,
                     "last_run_at": new_value,
                 }
             }
@@ -98,6 +106,10 @@ def _try_update_last_run(previous_last_run: Optional[str], new_value: str) -> bo
             query = query.is_("log_housekeeping->>last_run_at", "null")
         else:
             query = query.eq("log_housekeeping->>last_run_at", previous_last_run)
+        query = query.eq(
+            "log_housekeeping->>weekly_clear_enabled",
+            "true" if weekly_enabled else "false",
+        )
         resp = query.execute()
         return bool(resp.data)
     except Exception as exc:
@@ -157,7 +169,8 @@ class LogHousekeepingScheduler:
         config = _read_housekeeping_row()
         if config is None:
             return {"ran": False, "reason": "no app_settings row"}
-        if not config.get("weekly_clear_enabled", True):
+        weekly_enabled = bool(config.get("weekly_clear_enabled", True))
+        if not weekly_enabled:
             return {"ran": False, "reason": "weekly_clear_enabled=false"}
 
         last_run_raw = config.get("last_run_at")
@@ -167,7 +180,10 @@ class LogHousekeepingScheduler:
             return {"ran": False, "reason": "not yet due", "last_run_at": last_run_raw}
 
         new_value = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-        if not _try_update_last_run(last_run_raw, new_value):
+        # Pass the observed weekly_enabled through so the UPDATE
+        # preserves it and the conditional WHERE picks up any admin
+        # disable that landed between our read and our write.
+        if not _try_update_last_run(last_run_raw, new_value, weekly_enabled):
             # Another tick (or admin) bumped it first. Skip the clear so
             # we don't double-wipe.
             return {"ran": False, "reason": "lost race"}

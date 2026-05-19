@@ -157,7 +157,7 @@ def test_tick_runs_when_never_run_before(monkeypatch):
         sched, "_read_housekeeping_row",
         lambda: {"weekly_clear_enabled": True, "last_run_at": None},
     )
-    monkeypatch.setattr(sched, "_try_update_last_run", lambda prev, new: True)
+    monkeypatch.setattr(sched, "_try_update_last_run", lambda prev, new, enabled: True)
     called = {"n": 0}
 
     def fake_clear(initiator="?"):
@@ -195,7 +195,7 @@ def test_tick_runs_when_older_than_seven_days(monkeypatch):
         sched, "_read_housekeeping_row",
         lambda: {"weekly_clear_enabled": True, "last_run_at": stale},
     )
-    monkeypatch.setattr(sched, "_try_update_last_run", lambda prev, new: True)
+    monkeypatch.setattr(sched, "_try_update_last_run", lambda prev, new, enabled: True)
     called = {"n": 0}
     monkeypatch.setattr(sched, "clear_logs", lambda **kw: called.update(n=called["n"] + 1) or {"success": True, "cleared": 2})
 
@@ -212,7 +212,7 @@ def test_tick_skips_when_update_race_lost(monkeypatch):
         sched, "_read_housekeeping_row",
         lambda: {"weekly_clear_enabled": True, "last_run_at": None},
     )
-    monkeypatch.setattr(sched, "_try_update_last_run", lambda prev, new: False)
+    monkeypatch.setattr(sched, "_try_update_last_run", lambda prev, new, enabled: False)
     called = {"n": 0}
     monkeypatch.setattr(sched, "clear_logs", lambda **kw: called.update(n=called["n"] + 1) or {"success": True})
 
@@ -220,6 +220,31 @@ def test_tick_skips_when_update_race_lost(monkeypatch):
     assert result["ran"] is False
     assert result["reason"] == "lost race"
     assert called["n"] == 0
+
+
+def test_tick_passes_observed_enabled_to_update(monkeypatch):
+    """Regression: the UPDATE used to hardcode weekly_clear_enabled=True,
+    silently re-enabling the toggle if an admin disabled it between read
+    and write. tick() must thread the observed value through."""
+    sched = _import_scheduler()
+    monkeypatch.setattr(
+        sched, "_read_housekeeping_row",
+        lambda: {"weekly_clear_enabled": True, "last_run_at": None},
+    )
+    captured = {}
+
+    def fake_update(prev, new, enabled):
+        captured["prev"] = prev
+        captured["new"] = new
+        captured["enabled"] = enabled
+        return True
+
+    monkeypatch.setattr(sched, "_try_update_last_run", fake_update)
+    monkeypatch.setattr(sched, "clear_logs", lambda **kw: {"success": True, "cleared": 0})
+
+    sched.LogHousekeepingScheduler().tick()
+    assert captured["enabled"] is True
+    assert captured["prev"] is None
 
 
 def test_tick_returns_no_config_when_row_missing(monkeypatch):
