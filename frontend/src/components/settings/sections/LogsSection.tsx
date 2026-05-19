@@ -19,6 +19,7 @@ import { logsAPI, type LogHousekeeping } from '@/lib/api/logs';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
 import { createLogger } from '@/lib/logger';
+import { getAdminMode } from '@/lib/adminMode';
 
 const log = createLogger('logs-section');
 
@@ -76,8 +77,11 @@ const LogHousekeepingCard: React.FC = () => {
           )}
         </div>
         <Switch
+          // PUT /logs/housekeeping is admin-only — disable for non-admins
+          // so they can still see the card's last-cleared timestamp without
+          // clicking into a confusing 403.
           checked={config?.weekly_clear_enabled ?? false}
-          disabled={!config || saving}
+          disabled={!config || saving || !getAdminMode()}
           onCheckedChange={handleToggle}
         />
       </div>

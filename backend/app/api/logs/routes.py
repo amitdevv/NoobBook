@@ -261,21 +261,46 @@ def update_log_housekeeping():
         ), 400
     enabled = bool(payload.get("weekly_clear_enabled"))
 
-    config = _read_housekeeping()
-    new_value = {**config, "weekly_clear_enabled": enabled}
+    # Re-read inside the write path and conditionally update on the
+    # observed last_run_at. Without this gate, a scheduler tick that lands
+    # between our read and our write would have its freshly-written
+    # last_run_at silently reset to the snapshot value — making the next
+    # tick think it's "never run" and clear logs a second time inside the
+    # same 7-day window. Mirrors the conditional-UPDATE pattern in
+    # log_housekeeping_scheduler._try_update_last_run.
     try:
         client = get_supabase()
-        resp = (
+        config = _read_housekeeping()
+        prev_last_run = config.get("last_run_at")
+        new_value = {**config, "weekly_clear_enabled": enabled}
+        update_q = (
             client.table("app_settings")
             .update({"log_housekeeping": new_value})
             .eq("id", True)
-            .execute()
         )
+        if prev_last_run is None:
+            update_q = update_q.is_("log_housekeeping->>last_run_at", "null")
+        else:
+            update_q = update_q.eq("log_housekeeping->>last_run_at", prev_last_run)
+        resp = update_q.execute()
     except Exception as exc:
         logger.exception("Failed to update app_settings.log_housekeeping")
         return jsonify({"success": False, "error": str(exc)}), 500
     if not resp.data:
-        return jsonify({"success": False, "error": "no app_settings row"}), 500
+        # Scheduler tick won the race. Re-read so the caller sees the
+        # current state and can retry the toggle if it still doesn't match.
+        latest = _read_housekeeping()
+        return jsonify(
+            {
+                "success": False,
+                "error": (
+                    "Configuration changed concurrently — please reload "
+                    "and try again."
+                ),
+                "weekly_clear_enabled": bool(latest.get("weekly_clear_enabled", True)),
+                "last_run_at": latest.get("last_run_at"),
+            }
+        ), 409
     initiator = getattr(g, "user_id", None) or "admin"
     logger.info(
         "Weekly log auto-clear toggled %s by %s",
