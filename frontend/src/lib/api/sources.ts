@@ -91,6 +91,18 @@ export interface ChunkContent {
 }
 
 /**
+ * A single result row returned by GET /notion/search — used by the Notion picker.
+ */
+export interface NotionPickerItem {
+  id: string;
+  type: 'page' | 'database';
+  title?: string;
+  url?: string;
+  created_time?: string;
+  last_edited_time?: string;
+}
+
+/**
  * Processed content returned from the processed content API
  * Educational Note: This is used for viewing extracted text from sources
  * in the Sources panel. Users can click on a processed source to see
@@ -122,7 +134,7 @@ export interface RawFileUrl {
  */
 export const VIEWABLE_EXTENSIONS = [
   '.pdf', '.txt', '.docx', '.pptx', '.md', '.json', '.html', '.xml',  // Documents
-  '.link', '.research', '.mcp',                                          // Web content / MCP
+  '.link', '.research', '.mcp', '.notion',                              // Web content / MCP / Notion
 ];
 
 export const NON_VIEWABLE_EXTENSIONS = [
@@ -615,6 +627,71 @@ class SourcesAPI {
       return response.data.source;
     } catch (error) {
       log.error({ err: error }, 'failed to add Mixpanel source');
+      throw error;
+    }
+  }
+
+  /**
+   * Check whether the global Notion integration is configured (i.e. the
+   * admin has set NOTION_API_KEY). Returns false rather than throwing on
+   * misconfiguration so the picker can show a friendly empty state.
+   */
+  async getNotionStatus(): Promise<{ configured: boolean }> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/notion/status`);
+      return { configured: !!response.data?.configured };
+    } catch (error) {
+      log.error({ err: error }, 'failed to fetch notion status');
+      return { configured: false };
+    }
+  }
+
+  /**
+   * Search the connected Notion workspace for pages/databases (paginated server-side).
+   */
+  async searchNotion(
+    query?: string,
+    type?: 'page' | 'database',
+    limit = 50
+  ): Promise<NotionPickerItem[]> {
+    try {
+      const params: Record<string, string> = { limit: String(limit) };
+      if (query) params.q = query;
+      if (type) params.type = type;
+      const response = await axios.get(`${API_BASE_URL}/notion/search`, { params });
+      return (response.data?.results || []) as NotionPickerItem[];
+    } catch (error) {
+      log.error({ err: error }, 'failed to search notion');
+      throw error;
+    }
+  }
+
+  /**
+   * Add a Notion source (one page or one database) to a project.
+   * Educational Note: Notion content IS embedded for RAG — unlike Jira/Mixpanel
+   * which are live-API flags, Notion pages/databases are fetched once during
+   * processing, chunked, and stored for semantic search.
+   */
+  async addNotionSource(
+    projectId: string,
+    payload: {
+      notion_id: string;
+      object_type: 'page' | 'database';
+      title?: string;
+      notion_url?: string;
+      last_edited_time?: string;
+      name?: string;
+      description?: string;
+    }
+  ): Promise<Source> {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/projects/${projectId}/sources/notion`,
+        payload
+      );
+      return response.data.source;
+    } catch (error) {
+      log.error({ err: error }, 'failed to add Notion source');
       throw error;
     }
   }

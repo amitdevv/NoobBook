@@ -75,6 +75,7 @@ class SourceProcessingService:
         ".mixpanel": "mixpanel",  # Mixpanel analytics sources (live API flag)
         ".mcp": "mcp",  # MCP server resources
         ".research": "research",  # Deep research source
+        ".notion": "notion",  # Notion page/database sources
     }
 
     def process_source(self, project_id: str, source_id: str) -> Dict[str, Any]:
@@ -204,6 +205,10 @@ class SourceProcessingService:
             elif processor_type == "research":
                 from app.services.source_services.source_processing.research_processor import process_research
                 return process_research(project_id, source_id, source, raw_file_path, source_service)
+
+            elif processor_type == "notion":
+                from app.services.source_services.source_processing.notion_processor import process_notion
+                return process_notion(project_id, source_id, source, raw_file_path, source_service)
 
             else:
                 # Unsupported file type

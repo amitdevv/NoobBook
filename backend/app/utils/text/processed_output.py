@@ -53,6 +53,7 @@ SOURCE_METADATA_KEYS = {
     "LINK": ["url", "title", "content_type", "character_count", "token_count"],
     "YOUTUBE": ["url", "video_id", "language", "is_auto_generated", "duration", "segment_count", "character_count", "token_count"],
     "RESEARCH": ["topic", "link_count", "character_count", "token_count"],
+    "NOTION": ["object_type", "notion_url", "last_edited_time", "page_count", "character_count", "token_count"],
 }
 
 

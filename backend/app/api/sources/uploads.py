@@ -590,3 +590,131 @@ def add_mcp_source(project_id: str):
     except Exception as e:
         current_app.logger.error(f"Error adding MCP source: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# Notion: picker endpoints + source creation
+#
+# The picker endpoints (status, search) are project-agnostic — they just expose
+# the globally-configured Notion workspace so the frontend can let users browse
+# and pick a page/database. The actual source creation is per-project.
+# ---------------------------------------------------------------------------
+
+
+@sources_bp.route('/notion/status', methods=['GET'])
+@require_permission("integrations", "notion")
+def notion_status():
+    """Report whether the global Notion integration is configured."""
+    try:
+        from app.services.integrations.knowledge_bases.notion.notion_service import (
+            notion_service,
+        )
+        return jsonify({
+            'success': True,
+            'configured': notion_service.is_configured(),
+        }), 200
+    except Exception as e:
+        current_app.logger.error(f"Error checking Notion status: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@sources_bp.route('/notion/search', methods=['GET'])
+@require_permission("integrations", "notion")
+def notion_search():
+    """
+    Search the connected Notion workspace for pages and/or databases.
+
+    Query params:
+        q: Optional search query (Notion does substring/title matching)
+        type: Optional filter — 'page' or 'database' (default: both)
+        limit: Optional max results (default: 50, max: 100)
+    """
+    try:
+        from app.services.integrations.knowledge_bases.notion.notion_service import (
+            notion_service,
+        )
+
+        if not notion_service.is_configured():
+            return jsonify({
+                'success': False,
+                'error': 'Notion not configured. Add NOTION_API_KEY in Settings → API Keys.',
+                'configured': False,
+            }), 400
+
+        query = request.args.get('q', '').strip() or None
+        filter_type = request.args.get('type', '').strip().lower() or None
+        if filter_type and filter_type not in ('page', 'database'):
+            return jsonify({'success': False, 'error': "type must be 'page' or 'database'"}), 400
+        try:
+            limit = int(request.args.get('limit', '50'))
+        except ValueError:
+            limit = 50
+        limit = max(1, min(limit, 100))
+
+        result = notion_service.search(query=query, filter_type=filter_type, limit=limit)
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Notion search failed')}), 502
+
+        return jsonify({
+            'success': True,
+            'results': result.get('results', []),
+            'total': result.get('total', 0),
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Error searching Notion: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@sources_bp.route('/projects/<project_id>/sources/notion', methods=['POST'])
+@require_permission("integrations", "notion")
+def add_notion_source_endpoint(project_id: str):
+    """
+    Add a Notion source (one page or one database) to a project.
+
+    Request Body:
+        {
+            "notion_id": "uuid",                # required
+            "object_type": "page" | "database", # required
+            "title": "Picked title",            # optional, from picker
+            "notion_url": "https://notion.so/…",# optional
+            "last_edited_time": "ISO ts",       # optional
+            "name": "Override display name",    # optional
+            "description": "..."                # optional
+        }
+    """
+    try:
+        data = request.get_json() or {}
+        notion_id = (data.get('notion_id') or '').strip()
+        object_type = (data.get('object_type') or '').strip().lower()
+
+        if not notion_id:
+            return jsonify({'success': False, 'error': 'notion_id is required'}), 400
+        if object_type not in ('page', 'database'):
+            return jsonify({
+                'success': False,
+                'error': "object_type must be 'page' or 'database'",
+            }), 400
+
+        source = source_service.add_notion_source(
+            project_id=project_id,
+            notion_id=notion_id,
+            object_type=object_type,
+            title=data.get('title'),
+            notion_url=data.get('notion_url'),
+            last_edited_time=data.get('last_edited_time'),
+            name=data.get('name'),
+            description=data.get('description', ''),
+        )
+
+        return jsonify({
+            'success': True,
+            'source': source,
+            'message': 'Notion source added successfully',
+        }), 201
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error adding Notion source: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500

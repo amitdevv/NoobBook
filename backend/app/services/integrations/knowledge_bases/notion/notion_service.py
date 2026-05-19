@@ -4,13 +4,27 @@ Notion Integration Service - Notion API integration for NoobBook.
 Educational Note: This service provides methods to query Notion pages and databases
 using the Notion API. It follows NoobBook's service pattern with lazy-loaded
 client initialization and environment-based configuration.
+
+The page-fetch path recursively walks child blocks (with caps) so toggles,
+sub-pages, column layouts, and nested lists actually surface in the text we
+hand to RAG. Both ``search`` and the page/block walkers paginate through
+``has_more`` / ``next_cursor`` so large workspaces and long pages aren't
+truncated at 100 results.
 """
 import logging
 import os
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 import requests
 
 logger = logging.getLogger(__name__)
+
+
+# Recursion and result caps for page extraction. These guard against
+# pathologically large or self-referential Notion pages so a single import
+# can't run away with the worker pool. Tune in one place if needed.
+MAX_RECURSION_DEPTH = 5
+MAX_TOTAL_BLOCKS = 2000
+MAX_PAGINATION_PAGES = 50  # ~5000 blocks/items per paginated endpoint
 
 
 class NotionService:
@@ -117,62 +131,249 @@ class NotionService:
         except Exception as e:
             return {"success": False, "error": f"Request failed: {str(e)}"}
 
-    def search(self, query: Optional[str] = None, filter_type: Optional[str] = None, limit: int = 20) -> Dict[str, Any]:
+    # ------------------------------------------------------------------
+    # Pagination helpers
+    # ------------------------------------------------------------------
+
+    def _paginate_post(
+        self,
+        endpoint: str,
+        payload: Dict[str, Any],
+        page_size: int = 100,
+    ) -> Tuple[bool, List[Dict[str, Any]], Optional[str]]:
         """
-        Search Notion pages and databases.
+        Walk a paginated POST endpoint until ``has_more`` is false or we hit
+        MAX_PAGINATION_PAGES. Returns (success, results, error).
+        """
+        results: List[Dict[str, Any]] = []
+        cursor: Optional[str] = None
+        for _ in range(MAX_PAGINATION_PAGES):
+            body = dict(payload)
+            body["page_size"] = min(page_size, 100)
+            if cursor:
+                body["start_cursor"] = cursor
+            resp = self._make_request(endpoint, method='POST', json_data=body)
+            if not resp.get("success"):
+                return False, results, resp.get("error")
+            data = resp["data"]
+            results.extend(data.get("results", []) or [])
+            if not data.get("has_more"):
+                return True, results, None
+            cursor = data.get("next_cursor")
+            if not cursor:
+                return True, results, None
+        logger.warning("Notion pagination hit cap of %d pages at %s", MAX_PAGINATION_PAGES, endpoint)
+        return True, results, None
+
+    def _paginate_get(
+        self,
+        endpoint: str,
+        page_size: int = 100,
+    ) -> Tuple[bool, List[Dict[str, Any]], Optional[str]]:
+        """
+        Walk a paginated GET endpoint (e.g. ``blocks/{id}/children``). Notion
+        accepts start_cursor / page_size as query params on these endpoints.
+        Returns (success, results, error).
+        """
+        results: List[Dict[str, Any]] = []
+        cursor: Optional[str] = None
+        for _ in range(MAX_PAGINATION_PAGES):
+            sep = '&' if '?' in endpoint else '?'
+            url = f"{endpoint}{sep}page_size={min(page_size, 100)}"
+            if cursor:
+                url = f"{url}&start_cursor={cursor}"
+            resp = self._make_request(url)
+            if not resp.get("success"):
+                return False, results, resp.get("error")
+            data = resp["data"]
+            results.extend(data.get("results", []) or [])
+            if not data.get("has_more"):
+                return True, results, None
+            cursor = data.get("next_cursor")
+            if not cursor:
+                return True, results, None
+        logger.warning("Notion pagination hit cap of %d pages at %s", MAX_PAGINATION_PAGES, endpoint)
+        return True, results, None
+
+    # ------------------------------------------------------------------
+    # Block → text rendering
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _rich_text_to_str(rich_text: Optional[List[Dict[str, Any]]]) -> str:
+        """Join Notion's rich_text array into plain text."""
+        if not rich_text:
+            return ""
+        return "".join(rt.get("plain_text", "") for rt in rich_text)
+
+    @classmethod
+    def _render_block(cls, block: Dict[str, Any], indent: int = 0) -> Optional[str]:
+        """
+        Render a single Notion block as markdown-ish plain text. Returns None
+        when the block has no surfaceable text (e.g. unsupported embeds).
+        Children are NOT rendered here — the recursive walker handles them.
+        """
+        block_type = block.get("type")
+        if not block_type or block_type not in block:
+            return None
+        body = block[block_type] or {}
+        text = cls._rich_text_to_str(body.get("rich_text"))
+        prefix = "  " * indent
+
+        if block_type == "paragraph":
+            return f"{prefix}{text}" if text else None
+        if block_type == "heading_1":
+            return f"{prefix}# {text}" if text else None
+        if block_type == "heading_2":
+            return f"{prefix}## {text}" if text else None
+        if block_type == "heading_3":
+            return f"{prefix}### {text}" if text else None
+        if block_type == "bulleted_list_item":
+            return f"{prefix}- {text}"
+        if block_type == "numbered_list_item":
+            return f"{prefix}1. {text}"
+        if block_type == "to_do":
+            checked = body.get("checked", False)
+            box = "[x]" if checked else "[ ]"
+            return f"{prefix}- {box} {text}"
+        if block_type == "toggle":
+            return f"{prefix}▸ {text}" if text else None
+        if block_type == "quote":
+            return f"{prefix}> {text}" if text else None
+        if block_type == "callout":
+            return f"{prefix}> {text}" if text else None
+        if block_type == "code":
+            language = body.get("language", "")
+            return f"{prefix}```{language}\n{text}\n{prefix}```" if text else None
+        if block_type == "divider":
+            return f"{prefix}---"
+        if block_type == "child_page":
+            # Title is on the block itself, not in rich_text
+            title = body.get("title", "")
+            return f"{prefix}## {title}" if title else None
+        if block_type == "child_database":
+            title = body.get("title", "")
+            return f"{prefix}### Database: {title}" if title else None
+        if block_type == "bookmark" or block_type == "embed":
+            url = body.get("url", "")
+            caption = cls._rich_text_to_str(body.get("caption"))
+            label = caption or url
+            return f"{prefix}[{label}]({url})" if url else None
+
+        # Fallback: if we got any text out of rich_text, emit it
+        return f"{prefix}{text}" if text else None
+
+    def _walk_blocks(
+        self,
+        parent_id: str,
+        indent: int,
+        depth: int,
+        counter: Dict[str, int],
+    ) -> Tuple[List[str], Optional[str]]:
+        """
+        Recursively walk children of ``parent_id`` and return rendered lines.
+        Caps recursion at MAX_RECURSION_DEPTH and total emitted blocks at
+        MAX_TOTAL_BLOCKS. Returns (lines, error_or_none).
+        """
+        lines: List[str] = []
+        if depth > MAX_RECURSION_DEPTH:
+            return lines, None
+        if counter["count"] >= MAX_TOTAL_BLOCKS:
+            return lines, None
+
+        ok, blocks, err = self._paginate_get(f"blocks/{parent_id}/children")
+        if not ok:
+            return lines, err
+
+        for block in blocks:
+            if counter["count"] >= MAX_TOTAL_BLOCKS:
+                lines.append("…(truncated: page exceeded block cap)")
+                return lines, None
+            rendered = self._render_block(block, indent=indent)
+            if rendered:
+                lines.append(rendered)
+                counter["count"] += 1
+
+            if block.get("has_children") and depth < MAX_RECURSION_DEPTH:
+                child_id = block.get("id")
+                if child_id:
+                    child_lines, child_err = self._walk_blocks(
+                        child_id, indent=indent + 1, depth=depth + 1, counter=counter
+                    )
+                    if child_err:
+                        # Don't abort the whole page on a single child fetch error
+                        logger.warning(
+                            "Notion child fetch failed for block %s: %s", child_id, child_err
+                        )
+                    lines.extend(child_lines)
+
+        return lines, None
+
+    # ------------------------------------------------------------------
+    # Search / Page / Database
+    # ------------------------------------------------------------------
+
+    def search(self, query: Optional[str] = None, filter_type: Optional[str] = None, limit: int = 100) -> Dict[str, Any]:
+        """
+        Search Notion pages and databases (paginated).
 
         Args:
             query: Search query string (optional, returns all if not provided)
             filter_type: Filter by object type: 'page' or 'database' (optional)
-            limit: Maximum number of results (default: 20, max: 100)
+            limit: Maximum number of results to return after pagination (default 100)
 
         Returns:
             Dict with 'success' flag and either 'results' list or 'error'
         """
-        # Build search payload
-        payload = {
-            "page_size": min(limit, 100)
-        }
-
+        payload: Dict[str, Any] = {}
         if query:
             payload["query"] = query
-
         if filter_type:
-            payload["filter"] = {
-                "value": filter_type,
-                "property": "object"
-            }
+            payload["filter"] = {"value": filter_type, "property": "object"}
 
-        # TODO: Add pagination support (has_more / start_cursor) for large workspaces
-        result = self._make_request('search', method='POST', json_data=payload)
+        # Walk pages but bail as soon as we've collected `limit` results so a
+        # caller asking for 50 rows doesn't pull down 5000 just to discard 4950.
+        raw_results: List[Dict[str, Any]] = []
+        cursor: Optional[str] = None
+        for _ in range(MAX_PAGINATION_PAGES):
+            body: Dict[str, Any] = dict(payload)
+            body["page_size"] = min(limit, 100)
+            if cursor:
+                body["start_cursor"] = cursor
+            resp = self._make_request('search', method='POST', json_data=body)
+            if not resp.get("success"):
+                return {"success": False, "error": resp.get("error") or "Notion search failed"}
+            data = resp["data"]
+            raw_results.extend(data.get("results", []) or [])
+            if len(raw_results) >= limit or not data.get("has_more"):
+                break
+            cursor = data.get("next_cursor")
+            if not cursor:
+                break
+        raw_results = raw_results[:limit]
 
-        if not result['success']:
-            return result
-
-        # Format results
-        data = result['data']
-        results = data.get('results', [])
-
-        formatted_results = []
-        for item in results:
-            formatted_item = {
+        formatted_results: List[Dict[str, Any]] = []
+        for item in raw_results:
+            formatted_item: Dict[str, Any] = {
                 'id': item.get('id'),
                 'type': item.get('object'),  # 'page' or 'database'
                 'created_time': item.get('created_time'),
                 'last_edited_time': item.get('last_edited_time'),
-                'url': item.get('url')
+                'url': item.get('url'),
             }
 
             # Extract title
             if item.get('object') == 'page':
-                properties = item.get('properties', {})
-                title_prop = properties.get('title', {})
-                if title_prop.get('title'):
-                    formatted_item['title'] = ''.join([t.get('plain_text', '') for t in title_prop['title']])
+                properties = item.get('properties', {}) or {}
+                # Find the title property — it's not always called "title"
+                title_text = ""
+                for prop in properties.values():
+                    if prop.get('type') == 'title':
+                        title_text = self._rich_text_to_str(prop.get('title'))
+                        break
+                formatted_item['title'] = title_text or "Untitled"
             elif item.get('object') == 'database':
-                title = item.get('title', [])
-                if title:
-                    formatted_item['title'] = ''.join([t.get('plain_text', '') for t in title])
+                formatted_item['title'] = self._rich_text_to_str(item.get('title')) or "Untitled"
 
             formatted_results.append(formatted_item)
 
@@ -180,12 +381,17 @@ class NotionService:
             "success": True,
             "results": formatted_results,
             "total": len(formatted_results),
-            "has_more": data.get('has_more', False)
+            "has_more": False,
         }
 
     def get_page(self, page_id: str) -> Dict[str, Any]:
         """
-        Get page content including properties and blocks.
+        Get page content including properties and all nested blocks.
+
+        Recursively walks child blocks (toggles, sub-pages, columns, nested
+        lists) up to MAX_RECURSION_DEPTH levels and MAX_TOTAL_BLOCKS total
+        rendered blocks. Long pages are paginated via the blocks/{id}/children
+        endpoint.
 
         Args:
             page_id: Notion page ID
@@ -203,35 +409,30 @@ class NotionService:
 
         page = page_result['data']
 
-        # Get page blocks (content)
-        # Limitation: Only fetches top-level blocks. Nested children (e.g. items
-        # inside toggles, columns, or synced blocks) are not recursively fetched.
-        # TODO: Add pagination support (has_more / next_cursor) for pages with 100+ blocks
-        blocks_result = self._make_request(f'blocks/{page_id}/children')
-        if not blocks_result['success']:
-            return blocks_result
+        # Extract title from the page's own properties for display
+        title = "Untitled"
+        for prop in (page.get('properties') or {}).values():
+            if prop.get('type') == 'title':
+                title = self._rich_text_to_str(prop.get('title')) or "Untitled"
+                break
 
-        blocks = blocks_result['data'].get('results', [])
+        counter = {"count": 0}
+        lines, err = self._walk_blocks(page_id, indent=0, depth=0, counter=counter)
+        if err and not lines:
+            return {"success": False, "error": err}
 
-        # Extract text content from blocks
-        content_parts = []
-        for block in blocks:
-            block_type = block.get('type')
-            if block_type and block_type in block:
-                block_content = block[block_type]
-                if 'rich_text' in block_content:
-                    text = ''.join([t.get('plain_text', '') for t in block_content['rich_text']])
-                    if text:
-                        content_parts.append(text)
+        content = "\n\n".join(line for line in lines if line)
 
         return {
             "success": True,
             "page": {
                 'id': page.get('id'),
+                'title': title,
                 'url': page.get('url'),
                 'created_time': page.get('created_time'),
                 'last_edited_time': page.get('last_edited_time'),
-                'content': '\n\n'.join(content_parts)
+                'content': content,
+                'block_count': counter["count"],
             }
         }
 
@@ -255,23 +456,24 @@ class NotionService:
         database = result['data']
 
         # Extract schema
-        properties = database.get('properties', {})
-        schema = {}
-        for prop_name, prop_data in properties.items():
-            schema[prop_name] = {
+        properties = database.get('properties', {}) or {}
+        schema = {
+            prop_name: {
                 'type': prop_data.get('type'),
-                'id': prop_data.get('id')
+                'id': prop_data.get('id'),
             }
+            for prop_name, prop_data in properties.items()
+        }
 
         return {
             "success": True,
             "database": {
                 'id': database.get('id'),
-                'title': ''.join([t.get('plain_text', '') for t in database.get('title', [])]),
+                'title': self._rich_text_to_str(database.get('title')) or "Untitled",
                 'url': database.get('url'),
                 'created_time': database.get('created_time'),
                 'last_edited_time': database.get('last_edited_time'),
-                'schema': schema
+                'schema': schema,
             }
         }
 
@@ -279,15 +481,15 @@ class NotionService:
         self,
         database_id: str,
         filter_conditions: Optional[Dict] = None,
-        limit: int = 20
+        limit: int = 100,
     ) -> Dict[str, Any]:
         """
-        Query database with optional filters.
+        Query database with optional filters (paginated).
 
         Args:
             database_id: Notion database ID
             filter_conditions: Optional filter object (Notion filter format)
-            limit: Maximum results (default: 20, max: 100)
+            limit: Maximum results after pagination (default 100)
 
         Returns:
             Dict with 'success' flag and either 'results' list or 'error'
@@ -295,41 +497,65 @@ class NotionService:
         if not database_id:
             return {"success": False, "error": "database_id is required"}
 
-        # Build query payload
-        payload = {
-            "page_size": min(limit, 100)
-        }
-
+        payload: Dict[str, Any] = {}
         if filter_conditions:
             payload["filter"] = filter_conditions
 
-        result = self._make_request(f'databases/{database_id}/query', method='POST', json_data=payload)
+        # Walk pages but bail as soon as we've collected `limit` rows — for a
+        # database with thousands of rows and a small caller-limit, the old
+        # "fetch everything then trim" path would burn API calls and could
+        # tip us over Notion's rate limit and fail the whole import.
+        endpoint = f'databases/{database_id}/query'
+        raw_results: List[Dict[str, Any]] = []
+        cursor: Optional[str] = None
+        for _ in range(MAX_PAGINATION_PAGES):
+            body: Dict[str, Any] = dict(payload)
+            body["page_size"] = min(limit, 100)
+            if cursor:
+                body["start_cursor"] = cursor
+            resp = self._make_request(endpoint, method='POST', json_data=body)
+            if not resp.get("success"):
+                return {"success": False, "error": resp.get("error") or "Notion database query failed"}
+            data = resp["data"]
+            raw_results.extend(data.get("results", []) or [])
+            if len(raw_results) >= limit or not data.get("has_more"):
+                break
+            cursor = data.get("next_cursor")
+            if not cursor:
+                break
+        raw_results = raw_results[:limit]
 
-        if not result['success']:
-            return result
+        formatted_results: List[Dict[str, Any]] = []
+        for page in raw_results:
+            properties = page.get('properties', {}) or {}
+            # Resolve the row's display title from the actual title-type property
+            # — we can't rely on a string-value heuristic on the formatted props
+            # because title/rich_text/url/email/phone_number all collapse to
+            # plain strings below, so a row whose first property is a URL would
+            # otherwise get that URL promoted as its heading.
+            row_title = ""
+            for prop_data in properties.values():
+                if prop_data.get('type') == 'title':
+                    row_title = self._rich_text_to_str(prop_data.get('title'))
+                    if row_title:
+                        break
 
-        # Format results
-        data = result['data']
-        results = data.get('results', [])
-
-        formatted_results = []
-        for page in results:
-            properties = page.get('properties', {})
-            formatted_page = {
+            formatted_page: Dict[str, Any] = {
                 'id': page.get('id'),
+                'title': row_title or "Untitled",
                 'url': page.get('url'),
                 'created_time': page.get('created_time'),
                 'last_edited_time': page.get('last_edited_time'),
-                'properties': {}
+                'properties': {},
             }
 
             # Extract property values
             for prop_name, prop_data in properties.items():
                 prop_type = prop_data.get('type')
                 if prop_type == 'title':
-                    formatted_page['properties'][prop_name] = ''.join([t.get('plain_text', '') for t in prop_data.get('title', [])])
+                    formatted_page['properties'][prop_name] = self._rich_text_to_str(prop_data.get('title'))
                 elif prop_type == 'rich_text':
-                    formatted_page['properties'][prop_name] = ''.join([t.get('plain_text', '') for t in prop_data.get('rich_text', [])])
+                    formatted_page['properties'][prop_name] = self._rich_text_to_str(prop_data.get('rich_text'))
                 elif prop_type in ['number', 'checkbox', 'url', 'email', 'phone_number']:
                     formatted_page['properties'][prop_name] = prop_data.get(prop_type)
                 elif prop_type == 'select':
@@ -347,7 +573,7 @@ class NotionService:
             "success": True,
             "results": formatted_results,
             "total": len(formatted_results),
-            "has_more": data.get('has_more', False)
+            "has_more": False,
         }
 
 

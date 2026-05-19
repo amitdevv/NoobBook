@@ -202,6 +202,22 @@ class UserService:
         )
         return bool(resp.data)
 
+    def set_settings_key(self, user_id: str, key: str, value: Any) -> bool:
+        """
+        Read-modify-write a single key inside users.settings JSONB.
+
+        Educational Note: `users.settings` holds several unrelated knobs —
+        spending config, this log-download preference, anything we add
+        later. Callers updating just one key must merge, never replace,
+        or they'd clobber the other admins' spending limit settings.
+        """
+        current = self.get_user_settings_raw(user_id) or {}
+        if current.get(key) == value:
+            # No-op write — avoids burning a row update for an idempotent toggle.
+            return True
+        current[key] = value
+        return self.save_user_settings(user_id, current)
+
     def maybe_reset_expired_spending_period(
         self,
         user_id: str,
