@@ -131,12 +131,17 @@ class TestGeneratorExitFreshness:
 
 
 class TestLabelingBranches:
-    """main_chat_service writes one of three different message contents
-    depending on (cancelled, user_stopped). Exercise the matrix in
-    isolation — same shape as before H2."""
+    """main_chat_service writes one of four different outcomes depending on
+    (cancelled, user_stopped, has_text). Exercise the matrix in isolation —
+    same shape as before H2.
+
+    Returns None for the PROXY_DISCONNECT_NO_CONTENT branch to mirror
+    production, where assistant_msg = None and nothing is persisted. A
+    regression that accidentally writes a placeholder here would surface
+    as the test asserting None but getting a string back."""
 
     @staticmethod
-    def _label(cancelled: bool, user_stopped: bool, final_text: str) -> str:
+    def _label(cancelled: bool, user_stopped: bool, final_text: str):
         if cancelled and user_stopped:
             return (
                 final_text + "\n\n_(stopped by user)_"
@@ -144,7 +149,9 @@ class TestLabelingBranches:
                 else "_(stopped by user)_"
             )
         if cancelled:
-            return final_text if final_text.strip() else "I've processed your request."
+            # Mirrors the PROXY_DISCONNECT_PERSIST / PROXY_DISCONNECT_NO_CONTENT
+            # branches in main_chat_service._run_message_flow.
+            return final_text if final_text.strip() else None
         return final_text or "I've processed your request."
 
     def test_user_stop_with_text_appends_marker(self):
@@ -159,8 +166,11 @@ class TestLabelingBranches:
         assert self._label(True, False, "partial answer") == "partial answer"
         assert "stopped by user" not in self._label(True, False, "partial answer")
 
-    def test_proxy_disconnect_with_empty_text_uses_placeholder(self):
-        assert self._label(True, False, "") == "I've processed your request."
+    def test_proxy_disconnect_with_empty_text_persists_nothing(self):
+        """PROXY_DISCONNECT_NO_CONTENT branch — production sets
+        assistant_msg = None and skips the DB write. Asserting None here
+        catches a regression that re-introduces the bogus placeholder."""
+        assert self._label(True, False, "") is None
 
     def test_normal_completion_persists_text(self):
         assert self._label(False, False, "full answer") == "full answer"

@@ -23,15 +23,15 @@ import { ChatInput } from './ChatInput';
 import { ChatList } from './ChatList';
 import { ChatEmptyState } from './ChatEmptyState';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { exportChatAsPdf } from '@/lib/exportChatPdf';
+import { createLogger } from '@/lib/logger';
+import { API_BASE_URL, extractServerError } from '@/lib/api/client';
 
 // RawMessageView pulls in react-syntax-highlighter — sizeable, and only
 // used when the user toggles into Raw debug mode (rare). Defer until then.
 const RawMessageView = lazy(() =>
   import('./RawMessageView').then((m) => ({ default: m.RawMessageView })),
 );
-import { exportChatAsPdf } from '@/lib/exportChatPdf';
-import { createLogger } from '@/lib/logger';
-import { API_BASE_URL, extractServerError } from '@/lib/api/client';
 
 const log = createLogger('chat-panel');
 
