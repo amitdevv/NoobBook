@@ -445,6 +445,25 @@ def stream_message(project_id, chat_id):
             #   3. The proxy (Coolify/nginx) gave up on an idle SSE
             #      connection despite our 15s heartbeats.
             #
+            # ORDERING MATTERS: cancel_event.set() FIRST, BEFORE the Supabase
+            # lookup for the user-stop label. The Supabase call can hang for
+            # 30-120s on the OS-default socket timeout if Supabase/Kong is
+            # unreachable — which is exactly the burst-load scenario this PR
+            # targets. With the old ordering (label first, cancel last), the
+            # worker thread kept running Claude tool calls for the entire
+            # hang window, burning tokens and CPU on a request the user has
+            # already abandoned.
+            #
+            # The labeling logic can race the worker (rare — worker is
+            # usually mid-Claude-call for seconds when GeneratorExit fires,
+            # giving the Supabase query plenty of time to finish before the
+            # worker reaches the labeling branch in main_chat_service). On
+            # the rare race, a real user-stop gets labeled as proxy-
+            # disconnect; that's a UX wart, not data loss, and same UX as
+            # pre-PR-283. Acceptable trade-off for guaranteed worker
+            # termination on Supabase outages.
+            cancel_event.set()
+
             # cancel_event is set in all three cases — the worker stops
             # persisting. user_stop_event is set ONLY in case 1, so the
             # final assistant message only gets the "(stopped by user)"
@@ -456,7 +475,20 @@ def stream_message(project_id, chat_id):
             # in-process set we used pre-H2 only worked when workers=1.
             # Freshness check: a stop timestamp from BEFORE this stream
             # started is from a previous message — ignore it (M1 race).
-            user_stopped_at_iso = chat_service.get_user_stopped_at(project_id, chat_id)
+            try:
+                user_stopped_at_iso = chat_service.get_user_stopped_at(project_id, chat_id)
+            except Exception as supabase_exc:
+                # Defensive: get_user_stopped_at already catches everything,
+                # but if it ever raises (e.g. a new exception type after a
+                # supabase-py upgrade), default to proxy_disconnect rather
+                # than crashing the cleanup path. The worker has already
+                # been told to stop above; this is purely for labeling.
+                app.logger.warning(
+                    "SSE_CLOSE_TRACE chat=%s supabase_lookup_failed err=%s:%s "
+                    "— defaulting label to connection_dropped",
+                    chat_id, type(supabase_exc).__name__, str(supabase_exc)[:120],
+                )
+                user_stopped_at_iso = None
             was_user_stop = False
             if user_stopped_at_iso:
                 try:
@@ -478,7 +510,6 @@ def stream_message(project_id, chat_id):
                 now - stream_started_at,
                 now - last_event_at, heartbeat_count,
             )
-            cancel_event.set()
             raise
 
     headers = {
