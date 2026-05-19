@@ -249,9 +249,14 @@ def get_api_keys():
         # One Supabase round-trip up front so we know which keys are in the
         # persistent store vs only injected by the host (Coolify / compose).
         # The distinction tells the UI whether to render a "Pinned by
-        # deployment" badge and disable the input.
+        # deployment" badge and disable the input. We compare the actual
+        # values, not just key presence — when an operator pins a key via
+        # the host AND a stale DB entry exists for the same name, the host
+        # value wins in os.environ but the DB still contains the old one;
+        # treating presence-in-DB as "source: 'db'" would wrongly make the
+        # UI editable.
         from app.services.app_settings.api_key_store import api_key_store
-        db_keys = set(api_key_store.load_all().keys())
+        db_values = api_key_store.load_all()
 
         api_keys = []
         for key_config in API_KEYS_CONFIG:
@@ -259,15 +264,16 @@ def get_api_keys():
             value = env_service.get_key(key_id)
             masked_value = env_service.mask_key(value) if value else ''
 
-            in_db = key_id in db_keys
             if not value:
                 source = 'unset'
-            elif in_db:
+            elif db_values.get(key_id) == value:
                 source = 'db'
             else:
-                # Value is present in os.environ but the store doesn't have
-                # it — it was injected by the host environment and the UI
-                # cannot override it from here.
+                # Value is present in os.environ but doesn't match what's
+                # in the store (either nothing there, or a stale entry the
+                # host env is now overriding). Either way the UI can't
+                # change it from here — the operator must update the host
+                # env.
                 source = 'env'
 
             api_keys.append({

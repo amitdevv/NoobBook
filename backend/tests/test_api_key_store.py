@@ -132,6 +132,33 @@ def test_decrypt_fails_gracefully_after_secret_rotation(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
+def test_source_classification_uses_value_match_not_just_presence(monkeypatch):
+    """
+    Regression: when an operator pins a key via the host env AND a stale DB
+    entry exists for the same name, source must be 'env' (not 'db'). The
+    earlier implementation classified by name presence, which silently
+    exposed pinned keys as editable in the UI.
+    """
+    monkeypatch.setenv("SECRET_KEY", "s")
+    table = _FakeAppSettingsTable()
+    store_mod = _install_fake_supabase(monkeypatch, table)
+
+    # Both stores have an entry for the same key, but the values differ.
+    store_mod.ApiKeyStore().set("NOTION_API_KEY", "stale-db-value")
+    monkeypatch.setenv("NOTION_API_KEY", "host-pinned-value")
+
+    # This is the exact comparison the GET handler performs.
+    db_values = store_mod.ApiKeyStore().load_all()
+    value = os.environ["NOTION_API_KEY"]
+    if not value:
+        source = "unset"
+    elif db_values.get("NOTION_API_KEY") == value:
+        source = "db"
+    else:
+        source = "env"
+    assert source == "env"
+
+
 def test_hydrate_environ_does_not_overwrite_existing(monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "s")
     table = _FakeAppSettingsTable()

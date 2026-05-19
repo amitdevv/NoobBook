@@ -139,8 +139,9 @@ class ApiKeyStore:
                 .execute()
             )
             return bool(resp.data)
-        except Exception as exc:
-            logger.exception("ApiKeyStore: failed to write api_keys: %s", exc)
+        except Exception:
+            # logger.exception already attaches the traceback via sys.exc_info()
+            logger.exception("ApiKeyStore: failed to write api_keys")
             return False
 
     # ------------------------------------------------------------------
