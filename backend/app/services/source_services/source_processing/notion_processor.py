@@ -64,23 +64,27 @@ def _fetch_page(source_id: str, notion_id: str) -> Tuple[str, Dict[str, Any]]:
 
 def _format_db_row(row: Dict[str, Any], row_body: str) -> str:
     """
-    Render a database row as a single processed page: a property table on top,
-    followed by the row's page content (the body).
+    Render a database row as a single processed page: an H1 from the row's
+    title property, a property table, and then the row's page content.
+
+    The row's title comes from the `title` field that notion_service.query_database
+    extracts directly from the title-type property — we don't guess from
+    formatted property values because `query_database` strips type info, so
+    title/url/email/rich_text columns are all indistinguishable plain strings
+    after that point.
     """
     props = row.get("properties") or {}
-    title_value = ""
-    other_props: List[Tuple[str, Any]] = []
-    for k, v in props.items():
-        if isinstance(v, str) and v and not title_value:
-            # Promote the first non-empty string property to the H1 title
-            # and *skip* re-emitting it in the Properties list below — otherwise
-            # the row's title would appear twice in every embedded page.
-            title_value = v
-            continue
-        other_props.append((k, v))
+    title_value = (row.get("title") or "").strip()
 
     header = f"# {title_value}" if title_value else "# (untitled row)"
     lines = [header, ""]
+
+    # Properties list. Skip whichever property *was* the title so it doesn't
+    # appear twice on the page.
+    other_props: List[Tuple[str, Any]] = [
+        (k, v) for k, v in props.items()
+        if not (isinstance(v, str) and v == title_value)
+    ]
     if other_props:
         lines.append("## Properties")
         for k, v in other_props:

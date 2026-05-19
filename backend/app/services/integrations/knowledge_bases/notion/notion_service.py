@@ -501,19 +501,48 @@ class NotionService:
         if filter_conditions:
             payload["filter"] = filter_conditions
 
-        ok, raw_results, err = self._paginate_post(
-            f'databases/{database_id}/query', payload, page_size=min(limit, 100)
-        )
-        if not ok:
-            return {"success": False, "error": err or "Notion database query failed"}
-
+        # Walk pages but bail as soon as we've collected `limit` rows — for a
+        # database with thousands of rows and a small caller-limit, the old
+        # "fetch everything then trim" path would burn API calls and could
+        # tip us over Notion's rate limit and fail the whole import.
+        endpoint = f'databases/{database_id}/query'
+        raw_results: List[Dict[str, Any]] = []
+        cursor: Optional[str] = None
+        for _ in range(MAX_PAGINATION_PAGES):
+            body: Dict[str, Any] = dict(payload)
+            body["page_size"] = min(limit, 100)
+            if cursor:
+                body["start_cursor"] = cursor
+            resp = self._make_request(endpoint, method='POST', json_data=body)
+            if not resp.get("success"):
+                return {"success": False, "error": resp.get("error") or "Notion database query failed"}
+            data = resp["data"]
+            raw_results.extend(data.get("results", []) or [])
+            if len(raw_results) >= limit or not data.get("has_more"):
+                break
+            cursor = data.get("next_cursor")
+            if not cursor:
+                break
         raw_results = raw_results[:limit]
 
         formatted_results: List[Dict[str, Any]] = []
         for page in raw_results:
             properties = page.get('properties', {}) or {}
+            # Resolve the row's display title from the actual title-type property
+            # — we can't rely on a string-value heuristic on the formatted props
+            # because title/rich_text/url/email/phone_number all collapse to
+            # plain strings below, so a row whose first property is a URL would
+            # otherwise get that URL promoted as its heading.
+            row_title = ""
+            for prop_data in properties.values():
+                if prop_data.get('type') == 'title':
+                    row_title = self._rich_text_to_str(prop_data.get('title'))
+                    if row_title:
+                        break
+
             formatted_page: Dict[str, Any] = {
                 'id': page.get('id'),
+                'title': row_title or "Untitled",
                 'url': page.get('url'),
                 'created_time': page.get('created_time'),
                 'last_edited_time': page.get('last_edited_time'),

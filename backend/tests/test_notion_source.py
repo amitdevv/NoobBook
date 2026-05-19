@@ -333,8 +333,10 @@ def test_process_notion_database(tmp_path, monkeypatch):
     monkeypatch.setattr(np_module.notion_service, "query_database", lambda nid, **kw: {
         "success": True,
         "results": [
-            {"id": "row-1", "properties": {"Name": "Task 1", "Status": "Open"}},
-            {"id": "row-2", "properties": {"Name": "Task 2", "Status": "Done"}},
+            {"id": "row-1", "title": "Task 1",
+             "properties": {"Name": "Task 1", "Status": "Open"}},
+            {"id": "row-2", "title": "Task 2",
+             "properties": {"Name": "Task 2", "Status": "Done"}},
         ],
     })
     monkeypatch.setattr(np_module.notion_service, "get_page", lambda nid: {
@@ -357,6 +359,97 @@ def test_process_notion_database(tmp_path, monkeypatch):
     final_call = source_service.update_source.call_args_list[-1]
     pi = final_call.kwargs.get("processing_info", {})
     assert pi.get("total_pages") == 3
+
+
+def test_query_database_extracts_title_from_title_property(monkeypatch):
+    """The row's title must come from the title-type property, not from
+    whichever string-valued property happens to come first."""
+    import importlib
+    ns_module = importlib.import_module(
+        "app.services.integrations.knowledge_bases.notion.notion_service"
+    )
+    svc = ns_module.NotionService()
+    svc._configured = True
+    svc._api_key = "test"
+
+    # A row where a URL column comes BEFORE the title column in property order
+    # — the formatted props would otherwise collapse to indistinguishable
+    # strings and the URL would get promoted as the row heading.
+    row = {
+        "id": "row-1",
+        "properties": {
+            "Link": {"type": "url", "url": "https://example.com"},
+            "Name": {"type": "title", "title": [{"plain_text": "Real Title"}]},
+            "Status": {"type": "select", "select": {"name": "Open"}},
+        },
+    }
+    monkeypatch.setattr(svc, "_make_request", lambda *a, **kw: {
+        "success": True,
+        "data": {"results": [row], "has_more": False},
+    })
+
+    result = svc.query_database("db-1")
+    assert result["success"]
+    assert result["results"][0]["title"] == "Real Title"
+
+
+def test_query_database_early_exits_at_limit(monkeypatch):
+    """Pagination must stop once `limit` rows are collected — no over-fetching."""
+    import importlib
+    ns_module = importlib.import_module(
+        "app.services.integrations.knowledge_bases.notion.notion_service"
+    )
+    svc = ns_module.NotionService()
+    svc._configured = True
+    svc._api_key = "test"
+
+    calls = {"n": 0}
+
+    def fake_request(endpoint, method="GET", json_data=None):
+        calls["n"] += 1
+        # Each page returns 50 rows and claims there's more — but the caller
+        # asked for limit=50, so the loop must break after the first page.
+        return {
+            "success": True,
+            "data": {
+                "results": [
+                    {"id": f"row-{i}", "title": "t", "properties": {}}
+                    for i in range(50)
+                ],
+                "has_more": True,
+                "next_cursor": "cursor-x",
+            },
+        }
+
+    monkeypatch.setattr(svc, "_make_request", fake_request)
+    result = svc.query_database("db-1", limit=50)
+    assert result["success"]
+    assert len(result["results"]) == 50
+    assert calls["n"] == 1, "should not have requested a second page"
+
+
+def test_format_db_row_uses_title_field(monkeypatch):
+    """_format_db_row should honour the explicit `title` field, even if a
+    different string-valued property comes earlier."""
+    from app.services.source_services.source_processing.notion_processor import (
+        _format_db_row,
+    )
+    row = {
+        "id": "r",
+        "title": "Real Title",
+        "properties": {
+            "Link": "https://example.com",
+            "Name": "Real Title",
+            "Status": "Open",
+        },
+    }
+    rendered = _format_db_row(row, row_body="Body text")
+    assert rendered.startswith("# Real Title")
+    # The title property itself should not appear twice.
+    assert rendered.count("Real Title") == 1
+    # Other props should still be listed.
+    assert "Link" in rendered and "https://example.com" in rendered
+    assert "Status" in rendered and "Open" in rendered
 
 
 def test_process_notion_invalid_stub(tmp_path, monkeypatch):
