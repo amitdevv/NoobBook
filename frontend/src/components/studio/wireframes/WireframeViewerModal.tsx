@@ -12,8 +12,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PencilSimple } from '@phosphor-icons/react';
+import { PencilSimple, Warning } from '@phosphor-icons/react';
 import type { WireframeJob } from '@/lib/api/studio/wireframes';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // WireframeViewer pulls in @excalidraw/excalidraw (~1.2 MB minified —
 // the largest single dep in the dep graph). Defer until the modal opens.
@@ -21,6 +22,25 @@ import type { WireframeJob } from '@/lib/api/studio/wireframes';
 // they never viewed a wireframe.
 const WireframeViewer = lazy(() =>
   import('./WireframeViewer').then((m) => ({ default: m.WireframeViewer })),
+);
+
+// Local fallback for excalidraw chunk-load failure — keeps the error
+// scoped to the modal so the rest of the workspace stays usable.
+const WireframeLoadError = ({ onClose }: { onClose?: () => void }) => (
+  <div className="h-full flex items-center justify-center p-6">
+    <div className="text-center max-w-sm">
+      <Warning size={28} weight="duotone" className="mx-auto text-amber-600 mb-3" />
+      <p className="text-sm text-stone-700 font-medium mb-1">Couldn't load the wireframe viewer</p>
+      <p className="text-xs text-stone-500 mb-4">
+        Check your connection and refresh the page to try again.
+      </p>
+      {onClose && (
+        <Button variant="outline" size="sm" onClick={onClose}>
+          Close
+        </Button>
+      )}
+    </div>
+  </div>
 );
 
 interface WireframeViewerModalProps {
@@ -86,15 +106,23 @@ export const WireframeViewerModal: React.FC<WireframeViewerModalProps> = ({
 
         {/* Wireframe viewer - Excalidraw needs explicit non-zero dimensions */}
         <div style={{ flex: 1, height: 'calc(92vh - 50px)', width: '100%' }}>
-          <Suspense
-            fallback={
-              <div className="h-full flex items-center justify-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-              </div>
-            }
+          {/* Local ErrorBoundary keeps an excalidraw chunk-load failure
+              (~3.4 MB of code — most likely point for network issues to
+              surface) scoped to this modal instead of crashing the workspace. */}
+          <ErrorBoundary
+            resetKey={job.id}
+            fallback={<WireframeLoadError onClose={onClose} />}
           >
-            <WireframeViewer elements={job.elements} />
-          </Suspense>
+            <Suspense
+              fallback={
+                <div className="h-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                </div>
+              }
+            >
+              <WireframeViewer elements={job.elements} />
+            </Suspense>
+          </ErrorBoundary>
         </div>
 
         {/* Edit input */}

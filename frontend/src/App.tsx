@@ -325,27 +325,28 @@ function App() {
   const isShareRoute =
     typeof window !== 'undefined' && window.location.pathname.startsWith('/share/');
 
-  if (authRequired && !isAuthenticated && !isShareRoute) {
-    // AuthPage is now lazy — wrap in Suspense so its chunk load shows the
-    // spinner rather than blank screen.
-    return (
-      <Suspense fallback={<FullScreenSpinner />}>
-        <AuthPage onAuthenticated={refreshAuth} />
-      </Suspense>
-    );
-  }
-
+  // ErrorBoundary wraps BOTH the early-return AuthPage path AND the
+  // authenticated workspace below. Without this, an AuthPage chunk-load
+  // failure would leave the user staring at a blank loading spinner with
+  // no recovery — particularly bad as a first impression. The boundary's
+  // chunk-load detection (see ErrorBoundary.tsx) surfaces a "please refresh"
+  // prompt instead of a generic crash panel for that specific failure.
   return (
     <ErrorBoundary>
-      <PermissionsProvider>
-        <IntegrationsProvider>
-          <BrowserRouter>
-            {/* One Suspense boundary wraps all routes — every <Route> below
-                has a lazy-loaded element. The first navigation to each route
-                shows FullScreenSpinner while the chunk downloads; subsequent
-                navigations are instant (browser cache). */}
-            <Suspense fallback={<FullScreenSpinner />}>
-              <Routes>
+      {authRequired && !isAuthenticated && !isShareRoute ? (
+        <Suspense fallback={<FullScreenSpinner />}>
+          <AuthPage onAuthenticated={refreshAuth} />
+        </Suspense>
+      ) : (
+        <PermissionsProvider>
+          <IntegrationsProvider>
+            <BrowserRouter>
+              {/* One Suspense boundary wraps all routes — every <Route> below
+                  has a lazy-loaded element. The first navigation to each route
+                  shows FullScreenSpinner while the chunk downloads; subsequent
+                  navigations are instant (browser cache). */}
+              <Suspense fallback={<FullScreenSpinner />}>
+                <Routes>
               {/* Shared project (read-only). Mounted before /projects so
                   public-link viewers don't need a JWT to reach it. */}
               <Route path="/share/:token" element={<ShareWorkspace />} />
@@ -391,9 +392,10 @@ function App() {
           <GlobalLogsModalGate isAdmin={isAdmin} />
           {/* Top-level toasts — used by the SESSION_EXPIRED_EVENT handler
               so the user gets an explanation before AuthPage renders. */}
-          <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-        </IntegrationsProvider>
-      </PermissionsProvider>
+              <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+            </IntegrationsProvider>
+          </PermissionsProvider>
+      )}
     </ErrorBoundary>
   );
 }

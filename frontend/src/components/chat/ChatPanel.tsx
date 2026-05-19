@@ -22,6 +22,8 @@ import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { ChatList } from './ChatList';
 import { ChatEmptyState } from './ChatEmptyState';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+
 // RawMessageView pulls in react-syntax-highlighter — sizeable, and only
 // used when the user toggles into Raw debug mode (rare). Defer until then.
 const RawMessageView = lazy(() =>
@@ -1226,15 +1228,42 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       />
 
       {rawMode && activeChat ? (
-        <Suspense
+        // Local ErrorBoundary: a syntax-highlighter chunk-load failure
+        // shouldn't crash the entire chat panel — let the user click
+        // back out of Raw mode and keep using the normal view. resetKey
+        // = chat-id so switching chats resets any prior error.
+        <ErrorBoundary
+          resetKey={activeChat.id}
           fallback={
-            <div className="flex-1 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+            <div className="flex-1 flex items-center justify-center p-6">
+              <div className="text-center max-w-sm">
+                <p className="text-sm text-stone-700 font-medium mb-1">
+                  Couldn't load the raw debug view
+                </p>
+                <p className="text-xs text-stone-500 mb-3">
+                  Toggle Raw mode off to return to the normal chat view.
+                </p>
+                <button
+                  type="button"
+                  className="text-xs text-amber-700 hover:underline"
+                  onClick={() => setRawMode(false)}
+                >
+                  Exit Raw mode
+                </button>
+              </div>
             </div>
           }
         >
-          <RawMessageView projectId={projectId} chatId={activeChat.id} />
-        </Suspense>
+          <Suspense
+            fallback={
+              <div className="flex-1 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+              </div>
+            }
+          >
+            <RawMessageView projectId={projectId} chatId={activeChat.id} />
+          </Suspense>
+        </ErrorBoundary>
       ) : (
         <ChatMessages
           messages={activeChat?.messages || []}

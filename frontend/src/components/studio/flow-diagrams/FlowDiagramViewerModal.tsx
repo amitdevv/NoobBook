@@ -12,8 +12,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PencilSimple } from '@phosphor-icons/react';
+import { PencilSimple, Warning } from '@phosphor-icons/react';
 import type { FlowDiagramJob } from '@/lib/api/studio';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // FlowDiagramViewer pulls in mermaid (~500 KB minified). Defer until the
 // modal opens — pre-fix, every user paid for mermaid up-front even when
@@ -21,6 +22,27 @@ import type { FlowDiagramJob } from '@/lib/api/studio';
 // loads when the user clicks a flow diagram tile.
 const FlowDiagramViewer = lazy(() =>
   import('./FlowDiagramViewer').then((m) => ({ default: m.FlowDiagramViewer })),
+);
+
+// Local fallback used when the lazy chunk fails to load (offline, deploy
+// rotation, etc). Inline + compact so the failure doesn't crash the
+// whole workspace — only the modal body shows the error and the user
+// can close the modal and continue working.
+const FlowDiagramLoadError = ({ onClose }: { onClose?: () => void }) => (
+  <div className="h-full flex items-center justify-center p-6">
+    <div className="text-center max-w-sm">
+      <Warning size={28} weight="duotone" className="mx-auto text-amber-600 mb-3" />
+      <p className="text-sm text-stone-700 font-medium mb-1">Couldn't load the diagram viewer</p>
+      <p className="text-xs text-stone-500 mb-4">
+        Check your connection and refresh the page to try again.
+      </p>
+      {onClose && (
+        <Button variant="outline" size="sm" onClick={onClose}>
+          Close
+        </Button>
+      )}
+    </div>
+  </div>
 );
 
 interface FlowDiagramViewerModalProps {
@@ -88,18 +110,27 @@ export const FlowDiagramViewerModal: React.FC<FlowDiagramViewerModalProps> = ({
 
         {/* Full diagram viewer area */}
         <div className="flex-1 overflow-hidden">
-          <Suspense
-            fallback={
-              <div className="h-full flex items-center justify-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-              </div>
-            }
+          {/* Local ErrorBoundary ensures a chunk-load failure (mermaid 404
+              after a deploy, offline mid-fetch) stays scoped to this modal
+              instead of crashing the entire workspace at the App.tsx root
+              boundary. resetKey=job.id so a different diagram clears state. */}
+          <ErrorBoundary
+            resetKey={job.id}
+            fallback={<FlowDiagramLoadError onClose={onClose} />}
           >
-            <FlowDiagramViewer
-              mermaidSyntax={job.mermaid_syntax}
-              description={job.description || undefined}
-            />
-          </Suspense>
+            <Suspense
+              fallback={
+                <div className="h-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                </div>
+              }
+            >
+              <FlowDiagramViewer
+                mermaidSyntax={job.mermaid_syntax}
+                description={job.description || undefined}
+              />
+            </Suspense>
+          </ErrorBoundary>
         </div>
 
         {/* Edit input */}
