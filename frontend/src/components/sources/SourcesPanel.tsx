@@ -58,6 +58,7 @@ import {
   CaretRight,
   Plus,
   Plug,
+  NotionLogo,
 } from '@phosphor-icons/react';
 import { createLogger } from '@/lib/logger';
 import { patchOne, removeOne, upsertOne } from '@/lib/resourceState';
@@ -100,6 +101,7 @@ const getSourceIcon = (source: Source): typeof File => {
     case '.csv': return FileCsv;
     case '.database': return Table;
     case '.mcp': return Plug;
+    case '.notion': return NotionLogo;
     case '.md': return MarkdownLogo;
     case '.html': return FileHtml;
     case '.json': case '.xml': return FileText;
@@ -120,6 +122,7 @@ const getSourceIcon = (source: Source): typeof File => {
     case 'DATA': return Table;
     case 'DATABASE': return Table;
     case 'MCP': return Plug;
+    case 'NOTION': return NotionLogo;
     case 'DOCUMENT': return FileText;
     default: return File;
   }

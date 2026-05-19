@@ -32,6 +32,7 @@ SOURCE_TYPES = [
     "LINK",     # Web URL content
     "YOUTUBE",  # YouTube video transcripts
     "RESEARCH", # Research documents
+    "NOTION",   # Notion pages and database rows
 ]
 
 # Human-readable display names for headers
@@ -45,6 +46,7 @@ SOURCE_TYPE_DISPLAY = {
     "LINK": "URL",
     "YOUTUBE": "YouTube video transcript",
     "RESEARCH": "research document",
+    "NOTION": "Notion workspace content",
 }
 
 
@@ -75,7 +77,7 @@ def build_page_marker(source_type: str, page_num: int, total_pages: int) -> str:
 # Captures: group(1) = page number, group(2) = total pages
 # The .*? allows for optional suffixes like "(continues...)"
 ANY_PAGE_PATTERN = re.compile(
-    r'=== (?:PDF|TEXT|DOCX|PPTX|AUDIO|LINK|YOUTUBE|IMAGE|RESEARCH) PAGE (\d+) of (\d+).*?==='
+    r'=== (?:PDF|TEXT|DOCX|PPTX|AUDIO|LINK|YOUTUBE|IMAGE|RESEARCH|NOTION) PAGE (\d+) of (\d+).*?==='
 )
 
 # Type-specific patterns (for when you need to match a specific type)
@@ -89,6 +91,7 @@ PAGE_PATTERNS = {
     "LINK": re.compile(r'=== LINK PAGE (\d+) of (\d+) ==='),
     "YOUTUBE": re.compile(r'=== YOUTUBE PAGE (\d+) of (\d+) ==='),
     "RESEARCH": re.compile(r'=== RESEARCH PAGE (\d+) of (\d+) ==='),
+    "NOTION": re.compile(r'=== NOTION PAGE (\d+) of (\d+) ==='),
 }
 
 

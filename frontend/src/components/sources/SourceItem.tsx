@@ -35,6 +35,7 @@ import {
   ArrowsClockwise,
   CloudArrowDown,
   Plug,
+  NotionLogo,
 } from '@phosphor-icons/react';
 import {
   DropdownMenu,
@@ -97,6 +98,7 @@ const getSourceIcon = (source: Source): { icon: typeof File; weight?: 'bold' } =
     case '.xlsx': return { icon: FileXls, weight: 'bold' };
     case '.database': return { icon: Table, weight: 'bold' };
     case '.mcp': return { icon: Plug, weight: 'bold' };
+    case '.notion': return { icon: NotionLogo, weight: 'bold' };
     case '.md': return { icon: MarkdownLogo, weight: 'bold' };
     case '.html': return { icon: FileHtml, weight: 'bold' };
     case '.json': case '.xml': return { icon: FileText, weight: 'bold' };
@@ -117,6 +119,7 @@ const getSourceIcon = (source: Source): { icon: typeof File; weight?: 'bold' } =
     case 'DATA': return { icon: Table, weight: 'bold' };
     case 'DATABASE': return { icon: Table, weight: 'bold' };
     case 'MCP': return { icon: Plug, weight: 'bold' };
+    case 'NOTION': return { icon: NotionLogo, weight: 'bold' };
     case 'DOCUMENT': return { icon: FileText, weight: 'bold' };
     default: return { icon: File, weight: 'bold' };
   }
