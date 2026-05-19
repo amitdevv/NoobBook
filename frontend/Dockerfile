@@ -11,6 +11,12 @@ COPY . .
 # Empty VITE_API_HOST makes the frontend use same-origin requests,
 # which nginx will proxy to the backend container.
 ENV VITE_API_HOST=""
+# Raise Node's heap limit for the build. Default ~2 GB on node:20-alpine
+# isn't enough once mermaid / blocknote / excalidraw / shadcn are in the
+# dep graph — `tsc -b && vite build` OOMs with "Reached heap limit" on
+# fresh installs. 4 GB is plenty and well below what any non-toy host
+# provides; the container still exits before the next stage runs.
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 # Stage 2: Serve with nginx

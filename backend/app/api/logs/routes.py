@@ -24,13 +24,19 @@ from app.utils import logger as logger_module
 
 logger = logging.getLogger(__name__)
 
-# `2026-05-01 10:23:44 [ERROR] app.services.foo: message` — matches the
-# format string in setup_logging(). Loose enough to skip continuation
-# lines (stack-trace inner lines) which we still want to include verbatim.
+# Two shapes accepted:
+#   - new:  `10:23:44 [ERROR] app.services.foo [req:abc123]: message`
+#   - old:  `10:23:44 [ERROR] app.services.foo: message`        (pre-§1.4 archives)
+# The `[req:...]` group is optional so rotated archives written before the
+# req_id rollout still parse and display correctly in the admin UI.
+# Loose enough to skip continuation lines (stack-trace inner lines) which we
+# still want to include verbatim.
 _LINE_RE = re.compile(
     r"^(?P<ts>\d{2}:\d{2}:\d{2})\s+"
     r"\[(?P<level>[A-Z]+)\]\s+"
-    r"(?P<logger>[\w.\-]+):\s*"
+    r"(?P<logger>[\w.\-]+)"
+    r"(?:\s+\[req:(?P<req_id>[^\]]*)\])?"
+    r":\s*"
     r"(?P<message>.*)$"
 )
 
@@ -63,6 +69,7 @@ def _read_recent_lines(limit: int, levels: set[str]) -> list[dict[str, Any]]:
                         "ts": m.group("ts"),
                         "level": m.group("level"),
                         "logger": m.group("logger"),
+                        "req_id": m.group("req_id") or "",
                         "message": redact_line(m.group("message")),
                     }
                 else:

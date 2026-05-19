@@ -12,6 +12,7 @@ from .supabase_client import (
     get_auth_verifier_client,
     get_service_role_client,
     is_supabase_enabled,
+    check_singleton_identity,
     SupabaseClient,
 )
 from .auth_service import auth_service, AuthService
@@ -22,6 +23,7 @@ __all__ = [
     "get_auth_verifier_client",
     "get_service_role_client",
     "is_supabase_enabled",
+    "check_singleton_identity",
     "SupabaseClient",
     "auth_service",
     "AuthService",

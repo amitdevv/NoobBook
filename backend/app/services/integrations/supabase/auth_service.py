@@ -183,7 +183,13 @@ class AuthService:
                 "session": self._serialize_session(response.session),
             }
         except Exception as e:
-            logger.error("Token refresh failed: %s", e)
+            # Structured prefix pairs with AUTH_401_TRACE via the per-request
+            # req_id baked into every log record's format string. Together
+            # they answer: did refresh fail AND why? — in one grep.
+            logger.error(
+                "REFRESH_FAIL_TRACE err=%s:%s rt_suffix=%s",
+                type(e).__name__, str(e)[:200], refresh_token[-12:],
+            )
             return {"success": False, "error": "Token refresh failed"}
 
     def reset_password_email(self, email: str) -> Dict[str, Any]:

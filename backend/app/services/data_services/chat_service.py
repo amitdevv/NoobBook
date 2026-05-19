@@ -11,7 +11,7 @@ Separation of Concerns:
 - prompt_loader.py: Prompt management
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, List, Any
 
 from app.services.integrations.supabase import get_supabase, is_supabase_enabled
@@ -426,6 +426,59 @@ class ChatService:
         chat["message_count"] = count_response.count or 0
 
         return chat
+
+    def mark_user_stopped(self, project_id: str, chat_id: str) -> bool:
+        """Record that the user just clicked Stop on this chat.
+
+        Backs the §2.1 user-stop-vs-proxy-disconnect distinction. The SSE
+        worker's GeneratorExit handler reads `user_stopped_at` (via
+        `get_user_stopped_at`) and only treats the close as user-initiated
+        when the timestamp is fresher than the stream's start time.
+
+        Returns True if the row was updated (the project owns the chat),
+        False otherwise. The `eq("project_id", project_id)` scoping is
+        what prevents one tenant from poisoning another tenant's chat —
+        the WHERE clause filters out cross-project writes at the SQL
+        layer, defense-in-depth on top of the blueprint-level
+        verify_project_access hook in `app/api/messages/__init__.py`.
+        """
+        resp = (
+            self.supabase.table(self.table)
+            .update({"user_stopped_at": datetime.now(timezone.utc).isoformat()})
+            .eq("id", chat_id)
+            .eq("project_id", project_id)
+            .execute()
+        )
+        return bool(resp.data)
+
+    def get_user_stopped_at(self, project_id: str, chat_id: str) -> Optional[str]:
+        """Return the ISO timestamp of the last user-stop, or None.
+
+        Called from the SSE GeneratorExit handler — must be cheap and
+        safe to call from a worker thread. Tolerates network blips by
+        returning None (the caller then labels as proxy-disconnect, which
+        is the conservative default).
+
+        Scoped by (project_id, chat_id) as defense-in-depth on top of the
+        blueprint-level verify_project_access hook in messages/__init__.py.
+        Without the project_id filter, a tenant could probe another
+        tenant's chat metadata by passing their own project_id + the
+        target chat_id in the URL. Chat IDs are UUIDs (unguessable in
+        practice), but the cost of the extra WHERE clause is zero.
+        """
+        try:
+            resp = (
+                self.supabase.table(self.table)
+                .select("user_stopped_at")
+                .eq("id", chat_id)
+                .eq("project_id", project_id)
+                .execute()
+            )
+        except Exception:
+            return None
+        if not resp.data:
+            return None
+        return resp.data[0].get("user_stopped_at")
 
     def update_chat(
         self,

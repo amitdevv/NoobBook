@@ -5,7 +5,7 @@
  * and manages chat state and API interactions.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Sparkle } from '@phosphor-icons/react';
 import axios from 'axios';
 import { Skeleton } from '../ui/skeleton';
@@ -22,10 +22,16 @@ import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { ChatList } from './ChatList';
 import { ChatEmptyState } from './ChatEmptyState';
-import { RawMessageView } from './RawMessageView';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { exportChatAsPdf } from '@/lib/exportChatPdf';
 import { createLogger } from '@/lib/logger';
-import { API_BASE_URL } from '@/lib/api/client';
+import { API_BASE_URL, extractServerError } from '@/lib/api/client';
+
+// RawMessageView pulls in react-syntax-highlighter — sizeable, and only
+// used when the user toggles into Raw debug mode (rare). Defer until then.
+const RawMessageView = lazy(() =>
+  import('./RawMessageView').then((m) => ({ default: m.RawMessageView })),
+);
 
 const log = createLogger('chat-panel');
 
@@ -915,11 +921,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             }
           } catch (fallbackError) {
             log.error({ err: fallbackError }, 'failed to send message via fallback');
-            errorWithLogs('Failed to send message');
+            errorWithLogs(extractServerError(fallbackError, 'Failed to send message'));
           }
         } else if (shouldFallback && hasAttachments) {
           log.warn('stream failed before user_message event with attachments — surfacing error so user can retry');
-          errorWithLogs('Failed to send message — please retry.');
+          errorWithLogs(extractServerError(err, 'Failed to send message — please retry.'));
         } else {
           // Stream errored mid-flight after delivering partial events
           // (canonical user_message and/or assistant_delta). Re-sending
@@ -963,9 +969,36 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   /**
-   * Stop the current in-flight chat request
+   * Stop the current in-flight chat request.
+   *
+   * Order matters: signal the server BEFORE aborting the fetch, AND **await**
+   * the signal's network round-trip. We can't fire-and-forget here:
+   *
+   *   - `abortControllerRef.current.abort()` closes the SSE TCP connection
+   *     synchronously the next instruction.
+   *   - The backend's `GeneratorExit` handler fires within tens of ms.
+   *   - It reads `chats.user_stopped_at` to decide whether to label the
+   *     persisted assistant message as `(stopped by user)`.
+   *   - If the fire-and-forget `/messages/stop` POST hasn't reached the
+   *     backend yet, `user_stopped_at` is still NULL/stale, and the
+   *     message is mislabeled as `connection_dropped`.
+   *
+   * On localhost (~0.1 ms) the POST wins the race. On production WAN
+   * (~80-200 ms) it loses. Awaiting it costs the user a perceptible
+   * pause on slow connections but guarantees the label is correct.
+   *
+   * If the POST fails (network blip, 5xx) we still call abort() so the
+   * stream stops — the worst case is just a missing label, never a
+   * stuck stream.
    */
-  const handleStop = () => {
+  const handleStop = async () => {
+    if (activeChat) {
+      try {
+        await chatsAPI.stopMessage(projectId, activeChat.id);
+      } catch {
+        // stopMessage logs internally; we still want to abort below.
+      }
+    }
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -1195,7 +1228,42 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       />
 
       {rawMode && activeChat ? (
-        <RawMessageView projectId={projectId} chatId={activeChat.id} />
+        // Local ErrorBoundary: a syntax-highlighter chunk-load failure
+        // shouldn't crash the entire chat panel — let the user click
+        // back out of Raw mode and keep using the normal view. resetKey
+        // = chat-id so switching chats resets any prior error.
+        <ErrorBoundary
+          resetKey={activeChat.id}
+          fallback={
+            <div className="flex-1 flex items-center justify-center p-6">
+              <div className="text-center max-w-sm">
+                <p className="text-sm text-stone-700 font-medium mb-1">
+                  Couldn't load the raw debug view
+                </p>
+                <p className="text-xs text-stone-500 mb-3">
+                  Toggle Raw mode off to return to the normal chat view.
+                </p>
+                <button
+                  type="button"
+                  className="text-xs text-amber-700 hover:underline"
+                  onClick={() => setRawMode(false)}
+                >
+                  Exit Raw mode
+                </button>
+              </div>
+            </div>
+          }
+        >
+          <Suspense
+            fallback={
+              <div className="flex-1 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+              </div>
+            }
+          >
+            <RawMessageView projectId={projectId} chatId={activeChat.id} />
+          </Suspense>
+        </ErrorBoundary>
       ) : (
         <ChatMessages
           messages={activeChat?.messages || []}

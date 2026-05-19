@@ -9,26 +9,19 @@
  * - Citations as numbered superscripts with a reference section
  *
  * Uses `marked` for markdown→HTML, `html2canvas` for rendering, and `jspdf` for PDF output.
+ *
+ * Bundle note: jspdf (~500 KB), html2canvas (~300 KB), and marked (~50 KB) are
+ * the only callers in the entire app of the Export-to-PDF feature. They are
+ * dynamically imported INSIDE exportChatAsPdf below so the main bundle stays
+ * lean — these libraries only download when a user actually clicks Export.
+ * Type-only imports stay static and are stripped at build time.
  */
 
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
-import { Marked } from 'marked';
+import type { Marked as MarkedType } from 'marked';
 import { parseCitations } from './citations';
 import { sourcesAPI, type ChunkContent } from './api/sources';
 import type { Chat } from './api/chats';
 import { messageContentAsText } from './api/chats';
-
-// Isolated marked instance — raw HTML rendering disabled to prevent XSS.
-const pdfMarked = new Marked({
-  gfm: true,
-  breaks: true,
-  renderer: {
-    html({ text }: { text: string }) {
-      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    },
-  },
-});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -174,6 +167,7 @@ export function buildChatHtml(
   projectName: string,
   globalChunkToFootnote: Map<string, number>,
   citationContents: Map<string, ChunkContent>,
+  pdfMarked: MarkedType,
 ): string {
   const messages = chat.messages || [];
   const parts: string[] = [];
@@ -268,6 +262,29 @@ export async function exportChatAsPdf({
   projectId,
   projectName,
 }: ExportChatOptions): Promise<void> {
+  // ── Step 0: Dynamic-import the heavy PDF stack ──
+  // jspdf + html2canvas + marked sum to ~850 KB minified. Loading them here
+  // (rather than at module level) keeps that weight out of the main bundle;
+  // it only downloads on the first Export click and is cached afterwards.
+  const [{ jsPDF }, html2canvasMod, { Marked }] = await Promise.all([
+    import('jspdf'),
+    import('html2canvas'),
+    import('marked'),
+  ]);
+  // html2canvas is a CJS module with a default export — works either way.
+  const html2canvas = (html2canvasMod.default ?? html2canvasMod) as typeof html2canvasMod.default;
+
+  // Isolated marked instance — raw HTML rendering disabled to prevent XSS.
+  const pdfMarked = new Marked({
+    gfm: true,
+    breaks: true,
+    renderer: {
+      html({ text }: { text: string }) {
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      },
+    },
+  });
+
   const messages = chat.messages || [];
 
   // ── Step 1: Build citation map ──
@@ -297,7 +314,7 @@ export async function exportChatAsPdf({
   );
 
   // ── Step 3: Build HTML ──
-  const contentHtml = buildChatHtml(chat, projectName, globalChunkToFootnote, citationContents);
+  const contentHtml = buildChatHtml(chat, projectName, globalChunkToFootnote, citationContents, pdfMarked);
 
   // ── Step 4: Inject styles into <head> (proper CSS location) ──
   const styleEl = document.createElement('style');

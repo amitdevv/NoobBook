@@ -26,6 +26,32 @@ interface ErrorBoundaryState {
 }
 
 /**
+ * Detect "the server has a newer build than my cached index.html" errors.
+ * The dist/assets/<chunk>.js the lazy import() resolves to no longer
+ * exists on the server (Vite emits new content-hashed names per build).
+ * Browser returns 404, React.lazy rejects with a message that varies by
+ * browser:
+ *   Chrome/Edge:  "Failed to fetch dynamically imported module: <url>"
+ *   Firefox:      "Importing a module script failed."
+ *   Safari:       "Loading chunk N failed" / "WebKit encountered a fatal error"
+ * Detect all three so we can surface a "Please refresh" prompt instead of
+ * the generic crash panel — the cause is operational (deploy rotation),
+ * not a bug, and a one-click reload fixes it.
+ */
+function isChunkLoadError(err: Error | null): boolean {
+  if (!err) return false;
+  const msg = (err.message || '').toLowerCase();
+  const name = (err.name || '').toLowerCase();
+  return (
+    name === 'chunkloaderror' ||
+    msg.includes('failed to fetch dynamically imported module') ||
+    msg.includes('importing a module script failed') ||
+    msg.includes('loading chunk') ||
+    (msg.includes('failed to load') && msg.includes('chunk'))
+  );
+}
+
+/**
  * Top-level error boundary so a single render-time exception (e.g. a malformed
  * citation, a missing field on a streamed message, a thrown markdown token)
  * doesn't unmount the entire React tree and leave a blank cream-colored page.
@@ -66,6 +92,40 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   render() {
     if (!this.state.error) return this.props.children;
     if (this.props.fallback) return this.props.fallback;
+
+    // Chunk-load errors are an operational failure mode, not a bug: the
+    // user's cached index.html references a hashed chunk filename that
+    // the server replaced on a fresh deploy. Surface a clear "please
+    // refresh" panel that bypasses the generic stack-trace UI — the
+    // user shouldn't see an error pre that suggests THEY did something
+    // wrong.
+    if (isChunkLoadError(this.state.error)) {
+      return (
+        <div className="min-h-screen w-full flex items-center justify-center bg-background p-6">
+          <div className="max-w-md w-full rounded-2xl border border-amber-600/20 bg-card p-8 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full bg-amber-100/60 text-amber-700">
+                <ArrowClockwise size={22} weight="duotone" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-stone-900">
+                  A new version is available
+                </h2>
+                <p className="text-xs text-stone-500">
+                  Refresh the page to load the latest version of NoobBook.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5">
+              <Button onClick={this.handleReload} variant="default" size="sm">
+                <ArrowClockwise size={14} className="mr-1.5" />
+                Refresh now
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-background p-6">
