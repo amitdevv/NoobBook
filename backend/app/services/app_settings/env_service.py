@@ -1,174 +1,163 @@
 """
-Service for managing environment variables and .env file operations.
+EnvService — facade for reading/writing the runtime environment variables
+that the rest of the app consults via ``os.getenv``.
 
-Educational Note: This service provides a safe way to read, write, and
-update the .env file while maintaining the Flask app's environment.
+History note: an earlier implementation wrote runtime updates to
+``backend/.env`` on disk. That file is excluded by ``backend/.dockerignore``
+and lives on the container's ephemeral filesystem (only ``/app/data`` is
+volumed), so every key saved through the Admin Settings UI evaporated on
+the next container restart. Runtime writes are now routed through
+``ApiKeyStore``, which persists encrypted values into Supabase's
+``app_settings.api_keys`` JSONB column. Build-time env vars (set by
+docker-compose / Coolify) still take precedence — see
+``ApiKeyStore.hydrate_environ``.
 
-Stateless Deployment Note: On stateless container deployments (ECS, Fargate,
-Lambda), .env file writes will be lost on container restart. For those
-environments, use environment variable injection (e.g., ECS task definition,
-Secrets Manager) instead of runtime .env writes.
+This class keeps the same public surface so existing callers don't change:
+``get_key`` / ``set_key`` / ``delete_key`` / ``mask_key`` / ``reload_env``
+all still work. ``reload_env`` is now a no-op (kept for API compat) because
+there's no longer a file to reload.
+
+Rotation note: rotating ``SECRET_KEY`` invalidates ciphertexts in the
+store. The admin UI will then show the affected keys as unset and the
+operator must re-save them via the UI.
 """
 import logging
 import os
 from pathlib import Path
-from typing import Optional, Dict
-from dotenv import load_dotenv, set_key, unset_key
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class EnvService:
     """
-    Service for managing environment variables and .env file.
+    Service for managing environment variables.
 
-    Educational Note: This class encapsulates all .env file operations,
-    providing methods for CRUD operations on environment variables.
+    Reads remain ``os.getenv``-backed. Writes are dual-path: they update
+    the current process's ``os.environ`` immediately (so the same request
+    sees the new value) and persist into ``ApiKeyStore`` so the value
+    survives container restarts.
     """
 
     def __init__(self):
-        """Initialize the service and locate the .env file."""
-        # Find the .env file in the backend directory
+        # Path retained only for the one-time migration of legacy
+        # backend/.env entries into the store. We no longer write to this
+        # file in normal operation.
         self.backend_dir = Path(__file__).parent.parent.parent.parent
-        self.env_path = self.backend_dir / '.env'
+        self.env_path = self.backend_dir / ".env"
 
-        # Create .env file if it doesn't exist
-        if not self.env_path.exists():
-            self.env_path.touch()
+        # One-shot migration: if backend/.env still has API-key entries from
+        # the previous code path, move them into the store and strip them
+        # from the file. Idempotent — re-running on an empty file is a no-op.
+        # Best-effort: any failure (no Supabase yet, .env unreadable) is
+        # logged and skipped; the rest of the app must still come up.
+        try:
+            from app.services.app_settings.api_key_store import (
+                migrate_env_file_into_store,
+            )
+            # Lazy import to avoid a circular dep with API_KEYS_CONFIG.
+            from app.api.settings.api_keys import API_KEYS_CONFIG  # noqa: WPS433
 
-        # Load current environment variables
-        self.reload_env()
+            known = {entry["id"] for entry in API_KEYS_CONFIG}
+            migrate_env_file_into_store(self.env_path, known)
+        except Exception as exc:  # noqa: BLE001 — migration is best-effort
+            logger.warning("Legacy .env migration skipped: %s", exc)
 
-    def reload_env(self):
+    # ------------------------------------------------------------------
+    # Reads
+    # ------------------------------------------------------------------
+
+    def reload_env(self) -> None:
         """
-        Reload environment variables from the .env file.
+        No-op kept for backwards compatibility.
 
-        Educational Note: This ensures our app has the latest values
-        after any .env file updates.
+        Historical behaviour: re-read ``backend/.env`` into ``os.environ``.
+        Runtime writes now go through ``ApiKeyStore`` and ``os.environ`` is
+        updated in place inside ``set_key`` / ``delete_key``, so this call
+        has nothing to do. Existing call sites that invoke it after a save
+        keep working without modification.
         """
-        load_dotenv(self.env_path, override=True)
+        return None
 
     def get_key(self, key: str) -> Optional[str]:
-        """
-        Get an environment variable value.
-
-        Args:
-            key: The environment variable name
-
-        Returns:
-            The value or None if not found
-        """
+        """Return the current value of an environment variable, or None."""
         return os.getenv(key)
 
-    def set_key(self, key: str, value: str):
-        """
-        Set an environment variable in the .env file.
+    # ------------------------------------------------------------------
+    # Writes — dual-path: os.environ (immediate) + ApiKeyStore (persistent)
+    # ------------------------------------------------------------------
 
-        Educational Note: This uses python-dotenv's set_key function
-        which safely updates the .env file without losing other values.
-        It also handles commented lines properly.
+    def set_key(self, key: str, value: str) -> None:
+        """
+        Persist a key into the store and update the running process env.
 
         Args:
-            key: The environment variable name
-            value: The value to set
+            key: Environment variable name (e.g. ``"NOTION_API_KEY"``).
+            value: The value to store. Pass a non-empty string — callers
+                should ``delete_key`` for clearing.
         """
         if not key or not isinstance(key, str):
             raise ValueError("Key must be a non-empty string")
+        if value is None:
+            raise ValueError("Value cannot be None — use delete_key to clear")
 
-        # First, check if the key exists as a comment and remove it
-        if self.env_path.exists():
-            with open(self.env_path, 'r') as f:
-                lines = f.readlines()
-
-            # Remove any commented versions of this key
-            new_lines = []
-            for line in lines:
-                # Skip commented lines that contain this key
-                if line.strip().startswith('#') and f'{key}=' in line:
-                    continue
-                new_lines.append(line)
-
-            # Write back without the commented key
-            with open(self.env_path, 'w') as f:
-                f.writelines(new_lines)
-
-        # Use python-dotenv's set_key to update the .env file
-        success = set_key(self.env_path, key, value, quote_mode='never')
-        if not success:
-            raise RuntimeError(f"Failed to set key {key} in .env file")
-
-        # Also set in current environment immediately
+        # Update the running process first so the same request that's
+        # making this save can immediately use the new value (e.g. the
+        # validate-then-save flow).
         os.environ[key] = value
 
-    def delete_key(self, key: str):
-        """
-        Remove an environment variable from the .env file.
+        # Persist — failures here are logged inside the store and don't
+        # raise, but we surface a warning at the call site so the operator
+        # sees a hint in the response logs.
+        from app.services.app_settings.api_key_store import api_key_store
 
-        Args:
-            key: The environment variable name to remove
-        """
+        ok = api_key_store.set(key, value)
+        if not ok:
+            logger.warning(
+                "EnvService.set_key: persisted to os.environ but ApiKeyStore "
+                "write failed for %s — value will be lost on container restart.",
+                key,
+            )
+
+    def delete_key(self, key: str) -> None:
+        """Remove the key from both the running process and the store."""
         if not key or not isinstance(key, str):
             raise ValueError("Key must be a non-empty string")
 
-        # Use python-dotenv's unset_key to remove from .env file
-        success = unset_key(self.env_path, key)
-        if not success:
-            # Key might not exist, which is okay
-            pass
+        os.environ.pop(key, None)
 
-        # Also remove from current environment
-        if key in os.environ:
-            del os.environ[key]
+        from app.services.app_settings.api_key_store import api_key_store
 
-    def save(self):
-        """
-        Save changes to the .env file.
+        api_key_store.delete(key)
 
-        Educational Note: Since we're using set_key/unset_key,
-        changes are already saved. This method is for consistency.
-        """
-        # Changes are already saved by set_key/unset_key
-        # This method exists for API consistency
-        pass
+    def save(self) -> None:
+        """No-op kept for backwards compatibility (writes are immediate)."""
+        return None
+
+    # ------------------------------------------------------------------
+    # Display helpers
+    # ------------------------------------------------------------------
 
     def mask_key(self, value: Optional[str]) -> str:
         """
-        Mask an API key for display, showing only first and last few characters.
+        Mask an API key for display.
 
-        Educational Note: This is crucial for security - we never want to
-        expose full API keys in the UI or logs.
-
-        Args:
-            value: The API key to mask
-
-        Returns:
-            Masked version like 'sk-abc***xyz'
+        Returns ``'sk-...xyz'``-style output. Short values (<= 8 chars)
+        are fully masked. Empty / None returns ``''``.
         """
         if not value:
-            return ''
-
+            return ""
         if len(value) <= 8:
-            # Very short keys, mask entirely
-            return '***'
-
-        # Show first 3 and last 3 characters
+            return "***"
         return f"{value[:3]}***{value[-3:]}"
 
     def get_all_keys(self) -> Dict[str, str]:
         """
-        Get all environment variables from the .env file.
+        Read every persisted API key as ``{key: plaintext}``.
 
-        Returns:
-            Dictionary of all key-value pairs
+        Reads from the store, not from any file. Used by diagnostic
+        surfaces — never echo this directly to the browser.
         """
-        env_vars = {}
-        if self.env_path.exists():
-            with open(self.env_path, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, value = line.split('=', 1)
-                        # Remove quotes if present
-                        value = value.strip('"').strip("'")
-                        env_vars[key] = value
-        return env_vars
+        from app.services.app_settings.api_key_store import api_key_store
+
+        return api_key_store.load_all()

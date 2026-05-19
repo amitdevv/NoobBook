@@ -28,6 +28,15 @@ export interface ClientErrorPayload {
   timestamp?: string;
 }
 
+export interface LogPreferences {
+  auto_delete_on_download: boolean;
+}
+
+export interface LogHousekeeping {
+  weekly_clear_enabled: boolean;
+  last_run_at: string | null;
+}
+
 export const logsAPI = {
   async getRecent(n = 100, level: 'errors' | 'warnings' | 'all' = 'errors') {
     const res = await api.get<RecentLogsResponse>('/logs/recent', {
@@ -45,6 +54,34 @@ export const logsAPI = {
   async clear() {
     const res = await api.post<{ success: boolean; cleared: number }>('/logs/clear');
     return res.data;
+  },
+
+  /** Per-user "auto-delete logs after download" preference. */
+  async getPreferences(): Promise<LogPreferences> {
+    const res = await api.get<{ success: boolean } & LogPreferences>('/logs/preferences');
+    return { auto_delete_on_download: !!res.data.auto_delete_on_download };
+  },
+
+  async setPreferences(prefs: LogPreferences): Promise<LogPreferences> {
+    const res = await api.put<{ success: boolean } & LogPreferences>('/logs/preferences', prefs);
+    return { auto_delete_on_download: !!res.data.auto_delete_on_download };
+  },
+
+  /** Global weekly auto-clear configuration (read is open; write is admin-only). */
+  async getHousekeeping(): Promise<LogHousekeeping> {
+    const res = await api.get<{ success: boolean } & LogHousekeeping>('/logs/housekeeping');
+    return {
+      weekly_clear_enabled: !!res.data.weekly_clear_enabled,
+      last_run_at: res.data.last_run_at ?? null,
+    };
+  },
+
+  async setHousekeeping(prefs: { weekly_clear_enabled: boolean }): Promise<LogHousekeeping> {
+    const res = await api.put<{ success: boolean } & LogHousekeeping>('/logs/housekeeping', prefs);
+    return {
+      weekly_clear_enabled: !!res.data.weekly_clear_enabled,
+      last_run_at: res.data.last_run_at ?? null,
+    };
   },
 
   /** Fire-and-forget client error report. We don't await the response in

@@ -28,6 +28,7 @@ from app.services.source_services.source_upload import (
     add_jira_source,
     add_mcp_source,
     add_mixpanel_source,
+    add_notion_source,
 )
 # Local path utils used for temp file staging during source processing
 from app.utils.path_utils import (
@@ -470,6 +471,39 @@ class SourceService:
         this specific project. Queries Mixpanel's Query API live.
         """
         return self._shape_for_frontend(project_id, add_mixpanel_source(project_id, name, description))
+
+    def add_notion_source(
+        self,
+        project_id: str,
+        notion_id: str,
+        object_type: str,
+        title: Optional[str] = None,
+        notion_url: Optional[str] = None,
+        last_edited_time: Optional[str] = None,
+        name: Optional[str] = None,
+        description: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Add a Notion source (specific page or database) to a project.
+
+        Educational Note: Unlike Jira/Mixpanel which are live-API flags, Notion
+        sources fetch their content during processing and embed it for RAG —
+        Notion pages are slow-changing knowledge artifacts that benefit from
+        chunked semantic search.
+        """
+        return self._shape_for_frontend(
+            project_id,
+            add_notion_source(
+                project_id=project_id,
+                notion_id=notion_id,
+                object_type=object_type,
+                title=title,
+                notion_url=notion_url,
+                last_edited_time=last_edited_time,
+                name=name,
+                description=description,
+            ),
+        )
 
     def add_mcp_source(
         self,
