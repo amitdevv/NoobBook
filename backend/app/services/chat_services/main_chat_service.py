@@ -802,25 +802,42 @@ class MainChatService:
                 )
                 # No on_event emit — the SSE generator is already closed.
             elif cancelled:
-                # Proxy / connection drop, NOT a user-initiated stop. Persist
-                # the accumulated text as a normal assistant message so the
-                # frontend's recoverChatFromServer surfaces real content
-                # instead of a mislabeled stub.
-                recovered_content = final_text if final_text.strip() else "I've processed your request."
-                logger.warning(
-                    "PROXY_DISCONNECT_PERSIST chat=%s content_len=%d "
-                    "iterations=%d — persisting partial response (proxy "
-                    "or browser closed the SSE connection before "
-                    "assistant_done could fire).",
-                    chat_id, len(recovered_content), iteration,
-                )
-                assistant_msg = message_service.add_assistant_message(
-                    project_id=project_id,
-                    chat_id=chat_id,
-                    content=recovered_content,
-                    model=response.get("model"),
-                    tokens=response.get("usage"),
-                )
+                # Proxy / connection drop, NOT a user-initiated stop.
+                #
+                # If we accumulated real text before the drop, persist it as a
+                # normal assistant message so the frontend's
+                # recoverChatFromServer surfaces real content instead of a
+                # mislabeled stub.
+                #
+                # If we accumulated NOTHING (proxy dropped during the initial
+                # Claude latency, before any deltas streamed), do NOT persist
+                # a bogus "I've processed your request." reply — that would
+                # break the conversation flow with an answer that has nothing
+                # to do with the user's question. Leave the user-side message
+                # without an assistant reply; the user can re-send.
+                if final_text.strip():
+                    logger.warning(
+                        "PROXY_DISCONNECT_PERSIST chat=%s content_len=%d "
+                        "iterations=%d — persisting partial response (proxy "
+                        "or browser closed the SSE connection before "
+                        "assistant_done could fire).",
+                        chat_id, len(final_text), iteration,
+                    )
+                    assistant_msg = message_service.add_assistant_message(
+                        project_id=project_id,
+                        chat_id=chat_id,
+                        content=final_text,
+                        model=response.get("model"),
+                        tokens=response.get("usage"),
+                    )
+                else:
+                    logger.warning(
+                        "PROXY_DISCONNECT_NO_CONTENT chat=%s iterations=%d "
+                        "— skipping persist; no assistant text accumulated "
+                        "before disconnect (user can re-send their question).",
+                        chat_id, iteration,
+                    )
+                    assistant_msg = None
                 # No on_event emit — generator already closed.
             else:
                 assistant_msg = message_service.add_assistant_message(

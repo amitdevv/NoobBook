@@ -333,17 +333,34 @@ export { API_BASE_URL };
  * connection URI", "Claude rate limit reached", etc.) when the backend
  * supplies one.
  */
-// Test-only exports. Bundlers tree-shake unused exports in production
-// builds, so leaving this unguarded keeps the test surface stable across
-// dev/test/prod without conditional logic. Only consumed by
-// `src/lib/api/__tests__/client.test.ts`.
-export const __test = {
-  tryRefreshToken,
-  anotherTabRefreshedRecently,
-  resetCrossTabState: () => {
-    lastOtherTabRefreshAt = 0;
-  },
-};
+// Test-only exports. Defense-in-depth against accidental imports from
+// production code: in non-test/dev builds the methods are no-ops, so an
+// `import { __test } from '@/lib/api/client'` in app code TypeScript-
+// compiles AND keeps the test type contract, but can't actually mutate
+// production state. Vite still tree-shakes the active branch.
+//
+// `MODE` is set by Vite — `'test'` during vitest, `'production'` for
+// `npm run build`, `'development'` for `npm run dev`. We expose internals
+// in test and development; production gets harmless stubs.
+const _is_test_or_dev =
+  import.meta.env.MODE === 'test' || import.meta.env.MODE === 'development';
+
+export const __test = _is_test_or_dev
+  ? {
+      tryRefreshToken,
+      anotherTabRefreshedRecently,
+      resetCrossTabState: () => {
+        lastOtherTabRefreshAt = 0;
+      },
+    }
+  : {
+      tryRefreshToken: (): Promise<RefreshOutcome> =>
+        Promise.resolve('permanent' as RefreshOutcome),
+      anotherTabRefreshedRecently: () => false,
+      resetCrossTabState: () => {
+        /* no-op in production */
+      },
+    };
 
 
 export function extractServerError(err: unknown, fallback: string): string {

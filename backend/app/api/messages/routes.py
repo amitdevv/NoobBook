@@ -34,7 +34,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, List, Tuple, Union
 
-from flask import jsonify, request, current_app, Response, stream_with_context
+from flask import g, jsonify, request, current_app, Response, stream_with_context
 from werkzeug.utils import secure_filename
 from app.api.messages import messages_bp
 from app.services.chat_services import main_chat_service
@@ -310,6 +310,11 @@ def stream_message(project_id, chat_id):
     # inside the worker thread below so Opik traces still get tagged
     # after we leave the Flask request scope.
     user_email = identity.email if identity.is_authenticated else None
+    # Capture the req_id while we're still in the Flask request context.
+    # The worker thread re-stashes it via set_worker_req_id() so that
+    # PROXY_DISCONNECT_PERSIST + other background traces stay grep-able
+    # against the originating frontend request_id.
+    parent_req_id = getattr(g, "req_id", "-")
     app = current_app._get_current_object()
     # Bounded so the worker can't accumulate hundreds of KB of unread events
     # after the client disconnects. 512 is well above the steady-state size
@@ -351,6 +356,13 @@ def stream_message(project_id, chat_id):
         # cross the thread boundary. ContextVars are per-thread, so this
         # only affects this worker.
         set_current_user_email(user_email)
+        # Same shape: re-stash the parent req_id in this thread's
+        # ContextVar so every log line emitted from main_chat_service
+        # below carries the originating request's req_id instead of "-".
+        # Without this the most user-facing trace (PROXY_DISCONNECT_PERSIST)
+        # loses its correlation key precisely when we need it most.
+        from app.utils.request_context import set_worker_req_id
+        set_worker_req_id(parent_req_id)
         # Fire-and-forget: tag the Opik thread with user identity once per
         # chat so the thread list is filterable by user. Deduped in
         # claude_service so repeated sends in the same chat are cheap.
@@ -444,7 +456,7 @@ def stream_message(project_id, chat_id):
             # in-process set we used pre-H2 only worked when workers=1.
             # Freshness check: a stop timestamp from BEFORE this stream
             # started is from a previous message — ignore it (M1 race).
-            user_stopped_at_iso = chat_service.get_user_stopped_at(chat_id)
+            user_stopped_at_iso = chat_service.get_user_stopped_at(project_id, chat_id)
             was_user_stop = False
             if user_stopped_at_iso:
                 try:

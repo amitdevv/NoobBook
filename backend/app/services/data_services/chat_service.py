@@ -451,19 +451,27 @@ class ChatService:
         )
         return bool(resp.data)
 
-    def get_user_stopped_at(self, chat_id: str) -> Optional[str]:
+    def get_user_stopped_at(self, project_id: str, chat_id: str) -> Optional[str]:
         """Return the ISO timestamp of the last user-stop, or None.
 
         Called from the SSE GeneratorExit handler — must be cheap and
         safe to call from a worker thread. Tolerates network blips by
         returning None (the caller then labels as proxy-disconnect, which
         is the conservative default).
+
+        Scoped by (project_id, chat_id) as defense-in-depth on top of the
+        blueprint-level verify_project_access hook in messages/__init__.py.
+        Without the project_id filter, a tenant could probe another
+        tenant's chat metadata by passing their own project_id + the
+        target chat_id in the URL. Chat IDs are UUIDs (unguessable in
+        practice), but the cost of the extra WHERE clause is zero.
         """
         try:
             resp = (
                 self.supabase.table(self.table)
                 .select("user_stopped_at")
                 .eq("id", chat_id)
+                .eq("project_id", project_id)
                 .execute()
             )
         except Exception:

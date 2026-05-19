@@ -65,7 +65,14 @@ def _attach_request_id():
 
     Registered BEFORE `authenticate_request` so 401 responses still carry the
     req_id (the most common case we need to correlate).
+
+    CORS preflights (OPTIONS) are skipped — they don't carry app-level
+    semantics worth tracing and were producing noisy SLOW_REQUEST lines on
+    cached preflight refreshes. Matches the OPTIONS-skip in
+    `authenticate_request` below.
     """
+    if request.method == 'OPTIONS':
+        return None
     incoming = request.headers.get(_REQ_ID_HEADER, "").strip()
     if incoming and _REQ_ID_RE.fullmatch(incoming):
         g.req_id = incoming

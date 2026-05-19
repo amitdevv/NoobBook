@@ -965,16 +965,33 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   /**
    * Stop the current in-flight chat request.
    *
-   * Order matters: signal the server BEFORE aborting the fetch. The server
-   * marker is what makes the difference between "(stopped by user)" and the
-   * generic recovery path on the backend (Symptom 9 fix). If the POST fails
-   * we still abort — the worst case becomes "the message gets persisted as a
-   * normal response instead of labeled stopped", which is fine.
+   * Order matters: signal the server BEFORE aborting the fetch, AND **await**
+   * the signal's network round-trip. We can't fire-and-forget here:
+   *
+   *   - `abortControllerRef.current.abort()` closes the SSE TCP connection
+   *     synchronously the next instruction.
+   *   - The backend's `GeneratorExit` handler fires within tens of ms.
+   *   - It reads `chats.user_stopped_at` to decide whether to label the
+   *     persisted assistant message as `(stopped by user)`.
+   *   - If the fire-and-forget `/messages/stop` POST hasn't reached the
+   *     backend yet, `user_stopped_at` is still NULL/stale, and the
+   *     message is mislabeled as `connection_dropped`.
+   *
+   * On localhost (~0.1 ms) the POST wins the race. On production WAN
+   * (~80-200 ms) it loses. Awaiting it costs the user a perceptible
+   * pause on slow connections but guarantees the label is correct.
+   *
+   * If the POST fails (network blip, 5xx) we still call abort() so the
+   * stream stops — the worst case is just a missing label, never a
+   * stuck stream.
    */
-  const handleStop = () => {
+  const handleStop = async () => {
     if (activeChat) {
-      // Fire-and-forget. stopMessage swallows its own errors.
-      void chatsAPI.stopMessage(projectId, activeChat.id);
+      try {
+        await chatsAPI.stopMessage(projectId, activeChat.id);
+      } catch {
+        // stopMessage logs internally; we still want to abort below.
+      }
     }
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
