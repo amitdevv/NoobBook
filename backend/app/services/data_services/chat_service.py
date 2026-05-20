@@ -359,8 +359,10 @@ class ChatService:
                     # Lazy import: message_service depends on storage_service
                     # and storage_service depends on supabase client, so a
                     # top-level import creates a circular load at app start.
-                    from app.services.data_services import message_service as _ms
-                    formatted = _ms.message_service._format_message_for_frontend(msg)
+                    # Note: `message_service` re-exported in data_services
+                    # __init__ is the SINGLETON INSTANCE, not the module.
+                    from app.services.data_services import message_service as _msg_svc
+                    formatted = _msg_svc._format_message_for_frontend(msg)
                     formatted_content = formatted.get("content")
                     # Skip if the formatter projected the message down to
                     # nothing renderable (empty list / empty string).
