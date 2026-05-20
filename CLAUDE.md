@@ -1,85 +1,45 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) working in this repository. Keep this file lean — it's loaded into every session's context window. Deep details belong in code comments next to the thing they document.
 
-## Build & Run Commands
+---
 
-### macOS / Linux (Recommended)
+## What NoobBook is
+
+Open-source NotebookLM alternative. React frontend + Flask backend, self-hosted Supabase for data + storage + auth. Website: [noobbooklm.com](https://noobbooklm.com).
+
+**Two views, that's it:**
+1. **Dashboard** — project list (create / open / delete) + course resources.
+2. **Project Workspace** — three panels: Sources (multi-modal ingestion) · Chat (RAG Q&A with citations + voice) · Studio (content generation — fully built, not "planned").
+
+---
+
+## Run / build
+
 ```bash
-# First time setup (creates venv, installs all dependencies)
-bin/setup
+bin/setup                  # First-time: venv + deps for backend & frontend
+bin/dev                    # Start both servers (backend :5001, vite :5173)
+bin/dev --backend-only
+bin/dev --frontend-only
+bin/dev --install          # Refresh deps before starting
 
-# Run both backend and frontend
-bin/dev
-
-# Options
-bin/dev --backend-only    # Only Flask server (http://localhost:5001)
-bin/dev --frontend-only   # Only Vite server (http://localhost:5173)
-bin/dev --install         # Update deps before starting
+cd frontend && npm run build   # Production frontend build
+cd frontend && npm run lint    # ESLint
+cd backend && pytest           # Backend tests (372+ currently)
 ```
 
-### Windows
-```bash
-# First time setup
-cd backend
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
+**System deps:** `libreoffice` and `ffmpeg` (audio + DOCX/PPTX paths). On macOS: `brew install libreoffice ffmpeg`.
 
-cd ../frontend
-npm install
+**Docker / self-hosted Supabase:** see `docker/MAC_SETUP.md`. 16 containers (Supabase stack + backend + frontend + migrate).
 
-# Run both servers
-python start.py
+**Production:** Coolify behind Traefik on a bare-metal IOFlood box. The production compose file is `docker-compose-dev.yml` (NOT `docker-compose.yml`, which is the local-dev stack).
 
-# Stop servers
-python stop.py
-```
+---
 
-### Other Commands
-```bash
-npm run build                  # Production build (frontend)
-npm run lint                   # ESLint (frontend)
-```
+## Env vars
 
-### System Dependencies (Required)
-```bash
-# macOS
-brew install libreoffice ffmpeg
-npx playwright install
+Create `backend/.env`. Minimum:
 
-# Ubuntu/Debian
-sudo apt install libreoffice ffmpeg
-npx playwright install
-```
-
-### Docker with Self-Hosted Supabase (macOS)
-For running the full stack with self-hosted Supabase on macOS, see **[docker/MAC_SETUP.md](docker/MAC_SETUP.md)**.
-
-Quick start:
-```bash
-cd docker
-cp .env.example .env
-# Edit .env with your API keys
-./setup.sh
-```
-
-This starts 16 containers including PostgreSQL, Supabase services, and MinIO for storage.
-
-### Testing
-```bash
-# Backend tests
-cd backend && pytest
-
-# Single test file
-pytest tests/test_sources.py
-
-# Single test
-pytest tests/test_sources.py::test_upload_pdf -v
-```
-
-### Environment Variables
-Create `backend/.env` with:
 ```bash
 # Required
 ANTHROPIC_API_KEY=sk-ant-...
@@ -87,600 +47,360 @@ OPENAI_API_KEY=sk-...
 PINECONE_API_KEY=...
 PINECONE_INDEX_NAME=...
 
-# Optional
-ELEVENLABS_API_KEY=...          # Audio features
-TAVILY_API_KEY=...              # Web search fallback
-GOOGLE_CLIENT_ID=...            # Google Drive import
-GOOGLE_CLIENT_SECRET=...
-JIRA_CLOUD_ID=...               # Jira Cloud ID (for new API gateway format)
-JIRA_EMAIL=...                  # Jira user email
-JIRA_API_KEY=...                # Jira API token
-# OR (legacy format):
-# JIRA_DOMAIN=...               # Jira domain (https://your-company.atlassian.net)
-NOTION_API_KEY=...              # Notion integration
-MIXPANEL_SERVICE_ACCOUNT_USERNAME=...  # Mixpanel service account username
-MIXPANEL_SERVICE_ACCOUNT_SECRET=...    # Mixpanel service account secret
-MIXPANEL_PROJECT_ID=...                # Mixpanel numeric project ID
-MIXPANEL_REGION=us                     # us (default) | eu | in
-ANTHROPIC_TIER=1                # 1-4, controls rate limits
+# Supabase
+SUPABASE_URL=http://kong:8000             # internal Docker hostname in prod
+SUPABASE_PUBLIC_URL=https://<your-host>   # browser-reachable host — REQUIRED in prod
+                                          # so signed storage URLs work
+SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_KEY=...
+JWT_SECRET=...                            # needed for signature-verified fail-open
+
+# Per-feature (optional)
+ELEVENLABS_API_KEY=...      # Audio / voice transcription
+TAVILY_API_KEY=...          # Web search fallback
+GOOGLE_CLIENT_ID=...        # Google Drive import (+ SECRET)
+NOTION_API_KEY=...
+FRESHDESK_API_KEY=...       # + FRESHDESK_DOMAIN
+JIRA_CLOUD_ID=...           # + JIRA_EMAIL, JIRA_API_KEY
+MIXPANEL_SERVICE_ACCOUNT_USERNAME=...   # + SECRET + PROJECT_ID + REGION (us|eu|in)
+ANTHROPIC_TIER=1            # 1-4, controls worker count + rate limits
 ```
 
-### Claude Model
-Always use `claude-sonnet-4-5-20250929` as the default model for Claude API calls.
+API keys are also editable from Settings → API Keys (writes to `.env` via `app/api/settings/api_keys.py` :: `API_KEYS_CONFIG`). Services with cached config (Notion, Jira, Mixpanel) must call `reload_config()` in `update_api_keys()` after `env_service.reload_env()` for changes to take effect without a restart.
 
-### Image Generation
-Default provider is **OpenAI GPT Image 2** (`gpt-image-2-2026-04-21`) via `OPENAI_API_KEY`. Streams partial frames (`partial_images=2`) so studio surfaces show a live preview while the final image renders. If the model returns model-not-found / unauthorized / verification-required (the model is brand-new and may need API Org Verification at platform.openai.com/settings/organization/general), `imagen_service` transparently falls back to Gemini (`gemini-3-pro-image-preview` via `NANO_BANANA_API_KEY`). Brand-logo flows use `client.images.edit(...)` with the logo as a reference image. Per-image costs are tracked under `projects.costs.images`.
+---
 
-## PROJECT PURPOSE
+## Claude model
 
-**NoobBook is an open-source NotebookLM alternative. NotebookLM, but smarter.**
+**Default: `claude-sonnet-4-6`** (no date suffix). Haiku 4.5 is `claude-haiku-4-5-20251001`. Opus 4.6 is `claude-opus-4-6` (rare — only `website_agent`, `component_agent`, `presentation_agent`).
 
-Website: [noobbooklm.com](https://noobbooklm.com)
+Models are configured per-prompt in `data/prompts/*_prompt.json`. Hardcoded fallbacks in agents should also be `claude-sonnet-4-6`. Pricing snapshot: Sonnet $3 / $15 per MTok, Haiku $1 / $5, Opus $5 / $25.
 
-### What We Focus On
-- LLM API integration patterns (Claude, OpenAI, etc.)
-- Prompt engineering and system prompt design
-- Tool use and agentic loops
-- RAG (Retrieval Augmented Generation) with embeddings
-- Multi-modal AI (vision, audio transcription, text-to-speech)
-- Studio content generation (audio, video, documents, design)
+---
 
-### Current Scope
-- Self-hosted Supabase (PostgreSQL + Storage + Auth)
-- Multi-user with team collaboration support
-- RLS policies for data isolation per user
-- API key management via UI
+## Code rules (the important ones)
 
-### Code Philosophy
-- Keep it simple and readable
-- Add comments explaining LLM concepts where helpful
-- Each service should have a clear, single purpose
-- Avoid over-engineering
+1. **DRY.** Extract repeated logic. The DB-style analyzer agents (Freshdesk, Mixpanel) all mirror the same pattern — when adding a new one, copy don't reinvent.
+2. **One thing per file when it exceeds ~100 lines.** Keeps blast radius small.
+3. **Comments explain WHY, not WHAT.** Especially around LLM choices, prompt engineering, rate limits, and any non-obvious workaround. Don't write comments that just paraphrase the code.
+4. **Type hints on every Python function** (params + return). PEP 8 throughout.
+5. **Icons: Phosphor (`@phosphor-icons/react`)**, never Lucide.
+6. **Styling: Tailwind only.** No inline styles, no `.css` files unless absolutely required.
+7. **Components: shadcn/ui first.** `npx shadcn@latest add <name>` before building anything custom. See `frontend/DESIGN_SYSTEM.md` for colors (Amber-600 primary, Stone-800 text, warm-cream bg).
+8. **Toasts:** custom hook at `./ui/toast`, not `../hooks/use-toast`.
+9. **When unclear — ask.** Don't guess at architectural decisions.
 
-## IMPORTANT RULES TO FOLLOW
+---
 
-### Code Quality & Structure
-- Follow DRY — extract repeated logic into reusable functions/components - Think of this as the learning session will be attended by the Founder of Python! He should be amazed not disgusted
-- Keep code modular — one component/function per file when it exceeds 100 lines
-- Prefer composition over inheritance in React components
+## Layout map
 
-### Frontend Rules (React + Vite + shadcn + Tailwind)
-- **Always check shadcn/ui first** — before creating custom components, search if shadcn already provides it
-- Use shadcn components via: `npx shadcn@latest add [component-name]`
-- Tailwind for all styling — no inline styles or separate CSS files unless absolutely necessary
-- Toast notifications use the custom hook from `./ui/toast` (not `../hooks/use-toast`)
-
-### Design System
-- **Icons**: Use Phosphor Icons (`@phosphor-icons/react`) — NOT Lucide React
-- **Colors**: Amber-600 primary (`#D97706`), Stone-800 text, warm cream background
-- **Full spec**: See `frontend/DESIGN_SYSTEM.md` for complete reference
-
-### Backend Rules (Python Flask)
-- Follow PEP 8 style guidelines
-- Use type hints for all function parameters and return values
-- Organize routes in blueprints when they exceed 5 endpoints
-
-### Documentation & Comments
-- **Add explanatory comments** for LLM-related code — explain WHY, not just WHAT
-- Document agent architectures and prompt engineering decisions
-- Add docstrings to Python functions and classes
-
-### When In Doubt — ASK
-- If approach is unclear, ask before implementing
-
-## Project Overview
-
-NoobBook - An open-source NotebookLM alternative. Full-stack web application with React frontend and Flask backend.
-
-## Application Views
-
-The application has exactly **two core views**:
-
-### View 1: Dashboard
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  NoobBook                                             [ App Settings ]      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│   ┌─────────────────────┐    ┌─────────────────────┐                       │
-│   │         +           │    │  Project Name       │                       │
-│   │                     │    │  Description...     │                       │
-│   │  Create New Project │    │                     │                       │
-│   │                     │    │  Last opened: date  │                       │
-│   └─────────────────────┘    └─────────────────────┘                       │
-│                                                                             │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  Session 3: The Complete AI Tool     │  Previous Sessions & Resources      │
-│                                       │                                     │
-│  Tags: AI Chat, RAG, Image Gen,      │  - Session 1: API Basics            │
-│  Video Gen, Realtime Transcription,  │  - Session 2: Chat, Memory & Agents │
-│  Memories, Subagents, Web Search     │  - Course Code Repository           │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-**Purpose**: Project management (create, open, delete projects) + course learning resources
+backend/
+  app/
+    api/                    Flask blueprints — routes only, no business logic
+      chats, messages, projects, sources, settings, citations,
+      google, transcription, mcp, insights, logs, ...
+    services/
+      ai_agents/            Agentic loops (multi-turn tool use)
+                              freshdesk_analyzer_agent, mixpanel_analyzer_agent,
+                              csv_analyzer_agent, database_analyzer_agent,
+                              web_agent_service, deep_research_agent
+      ai_services/          Single-call AI tasks (no loop): pdf, pptx, image
+      chat_services/        main_chat_service.py — RAG + tool dispatch
+      data_services/        Pure CRUD over Supabase (chat, message, project,
+                              brand_asset, user, share, insight, ...)
+      tool_executors/       Tool dispatch + execution surfaces for agents
+      tools/                JSON tool definitions for Claude
+        chat_tools/         Tools the main chat exposes (search, memory,
+                              analyze_*_agent triggers, mcp shims)
+        <agent>_agent/      Sub-tools loaded by a specific analyzer agent
+        web_agent/, pdf_tools/, pptx_tools/, image_tools/
+      integrations/
+        claude/             Anthropic SDK wrapper (cost tracking, Opik)
+        supabase/           auth_service, storage_service, supabase_client,
+                              signed-URL rewrite for browser-reachable hosts
+        knowledge_bases/    jira, mixpanel, notion service modules
+        mcp/                MCP client + tool registry (per-user)
+        elevenlabs/, google/, freshdesk/, youtube/
+      source_services/      Ingestion pipeline (upload + processing per type)
+      studio_services/      One module per studio item type
+      background_services/  task_service, insight_scheduler, log_housekeeping
+    config/
+      prompt_loader.py      Loads & merges per-project prompt overrides
+      tool_loader.py        load_tool / load_tools_from_category
+      prompt_referenced_by.py   Maps prompt name → code file (UI breadcrumb)
+      tier_loader.py        ANTHROPIC_TIER → workers + RPM
+      context_loader.py     Builds chat system prompt (sources + memory)
+      brand_context_loader.py   Brand snippet injection
+    utils/
+      auth_middleware.py    JWT verify (fast-path local + slow-path GoTrue)
+      claude_parsing_utils.py   Tool-use parsing helpers
+      path_utils.py         All directory access — never hardcode paths
+      rate_limit_utils.py, batching_utils.py, encoding_utils.py
+      text/                 chunking, page_markers, processed_output, cleaning
+  data/
+    prompts/                *_prompt.json — every editable system prompt
+    projects/{id}/agents/   Debug logs for agent runs (optional)
+  supabase/migrations/      Sequentially-numbered SQL migrations
+  tests/
 
-### View 2: Project Workspace (3-Panel Layout)
+frontend/
+  src/
+    components/
+      chat/                 ChatPanel, ChatMessages, ChatInput, citations
+      sources/              SourcesPanel + per-type tabs (Drive, Notion,
+                              Freshdesk, Jira, Mixpanel, plain upload)
+      studio/               StudioPanel + sections, viewers, saved insights
+      project/              ProjectHeader, ProjectWorkspace, settings dialogs
+      settings/sections/    Per-area settings: ApiKeys, Prompts, Models,
+                              Permissions, Logs, Profile, Team, ...
+      dashboard/, onboarding/, ui/
+    lib/api/                Typed API clients (chats, sources, insights, ...)
+    contexts/, hooks/
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────┐
-│  ← Project Name                        [ Memory ] [ Project Settings ] [ + New ]     │
-├───────────────────┬─────────────────────────────────────┬────────────────────────────┤
-│  SOURCES          │  CHAT                               │  STUDIO                    │
-│                   │                                     │                            │
-│  [Search...]      │  Chat Name ▼               [8/8]   │  Generate content from     │
-│  [+ Add sources]  │  Ask questions about sources...     │  your sources              │
-│                   │                                     │                            │
-│  ┌─────────────┐  │  ┌─────────────────────────────┐   │  DOCUMENTS                 │
-│  │ 📄 PDF      │  │  │ User: "question here?"      │   │  • Generate Presentation   │
-│  │ 🖼️ Image    │  │  └─────────────────────────────┘   │  • Generate PRD / Docs     │
-│  │ 🎵 Audio    │  │                                     │  • Generate To-Do List     │
-│  │ 🔗 Link     │  │  ┌─────────────────────────────┐   │                            │
-│  │ 📺 YouTube  │  │  │ NoobBook:                   │   │  COMMUNICATION             │
-│  └─────────────┘  │  │ Response with citations¹²³  │   │  • Draft Team Email        │
-│                   │  └─────────────────────────────┘   │  • Draft Stakeholder Email │
-│                   │                                     │                            │
-│  8/100 sources    │  [🎤] Ask about your sources...    │  MEDIA                     │
-│  5.2 MB total     │                                     │  • Audio Overview          │
-│                   │  Click mic to speak, or type       │  • Video Overview          │
-│                   │                                     │                            │
-│                   │                                     │  ANALYSIS                  │
-│                   │                                     │  • Generate Mind Map       │
-└───────────────────┴─────────────────────────────────────┴────────────────────────────┘
-```
-**Purpose**: Where all AI features live
-- **Sources Panel**: Multi-modal ingestion (PDF, DOCX, PPTX, images, audio, YouTube, URLs)
-- **Chat Panel**: RAG-based Q&A with citations, voice input, conversation history
-- **Studio Panel**: Content generation features (planned)
 
-### Data Structure
+---
 
-#### Supabase Database (PostgreSQL)
-All user data is stored in Supabase with Row-Level Security (RLS) for multi-user isolation:
+## Data layer
+
+### Supabase tables (Postgres + RLS per user)
 
 | Table | Purpose |
-|-------|---------|
-| `users` | User accounts, global memory, settings, google_tokens |
-| `projects` | Project metadata, custom prompts, costs, project memory |
-| `sources` | Source metadata, status, file paths, token counts |
-| `chats` | Chat containers and metadata |
-| `messages` | Chat messages with JSONB content |
-| `chunks` | RAG text chunks with metadata |
-| `studio_signals` | AI-emitted signals for studio features |
+|---|---|
+| `users` | Accounts, global memory, settings, `google_tokens`, permissions |
+| `projects` | Metadata, custom prompts, `costs`, project memory, brand config |
+| `sources` | Source rows; `embedding_info` carries type/ext metadata |
+| `chats` | Containers; `selected_source_ids` for per-chat source scoping |
+| `messages` | JSONB `content` — string, dict `{text}`, or list of typed blocks |
+| `chunks` | RAG text chunks with `chunk_id = {source_id}_page_{n}_chunk_{n}` |
+| `studio_signals` | AI-emitted intents that drive studio generators |
 | `background_tasks` | Async task tracking |
-| `brand_assets` | Brand asset metadata |
-| `brand_config` | Project brand configuration |
+| `brand_assets`, `brand_config` | Brand identity per project |
+| `saved_insights` | Pinned chat answers with optional auto-refresh |
+| `freshdesk_tickets` | Synced ticket mirror used by the Freshdesk agent |
+| `oauth_state_nonces` | OAuth state CSRF token store |
+| `app_settings_api_keys` | Encrypted runtime API-key overrides |
 
-#### Supabase Storage (S3-compatible)
+### Supabase Storage buckets
+
 | Bucket | Purpose |
-|--------|---------|
-| `raw-files` | Original uploaded files (PDFs, DOCX, images, audio) |
-| `processed-files` | Extracted/processed text content |
-| `chunks` | Text chunks for RAG |
-| `studio-outputs` | Generated content (audio, video, PDFs) |
-| `brand-assets` | Brand logos, icons, fonts |
+|---|---|
+| `raw-files` | Originals (PDF, DOCX, images, audio) |
+| `processed-files` | Extracted text per source |
+| `chunks` | Chunked text for RAG (also indexed in Pinecone) |
+| `studio-outputs` | Generated audio / video / PDFs |
+| `brand-assets` | Logos, icons, fonts |
+| `chat-attachments` | Inline images pasted/dropped into chat |
 
-#### Local Files (Configuration & Debug Only)
-```
-data/
-├── prompts/                      # System prompt configurations (not user data)
-│   ├── default_prompt.json
-│   ├── pdf_extraction_prompt.json
-│   ├── memory_prompt.json
-│   └── ...                       # Other prompt configs
-└── projects/{id}/agents/         # Debug logs only (optional)
-    └── web_agent/{execution_id}.json
+### Signed-URL host rewriting
 
-app/services/tools/               # Tool definitions (JSON schemas)
-├── chat_tools/
-│   ├── source_search_tool.json
-│   └── memory_tool.json
-├── pdf_tools/, pptx_tools/, image_tools/
-└── web_agent/
-    ├── web_search.json
-    ├── web_fetch.json
-    └── return_search_result.json
-```
+`storage_service._rewrite_signed_url_for_browser` swaps the internal Supabase host (`SUPABASE_URL`, typically `http://kong:8000` in Docker) for a browser-reachable one. **Self-hosted deployments must set `SUPABASE_PUBLIC_URL`** to their public origin — otherwise screenshots, PDFs, audio, and brand assets render broken. `X-Forwarded-Host` is intentionally NOT trusted (spoofable when the backend is reachable directly).
 
-### API Endpoints
-Base URL: `http://localhost:5001/api/v1` (local dev) or `http://localhost/api/v1` (Docker)
+---
 
-**Projects**: GET/POST `/projects`, GET/PUT/DELETE `/projects/{id}`, GET `/projects/{id}/costs`, GET `/projects/{id}/memory`
+## API surface
 
-**Chats**:
-- `GET/POST /projects/{id}/chats` - List/create chats
-- `GET/PUT/DELETE /projects/{id}/chats/{chat_id}` - Chat operations
-- `POST /projects/{id}/chats/{chat_id}/messages` - Send message (calls Claude API)
-- `GET /projects/{id}/prompt` - Get project's system prompt
-- `GET /prompts/default` - Get global default prompt
+Base URL: `http://localhost:5001/api/v1` (local) / `http://localhost/api/v1` (Docker) / `https://<host>/api/v1` (prod).
 
-**Sources**:
-- `GET /projects/{id}/sources` - List all sources
-- `POST /projects/{id}/sources` - Upload file (multipart/form-data)
-- `POST /projects/{id}/sources/url` - Add URL source
-- `POST /projects/{id}/sources/text` - Add pasted text source
-- `PUT /projects/{id}/sources/{source_id}` - Update source (name, description, active)
-- `DELETE /projects/{id}/sources/{source_id}` - Delete source
-- `POST /projects/{id}/sources/{source_id}/cancel` - Cancel processing
-- `POST /projects/{id}/sources/{source_id}/retry` - Retry/start processing
+Read the routes inline — `backend/app/api/<area>/routes.py`. Key surfaces:
 
-**Settings**: `GET/POST /settings/api-keys`, `DELETE /settings/api-keys/{id}`, `POST /settings/api-keys/validate`
+- **Projects:** `GET/POST /projects`, `GET/PUT/DELETE /projects/{id}`, `/costs`, `/memory`
+- **Chats:** `GET/POST /projects/{id}/chats`, `/chats/{cid}` (GET/PUT/DELETE), `/messages`, `/messages/stream` (SSE), `/prompt`
+- **Sources:** `GET/POST /projects/{id}/sources`, `/url`, `/text`, per-source `PUT/DELETE/cancel/retry`
+- **Settings:** `/settings/api-keys`, `/settings/prompts` (admin), `/settings/users/me/{usage,permissions}`
+- **Auth helpers:** `/auth/me`, `/auth/logout`, `/google/{status,auth,callback,disconnect}`
+- **Citations:** `GET /projects/{id}/citations/{chunk_id}` — chunk content for tooltip
 
-## API Key Management
+---
 
-All API keys are stored in `backend/.env` (not database) and managed via the Settings → API Keys UI. Keys are defined in `API_KEYS_CONFIG` in `backend/app/api/settings/api_keys.py`.
+## Key architectural patterns
 
-**Categories:** `ai` (Claude, OpenAI, ElevenLabs, Gemini, VEO), `storage` (Pinecone), `utility` (Tavily, Google OAuth, Webshare), `integrations` (Notion, Jira)
+### Source ingestion pipeline
 
-**Adding a new API key:**
-1. Add entry to `API_KEYS_CONFIG` with `id`, `name`, `description`, `category`
-2. Create validator in `backend/app/services/app_settings/validation/` (make minimal API call to verify)
-3. Register validator in `ValidationService` class
-4. Add routing case in `_validate_key()` function
-5. Frontend auto-renders from config — only update `ApiKeysSection.tsx` if adding a new category to the type union
+`uploaded → processing → [embedding if token_count > 2500] → ready`. Raw files preserved on error so retry doesn't re-upload. Processing runs in background threads. Output format is uniform across types — built by `build_processed_output()` in `app/utils/text/processed_output.py` with `=== {TYPE} PAGE n of N ===` markers. Token-based chunking (~200 tokens via tiktoken `cl100k_base` for speed) handles all splitting.
 
-**Key patterns:**
-- Keys are masked before sending to frontend (`EnvService.mask_key()`)
-- Masked values (starting with `***`) are skipped on save
-- Validation tests real API connections before saving
-- Services with cached config (like Notion/Jira) need `reload_config()` called in `update_api_keys()` after `env_service.reload_env()` so changes take effect without restart
+Per-type extractor:
 
-**Google Drive**:
-- `GET /google/status` - Check if configured and connected
-- `GET /google/auth` - Get OAuth authorization URL
-- `GET /google/callback` - Handle OAuth callback (renders a self-closing popup that postMessages the opener)
-- `POST /google/disconnect` - Remove stored tokens
-- `GET /google/files` - List files (supports `folder_id`, `page_size`, `page_token`)
-- `POST /projects/{id}/sources/google-import` - Import file to sources
+| Type | Service | AI? |
+|---|---|---|
+| PDF | `ai_services/pdf_service.py` | Batched vision, 5 pages/batch, parallel |
+| PPTX | `ai_services/pptx_service.py` | Same shape as PDF (slides as images) |
+| Image | `ai_services/image_service.py` | Single Claude vision call |
+| DOCX | `utils/docx_utils.py` | python-docx, no AI |
+| Audio | `integrations/elevenlabs/audio_service.py` | ElevenLabs Scribe v1 |
+| Text | `source_processing_service.py` | Direct read |
+| YouTube | `integrations/youtube/youtube_service.py` | youtube-transcript-api |
+| URL | `ai_agents/web_agent_service.py` | Agentic loop (web_fetch + tavily) |
+| Notion / Freshdesk / Jira / Mixpanel | per-integration syncs | Service-account based |
 
-**Transcription**:
-- `GET /transcription/config` - Get ElevenLabs WebSocket URL with single-use token
-- `GET /transcription/status` - Check if ElevenLabs is configured
+### Main chat (RAG agentic loop)
 
-## Google Drive Integration
-
-Import files from Google Drive. OAuth 2.0 flow with `drive.readonly` scope. Tokens stored per-user in Supabase `users.google_tokens` column, auto-refresh on expiry. Google Workspace exports: Docs→DOCX, Sheets→CSV, Slides→PPTX.
-
-**Setup**: Create OAuth credentials in Google Cloud Console. The callback URL is derived from your deployment's host + API prefix — `http://localhost:5001/api/v1/google/callback` for local dev, `http://localhost/api/v1/google/callback` for Docker, `https://<your-domain>/api/v1/google/callback` for prod. Override with `GOOGLE_REDIRECT_URI` env var when the registered URI must differ from what the backend computes.
-
-**Multi-user Support**: Each user has their own Google Drive connection. The OAuth state parameter carries user_id for proper token association.
-
-**Connect UX**: `useGoogleConnect()` opens the consent popup, then listens for a postMessage from the callback page (fast path) and falls back to polling `/google/status` (slow path). The callback page renders `oauth.py:_render_callback_page()` HTML that calls `window.opener.postMessage(...)` then `window.close()`.
-
-## Voice Input (ElevenLabs)
-
-Real-time speech-to-text via ElevenLabs WebSocket. Backend generates single-use tokens (15 min expiry), frontend connects directly. Audio captured via AudioWorklet, converted to 16-bit PCM base64. API key stays server-side.
-
-## Source Processing Pipeline
-
-Status flow: `uploaded → processing → [embedding] → ready` (embedding only if token count > 2500).
-
-### Processed Output Format
-
-All processors use `build_processed_output()` from `app/utils/text/processed_output.py` for consistent output format:
+`main_chat_service.send_message`:
 
 ```
-# Extracted from {TYPE} document: {source_name}
-# Type: {TYPE}
-# Total pages: {N}
-# Processed at: {timestamp}
-# {metadata_key}: {value}
-# ...
-# token_count: {count or "200k+"}
-# ---
-
-=== {TYPE} PAGE 1 of N ===
-
-{page content}
-
-=== {TYPE} PAGE 2 of N ===
-
-{page content}
+user message → Claude (with tools) → tool_use? → execute → loop
+                                   → end_turn → store + return
 ```
 
-**Key Design Decisions:**
-- **Sources with logical pages** (PDF, PPTX, Image batch): Preserve real page/slide structure
-- **Sources without logical pages** (TEXT, DOCX, AUDIO, LINK, YOUTUBE): Single page marker `=== TYPE PAGE 1 of 1 ===`
-- **Token-based chunking** handles all splitting for embeddings (~200 tokens per chunk)
-- Each page extraction is **self-contained** with context from surrounding pages included
+System prompt assembled at request time by `context_loader.build_full_context` (sources, memory) + `brand_context_loader` (brand identity). Per-chat source selection via `chats.selected_source_ids`.
 
-### Page Markers
-All extracted content uses page markers: `=== {TYPE} PAGE 1 of N ===`
-Types: PDF, TEXT, DOCX, PPTX, AUDIO, IMAGE, LINK, YOUTUBE
+**Citations** use chunk IDs, not source IDs: `[[cite:{source_id}_page_{n}_chunk_{m}]]`. Frontend parses the marker and fetches chunk content via `/citations/{chunk_id}` on hover.
 
-### Source Types & AI Patterns
+**Image attachments** in user messages persist as a list of typed blocks:
+`[{type:"image", storage_path, media_type, filename}, {type:"text", text:"..."}]`
+The image block is dropped from `messages.content` on the read path *only* for tool-chain intermediates (`tool_use` / `tool_result`) — user image content is kept and re-signed by `message_service._format_blocks_with_images`. See `chat_service._is_displayable_message`.
 
-| Type | Service | AI Method | Pages |
-|------|---------|-----------|-------|
-| **PDF** | `ai_services/pdf_service.py` | Batched vision extraction (5 pages/batch, parallel ThreadPool). `submit_page_extraction` tool. | Real pages |
-| **PPTX** | `ai_services/pptx_service.py` | Same pattern as PDF - slides as images in batches, `submit_slide_extraction` tool. | Real slides |
-| **Image** | `ai_services/image_service.py` | Single Claude vision call with `submit_image_extraction` tool. | 1 per image |
-| **URL** | `ai_agents/web_agent_service.py` | Agentic loop with `web_fetch`, `tavily_search` tools. | Single page |
-| **DOCX** | `utils/docx_utils.py` | No AI - python-docx extraction | Single page |
-| **Audio** | `integrations/elevenlabs/audio_service.py` | No AI - ElevenLabs Scribe v1 transcription | Single page |
-| **Text** | `source_processing_service.py` | No AI - direct file read | Single page |
-| **YouTube** | `integrations/youtube/youtube_service.py` | No AI - youtube-transcript-api | Single page |
+### Analyzer-agent pattern (Freshdesk / Mixpanel mirror)
 
-**Design**: Raw files preserved on error (retry without re-upload). Processing runs in background threads. Tool-based extraction ensures structured output.
+When an integration needs more than a couple of read-only tool calls, wrap it in an analyzer agent so the main chat sees ONE tool instead of many.
 
-### Text Utilities (`app/utils/text/`)
+```
+backend/data/prompts/<name>_analyzer_agent_prompt.json
+  ↳ auto-appears in admin Settings → Prompts → "Agents" category
+    (filename ending in _analyzer_agent triggers the rule in
+     frontend/src/components/settings/sections/promptsLib.ts)
 
-Modular text processing for the RAG pipeline:
+backend/app/services/ai_agents/<name>_analyzer_agent.py
+  ↳ singleton; .run(project_id, source_id, query, chat_id, user_id, on_event)
+  ↳ tool_loader.load_tools_from_category("<name>_agent")
+  ↳ loop up to MAX_ITERATIONS (40), terminate on return_<name>_analysis
+  ↳ MAX_TOOL_RESULT_CHARS cap on per-call payload (avoids context blow-up)
 
-| Module | Purpose |
-|--------|---------|
-| `cleaning.py` | Text cleaning for embeddings (normalize whitespace, remove noise) |
-| `page_markers.py` | Standardized page marker format and regex patterns |
-| `processed_output.py` | `build_processed_output()` for consistent file headers |
-| `chunking.py` | Token-based chunking (~200 tokens) for embeddings |
+backend/app/services/tool_executors/<name>_analyzer_agent_executor.py
+  ↳ formats {summary, findings[], recommendations[]} into chat-ready markdown
 
-**Note**: `splitting.py` was removed - artificial page splitting is no longer used. Token-based chunking handles all splitting for embeddings.
+backend/app/services/tools/chat_tools/analyze_<name>_agent_tool.json
+  ↳ trigger tool the main chat sees (source_id + query)
 
-### Token Counting (Hybrid Approach)
+backend/app/services/tools/<name>_agent/*.json
+  ↳ all sub-tools live here; never expose to main chat
 
-Token counting uses **tiktoken** (local) for speed, with Claude API available for exact counts when needed.
+backend/app/services/chat_services/main_chat_service.py
+  ↳ self._get_<name>_analyzer_tool() in __init__ cache + _get_tools branch
+  ↳ dispatch case in _execute_tool for "analyze_<name>_agent"
+  ↳ permission gate: user_has_permission(user_id, "data_sources", "<name>")
 
-**Why tiktoken?** Chunking calls `count_tokens()` thousands of times (per page, per sentence, per word for long sentences). API calls would take minutes due to network latency. tiktoken is local and instant.
+backend/app/config/prompt_referenced_by.py
+  ↳ one-line entry maps prompt → agent file (UI breadcrumb)
+```
+
+Freshdesk is the reference implementation; Mixpanel was the most recent mirror.
+
+### MCP integration
+
+`backend/app/services/integrations/mcp/` — supports stdio and SSE transports. Per-user tool registry merged into `_get_tools()` at request time. stdio commands are allowlist-validated; arbitrary subprocess execution is rejected. Use for third-party MCP servers (e.g. official Mixpanel MCP) without rewriting their tools.
+
+### Saved insights
+
+Pinned chat answers (`saved_insights` table). Optional auto-refresh (daily/weekly) is driven by `background_services/insight_scheduler.py` — re-runs the original query through the same chat history.
+
+### Memory
+
+Two scopes: user-global (`users.memory`) and project-scoped (`projects.memory`). Tool-based — Claude calls `store_memory` → tool returns immediately → background task uses Haiku to merge new + existing (cap 150 tokens) → next system prompt includes the merged result via `context_loader`.
+
+---
+
+## AI service standard pattern
+
+Every AI service / agent / tool executor follows the same load-config → call → parse shape:
 
 ```python
-# embedding_utils.py
-count_tokens(text)      # Uses tiktoken (fast, local) - for chunking operations
-count_tokens_api(text)  # Uses Claude API (accurate, slower) - for billing/quota
+prompt_config = prompt_loader.get_prompt_config("<service_name>")
+tier_config   = get_anthropic_config()         # workers, RPM
+tool_def      = tool_loader.load_tool("<category>", "<tool_name>")
+output_dir    = path_utils.get_processed_dir(project_id)   # never hardcode
+
+response = claude_service.send_message(
+    messages=messages,
+    system_prompt=prompt_config["system_prompt"],
+    model=prompt_config["model"],
+    max_tokens=prompt_config["max_tokens"],
+    temperature=prompt_config["temperature"],
+    tools=[tool_def],
+    project_id=project_id,                     # required for cost tracking
+)
+
+# Parse only via claude_parsing_utils
+is_tool_use(response) / is_end_turn(response)
+extract_text(response) / extract_tool_use_blocks(response)
+extract_tool_inputs(response, "<tool_name>")
+build_tool_result_content(results)
 ```
 
-tiktoken uses `cl100k_base` encoding which closely matches Claude's tokenizer (within ~5% accuracy - good enough for chunking).
+**Never:**
+- Hardcode paths — use `path_utils`.
+- Parse Claude responses by hand — use `claude_parsing_utils`.
+- Roll your own rate limiter / batcher — `RateLimiter` + `create_batches` exist.
+- Skip `project_id` on Claude calls — cost tracking depends on it.
 
-## Web Agent Architecture
+For batched / parallel work: `ThreadPoolExecutor(max_workers=tier_config["max_workers"])` with cooperative cancellation via `task_service.is_target_cancelled(source_id)`. `DEFAULT_BATCH_SIZE = 5`.
 
-**Agentic loop pattern** for URL content extraction. Loop: Claude calls tools → execute → return result → repeat until termination.
+---
 
-**Tool Types**:
-- **Server Tools**: Claude handles execution (web_fetch, web_search) - results come in response
-- **Client Tools**: We execute via `web_agent_executor.py` (tavily_search)
-- **Termination Tool**: `return_search_result` signals completion
+## Tier configuration
 
-Execution logs saved to `data/projects/{id}/agents/web_agent/{execution_id}.json` for debugging.
+`ANTHROPIC_TIER` in `.env` (1–4) drives concurrency. From `app/config/tier_loader.py`:
 
-## Source Summaries
-
-AI-generated summaries (150-200 tokens via Haiku) help chat AI understand documents at a glance. Summaries included in system prompt via `context_loader.py`. For large sources, samples 8 evenly distributed chunks.
-
-## Chat Auto-Naming
-
-Background task generates 1-5 word title via Haiku after first message. Non-blocking - chat response returns immediately. Manual rename available via ChatList UI.
-
-## Main Chat Architecture
-
-**RAG agentic loop** for source-aware conversations. System prompt includes dynamic source context + memory via `context_loader.py`.
-
-### Tool Use Loop
-```
-User message → Claude API (with search_sources, store_memory tools)
-    ↓
-tool_use? → Yes: Execute tool → Store tool_use + tool_result → Loop back
-          → No:  Store final text → Return to user
-```
-
-### Source Search (Hybrid Search)
-
-The `search_sources` tool uses a smart hybrid search strategy based on source size:
-
-**Tool Schema** (`source_search_tool.json`):
-```json
-{
-  "source_id": "required - the source to search (from available sources)",
-  "keywords": ["optional", "array"],  // 1-2 word terms for local text search
-  "query": "optional string"           // semantic search phrase for Pinecone
-}
-```
-
-**Search Strategy** (`source_search_executor.py`):
-```
-if source.token_count < 1000:
-    → Return ALL chunks (no search needed)
-else:
-    → Local keyword search (fuzzy matching via difflib)
-    → Semantic search (OpenAI embedding → Pinecone)
-    → Combine & dedupe by chunk_id
-```
-
-**Key Point**: Claude passes `source_id` to search, but receives `chunk_id` in results. Citations must use `chunk_id`, NOT `source_id`.
-
-### Chunk-Based Citations
-
-Citations use chunk_ids for precise references to specific content sections.
-
-**Citation Format**: `[[cite:CHUNK_ID]]`
-**Chunk ID Format**: `{source_id}_page_{page}_chunk_{n}`
-**Example**: `[[cite:abc123-def456_page_5_chunk_2]]`
-
-**API Endpoint**: `GET /projects/{id}/citations/{chunk_id}`
-Returns chunk content for tooltip/popover display.
-
-**Flow**:
-```
-Claude response: "Information here [[cite:abc123_page_5_chunk_2]]"
-       ↓
-Frontend parses → extracts chunk_id
-       ↓
-Hover → GET /api/v1/projects/{id}/citations/{chunk_id}
-       ↓
-Backend loads chunk from Supabase → returns content + metadata
-       ↓
-Tooltip shows: "Source Name - Page 5, Section 2" + content
-```
-
-### Debug Logging
-Debug logging for API calls is available during development for troubleshooting chat interactions.
-
-## Claude API Response Parsing
-
-Centralized parsing via `utils/claude_parsing_utils.py`. Clean separation of concerns:
-
-```
-claude_service.py (API call) → returns raw {content_blocks, stop_reason, usage, model}
-         ↓
-claude_parsing_utils.py (parse response)
-   - is_tool_use(response) / is_end_turn(response)
-   - extract_text(response)
-   - extract_tool_use_blocks(response)
-   - build_tool_result_content(results)
-   - serialize_content_blocks(blocks)
-         ↓
-message_service.py (store if needed - pure CRUD)
-```
-
-**Tool use flow**: `stop_reason: "tool_use"` → extract tool_use blocks → execute → build tool_result content → send back with matching IDs.
-
-## Cost Tracking
-
-Per-project API cost tracking. Pricing: Sonnet ($3/$15 per 1M in/out), Haiku ($1/$5). All services pass `project_id` to `claude_service.send_message()`. Costs stored in Supabase `projects.costs` column, displayed in ProjectHeader with tooltip breakdown.
-
-## Memory System
-
-**Tool-based memory** for persistent context across conversations.
-
-- **User Memory** (Supabase `users.memory` column): Global preferences across all projects
-- **Project Memory** (Supabase `projects.memory` column): Project-specific context
-
-**Flow**: Claude calls `store_memory` → returns immediately (non-blocking) → background task uses Haiku to merge new + existing memory (max 150 tokens) → saved to Supabase → included in future system prompts via `context_loader.py`.
-
-## Tier Configuration
-
-Centralized rate limiting in `app/config/tier_loader.py`. Set via `ANTHROPIC_TIER` in .env (1-4).
-
-| Tier | Workers | Pages/min | Use Case |
-|------|---------|-----------|----------|
-| 1 | 4 | 10 | Free tier |
+| Tier | Workers | Pages/min | Use |
+|---|---|---|---|
+| 1 | 4 | 10 | Free |
 | 2 | 16 | 100 | Standard |
 | 3 | 24 | 200 | Pro |
-| 4 | 80 | 1500 | Enterprise/Demos |
+| 4 | 80 | 1500 | Enterprise / demos |
 
-**Tier 4 Optimization**: Workers can be high (80) because PDF/PPTX processing is I/O-bound (waiting for API), not CPU-bound. The 4000 RPM limit with 5-page batches theoretically supports ~20,000 pages/min, but output token limits (~800K/min) cap practical throughput.
+PDF/PPTX is I/O-bound so high worker counts are fine; the practical ceiling is the output-token-per-minute limit, not the worker count.
 
-## AI Service Standard Pattern
+---
 
-All AI services (`ai_services/`), AI agents (`ai_agents/`), and tool executors (`tool_executors/`) must follow this standardized pattern for consistency and maintainability.
+## Web agent / deep research
 
-### Required Steps (Mandatory)
+`web_agent_service` runs Claude's agentic loop for URL ingestion. Tools split into:
+- **Server tools** — Claude handles execution (`web_search`, `web_fetch`).
+- **Client tools** — we execute via `web_agent_executor.py` (`tavily_search`).
+- **Termination tool** — `return_search_result` signals "done".
 
-```
-1. CONFIGURATION LOADING
-   ├── prompt_loader.get_prompt_config("service_name")  # System prompt, model, temperature, max_tokens
-   ├── tool_loader.load_tool("category", "tool_name")   # Tool definitions (if using tools)
-   └── get_anthropic_config()                           # Tier config (workers, rate limits)
+Execution logs saved to `data/projects/{id}/agents/web_agent/{exec_id}.json` for postmortem. `deep_research_agent` uses the same skeleton with more iterations + file-staging tools.
 
-2. PATH MANAGEMENT
-   └── path_utils.get_*_dir(project_id)                 # Use path_utils for ALL directory access
-       ├── get_processed_dir()     # For output files
-       ├── get_raw_dir()           # For input files
-       ├── get_chunks_dir()        # For chunked text
-       └── get_chats_dir()         # For chat files
+---
 
-3. API CALL
-   └── claude_service.send_message(                     # Thin wrapper, returns raw response
-           messages, system_prompt, model,
-           max_tokens, temperature, tools,
-           tool_choice, project_id                      # project_id required for cost tracking
-       )
+## Cost tracking
 
-4. RESPONSE PARSING
-   └── claude_parsing_utils.*                           # Centralized parsing utilities
-       ├── is_tool_use(response)                        # Check if tool was called
-       ├── is_end_turn(response)                        # Check if conversation ended
-       ├── extract_text(response)                       # Get text content
-       ├── extract_tool_use_blocks(response)            # Get tool call details
-       ├── extract_tool_inputs(response, tool_name)     # Get inputs for specific tool
-       └── build_tool_result_content(results)           # Build tool result message
-```
+Per-project, stored in `projects.costs` JSONB. Every `claude_service.send_message` call must thread `project_id`. Image gen costs tracked separately under `projects.costs.images`. ProjectHeader surface in the UI shows totals with a tooltip breakdown.
 
-### Optional Steps (As Needed)
+---
 
-```
-FOR BATCHED PROCESSING (PDF, PPTX):
-├── batching_utils.create_batches(items, DEFAULT_BATCH_SIZE)
-├── batching_utils.get_batch_info(items, batch_size)
-└── DEFAULT_BATCH_SIZE = 5                              # Standard batch size
+## Frontend specifics
 
-FOR RATE-LIMITED APIs:
-├── rate_limit_utils.RateLimiter(requests_per_minute)
-└── rate_limiter.wait_if_needed()                       # Call before each API request
+- **Voice input** uses ElevenLabs realtime via a backend-issued single-use 15-min WebSocket token. PCM 16-bit base64 over AudioWorklet.
+- **Google Drive import** uses OAuth 2.0 (`drive.readonly`); tokens stored per-user in `users.google_tokens`, auto-refresh on expiry. Workspace types export: Docs→DOCX, Sheets→CSV, Slides→PPTX. Callback URL is derived from request host + API prefix; override with `GOOGLE_REDIRECT_URI` if your reverse proxy needs it.
+- **Chat auto-naming** runs in the background after the first message via Haiku; non-blocking.
+- **Onboarding tour** lives in `components/onboarding/`; first-run 5-step coachmark.
 
-FOR PARALLEL PROCESSING:
-├── ThreadPoolExecutor(max_workers=tier_config["max_workers"])
-├── task_service.is_target_cancelled(source_id)         # Check for user cancellation
-└── Cooperative cancellation pattern                    # Raise CancelledException
+---
 
-FOR BINARY DATA:
-└── encoding_utils.encode_bytes_to_base64(data)         # Base64 encoding for API
+## Conventions for new work
 
-FOR FILE-TYPE SPECIFIC:
-├── pdf_utils.get_page_count(), get_all_page_bytes()    # PDF operations
-├── docx_utils.extract_text()                           # DOCX extraction
-└── pptx_utils.convert_to_pdf()                         # PPTX to PDF conversion
-```
+1. **New AI surface** → start by writing the prompt JSON in `data/prompts/`. The admin Prompts UI auto-discovers it. Categorisation in `frontend/src/components/settings/sections/promptsLib.ts` is name-based (`*_analyzer_agent` → Agents, `*_extraction` / `csv_processor` / `summary` → Extraction, `default` / `chat_naming` / `memory` → Chat, everything else → Studio).
+2. **New tool for Claude** → JSON in `app/services/tools/<category>/`, loaded via `tool_loader`. If the tool is agent-internal, put it in the agent's subdir; if main-chat-visible, `chat_tools/`.
+3. **New integration that needs an editable prompt** → mirror the Freshdesk / Mixpanel analyzer pattern. Don't expose raw integration tools to the main chat.
+4. **New migration** → next sequential number in `backend/supabase/migrations/`. The migrate container applies them on boot. Mirror any filter logic in both the SQL and the Python helpers it represents (see `_is_displayable_message` ↔ `list_chats_with_message_count` RPC).
+5. **New API key** → entry in `API_KEYS_CONFIG`, validator in `app/services/app_settings/validation/`, registered in `ValidationService`, routing in `_validate_key`. Frontend auto-renders.
 
-### Service Template
+---
 
-```python
-"""
-Service Name - Brief description of what this service does.
-"""
-from app.config import prompt_loader, tool_loader, get_anthropic_config
-from app.services.integrations.claude import claude_service
-from app.utils import claude_parsing_utils
-from app.utils.path_utils import get_processed_dir
-from app.utils.rate_limit_utils import RateLimiter  # If rate limiting needed
-from app.utils.batching_utils import create_batches, DEFAULT_BATCH_SIZE  # If batching needed
-from app.services.data_services import message_service # if message storage required
+## Gotchas worth remembering
 
+- **`SUPABASE_PUBLIC_URL` MUST be set in prod** — without it, signed storage URLs point at `http://kong:8000` and the browser can't reach them. Symptom: screenshots vanish on refresh.
+- **JWT fail-open requires `JWT_SECRET`** — if unset and GoTrue blips, the auth middleware fails closed (no more "trust the unverified `sub`" path). This is intentional security hardening.
+- **`messages.content` shape varies** — string | dict `{text}` | list of typed blocks. Filters in `chat_service.get_chat` and `_is_displayable_message` must distinguish "tool-chain list" (skip) from "user image+text list" (keep).
+- **Migration numbering can collide** when develop and main fork — check `ls backend/supabase/migrations/ | sort` before adding.
+- **The `freshdesk_analyzer_agent` and `mixpanel_analyzer_agent` patterns are load-bearing examples** — if you're tempted to deviate, ask first.
 
-class ServiceName:
-    def __init__(self):
-        self._tool_definition = None  # Lazy load tools
+---
 
-    def _load_tool_definition(self):
-        if self._tool_definition is None:
-            self._tool_definition = tool_loader.load_tool("category", "tool_name")
-        return self._tool_definition
+## When stuck
 
-    def process(self, project_id: str, ...) -> Dict[str, Any]:
-        # 1. Load configurations
-        prompt_config = prompt_loader.get_prompt_config("service_name")
-        tool_def = self._load_tool_definition()
-        tier_config = get_anthropic_config()
-
-        # 2. Create rate limiter (if needed)
-        rate_limiter = RateLimiter(tier_config["pages_per_minute"])
-
-        # 3. Get paths
-        output_dir = get_processed_dir(project_id)
-
-        # 4. Process with rate limiting
-        rate_limiter.wait_if_needed()
-        response = claude_service.send_message(
-            messages=messages,
-            system_prompt=prompt_config["system_prompt"],
-            model=prompt_config["model"],
-            max_tokens=prompt_config["max_tokens"],
-            temperature=prompt_config["temperature"],
-            tools=[tool_def],
-            project_id=project_id
-        )
-
-        # 5. Parse response
-        tool_inputs = claude_parsing_utils.extract_tool_inputs(response, "tool_name")
-
-        return {"success": True, "data": tool_inputs}
-
-
-# Singleton instance
-service_name = ServiceName()
-```
-
-### What NOT to Do
-
-- **Never** duplicate configuration loading logic - use `prompt_loader`, `tool_loader`, `tier_loader`
-- **Never** hardcode paths - use `path_utils` functions
-- **Never** parse Claude responses manually - use `claude_parsing_utils`
-- **Never** implement custom rate limiting - use `RateLimiter` class
-- **Never** implement custom batching - use `create_batches()` utility
-- **Never** skip `project_id` in API calls - needed for cost tracking
+- The repo has 372+ backend tests. Run the relevant slice (`pytest tests/test_chat_service.py -v`) before opening a PR.
+- For any "where does X live?" question, prefer `grep` over guessing — file paths in this doc may drift between updates.
+- For LLM behaviour questions, check the prompt JSON first — it's the source of truth.
+- For "why did we do it this way?" — git log + commit messages tend to carry the rationale.
