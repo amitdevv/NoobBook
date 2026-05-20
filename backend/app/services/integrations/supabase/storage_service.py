@@ -59,9 +59,11 @@ def _rewrite_signed_url_for_browser(signed_url: Optional[str]) -> Optional[str]:
         return signed_url
     internal = (os.getenv("SUPABASE_URL") or "").rstrip("/")
     if not internal or not signed_url.startswith(internal):
+        _log_rewrite_decision("no_internal_match", internal, None, signed_url)
         return signed_url
 
     public = (os.getenv("SUPABASE_PUBLIC_URL") or "").rstrip("/")
+    source = "env"
 
     if not public or public == internal:
         # No operator override — fall back to the current request origin
@@ -74,12 +76,50 @@ def _rewrite_signed_url_for_browser(signed_url: Optional[str]) -> Optional[str]:
                 candidate = (request.host_url or "").rstrip("/")
                 if candidate and candidate != internal:
                     public = candidate
+                    source = "request_host_url"
         except Exception:  # pragma: no cover — defensive
             pass
 
     if not public or public == internal:
+        _log_rewrite_decision("no_public_available", internal, public, signed_url)
         return signed_url
-    return public + signed_url[len(internal):]
+    rewritten = public + signed_url[len(internal):]
+    _log_rewrite_decision(f"rewrote_via_{source}", internal, public, rewritten)
+    return rewritten
+
+
+# Single-shot diagnostic: log the FIRST rewrite decision per process so we
+# can verify in prod-log bundles whether the rewrite is using the env var,
+# request host, or no-op. Repeated calls within the same process stay
+# silent so we don't fill the log with per-chat noise.
+_REWRITE_LOG_ONCE = False
+
+
+def _log_rewrite_decision(
+    branch: str,
+    internal: Optional[str],
+    public: Optional[str],
+    final_url: Optional[str],
+) -> None:
+    global _REWRITE_LOG_ONCE
+    if _REWRITE_LOG_ONCE:
+        return
+    _REWRITE_LOG_ONCE = True
+    final_host = ""
+    if final_url:
+        try:
+            from urllib.parse import urlparse
+
+            final_host = urlparse(final_url).netloc
+        except Exception:  # pragma: no cover
+            final_host = ""
+    logger.info(
+        "signed_url_rewrite: branch=%s internal=%s public=%s final_host=%s",
+        branch,
+        internal or "",
+        public or "",
+        final_host,
+    )
 
 
 # Bucket names
