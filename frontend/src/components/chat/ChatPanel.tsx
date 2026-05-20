@@ -176,7 +176,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       const serverIds = new Set(
         server.messages.map((m) => m.id).filter((id): id is string => Boolean(id)),
       );
-      const localOnly = local.messages.filter((m) => m.id && !serverIds.has(m.id));
+      // `temp-…` IDs are inherently optimistic — they never have a
+      // canonical counterpart on the server, so blindly treating them as
+      // "local only" causes them to leak through every recovery fetch.
+      // Specifically, the soft-canonical preservation path (introduced
+      // for the screenshot-attachment regression) keeps a temp user
+      // message in `prev.messages` when the `user_message` SSE event
+      // arrives without an id. The 500ms post-stream recover refetch
+      // then re-appends that temp below the assistant message, producing
+      // a ghost user bubble. Strip them here so the server view stays
+      // authoritative.
+      const localOnly = local.messages.filter(
+        (m) => m.id && !m.id.startsWith('temp-') && !serverIds.has(m.id),
+      );
       if (localOnly.length === 0) return server;
       if (import.meta.env.DEV) {
         log.info(
@@ -683,10 +695,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     const replaceTempWithCanonicalUser = (canonicalUserMessage: Chat['messages'][number]) => {
       // Some SSE producers occasionally emit a `user_message` event with a
-      // missing/null payload during reconnects. Bail out instead of poisoning
-      // activeChat.messages with `undefined`, which crashes the renderer
-      // (`Cannot read properties of undefined (reading 'id')`).
-      if (!canonicalUserMessage?.id) return;
+      // missing/null payload during reconnects. We can't insert `undefined`
+      // into activeChat.messages (the renderer would crash), but we also
+      // mustn't silently return AND flip canonicalUserMessageReceivedRef —
+      // `appendAssistantMessage` reads that flag and strips the temp when
+      // it's true, which would reintroduce the missing-user-bubble
+      // regression. Instead: log and bail, leaving the flag false so
+      // `tempStillSole` in appendAssistantMessage stays true and the
+      // optimistic bubble survives until the 500ms recover refetch
+      // replaces it with the canonical (and mergeChatPreservingLocal
+      // strips the temp- id out of the merge result).
+      if (!canonicalUserMessage?.id) {
+        log.warn(
+          {
+            chatId: sendingChatId,
+            tempId: tempUserMessage.id,
+            hadAttachments: messageAttachments.length > 0,
+          },
+          'user_message event arrived without an id — keeping temp bubble',
+        );
+        return;
+      }
       canonicalUserMessageReceivedRef.current = true;
       // Carry the optimistic blob URLs onto the canonical message's image
       // blocks. The server-signed URLs aren't always reachable from the
@@ -761,7 +790,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       // bubble nor the final message is visible.
       setActiveChat((prev) => {
         if (!prev) return null;
-        const messagesWithoutTemp = prev.messages.filter((m) => m.id !== tempUserMessage.id);
+        // Only strip the optimistic temp message if a canonical user
+        // message is already present in the array. Without this guard,
+        // a missed/empty `user_message` SSE event lets us drop the user
+        // bubble entirely — the chat then shows only the AI reply with
+        // nothing above it (the screenshot-attachment regression). If
+        // the temp is still the only user-side representation, keep it;
+        // the post-stream recover refetch will reconcile it with the DB.
+        const tempStillSole = !canonicalUserMessageReceivedRef.current;
+        const messagesWithoutTemp = tempStillSole
+          ? prev.messages
+          : prev.messages.filter((m) => m.id !== tempUserMessage.id);
+        if (tempStillSole) {
+          log.warn(
+            {
+              chatId: prev.id,
+              assistantId: assistantMessage.id,
+              tempId: tempUserMessage.id,
+            },
+            'assistant arrived before canonical user_message — preserving temp bubble',
+          );
+        }
         const alreadyAppended = messagesWithoutTemp.some((msg) => msg.id === assistantMessage.id);
         if (import.meta.env.DEV) {
           log.info(
