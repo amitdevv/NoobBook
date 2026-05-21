@@ -192,13 +192,20 @@ const ConsolePanel: React.FC<{
   logFilePresent: boolean;
   panelMaxHeightClassName: string;
 }> = ({ lines, loading, logFilePresent, panelMaxHeightClassName }) => {
-  // The hook returns a stable cache keyed by row index. The cache is
-  // re-keyed (via the `key` prop) whenever the underlying lines array
-  // identity changes so a new server snapshot doesn't render with stale
-  // cached heights from a previous filter state.
+  // The hook keeps a per-index height cache that ResizeObserver
+  // populates as rows mount. We intentionally do NOT pass a `key`
+  // prop: a key change resets the entire cache, which makes every
+  // row snap back to DEFAULT_ROW_HEIGHT for the frame between reset
+  // and the next ResizeObserver tick — visually that shows up as
+  // multi-line rows briefly overlapping the rows below them. The
+  // live-tail poll appends new rows at the end every 30 s, and
+  // filter switches re-render each row's inner content; in both
+  // cases ResizeObserver fires on the affected rows and the cache
+  // self-corrects without a flicker. See the docstring of
+  // `useDynamicRowHeight` in react-window v2 — the observer is
+  // specifically designed to handle content re-renders.
   const rowHeight = useDynamicRowHeight({
     defaultRowHeight: DEFAULT_ROW_HEIGHT,
-    key: lines.length,
   });
 
   const showEmpty = !loading && lines.length === 0;
