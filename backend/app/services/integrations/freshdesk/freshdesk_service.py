@@ -151,8 +151,18 @@ class FreshdeskService:
             auth = HTTPBasicAuth(self._api_key, "X")
             headers = {"Content-Type": "application/json"}
 
+            call_t0 = time.monotonic()
             response = requests.get(
                 url, auth=auth, headers=headers, params=params, timeout=30
+            )
+            # Per-call summary so mid-sync failures are diagnosable from
+            # the bundle alone. Sync runs at the batch level above; this is
+            # the per-HTTP-call line.
+            log_level = logger.info if response.status_code == 200 else logger.warning
+            log_level(
+                "FRESHDESK_API endpoint=%s status=%s ms=%d",
+                endpoint, response.status_code,
+                int((time.monotonic() - call_t0) * 1000),
             )
 
             # Preemptive rate limit pause — sleep before we exhaust the limit
@@ -207,10 +217,16 @@ class FreshdeskService:
                 return {"success": False, "error": f"Freshdesk API error: {response.status_code} - {response.text[:200]}"}
 
         except requests.exceptions.Timeout:
+            # Mirror the JIRA_API / MIXPANEL_API error-path lines so a
+            # network failure mid-sync produces an observable signal in
+            # the bundle, not silence.
+            logger.warning("FRESHDESK_API endpoint=%s error=timeout", endpoint)
             return {"success": False, "error": "Request timed out."}
         except requests.exceptions.ConnectionError:
+            logger.warning("FRESHDESK_API endpoint=%s error=connection", endpoint)
             return {"success": False, "error": "Connection failed. Check FRESHDESK_DOMAIN."}
         except Exception as e:
+            logger.warning("FRESHDESK_API endpoint=%s error=%s", endpoint, type(e).__name__)
             return {"success": False, "error": f"Request failed: {str(e)}"}
 
     def list_tickets(
