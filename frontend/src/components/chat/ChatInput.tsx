@@ -9,6 +9,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { Textarea } from '../ui/textarea';
 import {
+  CircleNotch,
   PaperPlaneTilt,
   Microphone,
   CodeBlock,
@@ -17,6 +18,7 @@ import {
   X,
 } from '@phosphor-icons/react';
 import { usePermissions } from '@/contexts/PermissionsContext';
+import { optimizeAttachment } from '@/lib/image/optimizeAttachment';
 
 const ATTACHMENT_ALLOWED_MIMES = new Set([
   'image/png',
@@ -25,8 +27,21 @@ const ATTACHMENT_ALLOWED_MIMES = new Set([
   'image/webp',
   'image/gif',
 ]);
-const ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024; // 5MB — Claude vision cap
+// Pre-optimize ceiling. We accept raw inputs up to this size, then the
+// optimizer reduces them. A 20 MB Retina PNG that decodes to <1 MB is
+// fine; the cap exists so a 200 MB drag-drop doesn't hang the browser
+// decoder. The 5 MB final cap is below as POST_OPTIMIZE_MAX_BYTES.
+const ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
+// Mirrors backend `_MAX_ATTACHMENT_BYTES` in messages/routes.py. After
+// optimization we re-validate against this; a hand-crafted huge file
+// that survives compression would be rejected here.
+const POST_OPTIMIZE_MAX_BYTES = 5 * 1024 * 1024;
 const ATTACHMENT_MAX_COUNT = 10;
+// Debounce window before showing the "Optimising image…" indicator.
+// Most paste/drag-drop ops finish well under this, so the indicator
+// only appears for genuinely large inputs — keeps the UX flashy for
+// small images.
+const COMPRESSING_INDICATOR_DELAY_MS = 250;
 
 interface ChatInputProps {
   message: string;
@@ -74,6 +89,24 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [dragDepth, setDragDepth] = useState(0);
   const dragActive = dragDepth > 0;
 
+  // Surface "Optimising image…" only when the optimizer takes longer
+  // than COMPRESSING_INDICATOR_DELAY_MS — small pastes finish well
+  // under that and we don't want a flash of UI per attachment.
+  const [compressing, setCompressing] = useState(false);
+
+  // Ref-mirror of the current attachments array so the async path in
+  // `acceptFiles` reads the freshest list AFTER its `await`. Without
+  // this, two overlapping paste/drop gestures both captured the same
+  // initial `attachments` snapshot inside the closure and the second
+  // `onAttachmentsChange` overwrote the first — silently dropping
+  // the first batch. The ref is updated every render via the
+  // sync-effect below so it always reflects the parent's latest
+  // state by the time the await resolves.
+  const attachmentsRef = useRef(attachments);
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
   // Display value combines typed message and partial transcript
   const displayMessage = partialTranscript
     ? message + (message && !message.endsWith(' ') ? ' ' : '') + partialTranscript
@@ -91,9 +124,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   }, [displayMessage]);
 
   const acceptFiles = useCallback(
-    (incoming: File[]) => {
+    async (incoming: File[]) => {
       if (!incoming.length) return;
-      const accepted: File[] = [];
+
+      // MIME + raw-size gate. Pre-optimize cap is generous (20 MB) so
+      // large screenshots survive the gate and reach the optimizer.
+      const preOptimized: File[] = [];
       for (const file of incoming) {
         const mime = (file.type || '').toLowerCase();
         if (!ATTACHMENT_ALLOWED_MIMES.has(mime)) {
@@ -104,22 +140,70 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         }
         if (file.size > ATTACHMENT_MAX_BYTES) {
           onAttachmentError?.(
-            `${file.name || 'Image'} is over the 5MB limit.`,
+            `${file.name || 'Image'} is over the 20MB upload cap.`,
+          );
+          continue;
+        }
+        preOptimized.push(file);
+      }
+      if (!preOptimized.length) return;
+
+      // Show the indicator only if the optimizer is slow enough that
+      // the user would notice. `setTimeout` returns a handle we clear
+      // unconditionally in the finally block so a fast path never
+      // flashes the indicator.
+      const indicatorTimer = window.setTimeout(
+        () => setCompressing(true),
+        COMPRESSING_INDICATOR_DELAY_MS,
+      );
+
+      let optimized: File[];
+      try {
+        optimized = await Promise.all(
+          preOptimized.map((f) => optimizeAttachment(f)),
+        );
+      } finally {
+        window.clearTimeout(indicatorTimer);
+        setCompressing(false);
+      }
+
+      // Post-optimize re-validation against the backend cap. Catches
+      // a hand-crafted huge file that survived the optimizer (or one
+      // whose alpha-channel forced a PNG retention without enough
+      // resize headroom).
+      const accepted: File[] = [];
+      for (const file of optimized) {
+        if (file.size > POST_OPTIMIZE_MAX_BYTES) {
+          onAttachmentError?.(
+            `${file.name || 'Image'} didn't compress small enough — try a smaller image.`,
           );
           continue;
         }
         accepted.push(file);
       }
       if (!accepted.length) return;
-      const next = [...attachments, ...accepted];
+
+      // Read the latest attachments list via the ref — the `attachments`
+      // prop captured in this closure is the snapshot from the render
+      // that fired off this acceptFiles call; if a second paste/drop
+      // started while the first was still in `await Promise.all`,
+      // using the prop would clobber the first batch.
+      const current = attachmentsRef.current;
+      const next = [...current, ...accepted];
       if (next.length > ATTACHMENT_MAX_COUNT) {
         onAttachmentError?.(
           `Maximum ${ATTACHMENT_MAX_COUNT} attachments per message — extras dropped.`,
         );
       }
-      onAttachmentsChange(next.slice(0, ATTACHMENT_MAX_COUNT));
+      const merged = next.slice(0, ATTACHMENT_MAX_COUNT);
+      // Update the ref synchronously so a *third* concurrent call sees
+      // this merge result, not the parent state that hasn't committed
+      // yet. React's setState is async; the ref is the only single
+      // source of truth across overlapping awaits.
+      attachmentsRef.current = merged;
+      onAttachmentsChange(merged);
     },
-    [attachments, onAttachmentsChange, onAttachmentError],
+    [onAttachmentsChange, onAttachmentError],
   );
 
   // Paste handler — clipboard images get pulled out as Files. We
@@ -219,6 +303,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             attachments={attachments}
             onRemove={removeAttachment}
           />
+        )}
+
+        {compressing && (
+          // Debounced — only renders if optimization is taking long
+          // enough that the user would otherwise wonder why the chip
+          // hasn't appeared yet. Stays well clear of the textarea.
+          <div className="flex items-center gap-2 px-3 pt-2 text-[11px] text-muted-foreground">
+            <CircleNotch size={12} className="animate-spin" />
+            <span>Optimising image…</span>
+          </div>
         )}
 
         {/* Floating pill — mic, textarea, image, raw, send. */}
