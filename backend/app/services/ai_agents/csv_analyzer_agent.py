@@ -12,6 +12,7 @@ Results (including any generated plots) are returned to main_chat.
 """
 
 import logging
+import time
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 from datetime import datetime
@@ -48,6 +49,10 @@ class CSVAnalyzerAgent:
             self._prompt_config = prompt_loader.get_prompt_config("csv_analyzer_agent")
         return self._prompt_config
 
+    # Same preview cap as main_chat_service so the activity feed renders
+    # uniformly regardless of which layer the event came from.
+    _RESULT_PREVIEW_CHARS = 500
+
     @staticmethod
     def _emit_progress(
         on_event: Optional[Callable[[str, Dict[str, Any]], None]],
@@ -56,12 +61,10 @@ class CSVAnalyzerAgent:
         iteration: Optional[int] = None,
         tool: Optional[str] = None,
     ) -> None:
-        # Same shape as the Freshdesk/Mixpanel agents — mirroring them
-        # keeps the frontend renderer uniform. Critical here for a second
-        # reason: Cloudflare's SSE proxy ignores comment-only heartbeats
-        # and drops the connection at ~150s, so every iteration MUST emit
-        # a real data event to keep the stream alive. See SSE_CLOSE_TRACE
-        # at routes.py:506.
+        # Legacy event kept for the existing ReadingIndicator pill. The
+        # dev-only activity feed listens to tool_event (below) instead.
+        # Critical for keeping Cloudflare's SSE proxy from dropping the
+        # connection at ~150s — see SSE_CLOSE_TRACE at routes.py:506.
         if on_event is None:
             return
         try:
@@ -73,6 +76,45 @@ class CSVAnalyzerAgent:
             on_event("tool_progress", payload)
         except Exception:
             logger.debug("tool_progress emit failed", exc_info=True)
+
+    @classmethod
+    def _emit_tool_event(
+        cls,
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]],
+        phase: str,
+        *,
+        tool_id: Optional[str],
+        name: str,
+        parent_tool_id: Optional[str] = None,
+        input: Optional[Dict[str, Any]] = None,
+        result_preview: Optional[str] = None,
+        duration_ms: Optional[int] = None,
+        is_error: bool = False,
+    ) -> None:
+        """Emit a tool_event SSE frame for the dev activity feed.
+
+        Mirrors main_chat_service._emit_tool_event so child rows nest
+        under their parent analyze_csv_agent row via parent_tool_id.
+        """
+        if on_event is None:
+            return
+        try:
+            payload: Dict[str, Any] = {"phase": phase, "name": name}
+            if tool_id is not None:
+                payload["tool_id"] = tool_id
+            if parent_tool_id is not None:
+                payload["parent_tool_id"] = parent_tool_id
+            if input is not None:
+                payload["input"] = input
+            if result_preview is not None:
+                payload["result_preview"] = result_preview
+            if duration_ms is not None:
+                payload["duration_ms"] = duration_ms
+            if is_error:
+                payload["is_error"] = True
+            on_event("tool_event", payload)
+        except Exception:
+            logger.debug("tool_event emit failed", exc_info=True)
 
     def _load_tools(self) -> List[Dict[str, Any]]:
         """
@@ -96,6 +138,7 @@ class CSVAnalyzerAgent:
         user_id: Optional[str] = None,
         on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         cancel_event: Optional[Any] = None,
+        parent_tool_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Run the agent to answer a question about CSV data.
@@ -228,9 +271,46 @@ class CSVAnalyzerAgent:
                 tool_input = tool_block["input"]
                 tool_id = tool_block["id"]
 
+                # Emit start before execution so the activity feed
+                # renders a spinning row immediately. parent_tool_id
+                # ties this child to the outer analyze_csv_agent row.
+                inner_t0 = time.monotonic()
+                self._emit_tool_event(
+                    on_event,
+                    "start",
+                    tool_id=tool_id,
+                    name=tool_name,
+                    parent_tool_id=parent_tool_id,
+                    input=tool_input if isinstance(tool_input, dict) else None,
+                )
+
                 # Execute tool via analysis_executor
                 result, is_termination = analysis_executor.execute_tool(
                     tool_name, tool_input, project_id, source_id
+                )
+
+                # Build preview from whatever shape the result is.
+                # run_analysis returns {success, output, plot_filenames?};
+                # return_analysis input is summary/image_paths — already
+                # emitted as 'start' input above, so 'end' carries duration only.
+                preview: Optional[str] = None
+                if isinstance(result, dict):
+                    raw_preview = result.get("output") or result.get("summary") or ""
+                    if isinstance(raw_preview, str) and raw_preview:
+                        preview = (
+                            raw_preview[: self._RESULT_PREVIEW_CHARS] + "…"
+                            if len(raw_preview) > self._RESULT_PREVIEW_CHARS
+                            else raw_preview
+                        )
+                self._emit_tool_event(
+                    on_event,
+                    "end",
+                    tool_id=tool_id,
+                    name=tool_name,
+                    parent_tool_id=parent_tool_id,
+                    result_preview=preview,
+                    duration_ms=int((time.monotonic() - inner_t0) * 1000),
+                    is_error=isinstance(result, dict) and not result.get("success", True),
                 )
 
                 if is_termination:

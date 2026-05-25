@@ -10,7 +10,13 @@ import { Sparkle } from '@phosphor-icons/react';
 import axios from 'axios';
 import { ChatMessagesSkeleton } from './ChatMessagesSkeleton';
 import { chatsAPI } from '@/lib/api/chats';
-import type { Chat, ChatMetadata, ChatSyncPayload, StudioSignal } from '@/lib/api/chats';
+import type {
+  Chat,
+  ChatMetadata,
+  ChatSyncPayload,
+  StudioSignal,
+  ToolEventPayload,
+} from '@/lib/api/chats';
 import type { CostTracking } from '@/lib/api/projects';
 import { usersAPI, type UserUsage } from '@/lib/api/settings';
 import { sourcesAPI, type Source } from '@/lib/api/sources';
@@ -95,6 +101,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   // while the assistant is silent (e.g. FreshdeskAgent iterating). Cleared
   // when assistant text starts streaming or when the run finishes/errors.
   const [toolProgress, setToolProgress] = useState<string>('');
+  // Dev-only activity feed: per-call tool_event frames for the
+  // currently-streaming turn. Reset at the start of each send.
+  // Gated client-side by useDevFlag('tool_activity_feed') in
+  // ChatMessages; this state is cheap (small array) so we always
+  // collect it regardless of the flag.
+  const [toolEvents, setToolEvents] = useState<ToolEventPayload[]>([]);
   const [titleSyncPollKey, setTitleSyncPollKey] = useState(0);
   // AbortController for cancelling in-flight chat requests
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -677,6 +689,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setRawMode(false);
     setStreamingAssistantContent('');
     setToolProgress('');
+    setToolEvents([]);
     onAddSendingChat(sendingChatId, activeChat.title);
 
     // Optimistic user-message render. With attachments, the content is a
@@ -914,6 +927,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           },
           onToolProgress: (payload) => {
             setToolProgress(payload.message);
+          },
+          onToolEvent: (payload) => {
+            // Dev-only Activity Feed: append every frame; the
+            // ActivityFeed component folds them into a parent/child
+            // tree and dedupes by tool_id.
+            setToolEvents((prev) => [...prev, payload]);
           },
           onAssistantDone: (payload) => {
             setToolProgress('');
@@ -1369,6 +1388,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           chatId={activeChat?.id ?? null}
           streamingAssistantContent={streamingAssistantContent}
           toolProgress={toolProgress}
+          toolEvents={toolEvents}
         />
       )}
 

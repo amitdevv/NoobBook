@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
@@ -49,6 +50,8 @@ class DatabaseAnalyzerAgent:
             self._tools = tools_config["all_tools"]
         return self._tools or []
 
+    _RESULT_PREVIEW_CHARS = 500
+
     @staticmethod
     def _emit_progress(
         on_event: Optional[Callable[[str, Dict[str, Any]], None]],
@@ -57,9 +60,9 @@ class DatabaseAnalyzerAgent:
         iteration: Optional[int] = None,
         tool: Optional[str] = None,
     ) -> None:
-        # See csv_analyzer_agent._emit_progress for the rationale —
-        # Cloudflare drops idle SSE at ~150s so each iteration must emit
-        # a real data event, not just rely on heartbeats.
+        # Legacy event for ReadingIndicator pill. The dev activity feed
+        # uses tool_event below. Heartbeats alone won't survive
+        # Cloudflare's ~150s SSE timeout, so this must keep firing.
         if on_event is None:
             return
         try:
@@ -72,6 +75,41 @@ class DatabaseAnalyzerAgent:
         except Exception:
             logger.debug("tool_progress emit failed", exc_info=True)
 
+    @classmethod
+    def _emit_tool_event(
+        cls,
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]],
+        phase: str,
+        *,
+        tool_id: Optional[str],
+        name: str,
+        parent_tool_id: Optional[str] = None,
+        input: Optional[Dict[str, Any]] = None,
+        result_preview: Optional[str] = None,
+        duration_ms: Optional[int] = None,
+        is_error: bool = False,
+    ) -> None:
+        """See csv_analyzer_agent._emit_tool_event — same shape."""
+        if on_event is None:
+            return
+        try:
+            payload: Dict[str, Any] = {"phase": phase, "name": name}
+            if tool_id is not None:
+                payload["tool_id"] = tool_id
+            if parent_tool_id is not None:
+                payload["parent_tool_id"] = parent_tool_id
+            if input is not None:
+                payload["input"] = input
+            if result_preview is not None:
+                payload["result_preview"] = result_preview
+            if duration_ms is not None:
+                payload["duration_ms"] = duration_ms
+            if is_error:
+                payload["is_error"] = True
+            on_event("tool_event", payload)
+        except Exception:
+            logger.debug("tool_event emit failed", exc_info=True)
+
     def run(
         self,
         project_id: str,
@@ -81,6 +119,7 @@ class DatabaseAnalyzerAgent:
         user_id: Optional[str] = None,
         on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         cancel_event: Optional[Any] = None,
+        parent_tool_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         config = self._load_config()
         tools = self._load_tools()
@@ -214,8 +253,45 @@ class DatabaseAnalyzerAgent:
                     tool_input = tool_block.get("input", {}) or {}
                     tool_id = tool_block.get("id")
 
+                    inner_t0 = time.monotonic()
+                    self._emit_tool_event(
+                        on_event,
+                        "start",
+                        tool_id=tool_id,
+                        name=tool_name,
+                        parent_tool_id=parent_tool_id,
+                        input=tool_input if isinstance(tool_input, dict) else None,
+                    )
+
                     result, is_termination = executor.execute_tool(
                         tool_name, tool_input, project_id, source_id
+                    )
+
+                    preview: Optional[str] = None
+                    if isinstance(result, dict):
+                        raw_preview = (
+                            result.get("rows_preview")
+                            or result.get("output")
+                            or result.get("summary")
+                            or ""
+                        )
+                        if not isinstance(raw_preview, str):
+                            raw_preview = json.dumps(raw_preview)[: self._RESULT_PREVIEW_CHARS]
+                        if raw_preview:
+                            preview = (
+                                raw_preview[: self._RESULT_PREVIEW_CHARS] + "…"
+                                if len(raw_preview) > self._RESULT_PREVIEW_CHARS
+                                else raw_preview
+                            )
+                    self._emit_tool_event(
+                        on_event,
+                        "end",
+                        tool_id=tool_id,
+                        name=tool_name,
+                        parent_tool_id=parent_tool_id,
+                        result_preview=preview,
+                        duration_ms=int((time.monotonic() - inner_t0) * 1000),
+                        is_error=isinstance(result, dict) and not result.get("success", True),
                     )
 
                     if tool_name == "query_runner" and isinstance(tool_input.get("query"), str):

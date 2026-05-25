@@ -11,8 +11,10 @@ import React, { useRef, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Ghost, FileText, Copy, Check, DownloadSimple, ArrowDown } from '@phosphor-icons/react';
-import type { Message } from '../../lib/api/chats';
+import type { Message, ToolEventPayload } from '../../lib/api/chats';
 import { messageContentAsText } from '../../lib/api/chats';
+import { ActivityFeed } from './ActivityFeed';
+import { useDevFlag } from '@/hooks/useDevFlag';
 import { parseCitations } from '../../lib/citations';
 import { CitationBadge } from './CitationBadge';
 import { Separator } from '../ui/separator';
@@ -100,6 +102,13 @@ interface ChatMessagesProps {
    * progress beats whimsy when the user is waiting 30+ seconds.
    */
   toolProgress?: string;
+  /**
+   * Dev-only: streamed per-call lifecycle events for the Activity
+   * Feed. Always passed; rendered only when the dev flag
+   * `noobbook:dev:tool_activity_feed` is on. Cleared between turns
+   * in the parent.
+   */
+  toolEvents?: ToolEventPayload[];
   /**
    * Render in read-only mode (used by the shared-project view). Currently
    * a no-op for write affordances inside this component (the input + stop
@@ -669,12 +678,17 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
   chatId,
   streamingAssistantContent = '',
   toolProgress,
+  toolEvents,
   readOnly: _readOnly,
   studioAssetRewriter,
 }) => {
   // _readOnly is reserved for future use; ChatMessages currently has no
   // write affordances of its own (input + stop live in ChatPanel).
   void _readOnly;
+  // Dev-only flag (admin Settings → System → Developer Tools). When
+  // off, this hook returns false and the feed never renders, even
+  // though tool_events still arrive over SSE.
+  const [activityFeedEnabled] = useDevFlag('tool_activity_feed');
   const containerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -778,6 +792,17 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
             </div>
           );
         })}
+
+        {/* Dev-only Activity Feed for the in-flight turn. Renders above
+            the streaming bubble so the user reads "what tools ran" then
+            "what the model said". Persistence across refresh is a
+            follow-up (would need to lazy-fetch /raw and reconstruct
+            tool_event[] from tool_use/tool_result pairs). */}
+        {activityFeedEnabled && sending && toolEvents && toolEvents.length > 0 && (
+          <div className="flex justify-start">
+            <ActivityFeed events={toolEvents} inFlight={sending} />
+          </div>
+        )}
 
         {streamingAssistantContent && (
           <AIMessage

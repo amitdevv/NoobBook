@@ -21,6 +21,7 @@ def execute(
     user_id: Optional[str] = None,
     on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
     cancel_event: Optional[Any] = None,
+    parent_tool_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Execute CSV analyzer agent for a user query.
@@ -56,6 +57,7 @@ def execute(
         user_id=user_id,
         on_event=on_event,
         cancel_event=cancel_event,
+        parent_tool_id=parent_tool_id,
     )
 
     if result.get("success"):

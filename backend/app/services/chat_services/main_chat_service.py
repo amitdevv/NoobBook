@@ -25,6 +25,52 @@ from typing import Dict, Any, Tuple, List, Optional, Callable, Union
 UserMessagePayload = Union[str, List[Dict[str, Any]]]
 
 
+# Tool result previews are capped to keep SSE frames small. The full
+# result is already persisted in messages.content (tool_result blocks)
+# and can be fetched on demand if the dev-only UI ever needs the rest.
+_TOOL_EVENT_RESULT_PREVIEW_CHARS = 500
+
+
+def _emit_tool_event(
+    on_event: Optional[Callable[[str, Dict[str, Any]], None]],
+    phase: str,
+    *,
+    tool_id: Optional[str],
+    name: str,
+    parent_tool_id: Optional[str] = None,
+    input: Optional[Dict[str, Any]] = None,
+    result_preview: Optional[str] = None,
+    duration_ms: Optional[int] = None,
+    is_error: bool = False,
+) -> None:
+    """Emit a tool_event SSE frame for the dev-only activity feed UI.
+
+    Frontend ignores unrecognized events, so this is safe to always emit —
+    the feed is gated client-side by a dev flag in admin Settings.
+    Failures are swallowed: a broken SSE channel must not abort the
+    actual tool execution, which the user is paying for.
+    """
+    if on_event is None:
+        return
+    try:
+        payload: Dict[str, Any] = {"phase": phase, "name": name}
+        if tool_id is not None:
+            payload["tool_id"] = tool_id
+        if parent_tool_id is not None:
+            payload["parent_tool_id"] = parent_tool_id
+        if input is not None:
+            payload["input"] = input
+        if result_preview is not None:
+            payload["result_preview"] = result_preview
+        if duration_ms is not None:
+            payload["duration_ms"] = duration_ms
+        if is_error:
+            payload["is_error"] = True
+        on_event("tool_event", payload)
+    except Exception:
+        logger.debug("tool_event emit failed", exc_info=True)
+
+
 def _extract_user_text(content: UserMessagePayload) -> str:
     """
     Pull the plain-text portion out of a user-message payload, supporting
@@ -281,6 +327,7 @@ class MainChatService:
         user_message_text: Optional[str] = None,
         on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         cancel_event: Optional[Any] = None,
+        parent_tool_id: Optional[str] = None,
     ) -> str:
         """
         Execute a tool and return result string.
@@ -327,6 +374,7 @@ class MainChatService:
                 user_id=user_id,
                 on_event=on_event,
                 cancel_event=cancel_event,
+                parent_tool_id=parent_tool_id,
             )
             if result.get("success"):
                 content = result.get("content", "No analysis result")
@@ -351,6 +399,7 @@ class MainChatService:
                 user_id=user_id,
                 on_event=on_event,
                 cancel_event=cancel_event,
+                parent_tool_id=parent_tool_id,
             )
             if result.get("success"):
                 return result.get("content", "No analysis result")
@@ -735,6 +784,13 @@ class MainChatService:
                     tool_input = tool_block.get("input", {})
 
                     tool_t0 = time.monotonic()
+                    _emit_tool_event(
+                        on_event,
+                        "start",
+                        tool_id=tool_id,
+                        name=tool_name,
+                        input=tool_input if isinstance(tool_input, dict) else None,
+                    )
                     try:
                         result = self._execute_tool(
                             project_id,
@@ -746,12 +802,26 @@ class MainChatService:
                             user_message_text=user_message_text,
                             on_event=on_event,
                             cancel_event=cancel_event,
+                            parent_tool_id=tool_id,
                         )
                         is_error = False
                     except Exception as tool_error:
                         logger.error(f"Tool execution failed for {tool_name}: {tool_error}")
                         result = f"Tool execution failed: {str(tool_error)}"
                         is_error = True
+                    _emit_tool_event(
+                        on_event,
+                        "end",
+                        tool_id=tool_id,
+                        name=tool_name,
+                        result_preview=(
+                            (result[:_TOOL_EVENT_RESULT_PREVIEW_CHARS] + "…")
+                            if isinstance(result, str) and len(result) > _TOOL_EVENT_RESULT_PREVIEW_CHARS
+                            else (result if isinstance(result, str) else None)
+                        ),
+                        duration_ms=int((time.monotonic() - tool_t0) * 1000),
+                        is_error=is_error,
+                    )
                     # Never log the tool input/result body — only the shape.
                     # `input_keys` + `result_chars` are enough to reproduce
                     # the call shape from the bundle without leaking content

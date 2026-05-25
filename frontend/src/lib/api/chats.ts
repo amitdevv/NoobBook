@@ -150,10 +150,34 @@ export interface ToolProgressPayload {
   tool?: string;
 }
 
+/**
+ * Per-tool-call event for the dev-only Activity Feed.
+ *
+ * Emitted by the backend at the start and end of every tool dispatch
+ * (main chat + nested analyzer-agent inner tools). Frontend ignores
+ * these unless the dev flag `noobbook:dev:tool_activity_feed` is on,
+ * so it's safe to always parse them.
+ *
+ * `tool_id` matches Claude's tool_use_id, which is what the
+ * `messages.content` tool_use blocks are keyed by — that's how the
+ * persisted-mode feed reconnects to live-mode rows on refresh.
+ */
+export interface ToolEventPayload {
+  phase: 'start' | 'end' | 'error';
+  name: string;
+  tool_id?: string;
+  parent_tool_id?: string;
+  input?: Record<string, unknown>;
+  result_preview?: string;
+  duration_ms?: number;
+  is_error?: boolean;
+}
+
 export type ChatStreamEvent =
   | { type: 'user_message'; payload: Message }
   | { type: 'assistant_delta'; payload: { delta: string } }
   | { type: 'tool_progress'; payload: ToolProgressPayload }
+  | { type: 'tool_event'; payload: ToolEventPayload }
   | { type: 'assistant_done'; payload: { assistant_message: Message; sync?: ChatSyncPayload | null } }
   | { type: 'error'; payload: { message: string; assistant_message?: Message | null; sync?: ChatSyncPayload | null } };
 
@@ -162,6 +186,7 @@ export interface StreamMessageCallbacks {
   onUserMessage?: (message: Message) => void;
   onAssistantDelta?: (delta: string) => void;
   onToolProgress?: (payload: ToolProgressPayload) => void;
+  onToolEvent?: (payload: ToolEventPayload) => void;
   onAssistantDone?: (payload: { assistant_message: Message; sync?: ChatSyncPayload | null }) => void;
   onErrorEvent?: (payload: { message: string; assistant_message?: Message | null; sync?: ChatSyncPayload | null }) => void;
 }
@@ -208,6 +233,9 @@ class ChatsAPI {
         break;
       case 'tool_progress':
         callbacks?.onToolProgress?.(event.payload);
+        break;
+      case 'tool_event':
+        callbacks?.onToolEvent?.(event.payload);
         break;
       case 'assistant_done':
         callbacks?.onAssistantDone?.(event.payload);
@@ -256,6 +284,12 @@ class ChatsAPI {
         // Freshdesk analyzer doing 7-15 Claude+SQL iterations). Doesn't
         // change terminal state — terminal is still assistant_done/error.
         this.notifyStreamEvent({ type: 'tool_progress', payload }, callbacks);
+        break;
+      case 'tool_event':
+        // Structured per-call lifecycle event for the dev-only
+        // Activity Feed. Always parsed; ignored unless the dev flag
+        // is on (gated client-side in ChatPanel/ChatMessages).
+        this.notifyStreamEvent({ type: 'tool_event', payload }, callbacks);
         break;
       case 'assistant_done':
         state.terminalEvent = 'assistant_done';
