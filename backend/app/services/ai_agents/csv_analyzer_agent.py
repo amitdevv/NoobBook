@@ -12,8 +12,9 @@ Results (including any generated plots) are returned to main_chat.
 """
 
 import logging
+import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -48,6 +49,73 @@ class CSVAnalyzerAgent:
             self._prompt_config = prompt_loader.get_prompt_config("csv_analyzer_agent")
         return self._prompt_config
 
+    # Same preview cap as main_chat_service so the activity feed renders
+    # uniformly regardless of which layer the event came from.
+    _RESULT_PREVIEW_CHARS = 500
+
+    @staticmethod
+    def _emit_progress(
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]],
+        message: str,
+        *,
+        iteration: Optional[int] = None,
+        tool: Optional[str] = None,
+    ) -> None:
+        # Legacy event kept for the existing ReadingIndicator pill. The
+        # dev-only activity feed listens to tool_event (below) instead.
+        # Critical for keeping Cloudflare's SSE proxy from dropping the
+        # connection at ~150s — see SSE_CLOSE_TRACE at routes.py:506.
+        if on_event is None:
+            return
+        try:
+            payload: Dict[str, Any] = {"agent": "csv", "message": message}
+            if iteration is not None:
+                payload["iteration"] = iteration
+            if tool is not None:
+                payload["tool"] = tool
+            on_event("tool_progress", payload)
+        except Exception:
+            logger.debug("tool_progress emit failed", exc_info=True)
+
+    @classmethod
+    def _emit_tool_event(
+        cls,
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]],
+        phase: str,
+        *,
+        tool_id: Optional[str],
+        name: str,
+        parent_tool_id: Optional[str] = None,
+        input: Optional[Dict[str, Any]] = None,
+        result_preview: Optional[str] = None,
+        duration_ms: Optional[int] = None,
+        is_error: bool = False,
+    ) -> None:
+        """Emit a tool_event SSE frame for the dev activity feed.
+
+        Mirrors main_chat_service._emit_tool_event so child rows nest
+        under their parent analyze_csv_agent row via parent_tool_id.
+        """
+        if on_event is None:
+            return
+        try:
+            payload: Dict[str, Any] = {"phase": phase, "name": name}
+            if tool_id is not None:
+                payload["tool_id"] = tool_id
+            if parent_tool_id is not None:
+                payload["parent_tool_id"] = parent_tool_id
+            if input is not None:
+                payload["input"] = input
+            if result_preview is not None:
+                payload["result_preview"] = result_preview
+            if duration_ms is not None:
+                payload["duration_ms"] = duration_ms
+            if is_error:
+                payload["is_error"] = True
+            on_event("tool_event", payload)
+        except Exception:
+            logger.debug("tool_event emit failed", exc_info=True)
+
     def _load_tools(self) -> List[Dict[str, Any]]:
         """
         Load tools for data analysis.
@@ -68,6 +136,9 @@ class CSVAnalyzerAgent:
         query: str,
         chat_id: Optional[str] = None,
         user_id: Optional[str] = None,
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        cancel_event: Optional[Any] = None,
+        parent_tool_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Run the agent to answer a question about CSV data.
@@ -104,8 +175,26 @@ class CSVAnalyzerAgent:
         generated_plots = []
 
         logger.info("Starting CSV analysis for: %s", query[:50])
+        self._emit_progress(on_event, "Analyzing your CSV…")
 
         for iteration in range(1, self.MAX_ITERATIONS + 1):
+
+            # Bail before the next Claude call if the user disconnected.
+            # Without this the loop kept burning tokens for 30-60s after
+            # SSE drop (see backend.log.3 req:ce59… — 35 calls continued
+            # past SSE_CLOSE_TRACE at 150s).
+            if cancel_event is not None and cancel_event.is_set():
+                logger.info("CSV analyzer cancelled at iter %d", iteration)
+                break
+
+            # Emit a real data event each iteration. Heartbeats alone
+            # don't keep the SSE alive through Cloudflare; an actual
+            # `tool_progress` frame does.
+            self._emit_progress(
+                on_event,
+                f"Running analysis step {iteration}…",
+                iteration=iteration,
+            )
 
             response = claude_service.send_message(
                 messages=messages,
@@ -182,9 +271,46 @@ class CSVAnalyzerAgent:
                 tool_input = tool_block["input"]
                 tool_id = tool_block["id"]
 
+                # Emit start before execution so the activity feed
+                # renders a spinning row immediately. parent_tool_id
+                # ties this child to the outer analyze_csv_agent row.
+                inner_t0 = time.monotonic()
+                self._emit_tool_event(
+                    on_event,
+                    "start",
+                    tool_id=tool_id,
+                    name=tool_name,
+                    parent_tool_id=parent_tool_id,
+                    input=tool_input if isinstance(tool_input, dict) else None,
+                )
+
                 # Execute tool via analysis_executor
                 result, is_termination = analysis_executor.execute_tool(
                     tool_name, tool_input, project_id, source_id
+                )
+
+                # Build preview from whatever shape the result is.
+                # run_analysis returns {success, output, plot_filenames?};
+                # return_analysis input is summary/image_paths — already
+                # emitted as 'start' input above, so 'end' carries duration only.
+                preview: Optional[str] = None
+                if isinstance(result, dict):
+                    raw_preview = result.get("output") or result.get("summary") or ""
+                    if isinstance(raw_preview, str) and raw_preview:
+                        preview = (
+                            raw_preview[: self._RESULT_PREVIEW_CHARS] + "…"
+                            if len(raw_preview) > self._RESULT_PREVIEW_CHARS
+                            else raw_preview
+                        )
+                self._emit_tool_event(
+                    on_event,
+                    "end",
+                    tool_id=tool_id,
+                    name=tool_name,
+                    parent_tool_id=parent_tool_id,
+                    result_preview=preview,
+                    duration_ms=int((time.monotonic() - inner_t0) * 1000),
+                    is_error=isinstance(result, dict) and not result.get("success", True),
                 )
 
                 if is_termination:
@@ -221,6 +347,17 @@ class CSVAnalyzerAgent:
             if tool_results_data:
                 tool_results_content = claude_parsing_utils.build_tool_result_content(tool_results_data)
                 messages.append({"role": "user", "content": tool_results_content})
+
+        # If we broke out of the loop because the user disconnected,
+        # don't burn another Claude call on synthesis — return a no-op
+        # error result. The main chat path already won't persist anything
+        # past the cancel point.
+        if cancel_event is not None and cancel_event.is_set():
+            return {
+                "success": False,
+                "error": "cancelled",
+                "usage": {"input_tokens": total_input_tokens, "output_tokens": total_output_tokens},
+            }
 
         logger.warning("Max iterations reached (%d) — forcing tool-less synthesis", self.MAX_ITERATIONS)
 
