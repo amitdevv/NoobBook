@@ -280,6 +280,7 @@ class MainChatService:
         mcp_registry: Optional[Dict] = None,
         user_message_text: Optional[str] = None,
         on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        cancel_event: Optional[Any] = None,
     ) -> str:
         """
         Execute a tool and return result string.
@@ -324,6 +325,8 @@ class MainChatService:
                 query=tool_input.get("query", ""),
                 chat_id=chat_id,
                 user_id=user_id,
+                on_event=on_event,
+                cancel_event=cancel_event,
             )
             if result.get("success"):
                 content = result.get("content", "No analysis result")
@@ -346,6 +349,8 @@ class MainChatService:
                 query=tool_input.get("query", ""),
                 chat_id=chat_id,
                 user_id=user_id,
+                on_event=on_event,
+                cancel_event=cancel_event,
             )
             if result.get("success"):
                 return result.get("content", "No analysis result")
@@ -740,6 +745,7 @@ class MainChatService:
                             mcp_registry=mcp_registry,
                             user_message_text=user_message_text,
                             on_event=on_event,
+                            cancel_event=cancel_event,
                         )
                         is_error = False
                     except Exception as tool_error:

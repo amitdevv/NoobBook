@@ -14,7 +14,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from app.services.integrations.claude import claude_service
 from app.config import prompt_loader, tool_loader
@@ -49,7 +49,39 @@ class DatabaseAnalyzerAgent:
             self._tools = tools_config["all_tools"]
         return self._tools or []
 
-    def run(self, project_id: str, source_id: str, query: str, chat_id: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
+    @staticmethod
+    def _emit_progress(
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]],
+        message: str,
+        *,
+        iteration: Optional[int] = None,
+        tool: Optional[str] = None,
+    ) -> None:
+        # See csv_analyzer_agent._emit_progress for the rationale —
+        # Cloudflare drops idle SSE at ~150s so each iteration must emit
+        # a real data event, not just rely on heartbeats.
+        if on_event is None:
+            return
+        try:
+            payload: Dict[str, Any] = {"agent": "database", "message": message}
+            if iteration is not None:
+                payload["iteration"] = iteration
+            if tool is not None:
+                payload["tool"] = tool
+            on_event("tool_progress", payload)
+        except Exception:
+            logger.debug("tool_progress emit failed", exc_info=True)
+
+    def run(
+        self,
+        project_id: str,
+        source_id: str,
+        query: str,
+        chat_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        cancel_event: Optional[Any] = None,
+    ) -> Dict[str, Any]:
         config = self._load_config()
         tools = self._load_tools()
 
@@ -125,8 +157,24 @@ class DatabaseAnalyzerAgent:
         consecutive_errors = 0
         MAX_CONSECUTIVE_ERRORS = 3
 
+        self._emit_progress(on_event, "Connecting to database…")
+
         try:
             for iteration in range(1, self.MAX_ITERATIONS + 1):
+                if cancel_event is not None and cancel_event.is_set():
+                    logger.info("DB analyzer cancelled at iter %d", iteration)
+                    return {
+                        "success": False,
+                        "error": "cancelled",
+                        "usage": {"input_tokens": total_input_tokens, "output_tokens": total_output_tokens},
+                    }
+
+                self._emit_progress(
+                    on_event,
+                    f"Running query step {iteration}…",
+                    iteration=iteration,
+                )
+
                 response = claude_service.send_message(
                     messages=messages,
                     system_prompt=system_prompt,

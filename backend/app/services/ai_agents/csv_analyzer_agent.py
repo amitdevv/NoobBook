@@ -13,7 +13,7 @@ Results (including any generated plots) are returned to main_chat.
 
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -48,6 +48,32 @@ class CSVAnalyzerAgent:
             self._prompt_config = prompt_loader.get_prompt_config("csv_analyzer_agent")
         return self._prompt_config
 
+    @staticmethod
+    def _emit_progress(
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]],
+        message: str,
+        *,
+        iteration: Optional[int] = None,
+        tool: Optional[str] = None,
+    ) -> None:
+        # Same shape as the Freshdesk/Mixpanel agents — mirroring them
+        # keeps the frontend renderer uniform. Critical here for a second
+        # reason: Cloudflare's SSE proxy ignores comment-only heartbeats
+        # and drops the connection at ~150s, so every iteration MUST emit
+        # a real data event to keep the stream alive. See SSE_CLOSE_TRACE
+        # at routes.py:506.
+        if on_event is None:
+            return
+        try:
+            payload: Dict[str, Any] = {"agent": "csv", "message": message}
+            if iteration is not None:
+                payload["iteration"] = iteration
+            if tool is not None:
+                payload["tool"] = tool
+            on_event("tool_progress", payload)
+        except Exception:
+            logger.debug("tool_progress emit failed", exc_info=True)
+
     def _load_tools(self) -> List[Dict[str, Any]]:
         """
         Load tools for data analysis.
@@ -68,6 +94,8 @@ class CSVAnalyzerAgent:
         query: str,
         chat_id: Optional[str] = None,
         user_id: Optional[str] = None,
+        on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        cancel_event: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Run the agent to answer a question about CSV data.
@@ -104,8 +132,26 @@ class CSVAnalyzerAgent:
         generated_plots = []
 
         logger.info("Starting CSV analysis for: %s", query[:50])
+        self._emit_progress(on_event, "Analyzing your CSV…")
 
         for iteration in range(1, self.MAX_ITERATIONS + 1):
+
+            # Bail before the next Claude call if the user disconnected.
+            # Without this the loop kept burning tokens for 30-60s after
+            # SSE drop (see backend.log.3 req:ce59… — 35 calls continued
+            # past SSE_CLOSE_TRACE at 150s).
+            if cancel_event is not None and cancel_event.is_set():
+                logger.info("CSV analyzer cancelled at iter %d", iteration)
+                break
+
+            # Emit a real data event each iteration. Heartbeats alone
+            # don't keep the SSE alive through Cloudflare; an actual
+            # `tool_progress` frame does.
+            self._emit_progress(
+                on_event,
+                f"Running analysis step {iteration}…",
+                iteration=iteration,
+            )
 
             response = claude_service.send_message(
                 messages=messages,
@@ -221,6 +267,17 @@ class CSVAnalyzerAgent:
             if tool_results_data:
                 tool_results_content = claude_parsing_utils.build_tool_result_content(tool_results_data)
                 messages.append({"role": "user", "content": tool_results_content})
+
+        # If we broke out of the loop because the user disconnected,
+        # don't burn another Claude call on synthesis — return a no-op
+        # error result. The main chat path already won't persist anything
+        # past the cancel point.
+        if cancel_event is not None and cancel_event.is_set():
+            return {
+                "success": False,
+                "error": "cancelled",
+                "usage": {"input_tokens": total_input_tokens, "output_tokens": total_output_tokens},
+            }
 
         logger.warning("Max iterations reached (%d) — forcing tool-less synthesis", self.MAX_ITERATIONS)
 

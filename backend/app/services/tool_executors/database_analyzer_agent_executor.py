@@ -4,18 +4,34 @@ Database Analyzer Agent Executor - Executes analyze_database_agent tool calls fr
 Educational Note: This executor bridges main_chat_service and database_analyzer_agent.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from app.services.ai_agents.database_analyzer_agent import database_analyzer_agent
 
 
-def execute(project_id: str, source_id: str, query: str, chat_id: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
+def execute(
+    project_id: str,
+    source_id: str,
+    query: str,
+    chat_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+    cancel_event: Optional[Any] = None,
+) -> Dict[str, Any]:
     if not source_id:
         return {"success": False, "error": "source_id is required"}
     if not query:
         return {"success": False, "error": "query is required"}
 
-    result = database_analyzer_agent.run(project_id=project_id, source_id=source_id, query=query, chat_id=chat_id, user_id=user_id)
+    result = database_analyzer_agent.run(
+        project_id=project_id,
+        source_id=source_id,
+        query=query,
+        chat_id=chat_id,
+        user_id=user_id,
+        on_event=on_event,
+        cancel_event=cancel_event,
+    )
 
     if not result.get("success"):
         return {"success": False, "error": result.get("error", "Analysis failed")}
