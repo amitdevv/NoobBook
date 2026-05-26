@@ -331,6 +331,7 @@ def fork_project(
     source_owner_user_id: str,
     target_user_id: str,
     seed_chat_id: Optional[str] = None,
+    chat_only_id: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Clone an entire project for ``target_user_id``.
@@ -346,6 +347,14 @@ def fork_project(
             when they triggered the fork. Returned alongside the new
             project so the frontend can deep-link them straight to the
             cloned chat.
+        chat_only_id: Optional — when set, only this chat is cloned
+            (sources + chunks + Pinecone vectors are still cloned in
+            full so citations in the cloned chat resolve cleanly).
+            Used by chat-scoped shares so a viewer can fork the one
+            chat they were given access to without dragging the
+            owner's other chats into the copy. If supplied,
+            ``seed_chat_id`` should be the same id — we don't enforce
+            equality so the caller can use a single param if desired.
 
     Returns:
         Dict with at least ``project_id`` and (optionally) ``chat_id``,
@@ -488,10 +497,20 @@ def fork_project(
     )
 
     # ── Chats + messages ────────────────────────────────────────────
-    chat_resp = (
+    # chat_only_id constrains the chat clone scope for per-chat shares.
+    # We still scope by project_id to keep cross-project requests
+    # impossible even if the caller passes a bogus id — the result
+    # row simply won't match. Order-by is preserved for parity with
+    # the project-wide path.
+    chats_query = (
         client.table("chats")
         .select("*")
         .eq("project_id", source_project_id)
+    )
+    if chat_only_id:
+        chats_query = chats_query.eq("id", chat_only_id)
+    chat_resp = (
+        chats_query
         .order("created_at", desc=False)
         .execute()
     )

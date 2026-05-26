@@ -87,7 +87,13 @@ export const ShareWorkspace: React.FC = () => {
         if (cancelled) return;
         const root = res.data;
         setState({ kind: 'ready', root });
-        const initial = readChatFromHash() ?? root.chats[0]?.id ?? null;
+        // For chat-scoped shares the backend returns only one chat —
+        // force-select it and ignore any hash that points at a sibling
+        // chat the viewer never had access to. Project-wide shares
+        // still honor the hash so deep-links survive refresh.
+        const initial = root.share.chat_id
+          ? root.chats[0]?.id ?? null
+          : readChatFromHash() ?? root.chats[0]?.id ?? null;
         setActiveChatId(initial);
       } catch (err) {
         if (cancelled) return;
@@ -204,6 +210,10 @@ export const ShareWorkspace: React.FC = () => {
   const { root } = state;
   const chats = root.chats;
   const isAuthed = root.viewer.is_authenticated;
+  // Hide the chat rail entirely when the share is scoped to one chat.
+  // Showing a single-row "Chats" list with no navigation value just
+  // adds noise; chat-scoped viewers came for one conversation.
+  const isChatScopedShare = !!root.share.chat_id;
 
   return (
     <div className="min-h-screen bg-stone-50/40">
@@ -226,15 +236,23 @@ export const ShareWorkspace: React.FC = () => {
 
       <div className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 pb-10">
         <div className="grid grid-cols-12 gap-6">
-          <aside className="col-span-12 md:col-span-4 lg:col-span-3">
-            <ChatRail
-              chats={chats}
-              activeChatId={activeChatId}
-              onSelect={setActiveChatId}
-            />
-          </aside>
+          {!isChatScopedShare && (
+            <aside className="col-span-12 md:col-span-4 lg:col-span-3">
+              <ChatRail
+                chats={chats}
+                activeChatId={activeChatId}
+                onSelect={setActiveChatId}
+              />
+            </aside>
+          )}
 
-          <main className="col-span-12 md:col-span-8 lg:col-span-9">
+          <main
+            className={
+              isChatScopedShare
+                ? 'col-span-12'
+                : 'col-span-12 md:col-span-8 lg:col-span-9'
+            }
+          >
             {activeChatId ? (
               <ChatPane
                 chat={activeChat}

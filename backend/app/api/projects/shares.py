@@ -61,6 +61,10 @@ def _serialize_share(row: dict) -> dict:
         "expires_at": row.get("expires_at"),
         "revoked_at": row.get("revoked_at"),
         "is_active": share_service.is_share_usable(row),
+        # NULL on legacy / project-wide shares, populated on chat-scoped
+        # shares. Lets the SharingModal filter rows into the right tab
+        # (project vs. per-chat) without re-fetching.
+        "chat_id": row.get("chat_id"),
     }
 
 
@@ -136,6 +140,18 @@ def create_project_share(project_id: str):
                     "error": f"expires_in_days must be one of {sorted(_ALLOWED_EXPIRY_DAYS)} or null",
                 }), 400
 
+        # Optional chat-scope. When present, share_service validates the
+        # chat belongs to this project and raises ValueError on mismatch.
+        chat_id_raw = data.get("chat_id")
+        chat_id: Optional[str] = None
+        if chat_id_raw is not None:
+            if not isinstance(chat_id_raw, str) or not chat_id_raw.strip():
+                return jsonify({
+                    "success": False,
+                    "error": "chat_id must be a non-empty string",
+                }), 400
+            chat_id = chat_id_raw.strip()
+
         try:
             row = share_service.create_share(
                 project_id=project_id,
@@ -143,6 +159,7 @@ def create_project_share(project_id: str):
                 mode=mode,
                 invited_emails=invited_emails,
                 expires_in_days=expires_in_days,
+                chat_id=chat_id,
             )
         except ValueError as ve:
             return jsonify({"success": False, "error": str(ve)}), 400

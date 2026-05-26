@@ -27,12 +27,23 @@ export interface ProjectShare {
   expires_at: string | null;
   revoked_at: string | null;
   is_active: boolean;
+  /**
+   * NULL on project-wide shares (the legacy default — viewer sees
+   * every chat in the project). Set on chat-scoped shares: the
+   * viewer can only see this single chat.
+   */
+  chat_id: string | null;
 }
 
 export interface CreateShareInput {
   mode: ShareMode;
   invited_emails?: string[];
   expires_in_days?: ShareExpiry;
+  /**
+   * When set, the share is scoped to one chat. Backend validates the
+   * chat belongs to the project and rejects mismatched ids with 400.
+   */
+  chat_id?: string | null;
 }
 
 export interface InvitableUser {

@@ -20,6 +20,7 @@ import type { Chat, ChatMetadata } from '../../lib/api/chats';
 import type { CostTracking } from '../../lib/api/projects';
 import type { UserUsage } from '../../lib/api/settings';
 import { cn } from '../../lib/utils';
+import { ShareButton } from '../project/ShareButton';
 
 interface ChatHeaderProps {
   activeChat: Chat | null;
@@ -33,6 +34,8 @@ interface ChatHeaderProps {
   onShowChatList: () => void;
   onExportChat: () => void;
   exportingChat: boolean;
+  projectId: string;
+  projectName: string;
 }
 
 // Cost formatters — mirrors ProjectHeader so the two badges look identical
@@ -65,6 +68,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = React.memo(({
   onShowChatList,
   onExportChat,
   exportingChat,
+  projectId,
+  projectName,
 }) => {
   const { hasPermission } = usePermissions();
 
@@ -146,6 +151,27 @@ export const ChatHeader: React.FC<ChatHeaderProps> = React.memo(({
                 New chat
                 <kbd className="ml-1.5 text-xs opacity-70">{shortcutLabel}</kbd>
               </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Per-chat share — opens the SharingModal in chat-scope
+              mode so links created here surface only this chat to
+              viewers. Disabled until activeChat is loaded (id needed). */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <ShareButton
+                    projectId={projectId}
+                    projectName={projectName}
+                    chatId={activeChat?.id}
+                    chatTitle={activeChat?.title || 'Chat'}
+                    variant="ghost-icon"
+                    disabled={!activeChat}
+                  />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Share this chat</TooltipContent>
             </Tooltip>
           </TooltipProvider>
 

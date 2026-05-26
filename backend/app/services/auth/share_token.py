@@ -37,6 +37,10 @@ class ShareContext:
     owner_user_id: str      # the user who created the share (project owner)
     viewer_user_id: Optional[str]   # set iff the viewer is JWT-authenticated
     viewer_email: Optional[str]     # set iff the viewer is JWT-authenticated
+    # When set, the share is scoped to ONE chat in the project. Routes
+    # use this to filter the chat list and to 404 requests for any
+    # other chat_id. None means project-wide (legacy / default).
+    chat_id: Optional[str] = None
 
 
 def _error(payload: dict, status: int):
@@ -144,6 +148,10 @@ def require_share_token(*, require_jwt: bool = False) -> Callable:
                 owner_user_id=row["created_by"],
                 viewer_user_id=viewer_user_id,
                 viewer_email=viewer_email,
+                # row["chat_id"] is missing on rows created before the
+                # 00046 migration ran in this env — .get() keeps the
+                # decorator forward/backward compatible.
+                chat_id=row.get("chat_id"),
             )
 
             return fn(*args, **kwargs)

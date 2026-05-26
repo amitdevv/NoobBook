@@ -70,6 +70,7 @@ def create_share(
     mode: str,
     invited_emails: Optional[List[str]] = None,
     expires_in_days: Optional[int] = None,
+    chat_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Create a new share row for a project.
@@ -81,6 +82,11 @@ def create_share(
         invited_emails: Required and non-empty when mode == "invited".
                         Lower-cased and de-duped for stable matching.
         expires_in_days: 7, 30, or None. None means the share never expires.
+        chat_id: Optional — when set, the share is scoped to this single
+                 chat. The viewer's landing page shows only that chat;
+                 every per-chat route 404s if another chat_id is
+                 requested. NULL keeps the historical project-wide
+                 behaviour (every chat visible).
 
     Returns:
         The inserted row (including the generated token).
@@ -111,6 +117,27 @@ def create_share(
             raise ValueError("expires_in_days must be positive (or None for never)")
         expires_at = (_now() + timedelta(days=expires_in_days)).isoformat()
 
+    client = _client()
+
+    # Validate chat_id BEFORE generating a token / inserting so a bad
+    # chat_id surfaces as a 400 instead of an orphan-creating insert
+    # that then fails on the FK. Cross-project chat ids are rejected
+    # so the owner can't share another tenant's chat by guessing its uuid.
+    if chat_id is not None:
+        chat_check = (
+            client.table("chats")
+            .select("id, project_id")
+            .eq("id", chat_id)
+            .limit(1)
+            .execute()
+        )
+        if not chat_check.data:
+            raise ValueError(f"Chat {chat_id} not found")
+        if chat_check.data[0].get("project_id") != project_id:
+            raise ValueError(
+                "Chat does not belong to this project"
+            )
+
     row = {
         "project_id": project_id,
         "token": _generate_token(),
@@ -118,9 +145,9 @@ def create_share(
         "invited_emails": normalized_emails,
         "created_by": created_by,
         "expires_at": expires_at,
+        "chat_id": chat_id,
     }
 
-    client = _client()
     response = client.table("project_shares").insert(row).execute()
     if not response.data:
         raise RuntimeError("Failed to create project share")
