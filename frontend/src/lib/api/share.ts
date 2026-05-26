@@ -25,6 +25,12 @@ export interface ShareRoot {
     project_id: string;
     mode: 'public' | 'invited';
     url: string;
+    /**
+     * Null = project-wide share (viewer sees every chat).
+     * String = chat-scoped share; only this chat is in `chats[]`,
+     * and every other chat_id 404s on the per-chat routes.
+     */
+    chat_id: string | null;
   };
   project: {
     id: string;

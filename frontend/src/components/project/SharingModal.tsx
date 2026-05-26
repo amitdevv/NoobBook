@@ -46,6 +46,14 @@ interface SharingModalProps {
   onOpenChange: (next: boolean) => void;
   projectId: string;
   projectName: string;
+  /**
+   * When supplied, the modal flips into chat-scope mode: created
+   * links are scoped to this single chat, and the existing-links
+   * list filters to per-chat shares of this chat only. Omit for the
+   * default project-wide mode (manages shares where chat_id IS NULL).
+   */
+  chatId?: string;
+  chatTitle?: string;
 }
 
 /**
@@ -65,7 +73,16 @@ export const SharingModal: React.FC<SharingModalProps> = ({
   onOpenChange,
   projectId,
   projectName,
+  chatId,
+  chatTitle,
 }) => {
+  // `isChatScope` is the single source of truth for the modal's
+  // behaviour. We don't toggle it inside — it's set by the caller
+  // (ChatHeader vs ProjectHeader) and stays stable for the modal's
+  // lifetime. Existing shares are filtered to match the scope so
+  // the project-level modal never accidentally exposes a per-chat
+  // link's revoke button (and vice versa).
+  const isChatScope = !!chatId;
   const { toasts, dismissToast, success, error, errorWithLogs } = useToast();
 
   // ── List state ───────────────────────────────────────────────────
@@ -99,14 +116,24 @@ export const SharingModal: React.FC<SharingModalProps> = ({
     try {
       setListLoading(true);
       const res = await sharesAPI.list(projectId);
-      setShares(res.data.shares || []);
+      // Filter the list to the matching scope so each modal only
+      // manages its own world: project-level modal hides per-chat
+      // shares, per-chat modal hides project-wide AND other chats'
+      // per-chat shares. Owners with many per-chat shares would
+      // otherwise see a cluttered list with revoke buttons for links
+      // unrelated to the chat in front of them.
+      const all = res.data.shares || [];
+      const filtered = isChatScope
+        ? all.filter((s) => s.chat_id === chatId)
+        : all.filter((s) => s.chat_id == null);
+      setShares(filtered);
     } catch (err) {
       log.error({ err }, 'failed to load shares');
       errorWithLogs('Failed to load shares');
     } finally {
       setListLoading(false);
     }
-  }, [projectId, errorWithLogs]);
+  }, [projectId, errorWithLogs, isChatScope, chatId]);
 
   useEffect(() => {
     if (!open) return;
@@ -229,6 +256,8 @@ export const SharingModal: React.FC<SharingModalProps> = ({
         mode,
         invited_emails: mode === 'invited' ? emails : undefined,
         expires_in_days: expiry,
+        // Backend treats a null/missing chat_id as project-wide.
+        chat_id: isChatScope ? chatId : null,
       });
       const created = res.data.share;
       setShares((prev) => upsertOne(prev, created, { prepend: true }));
@@ -285,11 +314,26 @@ export const SharingModal: React.FC<SharingModalProps> = ({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-semibold pr-8">
               <Share size={18} className="text-primary flex-shrink-0" />
-              <span className="truncate">Share &ldquo;{projectName}&rdquo;</span>
+              <span className="truncate">
+                {isChatScope
+                  ? `Share this chat — ${chatTitle || 'Untitled chat'}`
+                  : `Share "${projectName}"`}
+              </span>
             </DialogTitle>
             <DialogDescription className="text-xs leading-relaxed text-muted-foreground mt-1">
-              Anyone with the link gets <strong>read-only</strong> access to this project&apos;s chats.
-              Sources, memory, API keys, and brand stay with you.
+              {isChatScope ? (
+                <>
+                  Anyone with the link gets <strong>read-only</strong> access to
+                  this <strong>single chat</strong>. Your other chats, sources,
+                  memory, API keys, and brand stay private.
+                </>
+              ) : (
+                <>
+                  Anyone with the link gets <strong>read-only</strong> access to
+                  every chat in this project. Sources, memory, API keys, and
+                  brand stay with you.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
         </div>

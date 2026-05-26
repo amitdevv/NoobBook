@@ -38,14 +38,45 @@ def _public_app_url() -> str:
 
 
 def _share_root_payload(ctx) -> dict:
-    """Top-level metadata returned to the viewer when they open the link."""
+    """Top-level metadata returned to the viewer when they open the link.
+
+    For project-wide shares (``ctx.chat_id is None``) the chat list
+    contains every chat in the project. For chat-scoped shares we look
+    up only the one chat and return a list with that single entry —
+    the viewer can't see any other chat in the project, even if they
+    know its id (see ``get_share_chat`` for the per-fetch guard).
+    """
     project = project_service.get_project(ctx.project_id, user_id=ctx.owner_user_id)
-    chats = chat_service.list_chats(ctx.project_id)
+
+    chats: list = []
+    if ctx.chat_id:
+        # Chat-scoped share: surface only the bookmarked chat. If it
+        # was deleted between share-creation and the viewer opening the
+        # link, the FK ON DELETE CASCADE should have already removed
+        # the row — but stay defensive (list endpoint vs FK timing).
+        only_chat = chat_service.get_chat(ctx.project_id, ctx.chat_id)
+        if only_chat:
+            # list_chats returns metadata-shaped dicts (no messages).
+            # Mirror that shape so the frontend can render the rail
+            # uniformly. Drop any heavy fields that get_chat eagerly
+            # loaded (messages, studio_signals) — the rail just needs
+            # id/title/timestamps.
+            chats = [{
+                "id": only_chat.get("id"),
+                "title": only_chat.get("title"),
+                "created_at": only_chat.get("created_at"),
+                "updated_at": only_chat.get("updated_at"),
+                "message_count": only_chat.get("message_count"),
+            }]
+    else:
+        chats = chat_service.list_chats(ctx.project_id)
+
     return {
         "share": {
             "project_id": ctx.project_id,
             "mode": ctx.mode,
             "url": f"{_public_app_url()}/share/{request.view_args.get('token', '')}",
+            "chat_id": ctx.chat_id,
         },
         "project": {
             "id": project.get("id") if project else ctx.project_id,
@@ -61,6 +92,79 @@ def _share_root_payload(ctx) -> dict:
             "email": ctx.viewer_email,
         },
     }
+
+
+def _chat_in_scope(ctx, chat_id: str) -> bool:
+    """True if ``chat_id`` is reachable through this share.
+
+    For project-wide shares any chat in the project is in scope. For
+    chat-scoped shares only the bookmarked chat is — every other
+    chat_id must 404. Path-parameter chat_ids reach this check after
+    the decorator has already authorized the project scope, so the
+    surface for cross-project traversal is closed.
+    """
+    if ctx.chat_id is None:
+        return True
+    return ctx.chat_id == chat_id
+
+
+def _studio_artifact_referenced_by_scoped_chat(
+    ctx, job_id: str, filename: str,
+) -> bool:
+    """Whether the requested studio artifact is referenced by the
+    chat-scoped share's chat.
+
+    Studio outputs live at ``{project_id}/{kind}/{job_id}/{filename}``
+    and are linked back to chats through markers in message content
+    (e.g. ``[[image:FILENAME]]``, audio/video signal references). The
+    schema doesn't store an explicit ``chat_id`` on each artifact, so
+    we authorize by content reference: if either the unique ``job_id``
+    or the ``filename`` appears anywhere in the scoped chat's messages,
+    the viewer reached it through legitimate channels and we allow it.
+    Anything else 404s — closing the gap where a holder of a chat-scoped
+    token could probe sibling chats' artifacts by guessing UUIDs.
+
+    Best-effort: on lookup failure we deny (return False) rather than
+    fail-open, since the worst case is a missing image in a rare race
+    against a freshly-created chat.
+    """
+    try:
+        chat = chat_service.get_chat(ctx.project_id, ctx.chat_id)
+    except Exception:
+        return False
+    if not chat:
+        return False
+    messages = chat.get("messages") or []
+    # job_id is a UUID, filename is also generally unique — checking
+    # both with substring containment avoids needing to know every
+    # studio marker format (image/audio/video/pdf each use their own).
+    needles = [n for n in (job_id, filename) if n]
+    for msg in messages:
+        content = msg.get("content")
+        # Content can be a str, a list of typed blocks, or a dict with
+        # a `text` field — normalize all to a single string for the
+        # substring scan. We accept any text-containing block; image
+        # blocks have no payload that would reference another artifact.
+        text_parts: list = []
+        if isinstance(content, str):
+            text_parts.append(content)
+        elif isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict):
+                    txt = block.get("text")
+                    if isinstance(txt, str):
+                        text_parts.append(txt)
+        elif isinstance(content, dict):
+            txt = content.get("text")
+            if isinstance(txt, str):
+                text_parts.append(txt)
+        haystack = "\n".join(text_parts)
+        if not haystack:
+            continue
+        for needle in needles:
+            if needle in haystack:
+                return True
+    return False
 
 
 @share_bp.route('/share/<token>', methods=['GET'])
@@ -81,6 +185,12 @@ def get_share_chat(token: str, chat_id: str):  # noqa: ARG001
     """Full chat — messages, citations, studio_signals, costs."""
     try:
         ctx = get_share_context()
+        # Out-of-scope guard for chat-scoped shares. We 404 (not 403)
+        # to match the "chat not found" shape the frontend already
+        # handles, and to avoid leaking which chat ids exist in the
+        # project to a viewer who shouldn't see the list at all.
+        if not _chat_in_scope(ctx, chat_id):
+            return jsonify({"success": False, "error": "Chat not found"}), 404
         chat = chat_service.get_chat(ctx.project_id, chat_id)
         if not chat:
             return jsonify({"success": False, "error": "Chat not found"}), 404
@@ -99,6 +209,11 @@ def get_share_citation(token: str, chat_id: str, chunk_id: str):  # noqa: ARG001
     """
     try:
         ctx = get_share_context()
+        # Same scope check as get_share_chat — a chat-scoped share
+        # can't be used to resolve citations against chats that aren't
+        # in scope, even though chunks themselves are project-scoped.
+        if not _chat_in_scope(ctx, chat_id):
+            return jsonify({"success": False, "error": "Chat not found"}), 404
         # Verify the chat itself belongs to this project (guards against
         # crafted chat_ids — chunks are project-scoped but the chat path
         # should still be self-consistent).
@@ -170,6 +285,16 @@ def get_share_studio_artifact(token: str, kind: str, job_id: str, filename: str)
         ctx = get_share_context()
         if kind not in _ALLOWED_STUDIO_KINDS:
             return jsonify({"success": False, "error": "Unknown studio kind"}), 404
+        # Chat-scoped shares: prevent fetching artifacts that the
+        # scoped chat doesn't reference. The path encodes only
+        # kind/job_id/filename — no explicit chat_id on the artifact
+        # itself — so we authorize by content reference instead.
+        # Project-wide shares skip this and remain project-scoped (as
+        # before).
+        if ctx.chat_id and not _studio_artifact_referenced_by_scoped_chat(
+            ctx, job_id, filename,
+        ):
+            return jsonify({"success": False, "error": "File not found"}), 404
         # Walk the Supabase Storage path the studio uploads use.
         # storage_service.upload_studio_binary writes to:
         #   project_id/{kind}/{job_id}/{filename}
@@ -213,6 +338,11 @@ def fork_share_chat(token: str, chat_id: str):  # noqa: ARG001
             # Decorator guarantees this with require_jwt=True, but stay defensive.
             return jsonify({"success": False, "error": "Sign in required"}), 401
 
+        # Out-of-scope chat ids 404 the same as any other route. Stops
+        # a viewer with a chat-scoped link from forking a sibling chat.
+        if not _chat_in_scope(ctx, chat_id):
+            return jsonify({"success": False, "error": "Chat not found"}), 404
+
         # Confirm the chat exists under the share's project before kicking
         # off a multi-second clone. The decorator already authorized
         # access to the project; we just want a clean 404 if the chat id
@@ -228,6 +358,10 @@ def fork_share_chat(token: str, chat_id: str):  # noqa: ARG001
             source_owner_user_id=ctx.owner_user_id,
             target_user_id=ctx.viewer_user_id,
             seed_chat_id=chat_id,
+            # Chat-scoped shares clone only the one chat. Sources +
+            # chunks + Pinecone vectors still cloned in full so the
+            # cloned chat's citations resolve cleanly.
+            chat_only_id=ctx.chat_id,
         )
         if not result:
             return jsonify({"success": False, "error": "Fork failed"}), 500

@@ -1374,6 +1374,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         onShowChatList={() => setShowChatList(true)}
         onExportChat={handleExportChat}
         exportingChat={exportingChat}
+        projectId={projectId}
+        projectName={projectName}
       />
 
       {switchingChat ? (
