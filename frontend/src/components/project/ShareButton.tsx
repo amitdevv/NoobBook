@@ -60,7 +60,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
           aria-haspopup="dialog"
         >
           <Share size={16} />
-          Share
+          Share project
         </Button>
       )}
       <SharingModal
