@@ -108,6 +108,65 @@ def _chat_in_scope(ctx, chat_id: str) -> bool:
     return ctx.chat_id == chat_id
 
 
+def _studio_artifact_referenced_by_scoped_chat(
+    ctx, job_id: str, filename: str,
+) -> bool:
+    """Whether the requested studio artifact is referenced by the
+    chat-scoped share's chat.
+
+    Studio outputs live at ``{project_id}/{kind}/{job_id}/{filename}``
+    and are linked back to chats through markers in message content
+    (e.g. ``[[image:FILENAME]]``, audio/video signal references). The
+    schema doesn't store an explicit ``chat_id`` on each artifact, so
+    we authorize by content reference: if either the unique ``job_id``
+    or the ``filename`` appears anywhere in the scoped chat's messages,
+    the viewer reached it through legitimate channels and we allow it.
+    Anything else 404s — closing the gap where a holder of a chat-scoped
+    token could probe sibling chats' artifacts by guessing UUIDs.
+
+    Best-effort: on lookup failure we deny (return False) rather than
+    fail-open, since the worst case is a missing image in a rare race
+    against a freshly-created chat.
+    """
+    try:
+        chat = chat_service.get_chat(ctx.project_id, ctx.chat_id)
+    except Exception:
+        return False
+    if not chat:
+        return False
+    messages = chat.get("messages") or []
+    # job_id is a UUID, filename is also generally unique — checking
+    # both with substring containment avoids needing to know every
+    # studio marker format (image/audio/video/pdf each use their own).
+    needles = [n for n in (job_id, filename) if n]
+    for msg in messages:
+        content = msg.get("content")
+        # Content can be a str, a list of typed blocks, or a dict with
+        # a `text` field — normalize all to a single string for the
+        # substring scan. We accept any text-containing block; image
+        # blocks have no payload that would reference another artifact.
+        text_parts: list = []
+        if isinstance(content, str):
+            text_parts.append(content)
+        elif isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict):
+                    txt = block.get("text")
+                    if isinstance(txt, str):
+                        text_parts.append(txt)
+        elif isinstance(content, dict):
+            txt = content.get("text")
+            if isinstance(txt, str):
+                text_parts.append(txt)
+        haystack = "\n".join(text_parts)
+        if not haystack:
+            continue
+        for needle in needles:
+            if needle in haystack:
+                return True
+    return False
+
+
 @share_bp.route('/share/<token>', methods=['GET'])
 @require_share_token()
 def get_share_root(token: str):  # noqa: ARG001 — token is consumed by the decorator
@@ -226,6 +285,16 @@ def get_share_studio_artifact(token: str, kind: str, job_id: str, filename: str)
         ctx = get_share_context()
         if kind not in _ALLOWED_STUDIO_KINDS:
             return jsonify({"success": False, "error": "Unknown studio kind"}), 404
+        # Chat-scoped shares: prevent fetching artifacts that the
+        # scoped chat doesn't reference. The path encodes only
+        # kind/job_id/filename — no explicit chat_id on the artifact
+        # itself — so we authorize by content reference instead.
+        # Project-wide shares skip this and remain project-scoped (as
+        # before).
+        if ctx.chat_id and not _studio_artifact_referenced_by_scoped_chat(
+            ctx, job_id, filename,
+        ):
+            return jsonify({"success": False, "error": "File not found"}), 404
         # Walk the Supabase Storage path the studio uploads use.
         # storage_service.upload_studio_binary writes to:
         #   project_id/{kind}/{job_id}/{filename}

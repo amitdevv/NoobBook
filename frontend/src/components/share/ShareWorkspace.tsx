@@ -69,7 +69,14 @@ export const ShareWorkspace: React.FC = () => {
   const { toasts, dismissToast, error } = useToast();
 
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
-  const [activeChatId, setActiveChatId] = useState<string | null>(readChatFromHash());
+  // Defer initial chat selection until the share root lands. Reading
+  // the hash here would fire the per-chat fetch before we know
+  // whether this is a chat-scoped share — a stale `#chat=...` hash
+  // pointing at a different chat then 404s and surfaces a spurious
+  // "Could not load that chat." toast. The root-load effect calls
+  // readChatFromHash() itself for project-wide shares, so deferring
+  // here loses no functionality.
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
   const [exportingChat, setExportingChat] = useState(false);
