@@ -1,6 +1,6 @@
 /**
  * Components API
- * Educational Note: Handles AI-generated UI components (HTML/CSS/JS).
+ * Handles AI-generated UI components (HTML/CSS/JS).
  * Uses an agentic approach for multi-variation generation.
  */
 

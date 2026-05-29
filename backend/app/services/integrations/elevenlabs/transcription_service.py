@@ -1,7 +1,7 @@
 """
 Transcription Service - ElevenLabs Speech-to-Text support.
 
-Educational Note: This service generates single-use tokens for the frontend
+This service generates single-use tokens for the frontend
 to connect to ElevenLabs' real-time WebSocket transcription API.
 
 Security Note: We never expose the API key to the frontend. Instead, we
@@ -59,7 +59,7 @@ class TranscriptionService:
     """
     Service class for ElevenLabs speech-to-text configuration.
 
-    Educational Note: ElevenLabs real-time transcription uses WebSocket
+    ElevenLabs real-time transcription uses WebSocket
     connections directly from the browser. This service provides the
     configuration needed for the frontend to establish that connection.
     """
@@ -80,7 +80,7 @@ class TranscriptionService:
         """
         Generate a single-use token for ElevenLabs realtime transcription.
 
-        Educational Note: ElevenLabs requires a single-use token for client-side
+        ElevenLabs requires a single-use token for client-side
         WebSocket connections. This token is generated server-side using the API key,
         and expires after 15 minutes. This keeps the API key secure on the server.
 
@@ -131,7 +131,7 @@ class TranscriptionService:
         """
         token = self.generate_scribe_token()
 
-        # Educational Note: Using VAD (Voice Activity Detection) for
+        # Using VAD (Voice Activity Detection) for
         # automatic speech segmentation — commits transcript when
         # silence is detected. `no_verbatim=true` asks Scribe to drop
         # filler words, false starts, and stutters before commit,
@@ -153,7 +153,7 @@ class TranscriptionService:
 
         websocket_url = "".join(url_parts)
 
-        # Educational Note: Only return the token and config needed by frontend
+        # Only return the token and config needed by frontend
         # Never expose the API key to the client - it stays server-side only
         return {
             "websocket_url": websocket_url,

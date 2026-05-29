@@ -1,6 +1,6 @@
 /**
  * Mind Map Viewer Component
- * Educational Note: Uses React Flow to render an interactive mind map.
+ * Uses React Flow to render an interactive mind map.
  *
  * Features:
  * - Horizontal tree layout via dagre

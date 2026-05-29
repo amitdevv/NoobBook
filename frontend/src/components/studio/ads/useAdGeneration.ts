@@ -1,6 +1,6 @@
 /**
  * useAdGeneration Hook
- * Educational Note: Custom hook for ad creative generation logic.
+ * Custom hook for ad creative generation logic.
  * Handles state management, API calls, and polling.
  */
 

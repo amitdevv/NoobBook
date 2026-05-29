@@ -1,6 +1,6 @@
 /**
  * VideoProgressIndicator Component
- * Educational Note: Shows real-time progress during video generation using Google Veo 2.0.
+ * Shows real-time progress during video generation using Google Veo 2.0.
  * Video generation can take 10-20 minutes, so we show detailed progress updates.
  * Orange theme distinguishes videos from other studio items.
  */

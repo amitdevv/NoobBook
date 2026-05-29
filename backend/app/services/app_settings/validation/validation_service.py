@@ -1,7 +1,7 @@
 """
 ValidationService - Unified interface for all API key validators.
 
-Educational Note: This class provides a single interface for validating
+This class provides a single interface for validating
 API keys for various services. Each validator is in its own file to
 keep the code manageable.
 """
@@ -26,7 +26,7 @@ class ValidationService:
     """
     Unified service for validating API keys.
 
-    Educational Note: This class delegates to individual validator functions.
+    This class delegates to individual validator functions.
     Each validator makes the smallest possible request to minimize costs
     while verifying the key works.
     """

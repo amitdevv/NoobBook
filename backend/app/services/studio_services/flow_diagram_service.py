@@ -1,7 +1,7 @@
 """
 Flow Diagram Service - Generates Mermaid diagrams from source content.
 
-Educational Note: This service uses Claude to generate Mermaid diagram syntax
+This service uses Claude to generate Mermaid diagram syntax
 for visual process and relationship mapping. Unlike mind maps which use a custom
 node structure rendered with React Flow, flow diagrams use Mermaid.js which
 handles its own rendering.
@@ -36,7 +36,7 @@ class FlowDiagramService:
     """
     Service for generating Mermaid flow diagrams from source content.
 
-    Educational Note: Flow diagrams are generated in a single Claude call
+    Flow diagrams are generated in a single Claude call
     using the generate_flow_diagram tool for structured Mermaid syntax output.
     """
 
@@ -66,7 +66,7 @@ class FlowDiagramService:
         """
         Get source content for flow diagram generation.
 
-        Educational Note: For large sources, we sample chunks evenly
+        For large sources, we sample chunks evenly
         to stay within token limits while covering the full content.
         Content is downloaded from Supabase Storage.
         """

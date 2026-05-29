@@ -1,6 +1,6 @@
 /**
  * WireframeViewerModal Component
- * Educational Note: Full-screen modal for viewing and editing wireframes.
+ * Full-screen modal for viewing and editing wireframes.
  * Uses Excalidraw's built-in pan/zoom and editing capabilities.
  * Supports iterative editing via an edit input bar.
  */

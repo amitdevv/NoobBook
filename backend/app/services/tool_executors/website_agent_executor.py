@@ -1,7 +1,7 @@
 """
 Website Agent Executor - Handles studio signal execution for website generation.
 
-Educational Note: This executor is triggered by studio signals (from main chat)
+This executor is triggered by studio signals (from main chat)
 and launches the website agent as a background task. Similar to email_agent_executor,
 tool calls are handled inside website_agent_service itself.
 """
@@ -17,7 +17,7 @@ class WebsiteAgentExecutor:
     """
     Executor for website generation via studio signals.
 
-    Educational Note: The studio signal flow:
+    The studio signal flow:
     1. User chats with AI about sources
     2. AI decides to activate studio (sends studio_signal tool call)
     3. studio_signal_executor routes to this executor

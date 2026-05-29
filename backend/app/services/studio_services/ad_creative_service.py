@@ -1,7 +1,7 @@
 """
 Ad Creative Service - Generates ad creatives for Facebook/Instagram.
 
-Educational Note: This service implements a two-step AI pipeline:
+This service implements a two-step AI pipeline:
 1. Claude Haiku generates optimized image prompts from product info
 2. Google Gemini generates images from those prompts
 
@@ -49,7 +49,7 @@ class AdCreativeService:
         """
         Generate ad creatives for a product.
 
-        Educational Note: This is the main orchestrator that:
+        This is the main orchestrator that:
         1. Uses Haiku to generate image prompts
         2. Uses Gemini to generate images
         3. Updates job status throughout

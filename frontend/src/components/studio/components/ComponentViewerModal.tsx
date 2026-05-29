@@ -1,6 +1,6 @@
 /**
  * ComponentViewerModal Component
- * Educational Note: Modal for viewing and downloading UI components.
+ * Modal for viewing and downloading UI components.
  * Displays component variations with iframe preview, copy code, and download options.
  */
 

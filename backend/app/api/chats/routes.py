@@ -1,7 +1,7 @@
 """
 Chat CRUD endpoints.
 
-Educational Note: These endpoints handle chat lifecycle operations.
+These endpoints handle chat lifecycle operations.
 A chat is a container for a conversation - it has metadata (title, timestamps)
 and holds messages, but the actual AI processing happens in the messages blueprint.
 
@@ -23,7 +23,7 @@ def list_project_chats(project_id):
     """
     Get all chats for a specific project.
 
-    Educational Note: Returns chat metadata only (not full messages)
+    Returns chat metadata only (not full messages)
     for efficient loading of the chat list in the UI.
     """
     try:
@@ -47,7 +47,7 @@ def create_chat(project_id):
     """
     Create a new chat in a project.
 
-    Educational Note: Initializes an empty conversation.
+    Initializes an empty conversation.
     Messages are added via the messages blueprint's send_message endpoint.
     """
     try:
@@ -74,7 +74,7 @@ def get_chat(project_id, chat_id):
     """
     Get full chat data including all messages.
 
-    Educational Note: Loads the complete conversation history
+    Loads the complete conversation history
     for display in the chat interface. Pass ?raw=true to include
     all messages with original content blocks (for debug/raw view).
     """
@@ -106,7 +106,7 @@ def update_chat(project_id, chat_id):
     """
     Update chat metadata (currently only title).
 
-    Educational Note: Allows users to rename chats for better organization.
+    Allows users to rename chats for better organization.
     """
     try:
         data = request.get_json()
@@ -156,7 +156,7 @@ def delete_chat(project_id, chat_id):
     """
     Delete a chat and all its messages.
 
-    Educational Note: This is a hard delete. In production,
+    This is a hard delete. In production,
     consider soft delete with archive functionality.
     """
     try:
@@ -186,7 +186,7 @@ def get_chat_costs(project_id, chat_id):
     """
     Get per-chat cost and token usage breakdown.
 
-    Educational Note: Mirrors /projects/<id>/costs but scoped to a single
+    Mirrors /projects/<id>/costs but scoped to a single
     chat. Returns the same shape: total_cost and by_model breakdown with
     input_tokens, output_tokens, and cost for each of opus/sonnet/haiku.
     """

@@ -1,6 +1,6 @@
 /**
  * StudioContext
- * Educational Note: Provides shared state for Studio panel.
+ * Provides shared state for Studio panel.
  * Only contains data needed by multiple sections - each section owns its own job state.
  * This eliminates prop drilling while keeping sections isolated.
  */

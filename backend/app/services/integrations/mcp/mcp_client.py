@@ -1,7 +1,7 @@
 """
 MCP Client Wrapper - Isolates all async MCP SDK calls behind sync functions.
 
-Educational Note: MCP (Model Context Protocol) is a standard protocol for AI
+MCP (Model Context Protocol) is a standard protocol for AI
 apps to connect to external data sources via JSON-RPC. This wrapper supports
 two transports:
 
@@ -95,7 +95,7 @@ def _validate_stdio_command(command: str, args: List[str], env: Optional[Dict[st
     """
     Validate stdio command against allowlist and check for injection.
 
-    Educational Note: stdio spawns real processes — we must prevent
+    stdio spawns real processes — we must prevent
     arbitrary command execution. Only known-safe commands are allowed,
     shell metacharacters are rejected in args, and dangerous env vars
     (like PATH, LD_PRELOAD) are blocked to prevent allowlist bypass.
@@ -121,7 +121,7 @@ async def _connect(connection_config: Dict[str, Any]) -> AsyncIterator:
     """
     Create an MCP session for either SSE or stdio transport.
 
-    Educational Note: This is the central abstraction that all functions use.
+    This is the central abstraction that all functions use.
     It yields an initialized ClientSession regardless of transport type.
     For stdio, a subprocess is spawned and cleaned up on exit.
     For SSE, an HTTP connection is established.
@@ -279,7 +279,7 @@ async def _list_tools_async(connection_config: Dict[str, Any]) -> List[Dict[str,
     """
     List available tools from an MCP server.
 
-    Educational Note: MCP tools use JSON Schema for their input schemas,
+    MCP tools use JSON Schema for their input schemas,
     which maps directly to Claude's tool input_schema format — no conversion needed.
     """
     async with _connect(connection_config) as session:
@@ -303,7 +303,7 @@ async def _call_tool_async(
     """
     Call a tool on an MCP server and return the result as text.
 
-    Educational Note: MCP tool results contain content blocks (TextContent,
+    MCP tool results contain content blocks (TextContent,
     ImageContent, EmbeddedResource). We extract text from each block and
     concatenate them. If the result indicates an error, we prefix with "Error:".
     """
@@ -340,7 +340,7 @@ def _extract_root_cause(e: Exception) -> str:
     """
     Extract a human-readable error message from potentially nested exceptions.
 
-    Educational Note: The MCP SDK uses asyncio TaskGroups internally, which wrap
+    The MCP SDK uses asyncio TaskGroups internally, which wrap
     errors in ExceptionGroup/BaseExceptionGroup. The actual root cause (e.g.,
     "npm package not found" or "connection refused") is buried inside. We dig
     it out so users see something useful instead of "unhandled errors in a TaskGroup".

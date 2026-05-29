@@ -1,7 +1,7 @@
 """
 Model Loader - Admin-configurable Claude model overrides per use case.
 
-Educational Note: Every prompt config in `data/prompts/*.json` has a baked-in
+Every prompt config in `data/prompts/*.json` has a baked-in
 model (Haiku, Sonnet, or Opus). This module lets an admin override those models
 at runtime per category (chat, studio, query agents, source extraction) without
 editing 30+ JSON files.

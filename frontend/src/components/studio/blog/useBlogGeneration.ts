@@ -1,6 +1,6 @@
 /**
  * useBlogGeneration Hook
- * Educational Note: Manages blog post generation with SEO optimization.
+ * Manages blog post generation with SEO optimization.
  * Blog posts are created by an agent that plans, generates images, and writes markdown.
  */
 

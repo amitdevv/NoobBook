@@ -1,6 +1,6 @@
 /**
  * StudioHeader Component
- * Educational Note: Header section matching Chat/Sources header style.
+ * Header section matching Chat/Sources header style.
  * Consistent title + description layout across all panels.
  */
 

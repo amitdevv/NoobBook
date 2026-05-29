@@ -1,7 +1,7 @@
 """
 ElevenLabs Integration - Speech-to-text and text-to-speech services.
 
-Educational Note: ElevenLabs provides multiple audio services:
+ElevenLabs provides multiple audio services:
 
 Speech-to-Text:
 - audio_service: File-based transcription using Scribe v1 model

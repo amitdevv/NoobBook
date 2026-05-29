@@ -1,7 +1,7 @@
 """
 Message endpoints - the core AI interaction.
 
-Educational Note: This is where the magic happens! When a user sends a message,
+This is where the magic happens! When a user sends a message,
 the main_chat_service orchestrates:
 
 1. Context Building:
@@ -206,7 +206,7 @@ def send_message(project_id, chat_id):
     """
     Send a message in a chat and get AI response.
 
-    Educational Note: This endpoint is kept thin - all logic is delegated
+    This endpoint is kept thin - all logic is delegated
     to main_chat_service. The service handles:
     1. Storing user message
     2. Building context with system prompt

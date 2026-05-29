@@ -1,7 +1,7 @@
 """
 Audio Overview endpoints - TTS-based audio summaries.
 
-Educational Note: Audio overviews demonstrate text-to-speech (TTS) integration:
+Audio overviews demonstrate text-to-speech (TTS) integration:
 1. AI generates a conversational script from source content
 2. ElevenLabs API converts script to natural-sounding audio
 3. Audio file is stored and served for playback
@@ -44,7 +44,7 @@ def generate_audio_overview(project_id: str):
     """
     Start audio overview generation or edit as a background task.
 
-    Educational Note: This endpoint is non-blocking:
+    This endpoint is non-blocking:
     1. Creates a job record with status="pending"
     2. Submits background task via task_service
     3. Returns job_id immediately for status polling
@@ -185,7 +185,7 @@ def get_audio_job_status(project_id: str, job_id: str):
     """
     Get the status of an audio generation job.
 
-    Educational Note: Frontend polls this endpoint to check progress.
+    Frontend polls this endpoint to check progress.
     When status="ready", the audio_url field contains the playback URL.
 
     Response:
@@ -255,7 +255,7 @@ def get_audio_file(project_id: str, job_id: str, filename: str):
     """
     Serve an audio file from Supabase Storage.
 
-    Educational Note: This endpoint serves generated audio files for playback.
+    This endpoint serves generated audio files for playback.
     The frontend can use this URL as the src for an <audio> element.
 
     Response:
@@ -287,7 +287,7 @@ def get_tts_status():
     """
     Check if TTS (ElevenLabs) is configured.
 
-    Educational Note: This endpoint allows the frontend to check
+    This endpoint allows the frontend to check
     if audio generation is available before showing the option.
 
     Response:
@@ -312,7 +312,7 @@ def list_tts_voices():
     """
     List available TTS voices from ElevenLabs.
 
-    Educational Note: This endpoint allows users to choose
+    This endpoint allows users to choose
     their preferred voice for audio overviews.
 
     Response:

@@ -1,6 +1,6 @@
 /**
  * Ad Creatives API
- * Educational Note: Handles AI-generated ad creative images using Gemini Imagen.
+ * Handles AI-generated ad creative images using Gemini Imagen.
  */
 
 import axios from 'axios';

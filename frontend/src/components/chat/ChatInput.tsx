@@ -1,6 +1,6 @@
 /**
  * ChatInput Component
- * Educational Note: Input area with microphone button for voice input,
+ * Input area with microphone button for voice input,
  * text field for typing, and send button. Displays partial transcripts
  * in real-time while recording. Also accepts inline image attachments
  * via paste, drag-and-drop, or the image button — Claude/Gemini-style.

@@ -1,6 +1,6 @@
 /**
  * Marketing Strategies API
- * Educational Note: Handles AI-generated Marketing Strategy Documents.
+ * Handles AI-generated Marketing Strategy Documents.
  * Marketing strategies are written incrementally by the agent and stored as markdown files.
  */
 
@@ -188,7 +188,7 @@ export const marketingStrategiesAPI = {
 
   /**
    * Poll marketing strategy job status until complete or error
-   * Educational Note: Added initial delay to avoid race condition where
+   * Added initial delay to avoid race condition where
    * the job might not be saved to disk yet when polling starts.
    */
   async pollJobStatus(

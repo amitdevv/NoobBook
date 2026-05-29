@@ -1,6 +1,6 @@
 /**
  * BrandAssetCard Component
- * Educational Note: Displays a single brand asset (logo, icon, font, image)
+ * Displays a single brand asset (logo, icon, font, image)
  * with actions for viewing, setting primary, and deleting.
  */
 import React, { useState, useEffect, useRef } from 'react';
@@ -52,7 +52,7 @@ export const BrandAssetCard: React.FC<BrandAssetCardProps> = ({
   const blobUrlRef = useRef<string | null>(null);
 
   // Build authenticated image URL for preview
-  // Educational Note: The download endpoint now proxies the file through the backend
+  // The download endpoint now proxies the file through the backend
   // (instead of returning a Supabase signed URL) so it works in Docker where the
   // Supabase internal hostname isn't reachable from the browser.
   useEffect(() => {

@@ -1,7 +1,7 @@
 """
 Flow Diagram endpoints - AI-generated Mermaid diagrams.
 
-Educational Note: Flow diagrams demonstrate visual representation of processes
+Flow diagrams demonstrate visual representation of processes
 and relationships using Mermaid.js syntax:
 1. Claude analyzes source content
 2. Identifies processes, workflows, or relationships
@@ -39,7 +39,7 @@ def generate_flow_diagram(project_id: str):
     """
     Start flow diagram generation or edit via background task.
 
-    Educational Note: Flow diagrams are generated from source content using
+    Flow diagrams are generated from source content using
     Claude to create Mermaid diagram syntax for visual process mapping.
 
     Request Body:

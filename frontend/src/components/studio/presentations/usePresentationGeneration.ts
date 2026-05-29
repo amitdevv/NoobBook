@@ -1,6 +1,6 @@
 /**
  * usePresentationGeneration Hook
- * Educational Note: Custom hook for presentation generation logic.
+ * Custom hook for presentation generation logic.
  * Handles state management, API calls, and polling.
  */
 
@@ -86,7 +86,7 @@ export const usePresentationGeneration = (projectId: string) => {
 
   /**
    * Handle presentation generation
-   * Educational Note: Presentations auto-open in viewer after generation
+   * Presentations auto-open in viewer after generation
    */
   const handlePresentationGeneration = async (signal: StudioSignal) => {
     setIsGeneratingPresentation(true);

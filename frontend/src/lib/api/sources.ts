@@ -1,6 +1,6 @@
 /**
  * Sources API Service
- * Educational Note: Handles all source operations with the backend.
+ * Handles all source operations with the backend.
  * Sources are documents, images, audio, and data files uploaded to projects.
  */
 
@@ -12,7 +12,7 @@ const log = createLogger('sources-api');
 
 /**
  * Source metadata returned from the API
- * Educational Note: Status transitions for sources:
+ * Status transitions for sources:
  * - uploaded: File received, waiting for processing
  * - processing: Currently extracting text from PDF
  * - embedding: Creating vector embeddings for semantic search
@@ -77,7 +77,7 @@ export const ALLOWED_EXTENSIONS = {
 
 /**
  * Chunk content returned from citation API
- * Educational Note: This is used for the citation tooltip feature.
+ * This is used for the citation tooltip feature.
  * When Claude cites a source with [[cite:chunk_id]], we fetch the chunk content to display.
  * Chunk ID format: {source_id}_page_{page}_chunk_{n}
  */
@@ -104,7 +104,7 @@ export interface NotionPickerItem {
 
 /**
  * Processed content returned from the processed content API
- * Educational Note: This is used for viewing extracted text from sources
+ * This is used for viewing extracted text from sources
  * in the Sources panel. Users can click on a processed source to see
  * the full extracted text with page markers.
  */
@@ -129,7 +129,7 @@ export interface RawFileUrl {
 
 /**
  * File extensions that are viewable in the processed content viewer
- * Educational Note: Only text-based sources can be viewed.
+ * Only text-based sources can be viewed.
  * Audio, image, and CSV files are excluded.
  */
 export const VIEWABLE_EXTENSIONS = [
@@ -145,7 +145,7 @@ export const NON_VIEWABLE_EXTENSIONS = [
 
 /**
  * Get a source's file extension.
- * Educational Note: Prefer parsing from `source.name` (persists across renames),
+ * Prefer parsing from `source.name` (persists across renames),
  * but fall back to `embedding_info.file_extension` for sources with no extension
  * in the display name (e.g. DATABASE sources).
  */
@@ -451,7 +451,7 @@ class SourcesAPI {
 
   /**
    * Add a URL source (website or YouTube link)
-   * Educational Note: URLs are stored as .link files containing JSON metadata.
+   * URLs are stored as .link files containing JSON metadata.
    * The actual content fetching happens in a separate processing step.
    */
   async addUrlSource(
@@ -474,7 +474,7 @@ class SourcesAPI {
 
   /**
    * Add a pasted text source
-   * Educational Note: Text is stored as a .txt file. This is the simplest
+   * Text is stored as a .txt file. This is the simplest
    * source type - the raw content IS the processed content.
    */
   async addTextSource(
@@ -497,7 +497,7 @@ class SourcesAPI {
 
   /**
    * Add a deep research source
-   * Educational Note: Triggers an AI agent to research a topic and
+   * Triggers an AI agent to research a topic and
    * synthesize findings into a comprehensive source document.
    */
   async addResearchSource(
@@ -520,7 +520,7 @@ class SourcesAPI {
 
   /**
    * Add an MCP source from an account-level MCP connection
-   * Educational Note: Snapshots selected resources from an MCP server,
+   * Snapshots selected resources from an MCP server,
    * embeds them, and makes them searchable in chat via RAG.
    */
   async addMcpSource(
@@ -582,7 +582,7 @@ class SourcesAPI {
 
   /**
    * Add a Jira source for live issue queries in chat
-   * Educational Note: Jira credentials are configured globally in API Keys settings.
+   * Jira credentials are configured globally in API Keys settings.
    * The backend uses these to connect to the Jira Cloud API.
    */
   async addJiraSource(
@@ -607,7 +607,7 @@ class SourcesAPI {
 
   /**
    * Add a Mixpanel source for live analytics queries in chat
-   * Educational Note: Mixpanel Service Account credentials are configured
+   * Mixpanel Service Account credentials are configured
    * globally in API Keys settings. The backend uses these to query the
    * Mixpanel Query API live — no data is synced locally.
    */
@@ -668,7 +668,7 @@ class SourcesAPI {
 
   /**
    * Add a Notion source (one page or one database) to a project.
-   * Educational Note: Notion content IS embedded for RAG — unlike Jira/Mixpanel
+   * Notion content IS embedded for RAG — unlike Jira/Mixpanel
    * which are live-API flags, Notion pages/databases are fetched once during
    * processing, chunked, and stored for semantic search.
    */
@@ -716,7 +716,7 @@ class SourcesAPI {
 
   /**
    * Cancel processing for a source
-   * Educational Note: This stops any running tasks and sets status back to "uploaded"
+   * This stops any running tasks and sets status back to "uploaded"
    * so user can retry later. Raw file is preserved, only processed data is deleted.
    */
   async cancelProcessing(projectId: string, sourceId: string): Promise<void> {
@@ -732,7 +732,7 @@ class SourcesAPI {
 
   /**
    * Retry processing for a failed or uploaded source
-   * Educational Note: This restarts processing from the raw file.
+   * This restarts processing from the raw file.
    */
   async retryProcessing(projectId: string, sourceId: string): Promise<void> {
     try {
@@ -747,7 +747,7 @@ class SourcesAPI {
 
   /**
    * Get a chunk's content for citation display
-   * Educational Note: This enables the citation feature. When Claude cites
+   * This enables the citation feature. When Claude cites
    * a source with [[cite:CHUNK_ID]], we fetch the chunk content to display
    * in a tooltip/popover on hover.
    */
@@ -768,7 +768,7 @@ class SourcesAPI {
 
   /**
    * Get the processed content of a source for viewing
-   * Educational Note: This enables users to view the extracted text from
+   * This enables users to view the extracted text from
    * their sources. When a user clicks on a processed source in the Sources
    * panel, we fetch and display the full extracted text with page markers.
    */
@@ -839,7 +839,7 @@ class SourcesAPI {
 
   /**
    * Get the URL for an AI-generated image
-   * Educational Note: AI agents like the CSV analyzer can generate images
+   * AI agents like the CSV analyzer can generate images
    * (charts, plots). These are rendered in chat using [[image:FILENAME]]
    * syntax which gets converted to <img> tags pointing to this URL.
    */

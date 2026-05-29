@@ -1,6 +1,6 @@
 /**
  * AdSection Component
- * Educational Note: Self-contained section for ad creative generation.
+ * Self-contained section for ad creative generation.
  * Note: Ads use studio_item signal check instead of source_id filtering.
  */
 

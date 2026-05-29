@@ -1,7 +1,7 @@
 """
 Claude Service - Wrapper for Claude API interactions.
 
-Educational Note: This service provides a clean interface to the Claude API.
+This service provides a clean interface to the Claude API.
 It's designed to be used by multiple callers (chat, subagents, tools, etc.)
 with different configurations (prompts, tools, temperature).
 
@@ -56,7 +56,7 @@ class ClaudeService:
     """
     Service class for Claude API interactions.
 
-    Educational Note: This is a thin wrapper around the Anthropic client.
+    This is a thin wrapper around the Anthropic client.
     It handles client initialization and provides a consistent interface
     for making API calls with various configurations.
     """
@@ -70,7 +70,7 @@ class ClaudeService:
         """
         Get or create the Anthropic client.
 
-        Educational Note: Lazy initialization to avoid errors if API key
+        Lazy initialization to avoid errors if API key
         is not set at import time.
 
         Raises:
@@ -85,7 +85,7 @@ class ClaudeService:
             client = anthropic.Anthropic(api_key=api_key)
 
             # Wrap with Opik observability if configured
-            # Educational Note: track_anthropic() is a transparent wrapper that
+            # track_anthropic() is a transparent wrapper that
             # auto-logs every API call (prompt, response, tokens, latency, cost)
             # to the Opik dashboard. If OPIK_API_KEY is not set, we skip entirely.
             opik_api_key = os.getenv('OPIK_API_KEY')
@@ -120,7 +120,7 @@ class ClaudeService:
         """
         Retry transient Claude API errors with exponential backoff.
 
-        Educational Note: The Claude API can return transient errors:
+        The Claude API can return transient errors:
         - 429 (rate limit) / 529 (overloaded) → wait 30s per attempt
         - 500/502/503 (server error) → wait 2^attempt * 2 seconds
         - Timeout / connection errors → same short backoff
@@ -232,7 +232,7 @@ class ClaudeService:
         """
         Run fn() inside an @opik.track() parent trace with metadata.
 
-        Educational Note: track_anthropic() auto-creates a child span for
+        track_anthropic() auto-creates a child span for
         every client.messages.create() call, but that span is finalized before
         we can attach metadata. @opik.track() creates a parent trace around the
         call. update_current_trace() injects user_id, project_id, chat_id
@@ -285,7 +285,7 @@ class ClaudeService:
         """
         Send messages to Claude and get a response.
 
-        Educational Note: This is the core method for Claude API interaction.
+        This is the core method for Claude API interaction.
         Different callers can customize behavior via parameters:
         - Main chat: Just messages + system prompt
         - Subagents: Messages + tools + specific prompts
@@ -425,7 +425,7 @@ class ClaudeService:
         """
         Stream a Claude response and forward text deltas through a callback.
 
-        Educational Note: This uses Anthropic's streaming API so callers can
+        This uses Anthropic's streaming API so callers can
         surface partial assistant text in real time while still receiving a
         final response object compatible with send_message().
         """
@@ -606,7 +606,7 @@ class ClaudeService:
         """
         Count input tokens for a given set of messages without making an API call.
 
-        Educational Note: This is useful for determining context size before:
+        This is useful for determining context size before:
         - Deciding whether to use RAG vs full context
         - Estimating costs
         - Checking if content fits within model limits

@@ -1,7 +1,7 @@
 """
 Video Executor - Handles studio signal execution for video generation.
 
-Educational Note: This executor is triggered by studio signals (from main chat)
+This executor is triggered by studio signals (from main chat)
 and launches video generation as a background task.
 """
 import logging
@@ -16,7 +16,7 @@ class VideoExecutor:
     """
     Executor for video generation via studio signals.
 
-    Educational Note: The studio signal flow:
+    The studio signal flow:
     1. User chats with AI about creating videos
     2. AI decides to activate studio (sends studio_signal tool call)
     3. studio_signal_executor routes to this executor

@@ -1,6 +1,6 @@
 /**
  * FlowDiagramSection Component
- * Educational Note: Self-contained section for flow diagram generation.
+ * Self-contained section for flow diagram generation.
  */
 
 import React, { useEffect, useCallback } from 'react';

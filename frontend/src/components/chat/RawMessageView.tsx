@@ -1,6 +1,6 @@
 /**
  * RawMessageView Component
- * Educational Note: Debug view that displays ALL messages in a chat including
+ * Debug view that displays ALL messages in a chat including
  * tool_use and tool_result intermediates that are normally filtered out.
  * Shows the raw JSON content blocks with syntax highlighting so developers
  * can inspect the full Claude API exchange.

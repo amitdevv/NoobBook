@@ -1,7 +1,7 @@
 """
 Studio Index Service - Core CRUD for studio generation jobs via Supabase.
 
-Educational Note: This service manages studio content generation jobs
+This service manages studio content generation jobs
 (audio, video, presentations, etc.) in a Supabase `studio_jobs` table,
 replacing the previous local studio_index.json file approach.
 
@@ -185,7 +185,7 @@ def _map_job(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Flatten a Supabase row back to the dict format job modules expect.
 
-    Educational Note: The studio_jobs table stores type-specific fields in a
+    The studio_jobs table stores type-specific fields in a
     JSONB column (job_data). This function merges those back into the top-level
     dict so callers see the same flat structure they had with the old JSON files.
     """
@@ -532,7 +532,7 @@ def list_jobs_grouped(project_id: str) -> Dict[str, List[Dict[str, Any]]]:
     """
     List all studio jobs for a project, grouped by job_type.
 
-    Educational Note: This supports Studio bootstrap without issuing one
+    This supports Studio bootstrap without issuing one
     request per section. Callers can filter by source client-side.
     """
     try:

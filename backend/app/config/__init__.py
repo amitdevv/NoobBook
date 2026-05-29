@@ -1,7 +1,7 @@
 """
 Config - Configuration loaders and providers.
 
-Educational Note: This folder contains services that load and provide
+This folder contains services that load and provide
 configuration data for other services. They handle:
 - Tool definitions (JSON schemas for Claude tools)
 - Prompt configurations (system prompts, model settings)

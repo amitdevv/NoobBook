@@ -1,6 +1,6 @@
 /**
  * ChatEmptyState Component
- * Educational Note: Shown when no chats exist for a project.
+ * Shown when no chats exist for a project.
  * Provides a clear call-to-action to start a new chat.
  */
 

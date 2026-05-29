@@ -1,6 +1,6 @@
 /**
  * ComponentSection Component
- * Educational Note: Self-contained section for UI component generation.
+ * Self-contained section for UI component generation.
  */
 
 import React, { useEffect, useCallback } from 'react';

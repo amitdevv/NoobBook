@@ -1,7 +1,7 @@
 """
 PDF Service - Manages PDF processing and text extraction using tool-based approach.
 
-Educational Note: This service uses a TOOL-BASED extraction approach where:
+This service uses a TOOL-BASED extraction approach where:
 - Multiple PDF pages are sent to Claude in a single API call (batch)
 - Claude sees all pages in the batch for context awareness
 - Claude uses the submit_page_extraction tool to return per-page extractions
@@ -54,7 +54,7 @@ class PDFService:
     """
     Service class for managing PDF text extraction using tool-based approach.
 
-    Educational Note: This service orchestrates PDF processing:
+    This service orchestrates PDF processing:
     1. Splits PDF into batches of pages (max 5 per batch)
     2. Sends each batch to Claude API with all pages visible
     3. Claude uses submit_page_extraction tool for each page (with context!)
@@ -70,7 +70,7 @@ class PDFService:
         """
         Load the PDF extraction tool definition.
 
-        Educational Note: The tool definition tells Claude:
+        The tool definition tells Claude:
         - What the tool does (extract text for a page)
         - What parameters it accepts (page_number, extracted_text, etc.)
         - That it should be called once per page
@@ -93,7 +93,7 @@ class PDFService:
         """
         Extract text from a batch of PDF pages using tool-based approach.
 
-        Educational Note: This is the core of the new extraction approach:
+        This is the core of the new extraction approach:
         1. Build a message with ALL pages in the batch as document blocks
         2. Each document has a title like "filename.pdf - Page 7" for identification
         3. Claude can see all pages → understands cross-page context
@@ -225,7 +225,7 @@ class PDFService:
         """
         Parse PDF extraction tool calls from Claude's response.
 
-        Educational Note: Uses claude_parsing_utils.extract_tool_inputs() for
+        Uses claude_parsing_utils.extract_tool_inputs() for
         generic tool parsing, then processes the PDF-specific fields (page_number,
         extracted_text). Each extraction is self-contained with context included.
 
@@ -273,7 +273,7 @@ class PDFService:
         """
         Extract text from a PDF file using BATCHED TOOL-BASED processing.
 
-        Educational Note: This method implements the new extraction approach:
+        This method implements the new extraction approach:
         1. Gets total page count and tier configuration
         2. Extracts page bytes for all pages
         3. Splits into batches (max 5 pages per batch)

@@ -206,7 +206,7 @@ class UserService:
         """
         Read-modify-write a single key inside users.settings JSONB.
 
-        Educational Note: `users.settings` holds several unrelated knobs —
+        `users.settings` holds several unrelated knobs —
         spending config, this log-download preference, anything we add
         later. Callers updating just one key must merge, never replace,
         or they'd clobber the other admins' spending limit settings.
@@ -271,7 +271,7 @@ class UserService:
         """
         Update a user's spending limit and reset frequency.
 
-        Educational Note: Stored in users.settings JSONB.
+        Stored in users.settings JSONB.
         - cost_limit: Max USD per period (null = unlimited)
         - reset_frequency: "daily" | "weekly" | "monthly" | null (null = lifetime/no reset)
         - When reset_frequency changes, period_spend resets to 0 with a new period_start
@@ -489,7 +489,7 @@ class UserService:
         """
         Add to the user's period_spend after a successful API call.
 
-        Educational Note: Called from cost_tracking.add_usage() alongside
+        Called from cost_tracking.add_usage() alongside
         project and chat cost updates. Only increments if the user has
         a cost_limit with a reset_frequency configured.
         """
@@ -504,7 +504,7 @@ class UserService:
         """
         Sum total_cost across all projects owned by this user.
 
-        Educational Note: Each project stores a costs JSONB with total_cost.
+        Each project stores a costs JSONB with total_cost.
         We aggregate across all projects to get the user's total spend.
         """
         from app.services.integrations.supabase import get_supabase

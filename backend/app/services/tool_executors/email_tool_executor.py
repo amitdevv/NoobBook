@@ -93,7 +93,7 @@ class EmailToolExecutor:
         """
         Handle plan_email_template tool call.
 
-        Educational Note: Prompt-based reminders proved unreliable — the agent
+        Prompt-based reminders proved unreliable — the agent
         would acknowledge brand colors but still generate HTML with generic ones.
         Now we hard-override the planned color_scheme with brand values, so even
         if the agent ignores instructions, the stored plan has correct colors.
@@ -295,7 +295,7 @@ class EmailToolExecutor:
                 final_html = final_html.replace("'BRAND_LOGO'", f"'{logo_url}'")
 
                 # Fallback: inject logo if agent didn't include it at all.
-                # Educational Note: Even with user-message brand instructions, Claude
+                # Even with user-message brand instructions, Claude
                 # sometimes omits the logo <img> tag entirely. This guarantees the
                 # brand logo appears in the email header regardless.
                 if logo_url not in final_html:

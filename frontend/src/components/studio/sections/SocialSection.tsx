@@ -1,6 +1,6 @@
 /**
  * SocialSection Component
- * Educational Note: Self-contained section for social post generation.
+ * Self-contained section for social post generation.
  * Note: Social posts use studio_item signal check instead of source_id filtering.
  */
 

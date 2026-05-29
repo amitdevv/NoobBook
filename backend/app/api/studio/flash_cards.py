@@ -1,7 +1,7 @@
 """
 Flash Card endpoints - AI-generated learning cards.
 
-Educational Note: Flash cards demonstrate structured content extraction:
+Flash cards demonstrate structured content extraction:
 1. Claude analyzes source content
 2. Identifies key concepts and facts
 3. Generates question/answer pairs
@@ -40,7 +40,7 @@ def generate_flash_cards(project_id: str):
     """
     Start flash card generation or edit as a background task.
 
-    Educational Note: Flash cards are generated from source content using
+    Flash cards are generated from source content using
     Claude to create question/answer pairs for learning and memorization.
     Edits refine existing cards based on user instructions.
 

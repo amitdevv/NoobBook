@@ -1,7 +1,7 @@
 """
 MCP Processor - Handles MCP source processing (resource snapshot + embedding).
 
-Educational Note: An MCP source is processed by:
+An MCP source is processed by:
 1. Reading the `.mcp` raw metadata to get connection_id and resource URIs
 2. Connecting to the MCP server and reading the selected resources
 3. Building processed text with each resource as a "page"

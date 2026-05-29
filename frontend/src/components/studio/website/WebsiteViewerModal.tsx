@@ -1,6 +1,6 @@
 /**
  * WebsiteViewerModal Component
- * Educational Note: Modal for previewing generated websites in an iframe.
+ * Modal for previewing generated websites in an iframe.
  * Simpler than component viewer since websites are single-page previews.
  */
 

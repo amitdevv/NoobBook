@@ -1,7 +1,7 @@
 """
 Brand API Blueprint.
 
-Educational Note: Brand assets and configuration are workspace-level settings
+Brand assets and configuration are workspace-level settings
 (per-user, not per-project). This provides consistent branding across all
 projects' studio-generated content.
 

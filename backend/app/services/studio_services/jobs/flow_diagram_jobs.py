@@ -1,7 +1,7 @@
 """
 Flow Diagram Job Management - Tracks flow diagram generation jobs.
 
-Educational Note: Flow diagrams use Mermaid.js syntax which is rendered
+Flow diagrams use Mermaid.js syntax which is rendered
 directly by the frontend Mermaid library, unlike mind maps which use
 a custom node structure with React Flow.
 """

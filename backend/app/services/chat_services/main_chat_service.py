@@ -1,7 +1,7 @@
 """
 Main Chat Service - Orchestrates chat message processing and AI responses.
 
-Educational Note: This service handles the core chat logic with tool support.
+This service handles the core chat logic with tool support.
 
 Message Flow:
 1. User message - What the user types in chat
@@ -127,7 +127,7 @@ class MainChatService:
     """
     Service class for orchestrating chat conversations with tool support.
 
-    Educational Note: This service coordinates the message flow between
+    This service coordinates the message flow between
     user, Claude, and tools. It uses message_service for all message
     operations and tool parsing.
     """
@@ -141,63 +141,27 @@ class MainChatService:
     # complex questions room to finish than clip them early.
     MAX_TOOL_ITERATIONS = 40
 
-    def __init__(self):
+    # Short key -> chat_tools JSON filename. Definitions are static, so each is
+    # loaded once on first use and cached for the process lifetime.
+    _TOOL_DEFS = {
+        "search": "source_search_tool",
+        "memory": "memory_tool",
+        "csv_analyzer": "analyze_csv_agent_tool",
+        "database_analyzer": "analyze_database_agent_tool",
+        "freshdesk_analyzer": "analyze_freshdesk_agent_tool",
+        "mixpanel_analyzer": "analyze_mixpanel_agent_tool",
+        "studio_signal": "studio_signal_tool",
+    }
+
+    def __init__(self) -> None:
         """Initialize the service."""
-        self._search_tool = None
-        self._memory_tool = None
-        self._csv_analyzer_tool = None
-        self._database_analyzer_tool = None
-        self._freshdesk_analyzer_tool = None
-        self._mixpanel_analyzer_tool = None
-        self._studio_signal_tool = None
+        self._tool_cache: Dict[str, Dict[str, Any]] = {}
 
-    def _get_search_tool(self) -> Dict[str, Any]:
-        """Load the search_sources tool definition (cached)."""
-        if self._search_tool is None:
-            self._search_tool = tool_loader.load_tool("chat_tools", "source_search_tool")
-        return self._search_tool
-
-    def _get_memory_tool(self) -> Dict[str, Any]:
-        """Load the store_memory tool definition (cached)."""
-        if self._memory_tool is None:
-            self._memory_tool = tool_loader.load_tool("chat_tools", "memory_tool")
-        return self._memory_tool
-
-    def _get_csv_analyzer_tool(self) -> Dict[str, Any]:
-        """Load the analyze_csv_agent tool definition (cached)."""
-        if self._csv_analyzer_tool is None:
-            self._csv_analyzer_tool = tool_loader.load_tool("chat_tools", "analyze_csv_agent_tool")
-        return self._csv_analyzer_tool
-
-    def _get_database_analyzer_tool(self) -> Dict[str, Any]:
-        """Load the analyze_database_agent tool definition (cached)."""
-        if self._database_analyzer_tool is None:
-            self._database_analyzer_tool = tool_loader.load_tool(
-                "chat_tools", "analyze_database_agent_tool"
-            )
-        return self._database_analyzer_tool
-
-    def _get_freshdesk_analyzer_tool(self) -> Dict[str, Any]:
-        """Load the analyze_freshdesk_agent tool definition (cached)."""
-        if self._freshdesk_analyzer_tool is None:
-            self._freshdesk_analyzer_tool = tool_loader.load_tool(
-                "chat_tools", "analyze_freshdesk_agent_tool"
-            )
-        return self._freshdesk_analyzer_tool
-
-    def _get_mixpanel_analyzer_tool(self) -> Dict[str, Any]:
-        """Load the analyze_mixpanel_agent tool definition (cached)."""
-        if self._mixpanel_analyzer_tool is None:
-            self._mixpanel_analyzer_tool = tool_loader.load_tool(
-                "chat_tools", "analyze_mixpanel_agent_tool"
-            )
-        return self._mixpanel_analyzer_tool
-
-    def _get_studio_signal_tool(self) -> Dict[str, Any]:
-        """Load the studio_signal tool definition (cached)."""
-        if self._studio_signal_tool is None:
-            self._studio_signal_tool = tool_loader.load_tool("chat_tools", "studio_signal_tool")
-        return self._studio_signal_tool
+    def _get_tool(self, key: str) -> Dict[str, Any]:
+        """Load (and cache) a chat tool definition by its short key."""
+        if key not in self._tool_cache:
+            self._tool_cache[key] = tool_loader.load_tool("chat_tools", self._TOOL_DEFS[key])
+        return self._tool_cache[key]
 
     def _get_tools(
         self,
@@ -212,7 +176,7 @@ class MainChatService:
         """
         Get tools list for Claude API call.
 
-        Educational Note: Memory and studio_signal tools are always available.
+        Memory and studio_signal tools are always available.
         Search tool is only available when there are active non-CSV sources.
         CSV analyzer tool is available when there are CSV sources.
         Database analyzer tool is available when there are DATABASE sources.
@@ -237,22 +201,22 @@ class MainChatService:
         tools = []
 
         if not user_id or user_has_permission(user_id, "chat_features", "memory"):
-            tools.append(self._get_memory_tool())
+            tools.append(self._get_tool("memory"))
 
         if not user_id or user_has_permission(user_id, "studio"):
-            tools.append(self._get_studio_signal_tool())
+            tools.append(self._get_tool("studio_signal"))
 
         if has_active_sources:
-            tools.append(self._get_search_tool())
+            tools.append(self._get_tool("search"))
 
         if has_csv_sources and (not user_id or user_has_permission(user_id, "data_sources", "csv")):
-            tools.append(self._get_csv_analyzer_tool())
+            tools.append(self._get_tool("csv_analyzer"))
 
         if has_database_sources and (not user_id or user_has_permission(user_id, "data_sources", "database")):
-            tools.append(self._get_database_analyzer_tool())
+            tools.append(self._get_tool("database_analyzer"))
 
         if has_freshdesk_sources and (not user_id or user_has_permission(user_id, "data_sources", "freshdesk")):
-            tools.append(self._get_freshdesk_analyzer_tool())
+            tools.append(self._get_tool("freshdesk_analyzer"))
 
         # Add Jira tools only when the project has a .jira source (project-scoped)
         if has_jira_sources and (not user_id or user_has_permission(user_id, "data_sources", "jira")):
@@ -265,7 +229,7 @@ class MainChatService:
         # to the main chat so the surface stays small and consistent with
         # the Freshdesk pattern.
         if has_mixpanel_sources and (not user_id or user_has_permission(user_id, "data_sources", "mixpanel")):
-            tools.append(self._get_mixpanel_analyzer_tool())
+            tools.append(self._get_tool("mixpanel_analyzer"))
 
         # Add non-Jira knowledge base tools (Notion, GitHub, etc.) — always global
         tools.extend(knowledge_base_service.get_available_tools())
@@ -293,7 +257,7 @@ class MainChatService:
         """
         Build system prompt with memory and source context appended.
 
-        Educational Note: Context is rebuilt on every message to reflect
+        Context is rebuilt on every message to reflect
         current state (memory updates, per-chat source selections).
         Includes both memory context (personalization) and source context (tools).
         """
@@ -332,7 +296,7 @@ class MainChatService:
         """
         Execute a tool and return result string.
 
-        Educational Note: Routes tool calls to appropriate executor.
+        Routes tool calls to appropriate executor.
         - search_sources: Searches project sources for information
         - store_memory: Stores user/project memory (non-blocking, queues background task)
         - analyze_csv_agent: Triggers CSV analyzer agent for CSV data questions
@@ -379,7 +343,7 @@ class MainChatService:
             if result.get("success"):
                 content = result.get("content", "No analysis result")
                 # Include image filenames if any plots were generated
-                # Educational Note: Filenames are auto-generated unique IDs
+                # Filenames are auto-generated unique IDs
                 # Main chat Claude MUST use these exact filenames with [[image:FILENAME]]
                 if result.get("image_paths"):
                     content += f"\n\nGenerated visualizations (use these exact filenames):\n"
@@ -708,7 +672,7 @@ class MainChatService:
             turn_out_tokens += initial_usage.get("output_tokens", 0) or 0
 
             # Step 5: Handle tool use loop
-            # Educational Note: When Claude wants to use tools, stop_reason is "tool_use".
+            # When Claude wants to use tools, stop_reason is "tool_use".
             # We must execute tools and send back tool_result for each tool_use block.
             # Important: Claude can respond with text + tool_use together. The text is
             # the response to the user, the tool_use is for background processing.
@@ -744,7 +708,7 @@ class MainChatService:
                     break
 
                 # Store the assistant's tool_use response
-                # Educational Note: The message chain must be:
+                # The message chain must be:
                 # user -> assistant (tool_use[]) -> user (tool_result[]) -> assistant
                 # We must store the tool_use response before the tool_result
                 serialized_content = claude_parsing_utils.serialize_content_blocks(
@@ -772,7 +736,7 @@ class MainChatService:
                 # tool_use message), so Claude can't find the matching
                 # tool_use.
                 #
-                # Educational Note: We wrap each tool execution in try/except
+                # We wrap each tool execution in try/except
                 # so a tool_result is ALWAYS produced. Without this, if a tool
                 # throws, the assistant's tool_use block is orphaned (no
                 # matching tool_result), which corrupts the message history
@@ -899,7 +863,7 @@ class MainChatService:
                 )
 
             # Step 6: Store final text response
-            # Educational Note: When Claude sends text + tool_use, the text comes first.
+            # When Claude sends text + tool_use, the text comes first.
             # After tool execution, Claude may respond with more text OR empty (nothing to add).
             # We combine all text parts to show the complete response to the user.
             cancelled = cancel_event is not None and cancel_event.is_set()
@@ -1149,7 +1113,7 @@ class MainChatService:
         chat_service.sync_chat_to_index(project_id, chat_id)
 
         # Step 8: Auto-rename chat on first message (background task)
-        # Educational Note: We check if the chat had no messages before this one.
+        # We check if the chat had no messages before this one.
         # The naming runs in background so it doesn't block the response.
         if chat.get("message_count", 0) == 0:
             # Submit naming task to background
@@ -1239,7 +1203,7 @@ class MainChatService:
         """
         Generate and update chat title in background.
 
-        Educational Note: This runs as a background task so it doesn't
+        This runs as a background task so it doesn't
         block the main chat response. Uses AI to generate a concise title.
 
         Args:

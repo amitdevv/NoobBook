@@ -1,7 +1,7 @@
 """
 Mind Map Service - Generates hierarchical mind maps from source content.
 
-Educational Note: This service uses Claude to generate structured mind maps
+This service uses Claude to generate structured mind maps
 for visual concept mapping. Like the flash cards service, this is a single-call
 service using tool-based extraction:
 
@@ -30,7 +30,7 @@ class MindMapService:
     """
     Service for generating mind maps from source content.
 
-    Educational Note: Mind maps are generated in a single Claude call
+    Mind maps are generated in a single Claude call
     using the generate_mind_map tool for structured hierarchical output.
     """
 
@@ -60,7 +60,7 @@ class MindMapService:
         """
         Get source content for mind map generation.
 
-        Educational Note: For large sources, we sample chunks evenly
+        For large sources, we sample chunks evenly
         to stay within token limits while covering the full content.
         Content is downloaded from Supabase Storage.
         """

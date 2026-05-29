@@ -1,6 +1,6 @@
 /**
  * StudioToolsList Component
- * Educational Note: Renders all studio tools organized by category.
+ * Renders all studio tools organized by category.
  * Uses StudioContext for signals and generation handling.
  */
 

@@ -1,7 +1,7 @@
 """
 Page Markers - Shared constants for page marker format.
 
-Educational Note: All processed sources use a standardized page marker format:
+All processed sources use a standardized page marker format:
     === {TYPE} PAGE {N} of {TOTAL} ===
 
 This module defines:

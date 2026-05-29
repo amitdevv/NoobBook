@@ -1,6 +1,6 @@
 /**
  * MarketingStrategySection Component
- * Educational Note: Self-contained section for marketing strategy generation.
+ * Self-contained section for marketing strategy generation.
  */
 
 import React, { useEffect, useCallback } from 'react';

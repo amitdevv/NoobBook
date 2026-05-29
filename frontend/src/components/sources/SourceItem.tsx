@@ -1,31 +1,15 @@
 /**
  * SourceItem Component
- * Educational Note: Displays a single source with icon, name, size, and action menu.
+ * Displays a single source with icon, name, size, and action menu.
  * Shows processing status with loading indicator for sources being processed.
  * Shows error indicator for sources that failed processing.
  * Uses a 3-dot dropdown menu for actions (rename, download, delete).
  */
 
-import React, { useState } from 'react';
+import React, { createElement, useState } from 'react';
 import {
-  FileText,
-  FilePdf,
-  FileDoc,
-  FilePpt,
-  FileCsv,
-  FileHtml,
-  FilePng,
-  FileJpg,
-  FileXls,
-  MarkdownLogo,
-  File,
-  MusicNote,
-  Image,
-  Table,
   Trash,
   DownloadSimple,
-  Link,
-  YoutubeLogo,
   CircleNotch,
   Warning,
   CheckCircle,
@@ -34,9 +18,8 @@ import {
   Stop,
   ArrowsClockwise,
   CloudArrowDown,
-  Plug,
-  NotionLogo,
 } from '@phosphor-icons/react';
+import { getSourceIcon } from './sourceIcon';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,65 +53,8 @@ interface SourceItemProps {
 }
 
 /**
- * Get the appropriate icon component for a source.
- * Educational Note: We extract the file extension from source.name first because it persists
- * across all status transitions. The embedding_info.file_extension gets overwritten when
- * processing completes (replaced with embedding stats), so it's only reliable for fresh uploads.
- * The backend `type` field uses "DOCUMENT" for all document types (PDF, DOCX, PPTX, TXT),
- * so it can't distinguish between them — but it's useful for non-file sources (URLs, text).
- */
-const getSourceIcon = (source: Source): { icon: typeof File; weight?: 'bold' } => {
-  // 1. Extract extension from source name (most reliable — persists across processing)
-  const name = source.name || '';
-  const lastDot = name.lastIndexOf('.');
-  const nameExtension = lastDot > 0 ? name.substring(lastDot).toLowerCase() : '';
-
-  // 2. Also check embedding_info (available on fresh uploads before processing overwrites it)
-  const embeddingExtension = ((source.embedding_info as Record<string, string>)?.file_extension || '').toLowerCase();
-
-  const fileExtension = nameExtension || embeddingExtension;
-
-  // Map extension to icon (all bold for visual consistency)
-  switch (fileExtension) {
-    case '.pdf': return { icon: FilePdf, weight: 'bold' };
-    case '.docx': return { icon: FileDoc, weight: 'bold' };
-    case '.pptx': return { icon: FilePpt, weight: 'bold' };
-    case '.txt': return { icon: FileText, weight: 'bold' };
-    case '.csv': return { icon: FileCsv, weight: 'bold' };
-    case '.xlsx': return { icon: FileXls, weight: 'bold' };
-    case '.database': return { icon: Table, weight: 'bold' };
-    case '.mcp': return { icon: Plug, weight: 'bold' };
-    case '.notion': return { icon: NotionLogo, weight: 'bold' };
-    case '.md': return { icon: MarkdownLogo, weight: 'bold' };
-    case '.html': return { icon: FileHtml, weight: 'bold' };
-    case '.json': case '.xml': return { icon: FileText, weight: 'bold' };
-    case '.mp3': case '.wav': case '.m4a': case '.aac': case '.flac': return { icon: MusicNote, weight: 'bold' };
-    case '.jpg': case '.jpeg': return { icon: FileJpg, weight: 'bold' };
-    case '.png': return { icon: FilePng, weight: 'bold' };
-    case '.gif': case '.webp': return { icon: Image, weight: 'bold' };
-  }
-
-  // 3. Fall back to backend `type` field (for URLs, pasted text, etc. that have no extension in name)
-  const sourceType = source.type || '';
-  switch (sourceType) {
-    case 'YOUTUBE': return { icon: YoutubeLogo, weight: 'bold' };
-    case 'LINK': case 'RESEARCH': return { icon: Link, weight: 'bold' };
-    case 'TEXT': return { icon: FileText, weight: 'bold' };
-    case 'AUDIO': return { icon: MusicNote, weight: 'bold' };
-    case 'IMAGE': return { icon: Image, weight: 'bold' };
-    case 'DATA': return { icon: Table, weight: 'bold' };
-    case 'DATABASE': return { icon: Table, weight: 'bold' };
-    case 'MCP': return { icon: Plug, weight: 'bold' };
-    case 'NOTION': return { icon: NotionLogo, weight: 'bold' };
-    case 'DOCUMENT': return { icon: FileText, weight: 'bold' };
-    default: return { icon: File, weight: 'bold' };
-  }
-};
-
-/**
- * Get a human-readable error message from processing_info.
- * Educational Note: The backend stores detailed error info in processing_info.error.
- * We extract a short, user-friendly message from it to show in the UI.
+ * Extract a short, user-friendly error message from processing_info.error,
+ * which the backend populates with detailed failure info.
  */
 const getErrorMessage = (source: Source): string => {
   const error = (source.processing_info as Record<string, string>)?.error || '';
@@ -155,7 +81,7 @@ const getErrorMessage = (source: Source): string => {
 
 /**
  * Get status display info (icon, color, text)
- * Educational Note: Different statuses indicate processing state:
+ * Different statuses indicate processing state:
  * - uploaded: Waiting to be processed (could be fresh upload or cancelled)
  * - processing: Currently extracting text from PDF
  * - embedding: Creating vector embeddings for semantic search
@@ -262,7 +188,10 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   onSyncFreshdesk,
   onBackfillFreshdesk,
 }) => {
-  const { icon: Icon, weight: iconWeight } = getSourceIcon(source);
+  // getSourceIcon selects a stable module-scope Phosphor icon. Render it via
+  // createElement (not a PascalCase JSX binding) so the static-components lint
+  // doesn't mistake the selection for a component defined during render.
+  const sourceIcon = getSourceIcon(source);
   const statusDisplay = getStatusDisplay(source.status, source);
   const isFreshdesk = ((source.embedding_info as Record<string, string>)?.file_extension || '') === '.freshdesk';
   const isSyncing = isFreshdesk && (
@@ -277,14 +206,14 @@ export const SourceItem: React.FC<SourceItemProps> = ({
   // "uploaded" status means source is waiting for processing (fresh upload or cancelled)
   const isWaitingToProcess = source.status === 'uploaded';
   // Source can be toggled active/inactive only when it's ready
-  // Educational Note: No partial status - sources are either fully ready or failed
+  // No partial status - sources are either fully ready or failed
   const canToggleActive = source.status === 'ready';
   // Check if source can be viewed (ready + viewable type)
   const canView = isSourceViewable(source);
 
   /**
    * Handle click on the source row to view processed content
-   * Educational Note: Only viewable sources (text-based, ready status) can be clicked.
+   * Only viewable sources (text-based, ready status) can be clicked.
    * We check the target to avoid triggering when clicking on interactive elements.
    */
   const handleRowClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -313,11 +242,11 @@ export const SourceItem: React.FC<SourceItemProps> = ({
         <DropdownMenuTrigger asChild>
           <button className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded transition-colors">
             {/* Category icon - visible by default, hidden on hover */}
-            <Icon
-              size={18}
-              weight={iconWeight}
-              className="text-muted-foreground group-hover:hidden"
-            />
+            {createElement(sourceIcon, {
+              size: 18,
+              weight: 'bold',
+              className: 'text-muted-foreground group-hover:hidden',
+            })}
             {/* Menu icon - hidden by default, visible on hover */}
             <DotsThreeVertical
               size={18}

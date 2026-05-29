@@ -1,7 +1,7 @@
 """
 Screenshot Utilities - Playwright-based HTML to PNG screenshot capture.
 
-Educational Note: This module uses Playwright to capture screenshots of HTML files
+This module uses Playwright to capture screenshots of HTML files
 at exact viewport dimensions (1920x1080) for presentation export.
 
 Why Playwright?
@@ -141,7 +141,7 @@ def capture_slides_as_screenshots(
     """
     Capture screenshots of HTML slides using Playwright.
 
-    Educational Note: This function wraps the async Playwright API
+    This function wraps the async Playwright API
     in a synchronous interface for easier integration with Flask.
 
     Args:

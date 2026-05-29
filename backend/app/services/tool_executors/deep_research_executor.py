@@ -1,7 +1,7 @@
 """
 Deep Research Executor - Handles tool execution for the deep research agent.
 
-Educational Note: This executor routes tool calls from the deep research agent
+This executor routes tool calls from the deep research agent
 to the appropriate services. It handles:
     - write_research_to_file: Writes research segments to output file
     - tavily_search_advance: Routes to tavily_service for search/extract
@@ -22,7 +22,7 @@ class DeepResearchExecutor:
     """
     Executor for deep research agent tools.
 
-    Educational Note: The executor pattern separates tool routing from
+    The executor pattern separates tool routing from
     the agent loop logic. This makes it easy to add new tools or
     modify execution behavior without changing the agent service.
     """
@@ -43,7 +43,7 @@ class DeepResearchExecutor:
         """
         Execute a tool and return the result.
 
-        Educational Note: Returns a tuple of (result_message, is_termination).
+        Returns a tuple of (result_message, is_termination).
         The is_termination flag tells the agent loop to stop processing.
 
         Args:
@@ -72,7 +72,7 @@ class DeepResearchExecutor:
         """
         Execute write_research_to_file tool.
 
-        Educational Note: Writes research segments incrementally to file.
+        Writes research segments incrementally to file.
         Returns (result_message, is_termination) - termination is true
         when is_last_segment=true.
 
@@ -115,7 +115,7 @@ class DeepResearchExecutor:
         """
         Execute tavily_search_advance tool.
 
-        Educational Note: Delegates to tavily_service.search_advanced()
+        Delegates to tavily_service.search_advanced()
         which handles both 'search' and 'extract' operations.
 
         Args:
@@ -146,7 +146,7 @@ class DeepResearchExecutor:
         """
         Check if a tool call signals termination.
 
-        Educational Note: For deep research, termination happens when
+        For deep research, termination happens when
         write_research_to_file is called with is_last_segment=true.
 
         Args:

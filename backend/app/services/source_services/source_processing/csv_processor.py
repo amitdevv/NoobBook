@@ -1,7 +1,7 @@
 """
 CSV Processor - Handles CSV file processing.
 
-Educational Note: CSV files are NOT chunked or embedded. Instead:
+CSV files are NOT chunked or embedded. Instead:
 1. csv_service (AI) analyzes the CSV using csv_analyzer tool
 2. AI generates a concise summary (300-400 tokens)
 3. Raw CSV content is uploaded to processed storage for on-demand analysis
@@ -33,7 +33,7 @@ def process_csv(
     """
     Process a CSV file - AI analyzes and generates summary.
 
-    Educational Note: Unlike other sources, CSV files are NOT embedded.
+    Unlike other sources, CSV files are NOT embedded.
     The AI service analyzes the CSV and generates a concise summary.
     Raw CSV content is uploaded to processed storage for on-demand queries.
 

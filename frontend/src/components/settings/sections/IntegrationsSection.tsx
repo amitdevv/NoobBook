@@ -205,7 +205,7 @@ export const IntegrationsSection: React.FC<IntegrationsSectionProps> = ({ isAdmi
 
   /**
    * Parse stdio env vars from a multiline string (KEY=VALUE format).
-   * Educational Note: Users enter env vars like FRESHDESK_API_KEY=abc123,
+   * Users enter env vars like FRESHDESK_API_KEY=abc123,
    * one per line. We parse them into a key-value object for the API.
    */
   const parseStdioEnv = (): Record<string, string> => {

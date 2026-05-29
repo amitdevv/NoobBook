@@ -1,6 +1,6 @@
 /**
  * Presentations API
- * Educational Note: Handles AI-generated PowerPoint presentations.
+ * Handles AI-generated PowerPoint presentations.
  * Uses an agentic approach for HTML slides, then exports to PPTX.
  */
 
@@ -149,7 +149,7 @@ export interface PresentationPreviewResponse {
 export const presentationsAPI = {
   /**
    * Start presentation generation or edit (background task)
-   * Educational Note: Non-blocking - returns immediately with job_id
+   * Non-blocking - returns immediately with job_id
    */
   async startGeneration(
     projectId: string,
@@ -234,7 +234,7 @@ export const presentationsAPI = {
 
   /**
    * Get screenshot URL for image viewing
-   * Educational Note: Screenshots are PNG images captured by Playwright at 1920x1080
+   * Screenshots are PNG images captured by Playwright at 1920x1080
    */
   getScreenshotUrl(projectId: string, jobId: string, screenshotFile: string): string {
     return `${API_BASE_URL}/projects/${projectId}/studio/presentations/${jobId}/screenshots/${screenshotFile}`;

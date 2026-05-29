@@ -1,6 +1,6 @@
 /**
  * AudioListItem Component
- * Educational Note: Renders saved audio with inline playback controls.
+ * Renders saved audio with inline playback controls.
  * Includes a seekbar timeline that appears when the item is actively playing or paused.
  * Supports iterative editing via an inline edit input.
  */

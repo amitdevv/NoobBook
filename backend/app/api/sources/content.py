@@ -1,7 +1,7 @@
 """
 Content serving endpoints - citations, AI-generated images, and processed source content.
 
-Educational Note: These endpoints serve content that appears in chat responses
+These endpoints serve content that appears in chat responses
 and the sources panel:
 
 1. Citations:
@@ -58,7 +58,7 @@ def get_citation_content(project_id: str, chunk_id: str):
     """
     Get the content of a chunk for citation display.
 
-    Educational Note: This enables grounded AI responses with verifiable citations.
+    This enables grounded AI responses with verifiable citations.
     When Claude cites a chunk, users can hover to see:
     - The actual text Claude is referencing
     - Which source it came from
@@ -120,7 +120,7 @@ def get_ai_image(project_id: str, filename: str):
     """
     Serve an AI-generated image from the ai_outputs/images folder.
 
-    Educational Note: Some AI agents generate visual outputs:
+    Some AI agents generate visual outputs:
     - CSV analyzer: Charts and graphs
     - Future: Diagrams, infographics, etc.
 
@@ -185,7 +185,7 @@ def get_processed_content(project_id: str, source_id: str):
     """
     Get the processed text content of a source for viewing in the Sources panel.
 
-    Educational Note: This endpoint enables users to view the extracted/processed
+    This endpoint enables users to view the extracted/processed
     text from their sources. The processed files are stored in Supabase Storage
     and contain:
     - A metadata header (which we strip out)

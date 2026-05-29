@@ -1,6 +1,6 @@
 /**
  * VideoViewerModal Component
- * Educational Note: Modal for playing generated videos with HTML5 video player.
+ * Modal for playing generated videos with HTML5 video player.
  * Supports multiple videos per job (if user requested more than one).
  */
 

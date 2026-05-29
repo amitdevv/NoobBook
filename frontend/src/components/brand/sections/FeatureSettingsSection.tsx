@@ -1,6 +1,6 @@
 /**
  * FeatureSettingsSection Component
- * Educational Note: Controls which studio features should apply brand guidelines.
+ * Controls which studio features should apply brand guidelines.
  */
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../ui/button';

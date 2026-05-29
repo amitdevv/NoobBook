@@ -1,7 +1,7 @@
 """
 Mind Map Job Management - Tracks mind map generation jobs.
 
-Educational Note: Mind map jobs use AI to analyze source content and create
+Mind map jobs use AI to analyze source content and create
 hierarchical node structures for visual representation using React Flow.
 """
 from datetime import datetime

@@ -1,6 +1,6 @@
 /**
  * useComponentGeneration Hook
- * Educational Note: Custom hook for UI component generation logic.
+ * Custom hook for UI component generation logic.
  * Handles state management, API calls, and polling.
  */
 

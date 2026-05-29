@@ -1,6 +1,6 @@
 /**
  * SourcesFooter Component
- * Educational Note: Displays source statistics, progress bar, and limit warning.
+ * Displays source statistics, progress bar, and limit warning.
  * Shows count/limit ratio and total file size.
  */
 

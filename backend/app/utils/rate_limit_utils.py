@@ -1,7 +1,7 @@
 """
 Rate Limit Utils - Thread-safe rate limiting for API calls.
 
-Educational Note: Rate limiting prevents hitting API limits by:
+Rate limiting prevents hitting API limits by:
 - Tracking requests within a time window (typically 1 minute)
 - Blocking/waiting when the limit is reached
 - Resetting the counter when the window expires
@@ -39,7 +39,7 @@ class RateLimiter:
     """
     Thread-safe rate limiter for API calls.
 
-    Educational Note: This uses a sliding window approach:
+    This uses a sliding window approach:
     - Tracks how many requests were made in the current minute
     - When limit is reached, calculates wait time until window resets
     - Thread-safe via threading.Lock for concurrent batch processing
@@ -61,7 +61,7 @@ class RateLimiter:
         """
         Wait if rate limit is reached, then increment counter.
 
-        Educational Note: This method is called before each API request.
+        This method is called before each API request.
         It blocks if we've hit the limit, then increments the request count.
 
         Returns:
@@ -127,7 +127,7 @@ def create_rate_limiter(requests_per_minute: int) -> RateLimiter:
     """
     Factory function to create a rate limiter.
 
-    Educational Note: This is a convenience function that makes it
+    This is a convenience function that makes it
     clear we're creating a new limiter instance.
 
     Args:

@@ -1,7 +1,7 @@
 """
 Ad Creative Job Management - Tracks ad image generation jobs.
 
-Educational Note: Ad jobs generate marketing creatives using AI image generation.
+Ad jobs generate marketing creatives using AI image generation.
 Creates multiple ad variations for products based on source content.
 """
 from datetime import datetime

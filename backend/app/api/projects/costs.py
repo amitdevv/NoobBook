@@ -1,7 +1,7 @@
 """
 Project cost tracking endpoint.
 
-Educational Note: Cost tracking is essential for LLM applications because:
+Cost tracking is essential for LLM applications because:
 
 1. API calls cost real money - Claude, OpenAI, etc. charge per token
 2. Different models have different costs:
@@ -37,7 +37,7 @@ def get_project_costs_endpoint(project_id):
     """
     Get cost tracking data for a project.
 
-    Educational Note: This endpoint provides transparency about API usage.
+    This endpoint provides transparency about API usage.
     In production apps, this data helps with:
     - Billing users accurately
     - Setting usage quotas

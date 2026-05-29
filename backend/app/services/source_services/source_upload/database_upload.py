@@ -1,7 +1,7 @@
 """
 Database Upload Handler - Create a DATABASE source from an account-level DB connection.
 
-Educational Note: A database source is represented similarly to URL sources:
+A database source is represented similarly to URL sources:
 - We store a small `.database` "raw file" in Supabase Storage that contains
   non-secret metadata (connection_id, db_type, database_name).
 - The actual credentials live in the account-level database_connections table.

@@ -1,7 +1,7 @@
 """
 Jira Processor - Handles JIRA source processing.
 
-Educational Note: Unlike Freshdesk which syncs ticket data locally, the Jira
+Unlike Freshdesk which syncs ticket data locally, the Jira
 processor is lightweight. It only verifies the Jira API connection, fetches a
 list of available projects for the summary, and marks the source ready.
 All actual Jira queries happen live via the chat tools (jira_list_projects,
@@ -31,7 +31,7 @@ def _build_processed_text(
     """
     Build processed text summary of the connected Jira instance.
 
-    Educational Note: This text is stored in the processed-files bucket
+    This text is stored in the processed-files bucket
     and displayed in the Sources UI as a quick overview. It also feeds
     the AI summary generation so chat knows what Jira data is available.
     """

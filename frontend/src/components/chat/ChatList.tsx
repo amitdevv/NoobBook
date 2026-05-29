@@ -1,6 +1,6 @@
 /**
  * ChatList Component
- * Educational Note: Displays all chats for a project with ability to
+ * Displays all chats for a project with ability to
  * select, delete, rename, or create new chats. Shows chat metadata like
  * message count and last updated time.
  */

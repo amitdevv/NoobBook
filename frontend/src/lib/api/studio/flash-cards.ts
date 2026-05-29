@@ -1,6 +1,6 @@
 /**
  * Flash Cards API
- * Educational Note: Handles AI-generated flash cards for learning content.
+ * Handles AI-generated flash cards for learning content.
  */
 
 import axios from 'axios';

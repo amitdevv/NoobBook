@@ -1,7 +1,7 @@
 """
 Sources API Blueprint - Document and Media Management.
 
-Educational Note: Sources are the foundation of RAG (Retrieval Augmented Generation).
+Sources are the foundation of RAG (Retrieval Augmented Generation).
 They provide the context that makes AI responses grounded in your specific data.
 
 Source Types Supported:

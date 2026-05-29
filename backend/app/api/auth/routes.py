@@ -93,7 +93,7 @@ def refresh():
     """
     Refresh an expired JWT using the client's refresh token.
 
-    Educational Note: JWTs expire after ~1 hour. Long-running operations (like
+    JWTs expire after ~1 hour. Long-running operations (like
     studio blog generation) can outlast the token. Instead of forcing re-login,
     the frontend sends its stored refresh_token here to get a fresh token pair.
     This endpoint is excluded from auth checks (the before_request hook in

@@ -1,6 +1,6 @@
 /**
  * Mind Maps API
- * Educational Note: Handles AI-generated mind maps for visualizing content structure.
+ * Handles AI-generated mind maps for visualizing content structure.
  */
 
 import axios from 'axios';

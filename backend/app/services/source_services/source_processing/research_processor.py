@@ -1,7 +1,7 @@
 """
 Research Processor - Handles deep research source processing.
 
-Educational Note: This processor orchestrates an AI agent that:
+This processor orchestrates an AI agent that:
 1. Reads the research request (.research JSON file)
 2. Uses web search to find relevant information
 3. Fetches and analyzes provided reference links
@@ -37,7 +37,7 @@ def process_research(
     """
     Process a research source by running the deep research agent.
 
-    Educational Note: This is a long-running process that:
+    This is a long-running process that:
     1. Loads the research request parameters
     2. Runs an AI agent with web search capabilities
     3. Compiles findings into a structured document
@@ -204,7 +204,7 @@ def _process_embeddings(
     """
     Process embeddings for a research source.
 
-    Educational Note: Research documents are typically comprehensive and
+    Research documents are typically comprehensive and
     benefit greatly from semantic search via embeddings.
     Chunks are uploaded to Supabase Storage.
     """

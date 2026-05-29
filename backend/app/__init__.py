@@ -1,7 +1,7 @@
 """
 Flask application factory for NoobBook.
 
-Educational Note: The application factory pattern allows us to create
+The application factory pattern allows us to create
 multiple app instances with different configurations (dev, test, prod).
 This is a Flask best practice for larger applications.
 """
@@ -25,7 +25,7 @@ def create_app(config_name='development'):
     """
     Create and configure the Flask application.
 
-    Educational Note: This factory function:
+    This factory function:
     1. Creates the Flask instance
     2. Loads configuration
     3. Initializes extensions
@@ -169,7 +169,7 @@ def register_error_handlers(app):
     """
     Register global error handlers for the application.
 
-    Educational Note: Centralized error handling ensures consistent
+    Centralized error handling ensures consistent
     error responses across all endpoints.
     """
     @app.errorhandler(404)

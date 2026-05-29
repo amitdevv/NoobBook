@@ -1,7 +1,7 @@
 """
 Pinecone Service - Vector database operations for semantic search.
 
-Educational Note: Pinecone is a managed vector database that enables:
+Pinecone is a managed vector database that enables:
 - Storing high-dimensional vectors (embeddings)
 - Fast similarity search using cosine/dot product metrics
 - Metadata filtering for hybrid search
@@ -24,7 +24,7 @@ class PineconeService:
     """
     Service for Pinecone vector database operations.
 
-    Educational Note: This service handles:
+    This service handles:
     - Upserting vectors (insert/update)
     - Semantic search (query by vector)
     - Deleting vectors (by ID or filter)
@@ -43,7 +43,7 @@ class PineconeService:
         """
         Get or create the Pinecone client.
 
-        Educational Note: Lazy initialization ensures we don't fail
+        Lazy initialization ensures we don't fail
         at import time if the API key isn't set yet.
 
         Raises:
@@ -60,7 +60,7 @@ class PineconeService:
         """
         Get the Pinecone index.
 
-        Educational Note: The index must exist before we can use it.
+        The index must exist before we can use it.
         It's created automatically when the user validates their API key
         in AppSettings (via validation_service.validate_pinecone_key).
 
@@ -88,7 +88,7 @@ class PineconeService:
         """
         Upsert vectors into Pinecone.
 
-        Educational Note: Upsert = insert + update. If a vector ID exists,
+        Upsert = insert + update. If a vector ID exists,
         it's updated. If not, it's inserted. This makes it safe to call
         multiple times with the same data.
 
@@ -131,7 +131,7 @@ class PineconeService:
         """
         Perform semantic search using a query vector.
 
-        Educational Note: This is the core of RAG retrieval:
+        This is the core of RAG retrieval:
         1. User query is converted to embedding (done elsewhere)
         2. Query vector is compared to all vectors in namespace
         3. Most similar vectors (by cosine similarity) are returned
@@ -252,7 +252,7 @@ class PineconeService:
         """
         Delete all vectors for a specific source.
 
-        Educational Note: When a user deletes a source document,
+        When a user deletes a source document,
         we need to remove all its chunks from the vector database.
         We use metadata filtering to find and delete by source_id.
 
@@ -305,7 +305,7 @@ class PineconeService:
         """
         Delete all vectors in a namespace (entire project).
 
-        Educational Note: When a project is deleted, we delete
+        When a project is deleted, we delete
         the entire namespace to clean up all associated vectors.
 
         Args:

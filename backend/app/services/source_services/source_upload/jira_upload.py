@@ -1,7 +1,7 @@
 """
 Jira Upload Handler - Create a JIRA source flag for a project.
 
-Educational Note: Unlike Freshdesk sources that sync data locally, Jira sources
+Unlike Freshdesk sources that sync data locally, Jira sources
 are lightweight "flags" that enable the existing Jira API tools (jira_list_projects,
 jira_search_issues, jira_get_issue, jira_get_project) for a specific project.
 No data is synced or stored locally — all queries go directly to the Jira API.
@@ -31,7 +31,7 @@ def add_jira_source(
     """
     Create a JIRA source in a project and trigger processing.
 
-    Educational Note: This is a lightweight source that acts as a per-project
+    This is a lightweight source that acts as a per-project
     flag to enable Jira tools in chat. The processing step verifies the Jira
     connection and builds a summary of available projects.
 

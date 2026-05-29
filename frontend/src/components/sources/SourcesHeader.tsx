@@ -1,6 +1,6 @@
 /**
  * SourcesHeader Component
- * Educational Note: Header section matching Chat/Studio header style.
+ * Header section matching Chat/Studio header style.
  * Title + description in header, controls (search, add) in separate section below.
  */
 

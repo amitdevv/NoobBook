@@ -1,7 +1,7 @@
 """
 Component Agent Executor - Handles studio signal execution for UI components.
 
-Educational Note: This executor is triggered by studio signals (from main chat)
+This executor is triggered by studio signals (from main chat)
 and launches the component agent as a background task to generate 2-4 component variations.
 """
 
@@ -17,7 +17,7 @@ class ComponentAgentExecutor:
     """
     Executor for UI component generation via studio signals.
 
-    Educational Note: The studio signal flow:
+    The studio signal flow:
     1. User chats with AI about creating components
     2. AI decides to activate studio (sends studio_signal tool call)
     3. studio_signal_executor routes to this executor

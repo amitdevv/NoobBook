@@ -1,6 +1,6 @@
 /**
  * WireframeSection Component
- * Educational Note: Self-contained section for wireframe generation.
+ * Self-contained section for wireframe generation.
  */
 
 import React, { useEffect, useCallback } from 'react';

@@ -15,7 +15,7 @@ import { projectsAPI } from '@/lib/api';
 
 /**
  * CreateProjectDialog Component
- * Educational Note: This component handles project creation and editing.
+ * This component handles project creation and editing.
  * It demonstrates controlled components (form inputs bound to state)
  * and form submission handling.
  */

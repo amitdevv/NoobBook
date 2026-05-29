@@ -1,6 +1,6 @@
 /**
  * AdViewerModal Component
- * Educational Note: Modal for viewing and downloading ad creatives.
+ * Modal for viewing and downloading ad creatives.
  * Clicking a thumbnail opens it in a full-size lightbox where the user
  * can decide whether to download.
  */

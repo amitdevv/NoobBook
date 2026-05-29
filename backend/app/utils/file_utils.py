@@ -1,7 +1,7 @@
 """
 File Utilities - Validation and metadata for file uploads.
 
-Educational Note: These utilities handle file type validation and metadata
+These utilities handle file type validation and metadata
 extraction. They are stateless functions that can be used across services.
 """
 
@@ -73,7 +73,7 @@ def is_allowed_file(filename: str) -> bool:
     """
     Check if a file extension is allowed.
 
-    Educational Note: We validate file extensions for security
+    We validate file extensions for security
     and to ensure we can process the file type.
 
     Args:
@@ -131,7 +131,7 @@ def validate_file_size(filename: str, file_size: int) -> Optional[str]:
     """
     Validate file size based on file type.
 
-    Educational Note: All uploads share a single 1GB ceiling. Individual
+    All uploads share a single 1GB ceiling. Individual
     types may still fail at downstream processing (e.g. Claude vision has
     its own per-image limit), but the upload itself is accepted.
 

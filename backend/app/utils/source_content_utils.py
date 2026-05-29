@@ -4,7 +4,7 @@ Source Content Utilities - Shared functions for loading source content.
 Used by multiple agents (blog, website, etc.) to get source content
 with smart sampling for large sources.
 
-Educational Note: Content is loaded from Supabase Storage (processed files
+Content is loaded from Supabase Storage (processed files
 and chunks), not from local disk. All writes already go to Supabase;
 this module switches the read path to match.
 """

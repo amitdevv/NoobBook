@@ -1,7 +1,7 @@
 """
 Google Auth Service - Handle Google OAuth 2.0 authentication flow.
 
-Educational Note: This service manages the OAuth 2.0 flow for Google APIs:
+This service manages the OAuth 2.0 flow for Google APIs:
 1. Generate authorization URL (user visits to grant access)
 2. Exchange authorization code for access/refresh tokens
 3. Refresh access tokens when they expire (access tokens last ~1 hour)
@@ -53,7 +53,7 @@ class GoogleAuthService:
     """
     Service class for Google OAuth 2.0 authentication.
 
-    Educational Note: This service handles the complete OAuth lifecycle:
+    This service handles the complete OAuth lifecycle:
     - Generating auth URLs with appropriate scopes
     - Exchanging auth codes for tokens
     - Refreshing expired tokens
@@ -61,7 +61,7 @@ class GoogleAuthService:
     """
 
     # OAuth scopes we need for Google Drive
-    # Educational Note: Scopes define what access we're requesting
+    # Scopes define what access we're requesting
     # - drive.readonly: Read files from Drive
     SCOPES = [
         'https://www.googleapis.com/auth/drive.readonly',
@@ -114,7 +114,7 @@ class GoogleAuthService:
         """
         Get OAuth client configuration from environment.
 
-        Educational Note: We build the client config dict that google-auth
+        We build the client config dict that google-auth
         expects from our environment variables. This avoids needing a
         client_secrets.json file.
 
@@ -141,7 +141,7 @@ class GoogleAuthService:
         """
         Get the default user ID for single-user mode.
 
-        Educational Note: In single-user mode (using service key), we don't have
+        In single-user mode (using service key), we don't have
         a logged-in user context. We use the first user in the database as the
         default. For multi-user mode with proper auth, the user_id should be
         passed explicitly from the authenticated session.
@@ -171,7 +171,7 @@ class GoogleAuthService:
         """
         Check if we have valid Google credentials for a user.
 
-        Educational Note: This checks if:
+        This checks if:
         1. User has tokens stored in Supabase
         2. Tokens are valid or can be refreshed
 
@@ -193,7 +193,7 @@ class GoogleAuthService:
         """
         Generate the Google OAuth authorization URL.
 
-        Educational Note: This URL is where users are redirected to grant
+        This URL is where users are redirected to grant
         permission. It includes:
         - client_id: Identifies our app
         - scope: What access we're requesting
@@ -249,7 +249,7 @@ class GoogleAuthService:
         """
         Handle the OAuth callback and exchange code for tokens.
 
-        Educational Note: After user grants permission, Google redirects
+        After user grants permission, Google redirects
         to our callback with an authorization code. We exchange this code
         for access and refresh tokens, then store them in Supabase.
 
@@ -297,7 +297,7 @@ class GoogleAuthService:
         """
         Disconnect Google account by removing stored tokens.
 
-        Educational Note: We don't revoke the tokens (which would require
+        We don't revoke the tokens (which would require
         an API call), we just delete them from Supabase. User can revoke
         access from their Google account settings if desired.
 
@@ -325,7 +325,7 @@ class GoogleAuthService:
         """
         Get valid credentials, refreshing if necessary.
 
-        Educational Note: This is the main method other services should use
+        This is the main method other services should use
         to get credentials for API calls. It handles:
         1. Loading saved credentials from Supabase
         2. Checking if they're expired
@@ -400,7 +400,7 @@ class GoogleAuthService:
         """
         Save credentials to Supabase for a user.
 
-        Educational Note: We only store user-specific tokens (access token,
+        We only store user-specific tokens (access token,
         refresh token, scopes). App credentials (client_id, client_secret)
         are NOT stored in the database for security - they come from env vars.
 
@@ -434,7 +434,7 @@ class GoogleAuthService:
         """
         Get the email of the authenticated user.
 
-        Educational Note: We use Drive API's "about" endpoint to get user info.
+        We use Drive API's "about" endpoint to get user info.
         This works with our drive.readonly scope (unlike oauth2 userinfo which
         requires a separate userinfo.email scope).
 

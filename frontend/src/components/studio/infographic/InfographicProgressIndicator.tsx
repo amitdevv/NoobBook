@@ -1,6 +1,6 @@
 /**
  * InfographicProgressIndicator Component
- * Educational Note: Shows real-time progress during infographic generation.
+ * Shows real-time progress during infographic generation.
  * Amber theme distinguishes from other studio items.
  */
 

@@ -1,6 +1,6 @@
 /**
  * FlowDiagramViewer Component
- * Educational Note: Renders Mermaid diagrams with interactive pan/zoom features.
+ * Renders Mermaid diagrams with interactive pan/zoom features.
  * Uses the Mermaid.js library to parse and render diagram syntax.
  *
  * Features:
@@ -222,7 +222,7 @@ export const FlowDiagramViewer: React.FC<FlowDiagramViewerProps> = ({
   };
 
   // Download as SVG
-  // Educational Note: Mermaid with htmlLabels:true embeds HTML inside <foreignObject>.
+  // Mermaid with htmlLabels:true embeds HTML inside <foreignObject>.
   // HTML tags like <br>, <hr>, <img> are not self-closing in HTML5 but must be
   // self-closing in XML/SVG (e.g., <br/>, <hr/>, <img/>). We sanitize before download.
   const handleDownload = () => {

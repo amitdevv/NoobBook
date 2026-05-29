@@ -1,7 +1,7 @@
 """
 Studio Processing - Processing services for studio content generation.
 
-Educational Note: This subfolder will contain services that handle the
+This subfolder will contain services that handle the
 processing pipeline for studio features like audio generation, transcript
 creation, and content synthesis.
 

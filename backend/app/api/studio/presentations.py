@@ -1,7 +1,7 @@
 """
 Presentation Generator endpoints - AI-generated PowerPoint presentations.
 
-Educational Note: Presentation generation demonstrates HTML-to-PPTX workflow:
+Presentation generation demonstrates HTML-to-PPTX workflow:
 1. presentation_agent generates HTML slides with Tailwind CSS
 2. Playwright captures screenshots at 1920x1080
 3. python-pptx stitches screenshots into a PPTX file
@@ -238,7 +238,7 @@ def get_presentation_screenshot(project_id: str, job_id: str, filename: str):
     """
     Serve a screenshot image file (PNG).
 
-    Educational Note: Screenshots are captured by Playwright at 1920x1080
+    Screenshots are captured by Playwright at 1920x1080
     and used to create the PPTX. They provide a reliable preview.
     """
     try:

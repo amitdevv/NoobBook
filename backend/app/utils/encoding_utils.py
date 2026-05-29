@@ -1,7 +1,7 @@
 """
 Encoding Utilities - Base64 encoding for files.
 
-Educational Note: Claude's API requires binary files (PDFs, images) to be
+Claude's API requires binary files (PDFs, images) to be
 sent as base64-encoded strings. This utility handles the encoding process
 for different file types.
 
@@ -19,7 +19,7 @@ def encode_file_to_base64(file_path: Union[str, Path]) -> str:
     """
     Encode a file to base64 string.
 
-    Educational Note: This is the standard way to prepare binary files
+    This is the standard way to prepare binary files
     (PDFs, images) for Claude's API. The file is read in binary mode
     and converted to a base64 string.
 
@@ -49,7 +49,7 @@ def encode_bytes_to_base64(data: bytes) -> str:
     """
     Encode bytes to base64 string.
 
-    Educational Note: Use this when you already have the file
+    Use this when you already have the file
     contents in memory (e.g., from a file upload).
 
     Args:
@@ -65,7 +65,7 @@ def get_media_type(file_path: Union[str, Path]) -> str:
     """
     Get the MIME type for a file based on extension.
 
-    Educational Note: Claude needs to know the file type to process it
+    Claude needs to know the file type to process it
     correctly. We map common extensions to their MIME types.
 
     Args:
@@ -93,7 +93,7 @@ def is_supported_for_encoding(file_path: Union[str, Path]) -> bool:
     """
     Check if a file type is supported for base64 encoding to Claude.
 
-    Educational Note: Only certain file types can be sent to Claude
+    Only certain file types can be sent to Claude
     as base64-encoded content blocks. PDFs and images are supported.
 
     Args:

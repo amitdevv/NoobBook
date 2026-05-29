@@ -1,7 +1,7 @@
 """
 Email Template endpoints - AI-generated HTML email templates.
 
-Educational Note: Email templates demonstrate agent-based generation:
+Email templates demonstrate agent-based generation:
 1. email_agent_executor orchestrates the generation
 2. Claude creates HTML structure and content
 3. Gemini generates header/banner images
@@ -259,7 +259,7 @@ def preview_email_template(project_id: str, job_id: str):
     """
     Serve email template HTML for preview (iframe).
 
-    Educational Note: The iframe can't send Authorization headers for <img> tags
+    The iframe can't send Authorization headers for <img> tags
     inside the HTML. We inject ?token= into image src URLs so the browser passes
     the JWT when fetching images. This rewriting only affects the preview — the
     original HTML on disk stays clean for download/export.

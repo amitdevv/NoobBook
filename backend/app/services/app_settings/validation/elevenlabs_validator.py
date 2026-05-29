@@ -1,7 +1,7 @@
 """
 ElevenLabs API key validator.
 
-Educational Note: ElevenLabs has two key formats:
+ElevenLabs has two key formats:
 - Legacy keys: long hex strings, have broad permissions
 - Scoped keys (sk_ prefix): per-permission grants
 

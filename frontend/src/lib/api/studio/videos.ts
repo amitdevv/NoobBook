@@ -1,6 +1,6 @@
 /**
  * Videos API
- * Educational Note: Handles AI-generated videos using Google Veo.
+ * Handles AI-generated videos using Google Veo.
  * Video generation can take 10-20 minutes.
  */
 
@@ -89,7 +89,7 @@ export interface ListVideoJobsResponse {
 export const videosAPI = {
   /**
    * Start video generation (background task)
-   * Educational Note: Non-blocking - returns immediately with job_id
+   * Non-blocking - returns immediately with job_id
    * Uses Claude to generate optimized video prompt, then Google Veo for video
    */
   async startGeneration(
@@ -186,7 +186,7 @@ export const videosAPI = {
 
   /**
    * Poll video job status until complete or error
-   * Educational Note: Video generation can take 10-20 minutes with Google Veo
+   * Video generation can take 10-20 minutes with Google Veo
    */
   async pollJobStatus(
     projectId: string,

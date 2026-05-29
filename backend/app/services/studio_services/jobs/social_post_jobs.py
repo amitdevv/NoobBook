@@ -1,7 +1,7 @@
 """
 Social Post Job Management - Tracks social media post generation jobs.
 
-Educational Note: Social post jobs use AI to generate platform-specific
+Social post jobs use AI to generate platform-specific
 content (Twitter, LinkedIn, etc.) from source materials.
 """
 from datetime import datetime

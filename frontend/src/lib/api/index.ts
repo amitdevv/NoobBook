@@ -1,6 +1,6 @@
 /**
  * API Module - Central exports for all API services
- * Educational Note: This file provides a single import point for all API functionality.
+ * This file provides a single import point for all API functionality.
  *
  * Import patterns:
  *   import { api, projectsAPI } from '@/lib/api';

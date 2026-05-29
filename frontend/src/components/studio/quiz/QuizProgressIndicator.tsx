@@ -1,6 +1,6 @@
 /**
  * QuizProgressIndicator Component
- * Educational Note: Shows real-time progress during quiz generation.
+ * Shows real-time progress during quiz generation.
  * Orange theme distinguishes quizzes from other studio items.
  */
 

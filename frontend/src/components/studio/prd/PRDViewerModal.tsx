@@ -1,6 +1,6 @@
 /**
  * PRDViewerModal Component
- * Educational Note: Modal for viewing PRD markdown content.
+ * Modal for viewing PRD markdown content.
  * Renders markdown with proper styling for tables, lists, headings.
  */
 

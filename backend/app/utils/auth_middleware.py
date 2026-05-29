@@ -1,7 +1,7 @@
 """
 Auth Middleware - JWT validation for protected routes.
 
-Educational Note: This middleware validates JWT tokens issued by Supabase Auth.
+This middleware validates JWT tokens issued by Supabase Auth.
 We keep using the SERVICE_KEY Supabase client for database queries (bypasses RLS),
 but validate the user's JWT to extract their user_id. This is simpler than
 switching to ANON_KEY and lets the backend act as a trusted server.
@@ -130,7 +130,7 @@ def validate_token() -> Optional[str]:
     Returns:
         User ID string on success, None on failure
 
-    Educational Note: We call supabase.auth.get_user(jwt) which contacts
+    We call supabase.auth.get_user(jwt) which contacts
     the Supabase Auth server to verify the token signature and expiration.
     The SERVICE_KEY client has permission to validate any user's token.
 

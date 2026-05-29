@@ -1,6 +1,6 @@
 /**
  * useMindMapGeneration Hook
- * Educational Note: Manages mind map generation from sources.
+ * Manages mind map generation from sources.
  * Creates hierarchical node structures for visualization.
  * Supports iterative editing of existing mind maps.
  */

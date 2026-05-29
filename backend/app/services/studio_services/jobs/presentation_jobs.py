@@ -1,7 +1,7 @@
 """
 Presentation Job Management - Tracks presentation generation jobs.
 
-Educational Note: Presentations are generated as HTML slides that are
+Presentations are generated as HTML slides that are
 screenshotted at 1920x1080 and exported to PPTX format using python-pptx.
 """
 from datetime import datetime

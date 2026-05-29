@@ -1,7 +1,7 @@
 """
 Audio Processor - Handles audio file processing.
 
-Educational Note: Audio files are transcribed using ElevenLabs' Scribe v1
+Audio files are transcribed using ElevenLabs' Scribe v1
 model, which provides high-accuracy transcription with optional speaker
 diarization and audio event detection.
 
@@ -134,7 +134,7 @@ def _process_embeddings(
     """
     Process embeddings for a source using embedding_service.
 
-    Educational Note: We ALWAYS chunk and embed every source for consistent
+    We ALWAYS chunk and embed every source for consistent
     retrieval. The token count is used for chunk sizing decisions.
     Chunks are uploaded to Supabase Storage.
     """

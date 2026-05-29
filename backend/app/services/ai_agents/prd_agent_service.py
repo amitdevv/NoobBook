@@ -18,7 +18,7 @@ from app.services.integrations.claude import claude_service
 from app.config import prompt_loader, tool_loader
 from app.utils import claude_parsing_utils
 from app.utils.source_content_utils import get_source_content
-from app.services.data_services import message_service
+from app.services.data_services import agent_execution_service
 from app.services.studio_services import studio_index_service
 from app.services.tool_executors.prd_tool_executor import prd_tool_executor
 
@@ -220,7 +220,7 @@ class PRDAgentService:
         source_id: Optional[str]
     ) -> None:
         """Save execution log for debugging."""
-        message_service.save_agent_execution(
+        agent_execution_service.save_agent_execution(
             project_id=project_id,
             agent_name=self.AGENT_NAME,
             execution_id=execution_id,

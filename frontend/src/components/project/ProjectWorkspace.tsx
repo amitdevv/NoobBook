@@ -15,7 +15,7 @@ import {
 
 /**
  * ProjectWorkspace Component
- * Educational Note: This is the main workspace view for a project, inspired by NotebookLM.
+ * This is the main workspace view for a project, inspired by NotebookLM.
  *
  * Layout Structure:
  * - Background layer: Contains header and footer disclaimer
@@ -67,14 +67,14 @@ export const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   }, []);
 
   // Studio signals state - receives signals from ChatPanel, passes to StudioPanel
-  // Educational Note: Signals are chat-scoped and activate studio generation options
+  // Signals are chat-scoped and activate studio generation options
   const [studioSignals, setStudioSignals] = useState<StudioSignal[]>([]);
   const handleSignalsChange = useCallback((signals: StudioSignal[]) => {
     setStudioSignals(signals);
   }, []);
 
   // Per-chat source selection state
-  // Educational Note: Each chat maintains its own selected sources independently.
+  // Each chat maintains its own selected sources independently.
   // activeChatId tracks which chat is open; selectedSourceIds tracks that chat's selections.
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);

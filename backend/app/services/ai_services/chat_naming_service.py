@@ -1,7 +1,7 @@
 """
 Chat Naming Service - Generate concise chat titles using AI.
 
-Educational Note: This service generates short, descriptive titles for chats
+This service generates short, descriptive titles for chats
 based on the first user message. It uses Claude Haiku for fast, cost-effective
 naming (~$0.001 per title).
 
@@ -24,7 +24,7 @@ class ChatNamingService:
     """
     Service for generating chat titles using AI.
 
-    Educational Note: Uses Haiku model for speed and cost efficiency.
+    Uses Haiku model for speed and cost efficiency.
     The title should be concise (1-5 words) and capture the essence
     of what the user is asking about.
 
@@ -40,7 +40,7 @@ class ChatNamingService:
         """
         Load and cache the prompt config.
 
-        Educational Note: We cache the config to avoid reading
+        We cache the config to avoid reading
         the file on every title generation request.
         """
         if self._prompt_config is None:
@@ -53,7 +53,7 @@ class ChatNamingService:
         """
         Generate a chat title based on the first user message.
 
-        Educational Note: Uses prompt config from chat_naming_prompt.json
+        Uses prompt config from chat_naming_prompt.json
         for model, max_tokens, temperature, and system_prompt settings.
 
         Args:

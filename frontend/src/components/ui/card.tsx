@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 
 /**
  * Card components from shadcn/ui
- * Educational Note: These components compose together to create
+ * These components compose together to create
  * consistent card layouts. Using forwardRef allows parent components
  * to access the underlying DOM elements when needed.
  */

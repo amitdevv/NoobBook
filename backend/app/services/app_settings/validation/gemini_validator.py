@@ -1,7 +1,7 @@
 """
 Gemini 2.5 API key validator.
 
-Educational Note: Validates Gemini API keys by making a minimal
+Validates Gemini API keys by making a minimal
 text generation request to test if the key is valid.
 """
 import logging
@@ -15,7 +15,7 @@ def validate_gemini_2_5_key(api_key: str) -> Tuple[bool, str]:
     """
     Validate Gemini 2.5 API key by making a test text generation request.
 
-    Educational Note: This tests if the API key is valid and enabled for
+    This tests if the API key is valid and enabled for
     Gemini 2.5 (text generation) model.
 
     Args:

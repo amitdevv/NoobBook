@@ -1,6 +1,6 @@
 /**
  * ChatMessages Component
- * Educational Note: Displays the conversation message list with user and AI messages.
+ * Displays the conversation message list with user and AI messages.
  * - User messages: Right-aligned, simple styling
  * - AI messages: Left-aligned with markdown rendering and citation support
  * - Citations appear as hoverable badges that show source content
@@ -128,7 +128,7 @@ interface ChatMessagesProps {
 
 /**
  * Shared markdown component configurations
- * Educational Note: These define how different markdown elements are rendered.
+ * These define how different markdown elements are rendered.
  * Extracted as a constant to be reused across text segments.
  * Using 'as const' and explicit any typing for react-markdown compatibility.
  */
@@ -249,7 +249,7 @@ const markdownComponents: Record<string, React.FC<any>> = {
 
 /**
  * User Message Component
- * Educational Note: Right-aligned bubble style for user messages.
+ * Right-aligned bubble style for user messages.
  * Content is either a plain string (legacy / no-attachment) or a list of
  * typed blocks `[{type:"image", url, ...}, {type:"text", text}]` when the
  * user pasted/dropped images. Image blocks render as thumbnails above
@@ -308,7 +308,7 @@ const UserMessage: React.FC<{ content: string | UserMessageBlock[] }> = ({ conte
 
 /**
  * AI Message Component
- * Educational Note: Left-aligned with full markdown rendering support.
+ * Left-aligned with full markdown rendering support.
  * Now handles citations with [[cite:CHUNK_ID]] format.
  * Chunk ID format: {source_id}_page_{page}_chunk_{n}
  *
@@ -325,7 +325,7 @@ interface AIMessageProps {
 
 /**
  * Message Action Buttons Component
- * Educational Note: Copy and Download buttons for AI messages,
+ * Copy and Download buttons for AI messages,
  * similar to ChatGPT/Gemini UX pattern.
  */
 interface MessageActionsProps {
@@ -337,7 +337,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({ content }) => {
 
   /**
    * Copy message content to clipboard
-   * Educational Note: Uses modern Clipboard API with visual feedback
+   * Uses modern Clipboard API with visual feedback
    */
   const handleCopy = async () => {
     // Strip citation markers ([[cite:...]]) so the copied text reads cleanly
@@ -355,7 +355,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({ content }) => {
 
   /**
    * Download message as markdown file
-   * Educational Note: Creates a blob and triggers download
+   * Creates a blob and triggers download
    */
   const handleDownload = () => {
     // Remove citation markers for cleaner downloaded text
@@ -438,7 +438,7 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, projectId, studioAssetRe
 
     // Replace image markers with markdown images
     // [[image:FILENAME]] -> ![Chart](URL)
-    // Educational Note: AI agents generate charts/plots saved to ai_outputs/images
+    // AI agents generate charts/plots saved to ai_outputs/images
     processed = processed.replace(
       /\[\[image:([^\]]+)\]\]/g,
       (_match, filename) => {
@@ -667,7 +667,7 @@ const ReadingIndicator: React.FC<{ progressMessage?: string }> = ({ progressMess
 
 /**
  * ChatMessages Component - Memoized to prevent re-renders on parent state changes
- * Educational Note: Without React.memo, every keystroke in ChatInput would
+ * Without React.memo, every keystroke in ChatInput would
  * re-render this entire component (expensive markdown parsing). Memoization
  * ensures it only re-renders when messages, sending, or projectId actually change.
  */

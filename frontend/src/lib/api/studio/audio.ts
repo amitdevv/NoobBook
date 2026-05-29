@@ -1,6 +1,6 @@
 /**
  * Audio Overview API
- * Educational Note: Handles audio overview generation using ElevenLabs TTS.
+ * Handles audio overview generation using ElevenLabs TTS.
  * Non-blocking pattern - returns job_id for polling.
  */
 
@@ -92,7 +92,7 @@ export interface TTSStatusResponse {
 export const audioAPI = {
   /**
    * Start audio overview generation or edit
-   * Educational Note: Non-blocking - returns immediately with job_id
+   * Non-blocking - returns immediately with job_id
    */
   async startGeneration(
     projectId: string,
@@ -170,7 +170,7 @@ export const audioAPI = {
 
   /**
    * Poll job status until complete or error
-   * Educational Note: Uses polling with exponential backoff
+   * Uses polling with exponential backoff
    */
   async pollJobStatus(
     projectId: string,

@@ -1,7 +1,7 @@
 """
 Notion Upload Handler - Create a NOTION source for a project.
 
-Educational Note: Notion sources work like Google Drive imports — the user
+Notion sources work like Google Drive imports — the user
 picks a specific Notion page or database in the browse-and-pick UI, and we
 create a per-project source that resolves to that ID. The .notion stub holds
 the picked ID + object_type; the processor fetches live content during

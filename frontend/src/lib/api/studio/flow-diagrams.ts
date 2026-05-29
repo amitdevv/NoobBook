@@ -1,6 +1,6 @@
 /**
  * Flow Diagrams API
- * Educational Note: Handles AI-generated Mermaid diagrams for visualizing
+ * Handles AI-generated Mermaid diagrams for visualizing
  * processes, workflows, relationships, and more.
  */
 
@@ -144,7 +144,7 @@ export const flowDiagramsAPI = {
   /**
    * Poll flow diagram job status until complete or error
    *
-   * Educational Note: Includes initial retry tolerance to handle timing
+   * Includes initial retry tolerance to handle timing
    * between job creation and first poll availability.
    */
   async pollJobStatus(

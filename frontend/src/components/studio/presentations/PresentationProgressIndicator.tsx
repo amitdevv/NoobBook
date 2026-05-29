@@ -1,6 +1,6 @@
 /**
  * PresentationProgressIndicator Component
- * Educational Note: Shows real-time progress during presentation generation.
+ * Shows real-time progress during presentation generation.
  * Amber theme distinguishes from other studio items.
  */
 

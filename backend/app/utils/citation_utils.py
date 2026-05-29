@@ -1,7 +1,7 @@
 """
 Citation Utilities - Extract content from chunks for citations.
 
-Educational Note: Citations use chunk_ids to reference specific content.
+Citations use chunk_ids to reference specific content.
 Format: [[cite:CHUNK_ID]] where chunk_id = {source_id}_page_{page}_chunk_{n}
 
 When Claude cites a source with [[cite:chunk_id]], the frontend fetches
@@ -25,7 +25,7 @@ def parse_chunk_id(chunk_id: str) -> Optional[Dict[str, Any]]:
     """
     Parse a chunk_id into its components.
 
-    Educational Note: chunk_id format is {source_id}_page_{page}_chunk_{n}
+    chunk_id format is {source_id}_page_{page}_chunk_{n}
     Example: abc123-def456_page_5_chunk_2
 
     Args:
@@ -56,7 +56,7 @@ def get_chunk_content(
     """
     Get content for a chunk by its chunk_id.
 
-    Educational Note: This is the main function used by the frontend to
+    This is the main function used by the frontend to
     fetch citation content. It downloads the chunk from Supabase Storage
     and returns the text along with metadata for display.
 
@@ -113,7 +113,7 @@ def get_multiple_chunks(
     """
     Get content for multiple chunks at once.
 
-    Educational Note: When a response has multiple citations, the frontend
+    When a response has multiple citations, the frontend
     can batch-fetch all chunk contents in one call for efficiency.
 
     Args:
@@ -137,7 +137,7 @@ def extract_citations_from_text(text: str) -> List[str]:
     """
     Extract all chunk_ids from citation markers in text.
 
-    Educational Note: Claude's responses contain citations in format
+    Claude's responses contain citations in format
     [[cite:chunk_id]]. This function extracts all chunk_ids so the
     frontend can fetch their content.
 
@@ -169,7 +169,7 @@ def get_citations_with_content(
     """
     Extract citations from text and fetch their content.
 
-    Educational Note: Convenience function that combines extraction and
+    Convenience function that combines extraction and
     fetching. Returns a dict mapping chunk_id -> content for easy lookup.
 
     Args:

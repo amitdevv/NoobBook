@@ -1,7 +1,7 @@
 """
 Email Agent Executor - Handles studio signal execution for email templates.
 
-Educational Note: This executor is triggered by studio signals (from main chat)
+This executor is triggered by studio signals (from main chat)
 and launches the email agent as a background task. Unlike web_agent_executor,
 this doesn't handle individual tool calls - those are handled inside
 email_agent_service itself.
@@ -19,7 +19,7 @@ class EmailAgentExecutor:
     """
     Executor for email template generation via studio signals.
 
-    Educational Note: The studio signal flow:
+    The studio signal flow:
     1. User chats with AI about sources
     2. AI decides to activate studio (sends studio_signal tool call)
     3. studio_signal_executor routes to this executor

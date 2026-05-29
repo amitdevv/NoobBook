@@ -1,6 +1,6 @@
 /**
  * FlowDiagramViewerModal Component
- * Educational Note: Full-screen modal for viewing generated Mermaid diagrams.
+ * Full-screen modal for viewing generated Mermaid diagrams.
  * Maximizes viewing area for large diagrams with pan/zoom support.
  * Supports iterative editing via an edit input bar.
  */

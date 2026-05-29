@@ -1,7 +1,7 @@
 """
 Processing settings endpoints - API tier configuration.
 
-Educational Note: API providers have rate limits that vary by subscription tier.
+API providers have rate limits that vary by subscription tier.
 This module lets users configure their tier so the app can optimize:
 
 1. Parallel Processing:
@@ -53,7 +53,7 @@ def get_processing_settings():
     """
     Get processing settings including Anthropic tier configuration.
 
-    Educational Note: Returns current tier and all available tiers so
+    Returns current tier and all available tiers so
     the UI can show a tier selector with descriptions of each level.
 
     Returns:
@@ -105,7 +105,7 @@ def update_processing_settings():
     """
     Update processing settings.
 
-    Educational Note: Saves the selected tier to .env file. The tier
+    Saves the selected tier to .env file. The tier
     affects how parallel processing operates - higher tier = more
     concurrent API calls allowed.
 

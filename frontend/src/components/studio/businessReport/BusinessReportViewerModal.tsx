@@ -1,6 +1,6 @@
 /**
  * BusinessReportViewerModal Component
- * Educational Note: Modal for viewing business report markdown content with charts.
+ * Modal for viewing business report markdown content with charts.
  * Renders markdown with proper styling for headings, charts, tables, and data visualizations.
  */
 

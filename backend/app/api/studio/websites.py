@@ -1,7 +1,7 @@
 """
 Website Generator endpoints - AI-generated multi-page websites.
 
-Educational Note: Website generation demonstrates complex agent workflows:
+Website generation demonstrates complex agent workflows:
 1. website_agent_executor orchestrates the entire process
 2. Claude generates HTML, CSS, and JavaScript
 3. Gemini generates images for the site
@@ -249,7 +249,7 @@ def get_website_file(project_id: str, job_id: str, filename: str):
             return jsonify({'success': False, 'error': 'File not found'}), 404
 
         # For CSS files, inject auth token into url() references so images load.
-        # Educational Note: CSS url() references (e.g. background-image) trigger
+        # CSS url() references (e.g. background-image) trigger
         # separate browser requests that don't carry the parent page's query params.
         token = request.args.get('token', '')
         if mime_type == 'text/css' and token:
@@ -281,7 +281,7 @@ def preview_website(project_id: str, job_id: str):
     """
     Preview website by serving index.html with auth tokens injected.
 
-    Educational Note: The iframe can't pass Authorization headers for sub-resource
+    The iframe can't pass Authorization headers for sub-resource
     requests (CSS, JS, images). We inject ?token= into local resource URLs in the
     HTML so the browser passes the JWT when fetching these files. The original
     files on disk stay clean for download/export.

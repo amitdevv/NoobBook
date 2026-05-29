@@ -1,6 +1,6 @@
 /**
  * PRDSection Component
- * Educational Note: Self-contained section for PRD (Product Requirements Document) generation.
+ * Self-contained section for PRD (Product Requirements Document) generation.
  */
 
 import React, { useEffect, useCallback } from 'react';

@@ -1,6 +1,6 @@
 /**
  * Studio Types
- * Educational Note: Centralized type definitions for Studio panel.
+ * Centralized type definitions for Studio panel.
  * Studio items are activated by signals from the main chat based on context.
  */
 
@@ -56,7 +56,7 @@ export type StudioItemId =
 
 /**
  * Studio signal from backend - sent by main chat AI
- * Educational Note: These signals activate studio items contextually.
+ * These signals activate studio items contextually.
  * Multiple signals can exist for the same studio_item (different topics).
  */
 export interface StudioSignal {
@@ -83,7 +83,7 @@ export interface GenerationOption {
 
 /**
  * All available generation options
- * Educational Note: Organized by category - Learning, Business, Content
+ * Organized by category - Learning, Business, Content
  */
 export const generationOptions: GenerationOption[] = [
   // LEARNING

@@ -1,6 +1,6 @@
 /**
  * DriveItem Component
- * Educational Note: Reusable row component for displaying a Google Drive file or folder.
+ * Reusable row component for displaying a Google Drive file or folder.
  * Shows icon, name, metadata (type, size), and handles click events.
  */
 

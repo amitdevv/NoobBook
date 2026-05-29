@@ -1,6 +1,6 @@
 /**
  * ResearchTab Component
- * Educational Note: Handles adding sources via deep research.
+ * Handles adding sources via deep research.
  * User provides a topic, description, and optional links.
  * The system researches and generates a comprehensive source document.
  */

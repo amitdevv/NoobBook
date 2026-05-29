@@ -1,7 +1,7 @@
 /**
  * Brand API Service
  *
- * Educational Note: This module handles all brand-related API calls including
+ * This module handles all brand-related API calls including
  * asset management (logos, icons, fonts, images) and configuration (colors,
  * typography, guidelines, voice, feature settings).
  *
@@ -16,7 +16,7 @@ import { api } from './client';
 
 /**
  * Brand Asset Types
- * Educational Note: Assets are the visual components of a brand kit.
+ * Assets are the visual components of a brand kit.
  */
 export type BrandAssetType = 'logo' | 'icon' | 'font' | 'image';
 
@@ -38,7 +38,7 @@ export interface BrandAsset {
 
 /**
  * Custom Color Entry
- * Educational Note: Allows brands to define additional colors beyond the standard palette.
+ * Allows brands to define additional colors beyond the standard palette.
  */
 export interface CustomColor {
   name: string;
@@ -47,7 +47,7 @@ export interface CustomColor {
 
 /**
  * Color Palette Configuration
- * Educational Note: Defines the core colors used across brand materials.
+ * Defines the core colors used across brand materials.
  */
 export interface ColorEnabled {
   primary: boolean;
@@ -69,13 +69,13 @@ export interface ColorPalette {
 
 /**
  * Font Weight Options
- * Educational Note: Standard CSS font weight values.
+ * Standard CSS font weight values.
  */
 export type FontWeight = '300' | '400' | '500' | '600' | '700' | '800';
 
 /**
  * Typography Configuration
- * Educational Note: Defines font families, weights, and sizing for consistent text styling.
+ * Defines font families, weights, and sizing for consistent text styling.
  */
 export interface Typography {
   heading_font: string;
@@ -96,7 +96,7 @@ export interface Typography {
 
 /**
  * Popular Font Options
- * Educational Note: Curated list of web-safe and Google Fonts for brand typography.
+ * Curated list of web-safe and Google Fonts for brand typography.
  */
 export const POPULAR_FONTS = [
   // Sans-Serif (Modern, Clean)
@@ -143,7 +143,7 @@ export const FONT_WEIGHTS = [
 
 /**
  * Spacing Configuration
- * Educational Note: Defines spacing values for consistent layouts.
+ * Defines spacing values for consistent layouts.
  */
 export interface Spacing {
   base: string;
@@ -154,7 +154,7 @@ export interface Spacing {
 
 /**
  * Best Practices Configuration
- * Educational Note: Dos and don'ts guide the AI on brand-appropriate content.
+ * Dos and don'ts guide the AI on brand-appropriate content.
  */
 export interface BestPractices {
   dos: string[];
@@ -163,7 +163,7 @@ export interface BestPractices {
 
 /**
  * Brand Voice Configuration
- * Educational Note: Defines how the brand "sounds" in communications.
+ * Defines how the brand "sounds" in communications.
  */
 export interface BrandVoice {
   tone: string;
@@ -173,7 +173,7 @@ export interface BrandVoice {
 
 /**
  * Feature Settings
- * Educational Note: Controls which studio features should apply brand guidelines.
+ * Controls which studio features should apply brand guidelines.
  */
 export interface FeatureSettings {
   chat: boolean;
@@ -191,7 +191,7 @@ export interface FeatureSettings {
 
 /**
  * Full Brand Configuration
- * Educational Note: Complete brand settings stored per user (workspace-level).
+ * Complete brand settings stored per user (workspace-level).
  */
 export interface BrandConfig {
   id: string;
@@ -282,7 +282,7 @@ export const brandAPI = {
    * Upload a new brand asset
    * @param formData - FormData with file and metadata
    *
-   * Educational Note: We use FormData for file uploads (multipart/form-data)
+   * We use FormData for file uploads (multipart/form-data)
    * instead of JSON. The FormData should include:
    * - file: The actual file
    * - name: Display name
@@ -327,7 +327,7 @@ export const brandAPI = {
 
   /**
    * Get the brand configuration for the authenticated user
-   * Educational Note: Creates default config if none exists
+   * Creates default config if none exists
    */
   getConfig: () =>
     api.get<ConfigResponse>('/brand/config'),
@@ -405,7 +405,7 @@ export const brandAPI = {
 
 /**
  * Create a FormData object for asset upload
- * Educational Note: Helper to simplify the upload process
+ * Helper to simplify the upload process
  */
 export function createAssetFormData(
   file: File,

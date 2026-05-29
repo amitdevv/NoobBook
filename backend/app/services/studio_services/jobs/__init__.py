@@ -1,7 +1,7 @@
 """
 Studio Jobs Package - Individual job management modules.
 
-Educational Note: Each job type (audio, video, presentation, etc.) has its own
+Each job type (audio, video, presentation, etc.) has its own
 module for better organization and maintainability. All modules import the core
 load_index/save_index functions from the parent studio_index_service.
 

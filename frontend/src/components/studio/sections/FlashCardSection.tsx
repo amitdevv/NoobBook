@@ -1,6 +1,6 @@
 /**
  * FlashCardSection Component
- * Educational Note: Self-contained section for flash card generation.
+ * Self-contained section for flash card generation.
  */
 
 import React, { useEffect, useCallback } from 'react';

@@ -1,6 +1,6 @@
 /**
  * BrandAssetUploader Component
- * Educational Note: File upload component for brand assets with drag-and-drop support.
+ * File upload component for brand assets with drag-and-drop support.
  */
 import React, { useState, useRef, useCallback } from 'react';
 import { Button } from '../ui/button';

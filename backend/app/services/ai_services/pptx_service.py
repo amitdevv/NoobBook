@@ -1,7 +1,7 @@
 """
 PPTX Service - Manages PowerPoint presentation processing using LibreOffice and Claude vision.
 
-Educational Note: This service processes PPTX files in three stages:
+This service processes PPTX files in three stages:
 1. Convert PPTX to PDF using LibreOffice headless mode (via pptx_utils)
 2. Extract PDF pages as base64 (reusing existing pdf_utils)
 3. Send to Claude vision for slide analysis
@@ -44,7 +44,7 @@ class PPTXService:
     """
     Service class for processing PowerPoint presentations.
 
-    Educational Note: This service orchestrates PPTX processing:
+    This service orchestrates PPTX processing:
     1. Converts PPTX to PDF using LibreOffice headless (via pptx_utils)
     2. Splits PDF into batches of slides (max 5 per batch)
     3. Sends each batch to Claude API for visual analysis
@@ -71,7 +71,7 @@ class PPTXService:
         """
         Extract content from a PPTX file.
 
-        Educational Note: This is the main entry point for PPTX processing.
+        This is the main entry point for PPTX processing.
         It orchestrates the full pipeline:
         1. Convert PPTX to PDF (via pptx_utils)
         2. Extract slides in batches
@@ -353,7 +353,7 @@ class PPTXService:
         """
         Parse slide extraction tool calls from Claude's response.
 
-        Educational Note: Uses claude_parsing_utils.extract_tool_inputs() for
+        Uses claude_parsing_utils.extract_tool_inputs() for
         generic tool parsing, then processes the PPTX-specific fields (slide_number,
         slide_title, text_content, visual_elements, layout_notes).
 
@@ -390,7 +390,7 @@ class PPTXService:
         """
         Build a list of slide content strings (one per slide).
 
-        Educational Note: This returns just the page content for each slide.
+        This returns just the page content for each slide.
         The page markers and header are added by build_processed_output.
 
         Args:

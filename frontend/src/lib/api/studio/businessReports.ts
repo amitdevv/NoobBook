@@ -1,6 +1,6 @@
 /**
  * Business Reports API
- * Educational Note: Handles AI-generated data-driven business reports.
+ * Handles AI-generated data-driven business reports.
  * Business reports combine written analysis with data visualizations from CSV sources.
  * Uses multi-agent orchestration (business_report_agent + csv_analyzer_agent).
  */
@@ -255,7 +255,7 @@ export const businessReportsAPI = {
 
   /**
    * Poll business report job status until complete or error
-   * Educational Note: Added initial delay to avoid race condition where
+   * Added initial delay to avoid race condition where
    * the job might not be saved to disk yet when polling starts.
    * Business reports can take longer due to multiple CSV analyses.
    */

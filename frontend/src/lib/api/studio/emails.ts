@@ -1,6 +1,6 @@
 /**
  * Email Templates API
- * Educational Note: Handles AI-generated HTML email templates with images.
+ * Handles AI-generated HTML email templates with images.
  * Uses an agentic approach for multi-step generation.
  */
 

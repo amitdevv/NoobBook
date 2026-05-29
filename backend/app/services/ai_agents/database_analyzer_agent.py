@@ -1,7 +1,7 @@
 """
 Database Analyzer Agent - AI agent for answering questions using live DB data.
 
-Educational Note: This agent is triggered by main chat via the analyze_database_agent tool.
+This agent is triggered by main chat via the analyze_database_agent tool.
 It uses tool-calling to:
 1) Inspect schema via schema_fetcher
 2) Run read-only SQL via query_runner
@@ -19,21 +19,21 @@ from typing import Any, Callable, Dict, List, Optional
 
 from app.services.integrations.claude import claude_service
 from app.config import prompt_loader, tool_loader
-from app.services.data_services import message_service
+from app.services.ai_agents.analyzer_agent_base import AnalyzerAgentBase
 from app.services.tool_executors.database_executor import DatabaseExecutor
 from app.utils import claude_parsing_utils
 
 logger = logging.getLogger(__name__)
 
 
-class DatabaseAnalyzerAgent:
+class DatabaseAnalyzerAgent(AnalyzerAgentBase):
     """
     Agent for answering questions about DATABASE sources (Postgres/MySQL) using SQL.
     """
 
     AGENT_NAME = "database_analyzer_agent"
-    MAX_ITERATIONS = 40
     TERMINATION_TOOL = "return_database_result"
+    EXECUTION_TASK_PREFIX = "Analyze DB"
 
     def __init__(self) -> None:
         self._prompt_config: Dict[str, Any] | None = None
@@ -412,26 +412,6 @@ class DatabaseAnalyzerAgent:
             "generated_at": datetime.now().isoformat(),
         }
 
-    def _save_execution(
-        self,
-        project_id: str,
-        execution_id: str,
-        query: str,
-        messages: List[Dict[str, Any]],
-        result: Dict[str, Any],
-        started_at: str,
-        source_id: str,
-    ) -> None:
-        message_service.save_agent_execution(
-            project_id=project_id,
-            agent_name=self.AGENT_NAME,
-            execution_id=execution_id,
-            task=f"Analyze DB: {query}",
-            messages=messages,
-            result=result,
-            started_at=started_at,
-            metadata={"source_id": source_id, "query": query},
-        )
 
 
 database_analyzer_agent = DatabaseAnalyzerAgent()

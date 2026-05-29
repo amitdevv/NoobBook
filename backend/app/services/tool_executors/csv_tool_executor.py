@@ -1,7 +1,7 @@
 """
 CSV Tool Executor - Handles CSV analysis operations.
 
-Educational Note: This executor provides comprehensive CSV analysis
+This executor provides comprehensive CSV analysis
 capabilities including data profiling, statistics, filtering, and
 quality assessment. Used by both the simple csv_service (for processing)
 and the csv_analyzer_agent (for detailed analysis).
@@ -27,7 +27,7 @@ class CSVToolExecutor:
     """
     Executor for CSV analysis operations.
 
-    Educational Note: Provides intelligent data type detection,
+    Provides intelligent data type detection,
     statistical analysis, and data quality assessment for CSV files.
     """
 

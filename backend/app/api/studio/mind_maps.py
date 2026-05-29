@@ -1,7 +1,7 @@
 """
 Mind Map endpoints - AI-generated concept hierarchies.
 
-Educational Note: Mind maps demonstrate hierarchical content extraction:
+Mind maps demonstrate hierarchical content extraction:
 1. Claude analyzes source content
 2. Identifies main topics and subtopics
 3. Creates a tree structure of concepts
@@ -41,7 +41,7 @@ def generate_mind_map(project_id: str):
     """
     Start mind map generation or edit as a background task.
 
-    Educational Note: Mind maps are generated from source content using
+    Mind maps are generated from source content using
     Claude to create hierarchical node structures for visual concept mapping.
     Edits refine existing mind maps based on user instructions.
 

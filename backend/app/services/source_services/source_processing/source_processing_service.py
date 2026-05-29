@@ -1,7 +1,7 @@
 """
 Source Processing Service - Orchestrates processing for different source types.
 
-Educational Note: This service is a simple dispatcher that routes sources
+This service is a simple dispatcher that routes sources
 to the appropriate processor based on file type. Each processor handles:
 - Type-specific content extraction
 - Embedding generation (if needed)
@@ -42,7 +42,7 @@ class SourceProcessingService:
     """
     Service class for orchestrating source file processing.
 
-    Educational Note: This service dispatches to the appropriate processor
+    This service dispatches to the appropriate processor
     based on file extension. Processing is typically run in background threads.
     """
 
@@ -82,7 +82,7 @@ class SourceProcessingService:
         """
         Process a source file by dispatching to the appropriate processor.
 
-        Educational Note: This method acts as a router - it determines the
+        This method acts as a router - it determines the
         file type and calls the corresponding processor module. Each processor
         is responsible for:
         1. Extracting content (using AI services or direct parsing)
@@ -242,7 +242,7 @@ class SourceProcessingService:
         """
         Cancel processing for a source.
 
-        Educational Note: This cancels any running tasks for the source and
+        This cancels any running tasks for the source and
         cleans up processed data from Supabase Storage, but keeps the raw file
         so user can retry.
 
@@ -288,7 +288,7 @@ class SourceProcessingService:
         """
         Retry processing for a source that failed or was cancelled.
 
-        Educational Note: This submits a new processing task for the source.
+        This submits a new processing task for the source.
         Only works for sources that have a raw file in Supabase Storage but
         are not currently processing.
 

@@ -1,6 +1,6 @@
 /**
  * Brand Sections Index
- * Educational Note: Export all section components for easy import.
+ * Export all section components for easy import.
  */
 export { LogosSection } from './LogosSection';
 export { IconsSection } from './IconsSection';

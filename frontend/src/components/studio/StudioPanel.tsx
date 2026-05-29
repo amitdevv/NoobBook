@@ -1,6 +1,6 @@
 /**
  * StudioPanel Component
- * Educational Note: Layout-only orchestrator for the Studio panel.
+ * Layout-only orchestrator for the Studio panel.
  * All feature state is owned by individual sections via StudioContext.
  * This component only handles layout - no hooks, no props drilling.
  *

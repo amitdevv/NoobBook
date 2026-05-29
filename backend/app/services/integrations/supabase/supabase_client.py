@@ -1,7 +1,7 @@
 """
 Supabase Client - Centralized Supabase client initialization.
 
-Educational Note: This module provides a singleton Supabase client instance
+This module provides a singleton Supabase client instance
 that can be imported throughout the application. It handles configuration
 from environment variables and provides a clean interface for database operations.
 """
@@ -23,7 +23,7 @@ class SupabaseClient:
     """
     Singleton Supabase client wrapper.
 
-    Educational Note: Using a singleton pattern ensures we only create one
+    Using a singleton pattern ensures we only create one
     Supabase client instance throughout the application lifecycle, which is
     more efficient and prevents connection issues.
     """
@@ -55,7 +55,7 @@ class SupabaseClient:
         """
         Initialize the Supabase client from environment variables.
 
-        Educational Note: We use the SERVICE_KEY (not anon key) for single-user mode
+        We use the SERVICE_KEY (not anon key) for single-user mode
         because it bypasses Row Level Security (RLS). This is safe for local/single-user
         deployments. For multi-user production, use anon key with proper auth.
         """
@@ -101,7 +101,7 @@ class SupabaseClient:
         """
         Reset the client instance (useful for testing).
 
-        Educational Note: This method allows tests to reset the singleton
+        This method allows tests to reset the singleton
         state between test runs.
         """
         cls._instance = None
@@ -242,7 +242,7 @@ def is_supabase_enabled() -> bool:
     Returns:
         True if Supabase is configured, False otherwise
 
-    Educational Note: This allows the application to gracefully handle
+    This allows the application to gracefully handle
     cases where Supabase is not yet configured during initial setup.
     """
     return SupabaseClient.is_configured()

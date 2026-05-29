@@ -1,7 +1,7 @@
 """
 Text Cleaning - Functions for cleaning text before embeddings.
 
-Educational Note: Clean text is important for:
+Clean text is important for:
 - Embeddings: Excessive whitespace/newlines reduce embedding quality
 - Token counting: Clean text gives more accurate counts
 - Storage: Smaller file sizes without redundant whitespace
@@ -14,7 +14,7 @@ def clean_text_for_embedding(text: str) -> str:
     """
     Clean text before creating embeddings.
 
-    Educational Note: OpenAI embeddings work best with clean text.
+    OpenAI embeddings work best with clean text.
     Excessive whitespace and newlines add noise without semantic value.
 
     Cleaning steps:
@@ -51,7 +51,7 @@ def clean_chunk_text(text: str) -> str:
     """
     Clean chunk text, removing metadata headers if present.
 
-    Educational Note: Our chunk files have metadata headers like:
+    Our chunk files have metadata headers like:
         # Chunk Metadata
         # source_id: ...
         # ---
@@ -84,7 +84,7 @@ def normalize_whitespace(text: str) -> str:
     """
     Normalize whitespace without being as aggressive as embedding cleaning.
 
-    Educational Note: Sometimes we want to preserve paragraph breaks
+    Sometimes we want to preserve paragraph breaks
     (double newlines) but still clean up excessive whitespace.
 
     Args:

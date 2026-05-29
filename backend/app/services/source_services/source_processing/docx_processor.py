@@ -1,7 +1,7 @@
 """
 DOCX Processor - Handles Word document processing.
 
-Educational Note: DOCX files are processed using python-docx library.
+DOCX files are processed using python-docx library.
 The extracted text preserves document structure (headings, lists, tables)
 in a markdown-like format. DOCX files don't have logical page boundaries,
 so we store the entire content as a single "page" and let token-based
@@ -145,7 +145,7 @@ def _process_embeddings(
     """
     Process embeddings for a source using embedding_service.
 
-    Educational Note: We ALWAYS chunk and embed every source for consistent
+    We ALWAYS chunk and embed every source for consistent
     retrieval. The token count is used for chunk sizing decisions.
     Chunks are uploaded to Supabase Storage.
     """

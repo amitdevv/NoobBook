@@ -1,7 +1,7 @@
 """
 DOCX Utilities - Extract text from Word documents.
 
-Educational Note: These utilities extract text from DOCX files using python-docx.
+These utilities extract text from DOCX files using python-docx.
 DOCX files are ZIP archives containing XML documents. The python-docx library
 handles the complexity of parsing this structure.
 
@@ -40,7 +40,7 @@ def extract_text_from_docx(docx_path: Path) -> Dict[str, Any]:
     """
     Extract text content from a DOCX file.
 
-    Educational Note: This function reads the DOCX file and extracts:
+    This function reads the DOCX file and extracts:
     - All paragraphs (with heading level detection)
     - All tables (converted to markdown format)
     - Preserves document order
@@ -98,7 +98,7 @@ def _extract_document_content(doc: 'Document') -> str:
     """
     Extract all content from document in order.
 
-    Educational Note: DOCX documents have a body that contains paragraphs
+    DOCX documents have a body that contains paragraphs
     and tables in order. We iterate through the body elements to maintain
     the correct document order.
 
@@ -135,7 +135,7 @@ def _extract_paragraph(para: 'Paragraph') -> str:
     """
     Extract text from a paragraph with heading detection.
 
-    Educational Note: Word documents have paragraph styles that indicate
+    Word documents have paragraph styles that indicate
     headings (Heading 1, Heading 2, etc.). We convert these to markdown
     format for better structure preservation.
 
@@ -178,7 +178,7 @@ def _extract_table(table: 'Table') -> str:
     """
     Extract table content in markdown format.
 
-    Educational Note: Tables are converted to markdown table format:
+    Tables are converted to markdown table format:
     | Header 1 | Header 2 |
     |----------|----------|
     | Cell 1   | Cell 2   |

@@ -1,6 +1,6 @@
 /**
  * Citation Parser Utility
- * Educational Note: This utility parses citations from AI responses.
+ * This utility parses citations from AI responses.
  * Claude uses the format [[cite:CHUNK_ID]] to cite sources.
  * Chunk ID format: {source_id}_page_{page}_chunk_{n}
  * We parse these, assign numbers, and prepare data for rendering.
@@ -78,7 +78,7 @@ function parseChunkId(chunkId: string): { sourceId: string; pageNumber: number; 
 /**
  * Parse citations from AI response text
  *
- * Educational Note: This function extracts all citations from the text,
+ * This function extracts all citations from the text,
  * assigns sequential numbers to unique citations, and prepares data for
  * both inline rendering and the sources footer.
  *
@@ -164,7 +164,7 @@ export function hasCitations(text: string): boolean {
 /**
  * Split text into segments (text and citation markers)
  *
- * Educational Note: This function splits the AI response into an array of
+ * This function splits the AI response into an array of
  * segments where each segment is either plain text or a citation marker.
  * This makes it easy to render the text with inline citation components.
  *

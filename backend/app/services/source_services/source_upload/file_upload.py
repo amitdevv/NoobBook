@@ -1,7 +1,7 @@
 """
 File Upload Handler - Manages file uploads to Supabase Storage.
 
-Educational Note: This module handles uploading files (PDF, DOCX, images, audio, etc.)
+This module handles uploading files (PDF, DOCX, images, audio, etc.)
 to Supabase Storage and creating source entries in the database.
 
 Supports:
@@ -37,7 +37,7 @@ def upload_file(
     """
     Upload a new source file to Supabase Storage.
 
-    Educational Note: This function:
+    This function:
     1. Validates the file type and size
     2. Uploads the file to Supabase Storage (raw-files bucket)
     3. Creates metadata in the sources table
@@ -152,7 +152,7 @@ def create_from_existing_file(
     """
     Create a source entry from an already-saved file (upload to Supabase).
 
-    Educational Note: This is used when a file is downloaded/saved externally
+    This is used when a file is downloaded/saved externally
     (e.g., from Google Drive) and we need to upload it to Supabase Storage.
 
     Args:
@@ -239,7 +239,7 @@ def _submit_processing_task(project_id: str, source_id: str) -> None:
     """
     Submit a background task to process the source.
 
-    Educational Note: We import source_processing_service here to avoid
+    We import source_processing_service here to avoid
     circular imports at module load time.
     """
     try:

@@ -1,7 +1,7 @@
 """
 PDF Processor - Handles PDF file processing.
 
-Educational Note: Uses pdf_service which processes PDFs in PARALLEL using
+Uses pdf_service which processes PDFs in PARALLEL using
 ThreadPoolExecutor. Result is either "ready" (all pages succeeded) or "error".
 No partial status - we either succeed completely or fail completely.
 
@@ -122,7 +122,7 @@ def _process_embeddings(
     """
     Process embeddings for a source after text extraction.
 
-    Educational Note: We ALWAYS chunk and embed every source for consistent
+    We ALWAYS chunk and embed every source for consistent
     retrieval. The token count is used for chunk sizing decisions.
 
     Storage: Processed text is downloaded from Supabase Storage. Chunks are

@@ -1,34 +1,29 @@
 """
 Brand Asset Service - Business logic for brand asset management.
 
-Educational Note: Brand assets (logos, icons, fonts, images) are stored
+Brand assets (logos, icons, fonts, images) are stored
 at the workspace (user) level and used by studio agents to maintain
 consistent branding across all projects' generated content.
 """
 import uuid
 from typing import Optional, Dict, List, Any
 
-from app.services.integrations.supabase import get_supabase, is_supabase_enabled
 from app.services.integrations.supabase import storage_service
+from app.services.data_services.base_service import SupabaseService
 
 
-class BrandAssetService:
+class BrandAssetService(SupabaseService):
     """
     Service class for managing brand assets using Supabase.
 
-    Educational Note: Each asset has metadata stored in the database and
+    Each asset has metadata stored in the database and
     the actual file stored in Supabase Storage. The file_path column
     references the storage location.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the brand asset service."""
-        if not is_supabase_enabled():
-            raise RuntimeError(
-                "Supabase is not configured. Please add SUPABASE_URL and "
-                "SUPABASE_ANON_KEY to your .env file."
-            )
-        self.supabase = get_supabase()
+        super().__init__()
         self.table = "brand_assets"
 
     def list_assets(self, user_id: str) -> List[Dict[str, Any]]:

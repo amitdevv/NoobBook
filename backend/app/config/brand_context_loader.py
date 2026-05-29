@@ -1,7 +1,7 @@
 """
 Brand Context Loader - Builds brand context for studio agent prompts.
 
-Educational Note: This module creates formatted brand guidelines context
+This module creates formatted brand guidelines context
 that can be injected into studio agent system prompts. The context includes:
 
 1. Color Palette - Primary, secondary, accent, and custom colors
@@ -25,7 +25,7 @@ class BrandContextLoader:
     """
     Loader for building brand context for studio agent prompts.
 
-    Educational Note: This loader is called by studio services before
+    This loader is called by studio services before
     content generation. It checks if brand is enabled for the feature
     and builds formatted context for the AI to follow.
 
@@ -37,7 +37,7 @@ class BrandContextLoader:
         """
         Resolve project_id to user_id via the projects table.
 
-        Educational Note: Brand moved from project-level to user-level,
+        Brand moved from project-level to user-level,
         but studio agents still pass project_id. This bridge method
         ensures backward compatibility with zero changes to agents.
 
@@ -69,7 +69,7 @@ class BrandContextLoader:
         """
         Load brand context for injection into a studio agent prompt.
 
-        Educational Note: This method first checks if the feature has
+        This method first checks if the feature has
         brand enabled. If not, it returns an empty string. This allows
         features like mind maps to skip brand application while
         presentations and blogs follow brand guidelines.
@@ -480,7 +480,7 @@ def load_brand_context(project_id: str, feature_name: str, user_id: str = None) 
     """
     Convenience function for loading brand context.
 
-    Educational Note: Studio agents call this with project_id. The loader
+    Studio agents call this with project_id. The loader
     resolves project_id → user_id internally since brand is now user-level.
     When user_id is provided directly, the project lookup is skipped.
 

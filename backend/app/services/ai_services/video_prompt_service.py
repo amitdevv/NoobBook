@@ -1,7 +1,7 @@
 """
 Video Prompt Service - AI service for generating optimized video prompts.
 
-Educational Note: This is a simple AI service that uses Claude to generate
+This is a simple AI service that uses Claude to generate
 detailed, vivid video prompts from source content. The generated prompts are
 then used with Google Veo 2.0 for video generation.
 """
@@ -20,7 +20,7 @@ class VideoPromptService:
     """
     Simple AI service for generating video prompts.
 
-    Educational Note: Takes source content + user direction, uses Claude to
+    Takes source content + user direction, uses Claude to
     craft an optimized prompt for video generation. Single API call, no loop.
     """
 
@@ -122,7 +122,7 @@ Generate a clear, vivid video prompt (2-4 sentences) that describes what should 
         """
         Get source content for prompt generation from Supabase Storage.
 
-        Educational Note: Sample chunks for large sources, use full content for small ones.
+        Sample chunks for large sources, use full content for small ones.
         """
         try:
             from app.services.source_services import source_service

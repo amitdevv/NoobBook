@@ -1,7 +1,7 @@
 """
 PDF Utilities - Helper functions for PDF manipulation.
 
-Educational Note: This module handles PDF operations like:
+This module handles PDF operations like:
 - Getting page count
 - Extracting single pages as separate PDFs
 - Creating temporary single-page PDFs for API calls
@@ -47,7 +47,7 @@ def extract_single_page_bytes(pdf_path: Union[str, Path], page_number: int) -> b
     """
     Extract a single page from a PDF and return it as bytes.
 
-    Educational Note: We create a new PDF with just the one page,
+    We create a new PDF with just the one page,
     then return it as bytes for base64 encoding. This allows
     sending individual pages to Claude API.
 
@@ -92,7 +92,7 @@ def iterate_pages(pdf_path: Union[str, Path]) -> Generator[Tuple[int, bytes], No
     """
     Generator that yields each page of a PDF as (page_number, page_bytes).
 
-    Educational Note: Using a generator allows processing very large PDFs
+    Using a generator allows processing very large PDFs
     without loading all pages into memory at once. Each page is extracted
     and yielded one at a time.
 
@@ -115,7 +115,7 @@ def get_all_page_bytes(pdf_path: Union[str, Path]) -> List[Tuple[int, bytes]]:
     """
     Extract all pages from a PDF and return as a list.
 
-    Educational Note: Unlike iterate_pages() which is a generator,
+    Unlike iterate_pages() which is a generator,
     this loads all pages into memory at once. Use this when you need
     all pages upfront (e.g., for batching before parallel processing).
 

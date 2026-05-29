@@ -1,6 +1,6 @@
 /**
  * Export Chat as Markdown
- * Educational Note: Converts a chat conversation into a downloadable Markdown file.
+ * Converts a chat conversation into a downloadable Markdown file.
  * Resolves [[cite:CHUNK_ID]] citations into numbered footnotes with source content.
  */
 
@@ -59,7 +59,7 @@ interface ExportChatOptions {
 /**
  * Export a chat conversation as a Markdown file with resolved citations.
  *
- * Educational Note: This function:
+ * This function:
  * 1. Scans all assistant messages for [[cite:CHUNK_ID]] markers
  * 2. Assigns global footnote numbers across the entire conversation
  * 3. Fetches citation content from the API in parallel

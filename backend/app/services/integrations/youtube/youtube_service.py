@@ -1,7 +1,7 @@
 """
 YouTube Service - Fetch transcripts from YouTube videos.
 
-Educational Note: This service uses the youtube-transcript-api library to fetch
+This service uses the youtube-transcript-api library to fetch
 existing captions/transcripts from YouTube videos. It's much faster than downloading
 and transcribing audio since it uses YouTube's existing caption data.
 
@@ -32,7 +32,7 @@ class YouTubeService:
     """
     Service class for fetching YouTube video transcripts.
 
-    Educational Note: YouTube stores transcripts as a list of snippets,
+    YouTube stores transcripts as a list of snippets,
     each with text, start time, and duration. We combine these into
     readable text with optional timestamps.
     """
@@ -87,7 +87,7 @@ class YouTubeService:
         """
         Fetch and cache proxy list from the Webshare API.
 
-        Educational Note: Webshare provides rotating residential/datacenter proxies.
+        Webshare provides rotating residential/datacenter proxies.
         We cache the list for 30 minutes to avoid hitting their API on every transcript
         request. The proxy list endpoint returns IP:port pairs that we format as URLs.
 

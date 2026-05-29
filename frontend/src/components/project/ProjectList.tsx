@@ -19,7 +19,7 @@ const log = createLogger('project-list');
 
 /**
  * ProjectList Component
- * Educational Note: This component displays all projects and handles
+ * This component displays all projects and handles
  * project selection. It demonstrates React hooks (useState, useEffect)
  * and async data fetching patterns.
  */

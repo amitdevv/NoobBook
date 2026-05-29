@@ -1,7 +1,7 @@
 """
 TTS Service - Text-to-Speech using ElevenLabs API.
 
-Educational Note: This service converts text to speech using ElevenLabs' TTS API.
+This service converts text to speech using ElevenLabs' TTS API.
 It's used by studio services like audio overview to generate spoken content.
 
 Key Features:
@@ -31,7 +31,7 @@ class TTSService:
     """
     Service class for text-to-speech via ElevenLabs.
 
-    Educational Note: Uses the ElevenLabs Python SDK to convert text to audio.
+    Uses the ElevenLabs Python SDK to convert text to audio.
     Supports both file generation and streaming for different use cases.
     """
 
@@ -86,7 +86,7 @@ class TTSService:
         """
         Split text into chunks under MAX_CHARS_PER_REQUEST at sentence boundaries.
 
-        Educational Note: ElevenLabs has a 10k character limit. We split at
+        ElevenLabs has a 10k character limit. We split at
         sentence boundaries (. ! ?) to avoid cutting mid-sentence which would
         sound unnatural in the generated audio.
         """
@@ -138,7 +138,7 @@ class TTSService:
         """
         Generate audio from text and return bytes directly (no disk write).
 
-        Educational Note: Generates audio and returns raw bytes directly
+        Generates audio and returns raw bytes directly
         instead of writing to a file. Used for Supabase Storage uploads.
 
         Args:
@@ -230,7 +230,7 @@ class TTSService:
         """
         Generate audio stream from text.
 
-        Educational Note: For streaming use cases where you want to start
+        For streaming use cases where you want to start
         playing audio before the full generation is complete. Returns a
         generator that yields audio chunks.
 
@@ -261,7 +261,7 @@ class TTSService:
         """
         List available voices from ElevenLabs.
 
-        Educational Note: Useful for letting users choose their preferred voice.
+        Useful for letting users choose their preferred voice.
         Returns both default voices and any cloned voices in the account.
 
         Returns:

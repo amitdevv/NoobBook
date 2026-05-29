@@ -17,14 +17,14 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from app.config import prompt_loader, tool_loader
 from app.services.integrations.claude import claude_service
 from app.services.integrations.knowledge_bases.mixpanel import mixpanel_service
+from app.services.ai_agents.analyzer_agent_base import AnalyzerAgentBase
 from app.utils import claude_parsing_utils
 
 logger = logging.getLogger(__name__)
 
 
-class MixpanelAnalyzerAgent:
+class MixpanelAnalyzerAgent(AnalyzerAgentBase):
     AGENT_NAME = "mixpanel_analyzer_agent"
-    MAX_ITERATIONS = 40
     TERMINATION_TOOL = "return_mixpanel_analysis"
     # Cap each tool_result payload sent back to Claude so a single noisy
     # call (long-window query_events, large segmentation, or the heavy
@@ -34,7 +34,7 @@ class MixpanelAnalyzerAgent:
     # it here now that the agent owns the serialization step.
     MAX_TOOL_RESULT_CHARS = 15_000
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._tools: Optional[List[Dict[str, Any]]] = None
 
     def _load_tools(self) -> List[Dict[str, Any]]:

@@ -1,7 +1,7 @@
 """
 Source processing control endpoints - cancel and retry.
 
-Educational Note: Source processing is a background operation that can:
+Source processing is a background operation that can:
 - Take a long time (large PDFs, research sources)
 - Fail due to API errors
 - Need to be interrupted by user
@@ -51,7 +51,7 @@ def cancel_source_processing(project_id: str, source_id: str):
     """
     Cancel processing for a source.
 
-    Educational Note: Cancellation is "cooperative" - we set a flag and
+    Cancellation is "cooperative" - we set a flag and
     processors check it periodically. This allows for clean shutdown:
     - Current API call completes (can't interrupt HTTP)
     - Partial results are discarded
@@ -101,7 +101,7 @@ def retry_source_processing(project_id: str, source_id: str):
     """
     Retry processing for a failed or cancelled source.
 
-    Educational Note: Retry restarts the entire processing pipeline:
+    Retry restarts the entire processing pipeline:
     1. Verify source is in retryable state (uploaded, error)
     2. Clean up any partial processed data
     3. Trigger fresh processing from raw file

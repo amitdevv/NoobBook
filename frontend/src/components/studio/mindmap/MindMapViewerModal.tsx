@@ -1,6 +1,6 @@
 /**
  * MindMapViewerModal Component
- * Educational Note: Modal for viewing mind map tree visualization.
+ * Modal for viewing mind map tree visualization.
  * Uses MindMapViewer component for interactive node display.
  * Supports iterative editing of mind map content.
  */

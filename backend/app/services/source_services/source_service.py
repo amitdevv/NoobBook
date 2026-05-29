@@ -1,7 +1,7 @@
 """
 Source Service - Business logic for managing project sources.
 
-Educational Note: This service provides the main interface for source operations.
+This service provides the main interface for source operations.
 It delegates to specialized modules for cleaner code organization:
 - source_index_service: Index CRUD operations
 - source_upload: Upload handling (file, URL, text)
@@ -43,7 +43,7 @@ class SourceService:
     """
     Service class for managing project sources.
 
-    Educational Note: This is the main entry point for source operations.
+    This is the main entry point for source operations.
     Most logic has been delegated to specialized modules, keeping this
     class focused on orchestrating the modules and providing a clean API.
     """
@@ -200,7 +200,7 @@ class SourceService:
         """
         Delete a source, its raw file, processed content, and embeddings.
 
-        Educational Note: When deleting a source, we clean up:
+        When deleting a source, we clean up:
         1. Raw file (original upload)
         2. Processed file (extracted text)
         3. Chunk files (individual page files)
@@ -408,7 +408,7 @@ class SourceService:
         """
         Add a database source (Postgres/MySQL) to a project.
 
-        Educational Note: This creates a DATABASE source that stores a small
+        This creates a DATABASE source that stores a small
         `.database` metadata file in Supabase Storage and triggers processing
         to fetch a schema snapshot + embeddings.
         """
@@ -434,7 +434,7 @@ class SourceService:
         """
         Add a Freshdesk ticket source to a project.
 
-        Educational Note: This creates a Freshdesk source that stores a small
+        This creates a Freshdesk source that stores a small
         `.freshdesk` metadata file in Supabase Storage and triggers processing
         to sync tickets and make them queryable via the analysis agent.
         """
@@ -451,7 +451,7 @@ class SourceService:
         """
         Add a Jira source flag to a project.
 
-        Educational Note: Lightweight source that enables the existing Jira
+        Lightweight source that enables the existing Jira
         API tools (jira_list_projects, jira_search_issues, etc.) for this
         specific project. No data sync — tools query Jira live.
         """
@@ -466,7 +466,7 @@ class SourceService:
         """
         Add a Mixpanel source flag to a project.
 
-        Educational Note: Same lightweight pattern as Jira — enables Mixpanel
+        Same lightweight pattern as Jira — enables Mixpanel
         chat tools (mixpanel_list_events, mixpanel_query_events, etc.) for
         this specific project. Queries Mixpanel's Query API live.
         """
@@ -486,7 +486,7 @@ class SourceService:
         """
         Add a Notion source (specific page or database) to a project.
 
-        Educational Note: Unlike Jira/Mixpanel which are live-API flags, Notion
+        Unlike Jira/Mixpanel which are live-API flags, Notion
         sources fetch their content during processing and embed it for RAG —
         Notion pages are slow-changing knowledge artifacts that benefit from
         chunked semantic search.
@@ -517,7 +517,7 @@ class SourceService:
         """
         Add an MCP source to a project.
 
-        Educational Note: This creates an MCP source that stores a small
+        This creates an MCP source that stores a small
         `.mcp` metadata file in Supabase Storage and triggers processing
         to snapshot selected resources, embed them, and make them searchable.
         """

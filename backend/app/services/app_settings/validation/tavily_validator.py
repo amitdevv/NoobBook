@@ -1,7 +1,7 @@
 """
 Tavily API key validator.
 
-Educational Note: Validates Tavily API keys by making a minimal
+Validates Tavily API keys by making a minimal
 search request. Tavily is a search API optimized for LLMs and RAG.
 """
 import logging
@@ -15,7 +15,7 @@ def validate_tavily_key(api_key: str) -> Tuple[bool, str]:
     """
     Validate Tavily API key by making a test search request.
 
-    Educational Note: Tavily is a search API optimized for LLMs and RAG.
+    Tavily is a search API optimized for LLMs and RAG.
     We make a simple search request to verify the key works.
 
     Args:

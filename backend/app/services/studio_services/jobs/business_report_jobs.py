@@ -1,7 +1,7 @@
 """
 Business Report Job Management - Tracks business report generation jobs.
 
-Educational Note: Business reports combine AI-generated content with data analysis.
+Business reports combine AI-generated content with data analysis.
 This job tracker handles reports that may include:
 - Written analysis and insights
 - Charts/graphs from CSV data analysis (via csv_analyzer_agent)

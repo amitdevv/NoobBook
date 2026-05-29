@@ -1,7 +1,7 @@
 """
 Knowledge Base Integrations Package.
 
-Educational Note: This package manages external knowledge base integrations
+This package manages external knowledge base integrations
 like Jira, Notion, GitHub, etc. The knowledge_base_service acts as the main
 orchestrator that main_chat_service calls.
 

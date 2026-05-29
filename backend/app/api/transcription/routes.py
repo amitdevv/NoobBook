@@ -1,7 +1,7 @@
 """
 ElevenLabs transcription configuration endpoints.
 
-Educational Note: These endpoints provide configuration for real-time
+These endpoints provide configuration for real-time
 speech-to-text. The actual transcription happens client-side via WebSocket
 for lowest latency - we just provide the secure connection details.
 
@@ -35,7 +35,7 @@ def get_transcription_config():
     """
     Get ElevenLabs configuration for real-time transcription.
 
-    Educational Note: This endpoint generates a single-use token and embeds it
+    This endpoint generates a single-use token and embeds it
     in the WebSocket URL. The flow is:
 
     1. Frontend calls this endpoint before recording
@@ -98,7 +98,7 @@ def get_transcription_status():
     """
     Check if ElevenLabs transcription is configured.
 
-    Educational Note: This is a lightweight "health check" endpoint.
+    This is a lightweight "health check" endpoint.
     It checks if the ElevenLabs API key is set without:
     - Exposing the actual key
     - Making any external API calls

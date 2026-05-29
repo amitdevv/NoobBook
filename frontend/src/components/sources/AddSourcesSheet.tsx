@@ -1,6 +1,6 @@
 /**
  * AddSourcesSheet Component
- * Educational Note: Sheet modal with tabs for different source upload methods.
+ * Sheet modal with tabs for different source upload methods.
  * Orchestrates UploadTab, LinkTab, and DocumentEditorTab components.
  */
 

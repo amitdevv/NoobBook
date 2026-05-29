@@ -1,7 +1,7 @@
 """
 Tool Executors - Handle tool call execution for AI services.
 
-Educational Note: This folder contains executors that handle tool calls
+This folder contains executors that handle tool calls
 from Claude during chat or agent loops. Each executor is responsible for:
 - Receiving tool call parameters
 - Executing the appropriate action

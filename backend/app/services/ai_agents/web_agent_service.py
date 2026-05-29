@@ -1,7 +1,7 @@
 """
 Web Agent Service - AI agent for web content extraction and search.
 
-Educational Note: This is a simple agentic loop pattern:
+This is a simple agentic loop pattern:
 1. Send task to Claude with tools (2 server tools + 2 client tools)
 2. Loop until 'return_search_result' tool is called
 3. Server tools (web_fetch, web_search) - Claude handles execution
@@ -24,7 +24,7 @@ from datetime import datetime
 from app.services.integrations.claude import claude_service
 from app.config import prompt_loader, tool_loader
 from app.services.tool_executors import web_agent_executor
-from app.services.data_services import message_service
+from app.services.data_services import agent_execution_service
 from app.utils import claude_parsing_utils
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class WebAgentService:
     """
     Simple web content extraction agent.
 
-    Educational Note: Agent loops are simpler than they seem:
+    Agent loops are simpler than they seem:
     - Keep calling Claude until a specific tool signals completion
     - Server tools require no action from us
     - Client tools need execution and result sent back
@@ -58,7 +58,7 @@ class WebAgentService:
         """
         Load all 4 agent tools.
 
-        Educational Note: We load tools from JSON files:
+        We load tools from JSON files:
         - 2 server tools (web_fetch, web_search) - type: "server_tool"
         - 1 client tool (tavily_search) - we execute
         - 1 termination tool (return_search_result) - signals completion
@@ -80,7 +80,7 @@ class WebAgentService:
         """
         Run the agent to extract content from a URL.
 
-        Educational Note: Simple agentic loop:
+        Simple agentic loop:
         1. URL is injected into system_prompt
         2. user_message from config triggers the agent
         3. Loop until return_search_result tool is called
@@ -208,7 +208,7 @@ class WebAgentService:
         """
         Build the final result from return_search_result tool input.
 
-        Educational Note: The termination tool's input IS the result.
+        The termination tool's input IS the result.
         We just add metadata (iterations, token usage, timestamp).
         """
         return {
@@ -235,11 +235,11 @@ class WebAgentService:
         started_at: str,
         source_id: Optional[str] = None
     ) -> None:
-        """Save execution log using message_service."""
+        """Save execution log using agent_execution_service."""
         if not project_id:
             return
 
-        message_service.save_agent_execution(
+        agent_execution_service.save_agent_execution(
             project_id=project_id,
             agent_name=self.AGENT_NAME,
             execution_id=execution_id,

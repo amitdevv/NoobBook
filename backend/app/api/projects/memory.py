@@ -1,7 +1,7 @@
 """
 Project memory endpoint.
 
-Educational Note: Memory is a key concept in LLM applications that
+Memory is a key concept in LLM applications that
 allows the AI to maintain context across conversations.
 
 Memory Types in NoobBook:
@@ -44,7 +44,7 @@ def get_project_memory(project_id):
     """
     Get memory data for a project (user memory + project memory).
 
-    Educational Note: This endpoint returns both memory types so the UI
+    This endpoint returns both memory types so the UI
     can display what context the AI "remembers". This transparency helps
     users understand why the AI responds the way it does.
 
@@ -100,7 +100,7 @@ def update_project_memory(project_id):
     """
     Manually update user memory and/or project memory.
 
-    Educational Note: This endpoint allows users to directly edit what the AI
+    This endpoint allows users to directly edit what the AI
     "remembers" — giving them control over the context that shapes AI responses.
     Both fields are optional; only provided fields are updated.
 

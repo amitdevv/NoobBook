@@ -1,6 +1,6 @@
 /**
  * useInfographicGeneration Hook
- * Educational Note: Custom hook for infographic generation logic.
+ * Custom hook for infographic generation logic.
  * Handles state management, API calls, and polling.
  */
 
@@ -139,7 +139,7 @@ export const useInfographicGeneration = (projectId: string) => {
 
   /**
    * Handle iterative editing of an existing infographic
-   * Educational Note: Follows the same pattern as video editing —
+   * Follows the same pattern as video editing —
    * previous image prompt is passed to Claude for refinement.
    */
   const handleInfographicEdit = async (parentJob: InfographicJob, editInstructions: string) => {

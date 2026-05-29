@@ -1,6 +1,6 @@
 /**
  * QuizSection Component
- * Educational Note: Self-contained section for quiz generation.
+ * Self-contained section for quiz generation.
  * Owns all quiz-related state - isolated from other sections.
  */
 

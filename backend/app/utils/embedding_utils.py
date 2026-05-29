@@ -1,7 +1,7 @@
 """
 Embedding Utils - Token counting and embedding decisions.
 
-Educational Note: We ALWAYS create chunks and embed them for every source.
+We ALWAYS create chunks and embed them for every source.
 This creates a consistent pipeline across all file types:
 
 Pipeline: Source → Process → Count Tokens → Chunk → Embed
@@ -31,7 +31,7 @@ import tiktoken
 logger = logging.getLogger(__name__)
 
 # Initialize tiktoken encoder once (cl100k_base is closest to Claude's tokenizer)
-# Educational Note: cl100k_base is used by GPT-4 and Claude uses a similar
+# cl100k_base is used by GPT-4 and Claude uses a similar
 # byte-pair encoding. The counts are close enough for chunking purposes.
 _encoder = tiktoken.get_encoding("cl100k_base")
 
@@ -82,7 +82,7 @@ def count_tokens(text: str) -> int:
     """
     Count tokens using tiktoken (fast, local).
 
-    Educational Note: This uses tiktoken's cl100k_base encoding for fast
+    This uses tiktoken's cl100k_base encoding for fast
     local token counting. This is called thousands of times during chunking
     (per page, per sentence, per word for long sentences), so speed is critical.
 
@@ -110,7 +110,7 @@ def count_tokens_api(text: str) -> int:
     """
     Count tokens using Claude's count_tokens API (accurate but slow).
 
-    Educational Note: Use this when you need exact Claude token counts,
+    Use this when you need exact Claude token counts,
     such as for billing estimation or quota tracking. For chunking
     operations, use count_tokens() which uses tiktoken.
 

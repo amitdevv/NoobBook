@@ -1,7 +1,7 @@
 """
 Per-user module permissions.
 
-Educational Note: This module handles granular feature access control.
+This module handles granular feature access control.
 Each user has a `permissions` JSONB column on the users table. NULL means
 "all enabled" (the default). When an admin customizes a user's access,
 the full structure is stored.
@@ -26,7 +26,7 @@ def _get_default_permissions() -> Dict[str, Any]:
     """
     Return the all-enabled permission structure.
 
-    Educational Note: This is the baseline — every feature on. Admins
+    This is the baseline — every feature on. Admins
     selectively disable features per user. The structure is stored as
     JSONB on users.permissions when customized.
     """
@@ -113,7 +113,7 @@ def get_user_permissions(user_id: str) -> Dict[str, Any]:
     Load permissions for a user. Returns the stored JSONB if customized,
     or the all-enabled default if NULL.
 
-    Educational Note: NULL in the database means "use defaults" — this
+    NULL in the database means "use defaults" — this
     avoids writing 50+ boolean fields for every new user.
     """
     try:
@@ -193,7 +193,7 @@ def user_has_permission(user_id: str, category: str, item: Optional[str] = None)
     """
     Check if a user has access to a specific feature.
 
-    Educational Note: Three-level check:
+    Three-level check:
     1. If permissions is NULL → all enabled (default)
     2. If category.enabled is False → entire category disabled
     3. If item specified and items[item] is False → specific item disabled
@@ -252,7 +252,7 @@ def get_user_connection_access(user_id: str) -> Dict[str, list]:
     """
     Return which database and MCP connection IDs a user has access to.
 
-    Educational Note: A user has access if:
+    A user has access if:
     1. The connection has visible_to_all=true, OR
     2. The user is in the connection_users junction table
 
@@ -316,7 +316,7 @@ def update_user_connection_access(
     """
     Set which database and MCP connections a user can access.
 
-    Educational Note: This replaces the user's entries in the junction tables.
+    This replaces the user's entries in the junction tables.
     Connections with visible_to_all=true remain accessible regardless.
     The admin uses this to restrict access to specific connections.
     """

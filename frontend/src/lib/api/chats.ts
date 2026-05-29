@@ -1,6 +1,6 @@
 /**
  * Chats API Service
- * Educational Note: Handles all chat operations with the backend.
+ * Handles all chat operations with the backend.
  * This service provides methods for creating chats, sending messages,
  * and managing conversations with Claude AI.
  */
@@ -51,7 +51,7 @@ export function messageContentAsText(content: string | MessageContentBlock[]): s
 }
 
 /**
- * Educational Note: A message in the conversation.
+ * A message in the conversation.
  * Each message has a role (user or assistant) and content. Content is a
  * plain string for text-only messages (the common case) and a list of
  * typed blocks when the user attached an inline image — image blocks
@@ -71,7 +71,7 @@ export interface Message {
 }
 
 /**
- * Educational Note: Chat metadata for list views.
+ * Chat metadata for list views.
  * Used when displaying a list of chats without loading full message history.
  */
 export interface ChatMetadata {
@@ -83,7 +83,7 @@ export interface ChatMetadata {
 }
 
 /**
- * Educational Note: Full chat data including all messages.
+ * Full chat data including all messages.
  * Loaded when user opens a specific chat.
  * Studio signals are imported from studio/types for type consistency.
  */
@@ -119,7 +119,7 @@ export interface ChatSyncPayload {
 }
 
 /**
- * Educational Note: Raw message for debug/raw view.
+ * Raw message for debug/raw view.
  * Includes the original content blocks (tool_use, tool_result, etc.)
  * that are normally filtered out for the normal chat display.
  */
@@ -134,7 +134,7 @@ export interface RawMessage {
 }
 
 /**
- * Educational Note: Response from sending a message.
+ * Response from sending a message.
  * Contains both the user's message and the AI's response.
  */
 export interface SendMessageResponse {
@@ -199,7 +199,7 @@ export interface StreamMessageResult {
 }
 
 /**
- * Educational Note: Prompt configuration from data/prompts/*.json files.
+ * Prompt configuration from data/prompts/*.json files.
  * Each prompt defines model settings and the actual prompt text.
  * Note: Some prompts use user_message, others use user_message_template.
  */
@@ -310,7 +310,7 @@ class ChatsAPI {
 
   /**
    * List all chats for a specific project
-   * Educational Note: Returns chat metadata sorted by most recent first
+   * Returns chat metadata sorted by most recent first
    */
   async listChats(projectId: string): Promise<ChatMetadata[]> {
     try {
@@ -326,7 +326,7 @@ class ChatsAPI {
 
   /**
    * Create a new chat in a project
-   * Educational Note: Creates a new conversation with empty message history
+   * Creates a new conversation with empty message history
    */
   async createChat(projectId: string, title: string = 'New Chat'): Promise<ChatMetadata> {
     try {
@@ -343,7 +343,7 @@ class ChatsAPI {
 
   /**
    * Get full chat data including all messages
-   * Educational Note: Loads the complete conversation history
+   * Loads the complete conversation history
    */
   async getChat(projectId: string, chatId: string): Promise<Chat> {
     try {
@@ -359,7 +359,7 @@ class ChatsAPI {
 
   /**
    * Get raw messages for debug/raw view.
-   * Educational Note: Returns ALL messages including tool_use and tool_result
+   * Returns ALL messages including tool_use and tool_result
    * intermediates with their original content blocks.
    */
   async getRawMessages(projectId: string, chatId: string): Promise<RawMessage[]> {
@@ -376,7 +376,7 @@ class ChatsAPI {
 
   /**
    * Send a message in a chat and get AI response
-   * Educational Note: This sends the user's message to Claude API
+   * This sends the user's message to Claude API
    * and returns both the user message and AI response
    */
   async sendMessage(
@@ -515,7 +515,7 @@ class ChatsAPI {
 
   /**
    * Update a chat's title
-   * Educational Note: Allows users to rename chats for better organization
+   * Allows users to rename chats for better organization
    */
   async updateChat(
     projectId: string,
@@ -536,7 +536,7 @@ class ChatsAPI {
 
   /**
    * Update which sources are selected for a specific chat.
-   * Educational Note: Per-chat source selection — each chat maintains its own
+   * Per-chat source selection — each chat maintains its own
    * set of selected sources independently.
    */
   async updateChatSources(
@@ -557,7 +557,7 @@ class ChatsAPI {
 
   /**
    * Delete a chat and all its messages
-   * Educational Note: This is a hard delete for simplicity
+   * This is a hard delete for simplicity
    */
   async deleteChat(projectId: string, chatId: string): Promise<void> {
     try {
@@ -623,7 +623,7 @@ class ChatsAPI {
 
   /**
    * Get per-chat cost and token breakdown.
-   * Educational Note: Mirrors projectsAPI.getCosts but scoped to a single chat.
+   * Mirrors projectsAPI.getCosts but scoped to a single chat.
    */
   async getCosts(projectId: string, chatId: string): Promise<CostTracking> {
     try {
@@ -639,7 +639,7 @@ class ChatsAPI {
 
   /**
    * Get the system prompt for a project (custom or default)
-   * Educational Note: Returns the prompt that will be used
+   * Returns the prompt that will be used
    * for all AI conversations in this project
    */
   async getProjectPrompt(projectId: string): Promise<string> {
@@ -656,7 +656,7 @@ class ChatsAPI {
 
   /**
    * Get the global default prompt
-   * Educational Note: This is the fallback prompt used when
+   * This is the fallback prompt used when
    * projects don't have custom prompts
    */
   async getDefaultPrompt(): Promise<string> {
@@ -671,7 +671,7 @@ class ChatsAPI {
 
   /**
    * Get all prompt configurations
-   * Educational Note: Returns all prompts from the data/prompts/ directory.
+   * Returns all prompts from the data/prompts/ directory.
    * Each prompt includes model, temperature, max_tokens, system_prompt, and user_message.
    */
   async getAllPrompts(): Promise<PromptConfig[]> {
@@ -686,7 +686,7 @@ class ChatsAPI {
 
   /**
    * Update the project's custom system prompt
-   * Educational Note: This allows users to customize how the AI behaves
+   * This allows users to customize how the AI behaves
    * for a specific project. Pass null to reset to default prompt.
    */
   async updateProjectPrompt(
@@ -710,7 +710,7 @@ class ChatsAPI {
 
   /**
    * Get ElevenLabs configuration for real-time transcription
-   * Educational Note: Returns WebSocket URL with embedded single-use token.
+   * Returns WebSocket URL with embedded single-use token.
    * The token is generated server-side and expires after 15 minutes.
    * Always fetch a new config before starting a recording session.
    *
@@ -784,7 +784,7 @@ class ChatsAPI {
 
   /**
    * Check if transcription is configured
-   * Educational Note: Lightweight check to see if ElevenLabs API key is set.
+   * Lightweight check to see if ElevenLabs API key is set.
    */
   async isTranscriptionConfigured(): Promise<boolean> {
     try {

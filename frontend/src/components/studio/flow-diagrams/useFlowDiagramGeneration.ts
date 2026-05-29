@@ -1,6 +1,6 @@
 /**
  * useFlowDiagramGeneration Hook
- * Educational Note: Manages Mermaid flow diagram generation from sources.
+ * Manages Mermaid flow diagram generation from sources.
  * Creates various diagram types (flowchart, sequence, state, ER, etc.) for visualization.
  */
 

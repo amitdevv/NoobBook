@@ -1,7 +1,7 @@
 """
 Audio Service - Transcribes audio files using ElevenLabs Speech-to-Text API.
 
-Educational Note: This service handles audio file transcription using ElevenLabs'
+This service handles audio file transcription using ElevenLabs'
 Scribe v1 model (for file-based transcription, not real-time).
 
 Key Features:
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 # Supported language codes for ElevenLabs Speech-to-Text
-# Educational Note: Pass None for auto-detection, or one of these codes to force a language
+# Pass None for auto-detection, or one of these codes to force a language
 SUPPORTED_LANGUAGES = {
     "auto": None,  # Auto-detect language
     "eng": "English",
@@ -62,7 +62,7 @@ class AudioService:
     """
     Service class for audio file transcription via ElevenLabs.
 
-    Educational Note: Uses the ElevenLabs Python SDK to transcribe audio files.
+    Uses the ElevenLabs Python SDK to transcribe audio files.
     The Scribe v1 model provides high-accuracy transcription with speaker
     diarization and audio event detection.
     """
@@ -78,7 +78,7 @@ class AudioService:
         """
         Get or create the ElevenLabs client.
 
-        Educational Note: We lazy-load the client to avoid import errors
+        We lazy-load the client to avoid import errors
         if the elevenlabs package isn't installed or configured.
 
         Returns:
@@ -112,7 +112,7 @@ class AudioService:
         """
         Transcribe an audio file using ElevenLabs Scribe v1.
 
-        Educational Note: This method sends the audio file to ElevenLabs
+        This method sends the audio file to ElevenLabs
         for transcription. The result includes the full transcript text,
         word-level timestamps, and optionally speaker identification.
 
@@ -144,7 +144,7 @@ class AudioService:
             logger.info("Transcribing audio: %s", audio_path.name)
 
             # Normalize language code: empty string or "auto" -> None for auto-detect
-            # Educational Note: ElevenLabs expects None (not empty string) for auto-detection
+            # ElevenLabs expects None (not empty string) for auto-detection
             normalized_language = None
             if language_code and language_code.strip() and language_code.lower() != "auto":
                 normalized_language = language_code.strip()
@@ -152,7 +152,7 @@ class AudioService:
             # Read the audio file
             with open(audio_path, "rb") as audio_file:
                 # Build API call kwargs conditionally
-                # Educational Note: We only pass language_code if explicitly set,
+                # We only pass language_code if explicitly set,
                 # otherwise ElevenLabs auto-detects the language
                 api_kwargs = {
                     "file": audio_file,
@@ -173,7 +173,7 @@ class AudioService:
             transcript_text = self._build_transcript_text(transcription, diarize)
 
             # Get detected language from response
-            # Educational Note: ElevenLabs returns the detected (or specified) language code
+            # ElevenLabs returns the detected (or specified) language code
             detected_language_code = getattr(transcription, 'language_code', None)
             detected_language_name = SUPPORTED_LANGUAGES.get(
                 detected_language_code,
@@ -232,7 +232,7 @@ class AudioService:
         """
         Build transcript text from ElevenLabs response.
 
-        Educational Note: The transcription response contains the full text
+        The transcription response contains the full text
         and optionally word-level data with speaker identification. We format
         this into readable text, optionally prefixing speaker changes.
 
@@ -264,7 +264,7 @@ class AudioService:
         """
         Format transcript with speaker labels from word-level data.
 
-        Educational Note: When diarization is enabled, each word has a
+        When diarization is enabled, each word has a
         speaker_id. We group consecutive words by speaker and format
         as "Speaker X: [text]" for better readability.
 
@@ -289,7 +289,7 @@ class AudioService:
         for word in words:
             speaker = getattr(word, 'speaker_id', None)
             # Get word text and strip whitespace
-            # Educational Note: ElevenLabs word objects include whitespace in their
+            # ElevenLabs word objects include whitespace in their
             # text field. We strip it and join with single spaces for clean output.
             raw_text = getattr(word, 'text', '') or getattr(word, 'word', '')
             text = raw_text.strip() if raw_text else ''
@@ -326,7 +326,7 @@ class AudioService:
         """
         Build processed content using centralized build_processed_output.
 
-        Educational Note: We use the centralized build_processed_output function
+        We use the centralized build_processed_output function
         to ensure consistent header format across all source types. The audio
         service provides the metadata it knows about (language, model, etc.)
         and build_processed_output handles token counting and page splitting.
@@ -358,7 +358,7 @@ class AudioService:
         token_count = count_tokens(transcript_text)
 
         # Build metadata dict with all keys audio service can provide
-        # Educational Note: duration is not available from ElevenLabs transcription API
+        # duration is not available from ElevenLabs transcription API
         metadata = {
             "model_used": self.TRANSCRIPTION_MODEL,
             "language": language,

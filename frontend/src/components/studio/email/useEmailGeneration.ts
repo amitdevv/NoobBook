@@ -1,6 +1,6 @@
 /**
  * useEmailGeneration Hook
- * Educational Note: Custom hook for email template generation logic.
+ * Custom hook for email template generation logic.
  * Handles state management, API calls, and polling.
  */
 

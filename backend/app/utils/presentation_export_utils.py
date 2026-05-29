@@ -1,7 +1,7 @@
 """
 Presentation Export Utilities - Create PPTX from screenshots.
 
-Educational Note: This module uses python-pptx to create PowerPoint presentations
+This module uses python-pptx to create PowerPoint presentations
 from PNG screenshots captured from HTML slides.
 
 Why python-pptx?
@@ -48,7 +48,7 @@ def create_pptx_from_screenshots(
     """
     Create a PPTX file from screenshot images.
 
-    Educational Note: Each screenshot becomes a full-slide background image.
+    Each screenshot becomes a full-slide background image.
     The PPTX maintains the exact visual design from the HTML slides.
 
     Args:

@@ -1,7 +1,7 @@
 """
 Source CRUD endpoints - core source management.
 
-Educational Note: These endpoints handle the lifecycle of source files:
+These endpoints handle the lifecycle of source files:
 - List all sources for a project
 - Upload new source files (multipart/form-data)
 - Get/update/delete individual sources
@@ -45,7 +45,7 @@ source_service = SourceService()
 
 
 # Map file extensions to permission (category, item) tuples.
-# Educational Note: File uploads go through a single endpoint regardless of type,
+# File uploads go through a single endpoint regardless of type,
 # so we check permissions inline based on the uploaded file's extension.
 _EXT_PERMISSION_MAP = {
     # document_sources
@@ -88,7 +88,7 @@ def list_sources(project_id: str):
     """
     List all sources for a project.
 
-    Educational Note: Returns metadata for all uploaded sources,
+    Returns metadata for all uploaded sources,
     sorted by most recent first. Includes processing status so
     UI can show progress indicators.
 
@@ -121,7 +121,7 @@ def upload_source(project_id: str):
     """
     Upload a new source file to a project.
 
-    Educational Note: This endpoint demonstrates multipart/form-data handling.
+    This endpoint demonstrates multipart/form-data handling.
     Files are streamed to disk, not loaded entirely into memory - important
     for large PDFs and audio files.
 
@@ -158,7 +158,7 @@ def upload_source(project_id: str):
             }), 400
 
         # Permission check based on file type
-        # Educational Note: One upload endpoint handles all file types, so we
+        # One upload endpoint handles all file types, so we
         # resolve the permission from the extension and check inline.
         perm = _get_upload_permission(file.filename)
         if perm:
@@ -207,7 +207,7 @@ def get_source(project_id: str, source_id: str):
     """
     Get a specific source's metadata.
 
-    Educational Note: Returns full metadata including:
+    Returns full metadata including:
     - Basic info (name, description, file type)
     - Processing status and progress
     - Embedding info (if processed)
@@ -246,7 +246,7 @@ def update_source(project_id: str, source_id: str):
     """
     Update a source's metadata.
 
-    Educational Note: Only metadata can be updated (name, description, active).
+    Only metadata can be updated (name, description, active).
     The raw file cannot be modified - delete and re-upload instead.
 
     The 'active' field controls whether the source is included in RAG searches.
@@ -358,7 +358,7 @@ def delete_source(project_id: str, source_id: str):
     """
     Delete a source and all associated data.
 
-    Educational Note: This is a HARD delete that removes:
+    This is a HARD delete that removes:
     - Raw file from Supabase Storage
     - Processed text file from Supabase Storage
     - All chunks from Supabase Storage
@@ -397,7 +397,7 @@ def download_source(project_id: str, source_id: str):
     """
     Download the raw source file.
 
-    Educational Note: Redirects to a signed Supabase Storage URL.
+    Redirects to a signed Supabase Storage URL.
     The signed URL expires after 1 hour for security.
 
     Returns:
@@ -437,7 +437,7 @@ def get_sources_summary(project_id: str):
     """
     Get aggregate statistics about sources.
 
-    Educational Note: Useful for dashboard displays showing:
+    Useful for dashboard displays showing:
     - Total source count
     - Breakdown by category (document, image, audio, etc.)
     - Processing status counts
@@ -475,7 +475,7 @@ def get_allowed_types():
     """
     Get the list of allowed file types for upload.
 
-    Educational Note: This endpoint helps frontend:
+    This endpoint helps frontend:
     - Set file input accept attribute
     - Validate before upload
     - Show supported types in UI

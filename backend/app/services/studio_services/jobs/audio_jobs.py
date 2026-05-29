@@ -1,7 +1,7 @@
 """
 Audio Job Management - Tracks audio generation jobs.
 
-Educational Note: Audio jobs generate podcast-style content from source materials.
+Audio jobs generate podcast-style content from source materials.
 Uses ElevenLabs for text-to-speech synthesis.
 """
 from datetime import datetime

@@ -1,6 +1,6 @@
 /**
  * EmailSection Component
- * Educational Note: Self-contained section for email template generation.
+ * Self-contained section for email template generation.
  */
 
 import React, { useEffect, useCallback } from 'react';

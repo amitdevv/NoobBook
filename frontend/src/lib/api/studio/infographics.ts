@@ -1,6 +1,6 @@
 /**
  * Infographics API
- * Educational Note: Handles AI-generated infographic images using Gemini Imagen.
+ * Handles AI-generated infographic images using Gemini Imagen.
  */
 
 import axios from 'axios';

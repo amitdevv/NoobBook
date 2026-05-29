@@ -1,7 +1,7 @@
 """
 Database Processor - Handles DATABASE source processing (Postgres/MySQL).
 
-Educational Note: A database source is processed by capturing a schema snapshot
+A database source is processed by capturing a schema snapshot
 (tables + basic metadata). This snapshot is stored as a processed text file in
 Supabase Storage, then embedded + summarized like other sources.
 

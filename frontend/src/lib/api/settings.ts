@@ -1,6 +1,6 @@
 /**
  * Settings API Service
- * Educational Note: Handles all API key management operations with the backend.
+ * Handles all API key management operations with the backend.
  * This service provides methods for CRUD operations on API keys stored in .env.
  */
 
@@ -80,7 +80,7 @@ export interface UserUsage {
 class SettingsAPI {
   /**
    * Get all API keys from the backend
-   * Educational Note: Returns masked values for security
+   * Returns masked values for security
    */
   async getApiKeys(): Promise<ApiKey[]> {
     try {
@@ -94,7 +94,7 @@ class SettingsAPI {
 
   /**
    * Update multiple API keys
-   * Educational Note: This triggers a backend .env update and potential Flask reload
+   * This triggers a backend .env update and potential Flask reload
    */
   async updateApiKeys(apiKeys: ApiKeyUpdate[]): Promise<void> {
     try {
@@ -109,7 +109,7 @@ class SettingsAPI {
 
   /**
    * Delete a specific API key
-   * Educational Note: Removes the key from .env file
+   * Removes the key from .env file
    */
   async deleteApiKey(keyId: string): Promise<void> {
     try {
@@ -122,7 +122,7 @@ class SettingsAPI {
 
   /**
    * Validate an API key
-   * Educational Note: Tests if an API key works by making a test request
+   * Tests if an API key works by making a test request
    */
   async validateApiKey(keyId: string, value: string): Promise<ValidationResult> {
     try {
@@ -457,7 +457,7 @@ class UsersAPI {
 
   /**
    * Get permissions for a specific user
-   * Educational Note: Returns the category-based permission structure that
+   * Returns the category-based permission structure that
    * controls which features are available to this user.
    */
   async getUserPermissions(userId: string): Promise<{
@@ -674,7 +674,7 @@ export interface ProcessingSettings {
 class ProcessingSettingsAPI {
   /**
    * Get current processing settings
-   * Educational Note: Returns the current tier configuration for parallel processing
+   * Returns the current tier configuration for parallel processing
    */
   async getSettings(): Promise<{ settings: ProcessingSettings; available_tiers: AvailableTier[] }> {
     try {
@@ -691,7 +691,7 @@ class ProcessingSettingsAPI {
 
   /**
    * Update processing settings
-   * Educational Note: Saves the selected tier to .env file
+   * Saves the selected tier to .env file
    */
   async updateSettings(settings: { anthropic_tier: number }): Promise<ProcessingSettings> {
     try {
@@ -817,7 +817,7 @@ export interface GoogleFilesResponse {
 class GoogleDriveAPI {
   /**
    * Get Google Drive connection status
-   * Educational Note: Checks if OAuth is configured and if user is connected
+   * Checks if OAuth is configured and if user is connected
    */
   async getStatus(): Promise<GoogleStatus> {
     try {
@@ -839,7 +839,7 @@ class GoogleDriveAPI {
 
   /**
    * Start Google OAuth flow
-   * Educational Note: Returns the auth URL to redirect user to
+   * Returns the auth URL to redirect user to
    */
   async getAuthUrl(): Promise<string | null> {
     try {
@@ -853,7 +853,7 @@ class GoogleDriveAPI {
 
   /**
    * Disconnect Google Drive
-   * Educational Note: Removes stored tokens
+   * Removes stored tokens
    */
   async disconnect(): Promise<boolean> {
     try {
@@ -867,7 +867,7 @@ class GoogleDriveAPI {
 
   /**
    * List files from Google Drive
-   * Educational Note: Supports folder navigation and pagination
+   * Supports folder navigation and pagination
    */
   async listFiles(
     folderId?: string,
@@ -896,7 +896,7 @@ class GoogleDriveAPI {
 
   /**
    * Import a file from Google Drive to project sources
-   * Educational Note: Downloads/exports file and creates source entry
+   * Downloads/exports file and creates source entry
    */
   async importFile(
     projectId: string,

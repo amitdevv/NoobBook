@@ -1,7 +1,7 @@
 """
 VEO (Video Generation) API key validator.
 
-Educational Note: Validates API keys for VEO 2.0 video generation model
+Validates API keys for VEO 2.0 video generation model
 by starting a minimal video generation request.
 """
 import logging
@@ -16,7 +16,7 @@ def validate_veo_key(api_key: str) -> Tuple[bool, str]:
     """
     Validate VEO (Video Generation) API key.
 
-    Educational Note: This tests if the API key is valid and enabled for
+    This tests if the API key is valid and enabled for
     VEO 2.0 video generation model. We use minimal settings for fastest test.
 
     Args:

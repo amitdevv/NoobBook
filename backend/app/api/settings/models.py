@@ -1,7 +1,7 @@
 """
 Model settings endpoints - Admin-configurable Claude model per use case.
 
-Educational Note: Every prompt config has a baked-in model (Haiku, Sonnet, or
+Every prompt config has a baked-in model (Haiku, Sonnet, or
 Opus). This endpoint lets an admin override those models per category:
 
     - chat:       main conversation, auto-naming, memory

@@ -1,7 +1,7 @@
 """
 PPTX Utilities - LibreOffice path detection and PPTX to PDF conversion.
 
-Educational Note: These utilities handle the non-AI parts of PPTX processing:
+These utilities handle the non-AI parts of PPTX processing:
 - Detecting LibreOffice installation path across different operating systems
 - Converting PPTX files to PDF using LibreOffice headless mode
 
@@ -23,7 +23,7 @@ def get_libreoffice_path() -> str:
     """
     Get the LibreOffice executable path based on OS.
 
-    Educational Note: LibreOffice is installed in different locations
+    LibreOffice is installed in different locations
     on different operating systems. We detect the OS and return the
     appropriate path.
 
@@ -68,7 +68,7 @@ def convert_pptx_to_pdf(pptx_path: Path, output_dir: Path) -> Path:
     """
     Convert PPTX to PDF using LibreOffice headless mode.
 
-    Educational Note: LibreOffice's headless mode allows conversion
+    LibreOffice's headless mode allows conversion
     without launching a GUI. The --convert-to flag specifies the
     output format, and --outdir specifies where to save it.
 

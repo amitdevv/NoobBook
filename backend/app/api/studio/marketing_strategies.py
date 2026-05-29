@@ -1,7 +1,7 @@
 """
 Marketing Strategy Generator endpoints - AI-generated Marketing Strategy Documents.
 
-Educational Note: Marketing Strategy generation demonstrates the agentic loop pattern:
+Marketing Strategy generation demonstrates the agentic loop pattern:
 1. Agent plans the document structure (sections to write)
 2. Agent writes sections incrementally using write_marketing_section tool
 3. Agent signals completion via is_last_section=true flag

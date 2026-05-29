@@ -1,6 +1,6 @@
 /**
  * StudioSections Component
- * Educational Note: Renders all studio feature sections.
+ * Renders all studio feature sections.
  * Each section is isolated - only re-renders when its own state changes.
  * This replaces the old StudioGeneratedContent + StudioProgressIndicators + StudioModals pattern.
  */

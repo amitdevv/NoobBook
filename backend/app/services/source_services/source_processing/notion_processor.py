@@ -1,7 +1,7 @@
 """
 Notion Processor - Fetches Notion page or database content and embeds it.
 
-Educational Note: Notion sources are stored as `.notion` stub files holding
+Notion sources are stored as `.notion` stub files holding
 the picked page/database ID. The processor:
 
 1. Reads the stub → gets notion_id + object_type

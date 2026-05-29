@@ -1,6 +1,6 @@
 /**
  * InfographicSection Component
- * Educational Note: Self-contained section for infographic generation.
+ * Self-contained section for infographic generation.
  */
 
 import React, { useEffect, useCallback } from 'react';

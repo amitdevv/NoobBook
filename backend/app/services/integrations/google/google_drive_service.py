@@ -1,7 +1,7 @@
 """
 Google Drive Service - Fetch and download files from Google Drive.
 
-Educational Note: This service handles Google Drive operations:
+This service handles Google Drive operations:
 1. List files from user's Drive (with optional folder navigation)
 2. Download regular files (PDF, images, audio, etc.)
 3. Export Google Workspace files (Docs→DOCX, Sheets→CSV, Slides→PPTX)
@@ -44,14 +44,14 @@ class GoogleDriveService:
     """
     Service class for Google Drive file operations.
 
-    Educational Note: This service uses the Google Drive API v3 to:
+    This service uses the Google Drive API v3 to:
     - List files with filtering and pagination
     - Download binary files
     - Export Google Workspace files to standard formats
     """
 
     # Mapping of Google Workspace MIME types to export formats
-    # Educational Note: Google Workspace files must be EXPORTED, not downloaded
+    # Google Workspace files must be EXPORTED, not downloaded
     # because they're not stored as regular files
     EXPORT_MIME_TYPES = {
         'application/vnd.google-apps.document': {
@@ -137,7 +137,7 @@ class GoogleDriveService:
         """
         List files from Google Drive.
 
-        Educational Note: The Drive API uses a query language for filtering.
+        The Drive API uses a query language for filtering.
         Key query operators:
         - 'folder_id' in parents: Files in a specific folder
         - trashed = false: Exclude deleted files
@@ -161,7 +161,7 @@ class GoogleDriveService:
 
         try:
             # Build query
-            # Educational Note: We filter for supported file types and exclude trash
+            # We filter for supported file types and exclude trash
             query_parts = ["trashed = false"]
 
             if folder_id:
@@ -170,7 +170,7 @@ class GoogleDriveService:
             query = " and ".join(query_parts)
 
             # Execute query
-            # Educational Note: fields parameter limits response data for efficiency
+            # fields parameter limits response data for efficiency
             # Sort by modified time (newest first). Frontend separates folders/files.
             results = service.files().list(
                 q=query,
@@ -266,7 +266,7 @@ class GoogleDriveService:
         """
         Download a file from Google Drive.
 
-        Educational Note: There are two ways to get file content:
+        There are two ways to get file content:
         1. Download: For regular files (PDFs, images, etc.)
         2. Export: For Google Workspace files (Docs, Sheets, Slides)
 
@@ -318,7 +318,7 @@ class GoogleDriveService:
         """
         Download a regular (non-Google) file.
 
-        Educational Note: Regular files are downloaded as-is using
+        Regular files are downloaded as-is using
         the media download API with chunked transfer.
 
         Args:
@@ -363,7 +363,7 @@ class GoogleDriveService:
         """
         Export a Google Workspace file to a standard format.
 
-        Educational Note: Google Docs, Sheets, and Slides aren't stored
+        Google Docs, Sheets, and Slides aren't stored
         as regular files. We must use the export API to convert them
         to standard formats like DOCX, CSV, or PPTX.
 
@@ -410,7 +410,7 @@ class GoogleDriveService:
         """
         Get the appropriate file extension for a Drive file.
 
-        Educational Note: For Google Workspace files, we return the
+        For Google Workspace files, we return the
         export extension. For regular files, we extract from the name.
 
         Args:

@@ -1,7 +1,7 @@
 """
 Grouped Studio Jobs endpoint.
 
-Educational Note: Studio used to bootstrap by having every section hit its own
+Studio used to bootstrap by having every section hit its own
 list endpoint on mount. This route lets the frontend hydrate once and fan the
 results back out locally.
 """

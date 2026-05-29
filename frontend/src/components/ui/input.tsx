@@ -6,7 +6,7 @@ export type InputProps = React.InputHTMLAttributes<HTMLInputElement>
 
 /**
  * Input component from shadcn/ui
- * Educational Note: This is a styled wrapper around the native HTML input.
+ * This is a styled wrapper around the native HTML input.
  * The forwardRef pattern allows parent components to get a reference to
  * the actual input element (useful for focus management, etc.)
  */

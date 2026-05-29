@@ -1,7 +1,7 @@
 """
 Business Report Agent Executor - Handles studio signal execution for business reports.
 
-Educational Note: This executor is triggered by studio signals (from main chat)
+This executor is triggered by studio signals (from main chat)
 and launches the business_report_agent as a background task. The agent orchestrates
 data analysis (via csv_analyzer_agent) and report writing.
 
@@ -21,7 +21,7 @@ class BusinessReportAgentExecutor:
     """
     Executor for business report generation via studio signals.
 
-    Educational Note: The studio signal flow:
+    The studio signal flow:
     1. User chats with AI about sources (including CSV data)
     2. AI decides to generate a business report (sends studio_signal tool call)
     3. studio_signal_executor routes to this executor

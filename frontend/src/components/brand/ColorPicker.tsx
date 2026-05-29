@@ -1,6 +1,6 @@
 /**
  * ColorPicker Component
- * Educational Note: Simple color input with hex value display.
+ * Simple color input with hex value display.
  */
 import React from 'react';
 import { Input } from '../ui/input';

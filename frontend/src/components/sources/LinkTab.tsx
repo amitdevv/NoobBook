@@ -1,6 +1,6 @@
 /**
  * LinkTab Component
- * Educational Note: Handles adding sources via URL (website or YouTube).
+ * Handles adding sources via URL (website or YouTube).
  * URLs are stored as .link files - content fetching happens separately.
  */
 

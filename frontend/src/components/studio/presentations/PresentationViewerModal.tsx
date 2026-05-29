@@ -1,6 +1,6 @@
 /**
  * PresentationViewerModal Component
- * Educational Note: Modal for previewing generated presentations with slide navigation.
+ * Modal for previewing generated presentations with slide navigation.
  * Shows screenshot images with PPTX download option.
  */
 
@@ -60,7 +60,7 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
   }, [viewingPresentationJob?.id]);
 
   // Compute screenshot URL synchronously during render (not in useEffect)
-  // Educational Note: useMemo ensures the URL updates in the SAME render as
+  // useMemo ensures the URL updates in the SAME render as
   // the slide counter, keeping them in sync. useEffect runs after paint which
   // causes a visible desync between the counter and the displayed image.
   const screenshotUrl = useMemo(() => {

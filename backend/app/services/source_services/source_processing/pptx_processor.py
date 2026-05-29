@@ -1,7 +1,7 @@
 """
 PPTX Processor - Handles PowerPoint presentation processing.
 
-Educational Note: PPTX files are processed in three stages:
+PPTX files are processed in three stages:
 1. Convert PPTX to PDF using LibreOffice headless
 2. Extract PDF pages as base64 (reusing existing infrastructure)
 3. Send to Claude vision with presentation-specific prompts
@@ -125,7 +125,7 @@ def _process_embeddings(
     """
     Process embeddings for a source using embedding_service.
 
-    Educational Note: We ALWAYS chunk and embed every source for consistent
+    We ALWAYS chunk and embed every source for consistent
     retrieval. The token count is used for chunk sizing decisions.
     Chunks are uploaded to Supabase Storage.
     """

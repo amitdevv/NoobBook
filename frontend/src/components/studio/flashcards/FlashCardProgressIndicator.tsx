@@ -1,6 +1,6 @@
 /**
  * FlashCardProgressIndicator Component
- * Educational Note: Shows real-time progress during flash card generation.
+ * Shows real-time progress during flash card generation.
  * Purple theme distinguishes from other studio items.
  */
 

@@ -1,6 +1,6 @@
 /**
  * PresentationSection Component
- * Educational Note: Self-contained section for presentation generation.
+ * Self-contained section for presentation generation.
  */
 
 import React, { useEffect, useCallback } from 'react';

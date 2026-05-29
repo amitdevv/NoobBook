@@ -1,7 +1,7 @@
 """
 Jira API credentials validator.
 
-Educational Note: Validates Jira credentials by calling /rest/api/3/myself
+Validates Jira credentials by calling /rest/api/3/myself
 which returns the authenticated user's profile. Uses Basic Auth with
 email + API token. Requires JIRA_CLOUD_ID to determine the API base URL.
 """
@@ -21,7 +21,7 @@ def validate_jira_key(
     """
     Validate Jira credentials by fetching the authenticated user.
 
-    Educational Note: Jira uses Basic Auth (email:api_token) and needs a
+    Jira uses Basic Auth (email:api_token) and needs a
     Cloud ID to construct the API URL. All three fields must be provided.
     If email or cloud_id are missing, we return a helpful message telling
     the user to save those fields first.

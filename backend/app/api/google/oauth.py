@@ -1,7 +1,7 @@
 """
 Google OAuth 2.0 flow endpoints.
 
-Educational Note: OAuth 2.0 is the industry standard for authorization.
+OAuth 2.0 is the industry standard for authorization.
 It allows users to grant our app access to their Google Drive without
 sharing their password.
 
@@ -104,7 +104,7 @@ def _get_current_user_id() -> Optional[str]:
     """
     Get the current user ID from the authenticated session.
 
-    Educational Note: In single-user mode (service key), this returns None
+    In single-user mode (service key), this returns None
     which triggers the fallback to the default user in the database.
     For multi-user mode, implement JWT/session extraction here.
 
@@ -122,7 +122,7 @@ def google_status():
     """
     Check Google Drive configuration and connection status.
 
-    Educational Note: This endpoint checks two things:
+    This endpoint checks two things:
     1. Is Google OAuth configured? (client ID + secret set in .env)
     2. Is user connected? (valid tokens stored in Supabase users.google_tokens)
 
@@ -159,7 +159,7 @@ def google_auth():
     """
     Start Google OAuth flow by returning the authorization URL.
 
-    Educational Note: The authorization URL contains:
+    The authorization URL contains:
     - client_id: Identifies our app to Google
     - redirect_uri: Where to send user after granting permission
     - scope: What permissions we're requesting (drive.readonly)
@@ -205,7 +205,7 @@ def google_callback():
     """
     Handle OAuth callback from Google.
 
-    Educational Note: This is where the OAuth "dance" completes:
+    This is where the OAuth "dance" completes:
     1. Google redirects here with ?code=AUTHORIZATION_CODE&state=USER_ID
     2. We exchange the code for access + refresh tokens
     3. Tokens are stored in Supabase users.google_tokens (per-user)
@@ -267,7 +267,7 @@ def google_disconnect():
     """
     Disconnect Google Drive by removing stored tokens.
 
-    Educational Note: This removes tokens from Supabase users.google_tokens.
+    This removes tokens from Supabase users.google_tokens.
     User will need to re-authenticate to use Google Drive again.
 
     Note: This does NOT revoke access at Google's end - user can

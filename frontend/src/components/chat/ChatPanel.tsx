@@ -1,6 +1,6 @@
 /**
  * ChatPanel Component
- * Educational Note: Main orchestrator for the chat interface.
+ * Main orchestrator for the chat interface.
  * Composes smaller components (ChatHeader, ChatMessages, ChatInput, etc.)
  * and manages chat state and API interactions.
  */
@@ -381,7 +381,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   /**
    * Refetch sources when sourcesVersion changes
-   * Educational Note: This triggers when SourcesPanel notifies us that sources
+   * This triggers when SourcesPanel notifies us that sources
    * have changed (toggle active, delete, processing complete, etc.)
    */
   useEffect(() => {
@@ -393,7 +393,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   /**
    * Notify parent when studio signals change
-   * Educational Note: Signals are stored in the chat and loaded/updated
+   * Signals are stored in the chat and loaded/updated
    * when chat is loaded or after messages are sent.
    */
   useEffect(() => {
@@ -703,7 +703,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   /**
    * Send a message and get AI response
-   * Educational Note: We add the user message optimistically to the UI
+   * We add the user message optimistically to the UI
    * before the API call, so users see their message immediately.
    */
   const handleSend = async () => {
