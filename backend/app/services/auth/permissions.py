@@ -206,8 +206,16 @@ def user_has_permission(user_id: str, category: str, item: Optional[str] = None)
     Returns:
         True if the user has access
     """
-    perms = get_user_permissions(user_id)
+    return permission_in(get_user_permissions(user_id), category, item)
 
+
+def permission_in(perms: Dict[str, Any], category: str, item: Optional[str] = None) -> bool:
+    """Permission check against an already-loaded permissions dict.
+
+    Same logic as ``user_has_permission`` but without the DB fetch — call
+    ``get_user_permissions`` once and reuse the result across several checks
+    (e.g. the chat tool-gating path checks ~7 categories per turn).
+    """
     cat = perms.get(category)
     if cat is None:
         return True  # Unknown category = allowed

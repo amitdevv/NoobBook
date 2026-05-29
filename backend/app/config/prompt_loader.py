@@ -22,6 +22,7 @@ Prompt Hierarchy:
 1. Project custom prompt (if set)
 2. Global default prompt (fallback)
 """
+import copy
 import json
 import logging
 from pathlib import Path
@@ -30,6 +31,34 @@ from typing import Optional, Dict, Any
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+
+# Prompt JSON (shipped defaults, admin overrides, per-project settings) is read
+# on every AI call but only changes when an admin/user edits it. Cache parsed
+# JSON keyed by (path, mtime): re-parse only when the file's mtime changes, so
+# the "edits take effect without restart" guarantee holds (any write bumps
+# mtime). Return a deep copy so callers can't mutate the cached object.
+_json_mtime_cache: Dict[str, "tuple[int, Any]"] = {}
+
+
+def _read_json_mtime_cached(path: Path) -> Optional[Any]:
+    """Read+parse a JSON file, caching by mtime. None if missing/invalid."""
+    try:
+        mtime = path.stat().st_mtime_ns
+    except OSError:
+        return None
+    key = str(path)
+    cached = _json_mtime_cache.get(key)
+    if cached is not None and cached[0] == mtime:
+        return copy.deepcopy(cached[1])
+    try:
+        with open(path, "r") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        logger.error("Failed to read JSON %s: %s", path, e)
+        return None
+    _json_mtime_cache[key] = (mtime, data)
+    return copy.deepcopy(data)
 
 
 class PromptConfig(dict):
@@ -124,18 +153,13 @@ class PromptLoader:
     def _load_override(self, prompt_name: str) -> Optional[Dict[str, Any]]:
         """Read the override file for ``prompt_name``, or return ``None``."""
         path = self._override_path(prompt_name)
-        if not path.exists():
+        data = _read_json_mtime_cached(path)
+        if data is None:
             return None
-        try:
-            with open(path, 'r') as f:
-                data = json.load(f)
-            if not isinstance(data, dict):
-                logger.warning("Override %s is not a JSON object — ignoring", path)
-                return None
-            return data
-        except (json.JSONDecodeError, IOError) as e:
-            logger.error("Failed to read override %s: %s", path, e)
+        if not isinstance(data, dict):
+            logger.warning("Override %s is not a JSON object — ignoring", path)
             return None
+        return data
 
     def has_override(self, prompt_name: str) -> bool:
         """True iff an admin override file exists for this prompt."""
@@ -170,15 +194,13 @@ class PromptLoader:
     def _load_base(self, prompt_name: str) -> Optional[Dict[str, Any]]:
         """Load the shipped default for ``prompt_name``, no merge."""
         prompt_file = self.prompts_dir / f"{prompt_name}_prompt.json"
-        try:
-            with open(prompt_file, 'r') as f:
-                data = json.load(f)
-            # Legacy format compat
-            if "prompt" in data and "system_prompt" not in data:
-                data["system_prompt"] = data.pop("prompt")
-            return data
-        except (FileNotFoundError, json.JSONDecodeError):
+        data = _read_json_mtime_cached(prompt_file)
+        if data is None:
             return None
+        # Legacy format compat
+        if "prompt" in data and "system_prompt" not in data:
+            data["system_prompt"] = data.pop("prompt")
+        return data
 
     def get_prompt_default_config(self, prompt_name: str) -> Optional[Dict[str, Any]]:
         """
@@ -241,15 +263,11 @@ class PromptLoader:
         """
         project_file = self.projects_dir / f"{project_id}.json"
 
-        try:
-            with open(project_file, 'r') as f:
-                project_data = json.load(f)
-                custom_prompt = project_data.get("settings", {}).get("custom_prompt")
-
-                if custom_prompt:
-                    return custom_prompt
-        except (FileNotFoundError, json.JSONDecodeError):
-            pass
+        project_data = _read_json_mtime_cached(project_file)
+        if isinstance(project_data, dict):
+            custom_prompt = project_data.get("settings", {}).get("custom_prompt")
+            if custom_prompt:
+                return custom_prompt
 
         # Return default if no custom prompt
         return self.get_default_prompt()
@@ -273,15 +291,11 @@ class PromptLoader:
         # Check for custom prompt override
         project_file = self.projects_dir / f"{project_id}.json"
 
-        try:
-            with open(project_file, 'r') as f:
-                project_data = json.load(f)
-                custom_prompt = project_data.get("settings", {}).get("custom_prompt")
-
-                if custom_prompt:
-                    config["system_prompt"] = custom_prompt
-        except (FileNotFoundError, json.JSONDecodeError):
-            pass
+        project_data = _read_json_mtime_cached(project_file)
+        if isinstance(project_data, dict):
+            custom_prompt = project_data.get("settings", {}).get("custom_prompt")
+            if custom_prompt:
+                config["system_prompt"] = custom_prompt
 
         # get_default_prompt_config already returns a PromptConfig tagged with
         # prompt_name="default" so the admin "chat" category override applies.

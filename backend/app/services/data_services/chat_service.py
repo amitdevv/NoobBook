@@ -393,7 +393,18 @@ class ChatService(SupabaseService):
                     "citations": msg.get("citations", [])
                 })
 
-        # Get studio signals
+        chat["messages"] = display_messages
+        chat["studio_signals"] = self._get_formatted_signals(chat_id)
+        chat["message_count"] = len(messages)
+
+        return chat
+
+    def _get_formatted_signals(self, chat_id: str) -> List[Dict[str, Any]]:
+        """Fetch a chat's studio signals, shaped for the frontend.
+
+        Backend stores ``source_ids: ["uuid1", ...]``; the frontend expects
+        ``sources: [{source_id, chunk_ids}]``.
+        """
         signals_response = (
             self.supabase.table(self.studio_signals_table)
             .select("*")
@@ -401,27 +412,44 @@ class ChatService(SupabaseService):
             .order("created_at", desc=False)
             .execute()
         )
-
-        # Transform signals for frontend format
-        # Backend stores: source_ids: ["uuid1", "uuid2"]
-        # Frontend expects: sources: [{source_id: "...", chunk_ids: []}]
         formatted_signals = []
         for signal in (signals_response.data or []):
             source_ids = signal.get("source_ids", []) or []
-            formatted_signal = {
+            formatted_signals.append({
                 "id": signal.get("id"),
                 "studio_item": signal.get("studio_item"),
                 "direction": signal.get("direction", ""),
                 "sources": [{"source_id": sid, "chunk_ids": []} for sid in source_ids],
                 "created_at": signal.get("created_at"),
                 "status": signal.get("status", "pending")
-            }
-            formatted_signals.append(formatted_signal)
+            })
+        return formatted_signals
 
-        chat["messages"] = display_messages
-        chat["studio_signals"] = formatted_signals
-        chat["message_count"] = len(messages)
+    def get_chat_meta(self, project_id: str, chat_id: str) -> Optional[Dict[str, Any]]:
+        """Chat row + message_count WITHOUT fetching/formatting the message list.
 
+        For callers that only need scalar chat fields (selected_source_ids,
+        message_count, title, timestamps) — e.g. the chat turn start and sync
+        payload, which fetch messages separately. Avoids a full message fetch +
+        per-message formatting that get_chat would otherwise do and discard.
+        """
+        chat_response = (
+            self.supabase.table(self.table)
+            .select("*")
+            .eq("id", chat_id)
+            .eq("project_id", project_id)
+            .execute()
+        )
+        if not chat_response.data:
+            return None
+        chat = chat_response.data[0]
+        count_response = (
+            self.supabase.table(self.messages_table)
+            .select("id", count="exact")
+            .eq("chat_id", chat_id)
+            .execute()
+        )
+        chat["message_count"] = count_response.count or 0
         return chat
 
     @staticmethod
@@ -713,7 +741,9 @@ class ChatService(SupabaseService):
         }
 
     def get_chat_sync_state(self, project_id: str, chat_id: str) -> Optional[Dict[str, Any]]:
-        chat = self.get_chat(project_id, chat_id)
+        # Meta + signals only — this payload never uses the message list, so
+        # skip get_chat's full message fetch + per-message formatting.
+        chat = self.get_chat_meta(project_id, chat_id)
         if not chat:
             return None
 
@@ -726,7 +756,7 @@ class ChatService(SupabaseService):
                 "message_count": chat["message_count"],
                 "selected_source_ids": chat.get("selected_source_ids"),
             },
-            "studio_signals": chat.get("studio_signals", []),
+            "studio_signals": self._get_formatted_signals(chat_id),
             "chat_costs": self.get_chat_costs(project_id, chat_id),
         }
 

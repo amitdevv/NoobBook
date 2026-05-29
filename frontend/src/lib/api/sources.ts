@@ -207,20 +207,46 @@ export function getViewKind(source: Source): SourceViewKind {
   return 'markdown';
 }
 
+// Coalesce concurrent listSources calls: SourcesPanel and ChatPanel both fetch
+// the source list on workspace mount within milliseconds of each other. A short
+// shared-promise window collapses that to one request. The window (2s) is below
+// the 3s status-poll cadence, so polls still get fresh data; mutations refetch
+// well after the window. Mirrors src/lib/api/studio/jobGroups.ts.
+interface CachedSources {
+  fetchedAt: number;
+  promise?: Promise<Source[]>;
+  sources?: Source[];
+}
+const sourcesCache = new Map<string, CachedSources>();
+const SOURCES_CACHE_MS = 2000;
+
 class SourcesAPI {
   /**
    * List all sources for a project
    */
   async listSources(projectId: string): Promise<Source[]> {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/projects/${projectId}/sources`
-      );
-      return response.data.sources;
-    } catch (error) {
-      log.error({ err: error }, 'failed to fetch sources');
-      throw error;
+    const cached = sourcesCache.get(projectId);
+    const now = Date.now();
+    if (cached?.sources && now - cached.fetchedAt < SOURCES_CACHE_MS) {
+      return cached.sources;
     }
+    if (cached?.promise) {
+      return cached.promise;
+    }
+    const promise = axios
+      .get(`${API_BASE_URL}/projects/${projectId}/sources`)
+      .then((response) => {
+        const sources: Source[] = response.data.sources;
+        sourcesCache.set(projectId, { fetchedAt: Date.now(), sources });
+        return sources;
+      })
+      .catch((error) => {
+        sourcesCache.delete(projectId);
+        log.error({ err: error }, 'failed to fetch sources');
+        throw error;
+      });
+    sourcesCache.set(projectId, { fetchedAt: now, promise });
+    return promise;
   }
 
   /**

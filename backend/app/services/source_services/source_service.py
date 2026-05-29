@@ -64,6 +64,11 @@ class SourceService:
         """
         return source_index_service.list_sources_from_index(project_id)
 
+    def list_sources_for_context(self, project_id: str) -> List[Dict[str, Any]]:
+        """List sources with only the columns the chat source-context needs
+        (drops the heavy processing_info JSONB). Not for the Sources panel."""
+        return source_index_service.list_sources_for_context(project_id)
+
     def get_source(self, project_id: str, source_id: str) -> Optional[Dict[str, Any]]:
         """
         Get a specific source's metadata.

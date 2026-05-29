@@ -6,8 +6,9 @@ using Supabase as the database backend. It provides a clean abstraction
 over database operations.
 """
 import logging
+import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any
 
 from app.services.data_services.base_service import SupabaseService
@@ -148,12 +149,28 @@ class ProjectService(SupabaseService):
 
         project = response.data[0]
 
-        # Update last accessed time
-        self.supabase.table(self.table).update({
-            "last_accessed": datetime.now().isoformat()
-        }).eq("id", project_id).eq("user_id", uid).execute()
+        # Update last_accessed only when it's stale (>5 min). It drives dashboard
+        # ordering, so per-read precision isn't needed — and skipping the write on
+        # repeated reads removes a serial write round-trip from the hot read path.
+        # Any parse issue falls back to writing (preserves prior behavior).
+        if self._last_accessed_is_stale(project.get("last_accessed")):
+            self.supabase.table(self.table).update({
+                "last_accessed": datetime.now().isoformat()
+            }).eq("id", project_id).eq("user_id", uid).execute()
 
         return project
+
+    @staticmethod
+    def _last_accessed_is_stale(last_accessed: Optional[str]) -> bool:
+        """True if last_accessed is missing, unparseable, or older than 5 minutes."""
+        if not last_accessed:
+            return True
+        try:
+            prev = datetime.fromisoformat(str(last_accessed).replace("Z", "+00:00"))
+            now = datetime.now(prev.tzinfo) if prev.tzinfo else datetime.now()
+            return (now - prev) > timedelta(minutes=5)
+        except (ValueError, TypeError):
+            return True
 
     def update_project(
         self,
@@ -544,9 +561,24 @@ class ProjectService(SupabaseService):
         return response.data[0].get("user_id")
 
     def has_project_access(self, project_id: str, user_id: str) -> bool:
-        """Check if a user owns the project."""
+        """Check if a user owns the project.
+
+        Runs in the global before_request hook on every project-scoped API
+        call, so it's a serial DB round-trip on the hot path. Positive results
+        are cached briefly (ownership effectively never changes); negatives are
+        always re-checked so a freshly-created project isn't locked out. A
+        deleted project's stale True self-corrects within the TTL — and the
+        handler's own queries return empty regardless, so it's not a leak.
+        """
         if not project_id or not user_id:
             return False
+
+        key = (project_id, user_id)
+        now = time.monotonic()
+        expiry = _ACCESS_CACHE.get(key)
+        if expiry is not None and expiry > now:
+            return True
+
         response = (
             self.supabase.table(self.table)
             .select("id")
@@ -554,7 +586,18 @@ class ProjectService(SupabaseService):
             .eq("user_id", user_id)
             .execute()
         )
-        return bool(response.data)
+        allowed = bool(response.data)
+        if allowed:
+            # Bound memory: clear if the cache grows unexpectedly large.
+            if len(_ACCESS_CACHE) > 10000:
+                _ACCESS_CACHE.clear()
+            _ACCESS_CACHE[key] = now + _ACCESS_TTL_SECONDS
+        return allowed
+
+
+# Short-lived positive-only cache for has_project_access (see method docstring).
+_ACCESS_CACHE: Dict[tuple, float] = {}
+_ACCESS_TTL_SECONDS = 30.0
 
 
 # Singleton instance

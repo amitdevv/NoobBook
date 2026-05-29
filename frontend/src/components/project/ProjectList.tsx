@@ -103,15 +103,14 @@ export const ProjectList: React.FC<ProjectListProps> = ({
     }
   };
 
-  const handleOpenProject = async (project: Project) => {
-    try {
-      // Mark project as opened
-      await projectsAPI.open(project.id);
-      // Select the project
-      onSelectProject(project);
-    } catch (err) {
-      log.error({ err }, 'failed to open project');
-    }
+  const handleOpenProject = (project: Project) => {
+    // Navigate immediately — don't block the workspace route on the
+    // "mark as opened" POST. It only updates last_accessed (dashboard
+    // ordering), so fire-and-forget it in the background.
+    projectsAPI.open(project.id).catch((err) => {
+      log.error({ err }, 'failed to mark project opened');
+    });
+    onSelectProject(project);
   };
 
   const handleDeleteClick = (e: React.MouseEvent, projectId: string) => {

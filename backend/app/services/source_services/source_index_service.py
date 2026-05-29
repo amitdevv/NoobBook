@@ -290,3 +290,29 @@ def list_sources_from_index(project_id: str) -> List[Dict[str, Any]]:
 
     # Map field names for frontend compatibility
     return [_map_source_fields(source) for source in (response.data or [])]
+
+
+# Columns the chat system-prompt source context actually consumes (via
+# get_active_sources + build_source_context + _map_source_fields). Deliberately
+# excludes the heavy `processing_info` JSONB (per-page extraction debug data)
+# and other unused columns so the per-turn context query doesn't transfer and
+# deserialize them.
+_CONTEXT_SOURCE_COLUMNS = "id, name, type, status, is_active, embedding_info, summary_info, created_at"
+
+
+def list_sources_for_context(project_id: str) -> List[Dict[str, Any]]:
+    """Like ``list_sources_from_index`` but projects only the columns the chat
+    source-context build needs — avoids shipping the large processing_info blob
+    on every message. NOT for the Sources panel (which renders processing_info
+    error/sync state)."""
+    client = _get_client()
+
+    response = (
+        client.table("sources")
+        .select(_CONTEXT_SOURCE_COLUMNS)
+        .eq("project_id", project_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    return [_map_source_fields(source) for source in (response.data or [])]

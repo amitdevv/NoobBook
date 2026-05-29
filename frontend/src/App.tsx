@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
-import { CreateProjectDialog } from './components/dashboard';
+// Import directly from the file, NOT the dashboard barrel — the barrel also
+// re-exports Dashboard + AppSettings, which would pull them (and their heavy
+// markdown deps) into the eager entry chunk and defeat the lazy() splits below.
+import { CreateProjectDialog } from './components/dashboard/CreateProjectDialog';
 
 import { projectsAPI } from './lib/api';
 import { authAPI } from './lib/api/auth';

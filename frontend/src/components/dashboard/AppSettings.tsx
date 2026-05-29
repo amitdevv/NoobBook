@@ -4,7 +4,7 @@
  * Features: Profile, Team Management, API Keys, Integrations, System Settings.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,17 +12,20 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import { SettingsSidebar, type SettingsSection } from '../settings/SettingsSidebar';
-import {
-  ProfileSection,
-  TeamSection,
-  ApiKeysSection,
-  IntegrationsSection,
-  SystemSection,
-  DesignSection,
-  ModelsSection,
-  PromptsSection,
-  LogsSection,
-} from '../settings/sections';
+
+// Settings sections are lazy-loaded from their own files (not the barrel) so the
+// heavy ones — DesignSection pulls @uiw/react-md-editor + the full refractor
+// grammar set — aren't bundled into / modulepreloaded on the dashboard. Each
+// section's code loads on first navigation to it.
+const ProfileSection = lazy(() => import('../settings/sections/ProfileSection').then((m) => ({ default: m.ProfileSection })));
+const TeamSection = lazy(() => import('../settings/sections/TeamSection').then((m) => ({ default: m.TeamSection })));
+const ApiKeysSection = lazy(() => import('../settings/sections/ApiKeysSection').then((m) => ({ default: m.ApiKeysSection })));
+const IntegrationsSection = lazy(() => import('../settings/sections/IntegrationsSection').then((m) => ({ default: m.IntegrationsSection })));
+const SystemSection = lazy(() => import('../settings/sections/SystemSection').then((m) => ({ default: m.SystemSection })));
+const DesignSection = lazy(() => import('../settings/sections/DesignSection').then((m) => ({ default: m.DesignSection })));
+const ModelsSection = lazy(() => import('../settings/sections/ModelsSection').then((m) => ({ default: m.ModelsSection })));
+const PromptsSection = lazy(() => import('../settings/sections/PromptsSection').then((m) => ({ default: m.PromptsSection })));
+const LogsSection = lazy(() => import('../settings/sections/LogsSection').then((m) => ({ default: m.LogsSection })));
 
 interface AppSettingsProps {
   open: boolean;
@@ -142,7 +145,12 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
                   key={section}
                   className={section === activeSection ? 'h-full' : 'hidden'}
                 >
-                  {renderSection(section)}
+                  {/* Per-section Suspense so a lazy section loading only shows a
+                      spinner inside its own (often hidden) div — it never blanks
+                      out the currently-visible section. */}
+                  <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+                    {renderSection(section)}
+                  </Suspense>
                 </div>
               ))}
             </div>
