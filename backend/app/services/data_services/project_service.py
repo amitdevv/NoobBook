@@ -6,6 +6,7 @@ using Supabase as the database backend. It provides a clean abstraction
 over database operations.
 """
 import logging
+import time
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any
@@ -560,9 +561,24 @@ class ProjectService(SupabaseService):
         return response.data[0].get("user_id")
 
     def has_project_access(self, project_id: str, user_id: str) -> bool:
-        """Check if a user owns the project."""
+        """Check if a user owns the project.
+
+        Runs in the global before_request hook on every project-scoped API
+        call, so it's a serial DB round-trip on the hot path. Positive results
+        are cached briefly (ownership effectively never changes); negatives are
+        always re-checked so a freshly-created project isn't locked out. A
+        deleted project's stale True self-corrects within the TTL — and the
+        handler's own queries return empty regardless, so it's not a leak.
+        """
         if not project_id or not user_id:
             return False
+
+        key = (project_id, user_id)
+        now = time.monotonic()
+        expiry = _ACCESS_CACHE.get(key)
+        if expiry is not None and expiry > now:
+            return True
+
         response = (
             self.supabase.table(self.table)
             .select("id")
@@ -570,7 +586,18 @@ class ProjectService(SupabaseService):
             .eq("user_id", user_id)
             .execute()
         )
-        return bool(response.data)
+        allowed = bool(response.data)
+        if allowed:
+            # Bound memory: clear if the cache grows unexpectedly large.
+            if len(_ACCESS_CACHE) > 10000:
+                _ACCESS_CACHE.clear()
+            _ACCESS_CACHE[key] = now + _ACCESS_TTL_SECONDS
+        return allowed
+
+
+# Short-lived positive-only cache for has_project_access (see method docstring).
+_ACCESS_CACHE: Dict[tuple, float] = {}
+_ACCESS_TTL_SECONDS = 30.0
 
 
 # Singleton instance

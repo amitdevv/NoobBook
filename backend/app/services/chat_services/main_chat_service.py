@@ -561,8 +561,11 @@ class MainChatService:
             )
         )
 
-        # Verify chat exists
-        chat = chat_service.get_chat(project_id, chat_id)
+        # Verify chat exists. Use the lightweight meta fetch — this turn only
+        # reads selected_source_ids + message_count from `chat`, and the message
+        # history is fetched separately by build_api_messages below, so loading
+        # and formatting the full history here would be wasted work.
+        chat = chat_service.get_chat_meta(project_id, chat_id)
         if not chat:
             raise ValueError("Chat not found")
 

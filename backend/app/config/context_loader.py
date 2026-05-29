@@ -51,7 +51,9 @@ class ContextLoader:
         Returns:
             List of source metadata dicts for selected/ready sources
         """
-        all_sources = source_service.list_sources(project_id)
+        # Projected query: only the columns the source context needs (skips the
+        # heavy processing_info JSONB shipped on every message otherwise).
+        all_sources = source_service.list_sources_for_context(project_id)
 
         if selected_source_ids is None:
             # Legacy chat (column is NULL) — fall back to global active flag
