@@ -140,16 +140,19 @@ export const AppSettings: React.FC<AppSettingsProps> = ({
           {/* Content area */}
           <div className="flex-1 overflow-y-auto p-6 bg-white">
             <div className="h-full">
-              <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
-                {visibleSections.map((section) => (
-                  <div
-                    key={section}
-                    className={section === activeSection ? 'h-full' : 'hidden'}
-                  >
+              {visibleSections.map((section) => (
+                <div
+                  key={section}
+                  className={section === activeSection ? 'h-full' : 'hidden'}
+                >
+                  {/* Per-section Suspense so a lazy section loading only shows a
+                      spinner inside its own (often hidden) div — it never blanks
+                      out the currently-visible section. */}
+                  <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
                     {renderSection(section)}
-                  </div>
-                ))}
-              </Suspense>
+                  </Suspense>
+                </div>
+              ))}
             </div>
           </div>
         </div>

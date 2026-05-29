@@ -46,7 +46,7 @@ export default defineConfig({
           ) {
             return 'markdown-vendor'
           }
-          if (/[\\/]node_modules[\\/](dagre|graphlib|lodash)[\\/]/.test(id)) {
+          if (/[\\/]node_modules[\\/](dagre|graphlib)[\\/]/.test(id)) {
             return 'graph-vendor'
           }
         },
