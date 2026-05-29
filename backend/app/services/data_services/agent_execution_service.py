@@ -56,7 +56,10 @@ class AgentExecutionService:
                 "completed_at": datetime.now().isoformat(),
             }
             if metadata:
-                execution_log.update(metadata)
+                # Merge caller metadata, but never let it clobber the reserved
+                # top-level fields above (execution_id, agent_name, result, …).
+                for key, value in metadata.items():
+                    execution_log.setdefault(key, value)
 
             log_file = agent_dir / f"{execution_id}.json"
             with open(log_file, "w", encoding="utf-8") as f:

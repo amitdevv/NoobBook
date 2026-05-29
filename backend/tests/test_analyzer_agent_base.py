@@ -8,6 +8,8 @@ full termination path through the CSV agent's loop.
 import os
 from unittest.mock import patch
 
+import pytest
+
 # Importing the analyzer agents transitively pulls in supabase.auth_service,
 # which builds a client at import time. Supply dummy creds (only if unset) so
 # collection works in environments without a configured Supabase.
@@ -48,6 +50,13 @@ class TestSharedScaffolding:
         terminations = {a.TERMINATION_TOOL for a in ALL_AGENTS}
         assert len(names) == 4
         assert len(terminations) == 4
+
+    def test_subclass_missing_identity_is_rejected(self):
+        # A new analyzer that forgets AGENT_NAME / TERMINATION_TOOL should
+        # fail loudly at definition time, not silently misbehave at runtime.
+        with pytest.raises(TypeError):
+            class _BadAgent(AnalyzerAgentBase):
+                pass
 
 
 class TestSharedSaveExecution:

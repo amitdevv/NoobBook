@@ -28,6 +28,17 @@ class AnalyzerAgentBase:
     # Prefix for the saved execution-log task line, e.g. "Analyze CSV".
     EXECUTION_TASK_PREFIX: str = "Analyze"
 
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        # Fail loudly at import time if a new analyzer forgets its identity:
+        # an empty AGENT_NAME writes logs to a malformed path, and an empty
+        # TERMINATION_TOOL means the loop never terminates early.
+        super().__init_subclass__(**kwargs)
+        missing = [a for a in ("AGENT_NAME", "TERMINATION_TOOL") if not getattr(cls, a, "")]
+        if missing:
+            raise TypeError(
+                f"{cls.__name__} must set non-empty {', '.join(missing)}"
+            )
+
     def _save_execution(
         self,
         project_id: str,
