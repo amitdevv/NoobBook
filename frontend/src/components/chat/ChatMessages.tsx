@@ -259,7 +259,7 @@ type UserMessageBlock =
   | { type: 'image'; url: string; media_type?: string; filename?: string }
   | { type: 'text'; text: string };
 
-const UserMessage: React.FC<{ content: string | UserMessageBlock[] }> = ({ content }) => {
+const UserMessage: React.FC<{ content: string | UserMessageBlock[] }> = React.memo(({ content }) => {
   const isBlocks = Array.isArray(content);
   const imageBlocks = isBlocks
     ? (content as UserMessageBlock[]).filter((b): b is Extract<UserMessageBlock, { type: 'image' }> => b.type === 'image')
@@ -304,7 +304,8 @@ const UserMessage: React.FC<{ content: string | UserMessageBlock[] }> = ({ conte
       </div>
     </div>
   );
-};
+});
+UserMessage.displayName = 'UserMessage';
 
 /**
  * AI Message Component
@@ -332,7 +333,7 @@ interface MessageActionsProps {
   content: string;
 }
 
-const MessageActions: React.FC<MessageActionsProps> = ({ content }) => {
+const MessageActions: React.FC<MessageActionsProps> = React.memo(({ content }) => {
   const [copied, setCopied] = useState(false);
 
   /**
@@ -412,9 +413,10 @@ const MessageActions: React.FC<MessageActionsProps> = ({ content }) => {
       </div>
     </TooltipProvider>
   );
-};
+});
+MessageActions.displayName = 'MessageActions';
 
-const AIMessage: React.FC<AIMessageProps> = ({ content, projectId, studioAssetRewriter }) => {
+const AIMessage: React.FC<AIMessageProps> = React.memo(({ content, projectId, studioAssetRewriter }) => {
   // Parse citations from content to get citation numbers
   const { uniqueCitations, markerToNumber } = useMemo(
     () => parseCitations(content),
@@ -551,7 +553,8 @@ const AIMessage: React.FC<AIMessageProps> = ({ content, projectId, studioAssetRe
       </div>
     </div>
   );
-};
+});
+AIMessage.displayName = 'AIMessage';
 
 /**
  * Reading Beat — assistant "thinking" indicator.
@@ -750,6 +753,13 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
     setShowJumpMarker(false);
   };
 
+  // Memoize the displayable-message list so streaming deltas (which re-render
+  // this component on every token) don't re-allocate/re-filter the array.
+  const visibleMessages = useMemo(
+    () => messages.filter((msg) => msg && msg.id),
+    [messages],
+  );
+
   return (
     <div className="relative flex-1 min-h-0 min-w-0 w-full bg-white">
     <div
@@ -758,7 +768,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = React.memo(({
       className="absolute inset-0 overflow-y-auto overflow-x-hidden"
     >
       <div className="pt-6 pb-2 px-6 space-y-4 w-full">
-        {messages.filter((msg) => msg && msg.id).map((msg) => {
+        {visibleMessages.map((msg) => {
           const isUser = msg.role === 'user';
           const userPromptText = isUser ? messageContentAsText(msg.content) : '';
           return (

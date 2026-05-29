@@ -41,7 +41,7 @@ interface Props {
   prompt: string;
 }
 
-export const SaveAsInsightButton: React.FC<Props> = ({ projectId, chatId, prompt }) => {
+export const SaveAsInsightButton: React.FC<Props> = React.memo(({ projectId, chatId, prompt }) => {
   const trimmed = prompt.trim();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -162,4 +162,5 @@ export const SaveAsInsightButton: React.FC<Props> = ({ projectId, chatId, prompt
       </Dialog>
     </>
   );
-};
+});
+SaveAsInsightButton.displayName = 'SaveAsInsightButton';

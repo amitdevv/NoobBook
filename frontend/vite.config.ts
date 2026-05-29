@@ -34,6 +34,21 @@ export default defineConfig({
           }
           if (id.includes('@radix-ui')) return 'radix-vendor'
           if (id.includes('@phosphor-icons')) return 'icons-vendor'
+          // The markdown/syntax-highlight stack (react-markdown + the full
+          // refractor grammar set, ~1MB) and the graph-layout libs are only
+          // used inside lazy routes (chat / studio / brand settings). Pin them
+          // to their own chunks so Rollup doesn't hoist them into the eager
+          // entry — keeps first paint small. (Measured: entry 560KB→165KB gz.)
+          if (
+            /[\\/]node_modules[\\/](refractor|rehype-[^/]+|remark-[^/]+|react-markdown|micromark[^/]*|mdast-[^/]+|hast-[^/]+|@uiw[\\/]react-md(arkdown)?[^/]*|parse5|property-information|character-entities[^/]*|unified|vfile[^/]*|unist-[^/]+)[\\/]/.test(
+              id,
+            )
+          ) {
+            return 'markdown-vendor'
+          }
+          if (/[\\/]node_modules[\\/](dagre|graphlib|lodash)[\\/]/.test(id)) {
+            return 'graph-vendor'
+          }
         },
       },
     },

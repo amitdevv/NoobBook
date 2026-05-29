@@ -158,7 +158,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   }>({ projectName, sources: [], selectedSourceIds });
   useEffect(() => {
     keytermsSourceRef.current = { projectName, sources, selectedSourceIds };
-  });
+  }, [projectName, sources, selectedSourceIds]);
 
   // Voice recording hook. Polish always runs on stop — it's a
   // baseline UX win, not a dev/opt-in feature.

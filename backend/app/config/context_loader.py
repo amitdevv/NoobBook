@@ -77,6 +77,7 @@ class ContextLoader:
         self,
         project_id: str,
         selected_source_ids: Optional[List[str]] = None,
+        active_sources: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         """
         Build formatted source context for the system prompt.
@@ -88,11 +89,15 @@ class ContextLoader:
         Args:
             project_id: The project UUID
             selected_source_ids: Per-chat source selection (None = no sources)
+            active_sources: Pre-fetched active sources to avoid a redundant query
+                (the chat hot path already fetches these once per turn). When
+                None, they're fetched here.
 
         Returns:
             Formatted string to append to system prompt, or empty string if no sources
         """
-        active_sources = self.get_active_sources(project_id, selected_source_ids=selected_source_ids)
+        if active_sources is None:
+            active_sources = self.get_active_sources(project_id, selected_source_ids=selected_source_ids)
 
         if not active_sources:
             return ""
@@ -298,6 +303,7 @@ class ContextLoader:
         project_id: str,
         user_id: Optional[str] = None,
         selected_source_ids: Optional[List[str]] = None,
+        active_sources: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         """
         Build complete context including sources, memory, and MCP tools.
@@ -321,7 +327,9 @@ class ContextLoader:
             parts.append(memory_context)
 
         # Add source context (available tools)
-        source_context = self.build_source_context(project_id, selected_source_ids=selected_source_ids)
+        source_context = self.build_source_context(
+            project_id, selected_source_ids=selected_source_ids, active_sources=active_sources
+        )
         if source_context:
             parts.append(source_context)
 

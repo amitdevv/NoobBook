@@ -7,7 +7,7 @@ over database operations.
 """
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any
 
 from app.services.data_services.base_service import SupabaseService
@@ -148,12 +148,28 @@ class ProjectService(SupabaseService):
 
         project = response.data[0]
 
-        # Update last accessed time
-        self.supabase.table(self.table).update({
-            "last_accessed": datetime.now().isoformat()
-        }).eq("id", project_id).eq("user_id", uid).execute()
+        # Update last_accessed only when it's stale (>5 min). It drives dashboard
+        # ordering, so per-read precision isn't needed — and skipping the write on
+        # repeated reads removes a serial write round-trip from the hot read path.
+        # Any parse issue falls back to writing (preserves prior behavior).
+        if self._last_accessed_is_stale(project.get("last_accessed")):
+            self.supabase.table(self.table).update({
+                "last_accessed": datetime.now().isoformat()
+            }).eq("id", project_id).eq("user_id", uid).execute()
 
         return project
+
+    @staticmethod
+    def _last_accessed_is_stale(last_accessed: Optional[str]) -> bool:
+        """True if last_accessed is missing, unparseable, or older than 5 minutes."""
+        if not last_accessed:
+            return True
+        try:
+            prev = datetime.fromisoformat(str(last_accessed).replace("Z", "+00:00"))
+            now = datetime.now(prev.tzinfo) if prev.tzinfo else datetime.now()
+            return (now - prev) > timedelta(minutes=5)
+        except (ValueError, TypeError):
+            return True
 
     def update_project(
         self,

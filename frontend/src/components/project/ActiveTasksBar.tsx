@@ -138,20 +138,25 @@ export const ActiveTasksBar: React.FC<ActiveTasksBarProps> = ({
     }
   }, [projectId]);
 
-  // Poll every 3 seconds
+  // Adaptive polling: 3s while work is in flight (a chat is sending or any
+  // task is showing), 15s when idle. The idle poll still catches tasks started
+  // elsewhere (source processing, deep research) within 15s — at which point
+  // `hasActivity` flips and the cadence speeds back up — without hammering the
+  // backend every 3s for the whole time a workspace tab sits open.
+  const hasActivity = tasks.length > 0 || (sendingChatIds?.size ?? 0) > 0;
   useEffect(() => {
     const initialTimeout = window.setTimeout(() => {
       void fetchTasks();
     }, 0);
     const intervalId = window.setInterval(() => {
       void fetchTasks();
-    }, 3000);
+    }, hasActivity ? 3000 : 15000);
 
     return () => {
       window.clearTimeout(initialTimeout);
       window.clearInterval(intervalId);
     };
-  }, [fetchTasks]);
+  }, [fetchTasks, hasActivity]);
 
   const currentIds = useMemo(() => sendingChatIds || new Set<string>(), [sendingChatIds]);
   const names = useMemo(() => chatNames || new Map<string, string>(), [chatNames]);

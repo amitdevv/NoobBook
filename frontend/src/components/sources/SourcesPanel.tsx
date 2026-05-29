@@ -112,6 +112,12 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   const selectedSourceIdsRef = useRef(selectedSourceIds);
   selectedSourceIdsRef.current = selectedSourceIds;
 
+  // Ref to the latest sources so the fixed-cadence Freshdesk interval can read
+  // them without depending on `sources` (which would tear down/recreate the
+  // 15-min timer on every 3s status poll).
+  const sourcesRef = useRef(sources);
+  sourcesRef.current = sources;
+
   /**
    * Load sources from API (with loading state for initial load)
    */
@@ -166,7 +172,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     const FRESHDESK_SYNC_INTERVAL = 15 * 60 * 1000; // 15 minutes
 
     const interval = setInterval(async () => {
-      const freshdeskSources = sources.filter(
+      const freshdeskSources = sourcesRef.current.filter(
         (s) => s.status === 'ready' &&
           ((s.embedding_info as Record<string, string>)?.file_extension || '') === '.freshdesk'
       );
@@ -181,8 +187,9 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }, FRESHDESK_SYNC_INTERVAL);
 
     return () => clearInterval(interval);
+  // Fixed 15-min cadence keyed only on project; reads latest sources via ref.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, sources.length]);
+  }, [projectId]);
 
   /**
    * Detect when sources transition to "ready" status

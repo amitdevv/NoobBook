@@ -112,7 +112,7 @@ from flask import has_request_context
 from app.services.auth.rbac import get_request_identity
 from app.services.data_services.project_service import DEFAULT_USER_ID
 from app.utils import claude_parsing_utils
-from app.services.auth.permissions import user_has_permission
+from app.services.auth.permissions import get_user_permissions, permission_in
 
 
 class ClaudeStreamError(Exception):
@@ -197,29 +197,37 @@ class MainChatService:
         Returns:
             Tuple of (tool definitions list, MCP tool registry dict)
         """
-        # Include memory and studio_signal tools only if the user has permission
+        # Include memory and studio_signal tools only if the user has permission.
+        # Fetch the user's permissions ONCE (one DB row) and check it in-memory —
+        # the gating below probes up to 7 categories, which previously meant 7
+        # identical SELECTs per chat turn.
         tools = []
 
-        if not user_id or user_has_permission(user_id, "chat_features", "memory"):
+        perms = get_user_permissions(user_id) if user_id else None
+
+        def _can(category: str, item: Optional[str] = None) -> bool:
+            return perms is None or permission_in(perms, category, item)
+
+        if _can("chat_features", "memory"):
             tools.append(self._get_tool("memory"))
 
-        if not user_id or user_has_permission(user_id, "studio"):
+        if _can("studio"):
             tools.append(self._get_tool("studio_signal"))
 
         if has_active_sources:
             tools.append(self._get_tool("search"))
 
-        if has_csv_sources and (not user_id or user_has_permission(user_id, "data_sources", "csv")):
+        if has_csv_sources and _can("data_sources", "csv"):
             tools.append(self._get_tool("csv_analyzer"))
 
-        if has_database_sources and (not user_id or user_has_permission(user_id, "data_sources", "database")):
+        if has_database_sources and _can("data_sources", "database"):
             tools.append(self._get_tool("database_analyzer"))
 
-        if has_freshdesk_sources and (not user_id or user_has_permission(user_id, "data_sources", "freshdesk")):
+        if has_freshdesk_sources and _can("data_sources", "freshdesk"):
             tools.append(self._get_tool("freshdesk_analyzer"))
 
         # Add Jira tools only when the project has a .jira source (project-scoped)
-        if has_jira_sources and (not user_id or user_has_permission(user_id, "data_sources", "jira")):
+        if has_jira_sources and _can("data_sources", "jira"):
             tools.extend(knowledge_base_service.get_jira_tools())
 
         # Mixpanel analyzer agent for product-usage questions (project-scoped).
@@ -228,7 +236,7 @@ class MainChatService:
         # mixpanel_analyzer_agent.run() — only the trigger tool is exposed
         # to the main chat so the surface stays small and consistent with
         # the Freshdesk pattern.
-        if has_mixpanel_sources and (not user_id or user_has_permission(user_id, "data_sources", "mixpanel")):
+        if has_mixpanel_sources and _can("data_sources", "mixpanel"):
             tools.append(self._get_tool("mixpanel_analyzer"))
 
         # Add non-Jira knowledge base tools (Notion, GitHub, etc.) — always global
@@ -253,6 +261,7 @@ class MainChatService:
         base_prompt: str,
         user_id: Optional[str] = None,
         selected_source_ids: Optional[List[str]] = None,
+        active_sources: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         """
         Build system prompt with memory and source context appended.
@@ -268,7 +277,8 @@ class MainChatService:
         parts = [today_line, base_prompt]
 
         full_context = context_loader.build_full_context(
-            project_id, user_id=user_id, selected_source_ids=selected_source_ids
+            project_id, user_id=user_id, selected_source_ids=selected_source_ids,
+            active_sources=active_sources,
         )
         if full_context:
             parts.append(full_context)
@@ -594,12 +604,18 @@ class MainChatService:
         selected_source_ids = chat.get("selected_source_ids")
         prompt_config = prompt_loader.get_project_prompt_config(project_id)
         base_prompt = prompt_config.get("system_prompt", "")
+
+        # Fetch active sources ONCE for this turn and reuse for both the system
+        # prompt (source context) and tool gating below — previously this query
+        # ran twice per message.
+        active_sources = context_loader.get_active_sources(project_id, selected_source_ids=selected_source_ids)
+
         system_prompt = self._build_system_prompt(
-            project_id, base_prompt, user_id=resolved_user_id, selected_source_ids=selected_source_ids
+            project_id, base_prompt, user_id=resolved_user_id,
+            selected_source_ids=selected_source_ids, active_sources=active_sources,
         )
 
         # Step 3: Get tools (memory always available, search for non-CSV, analyzer for CSV)
-        active_sources = context_loader.get_active_sources(project_id, selected_source_ids=selected_source_ids)
         # Separate sources by file extension (stored inside embedding_info)
         def _file_ext(source: Dict[str, Any]) -> str:
             embedding_info = source.get("embedding_info", {}) or {}
