@@ -1,6 +1,6 @@
 /**
  * EmailProgressIndicator Component
- * Educational Note: Shows real-time progress during email template generation.
+ * Shows real-time progress during email template generation.
  */
 
 import React from 'react';

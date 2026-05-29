@@ -1,7 +1,7 @@
 """
 Freshdesk API key validator.
 
-Educational Note: Validates Freshdesk credentials by fetching a single ticket.
+Validates Freshdesk credentials by fetching a single ticket.
 Uses Basic Auth with api_key as username and 'X' as password (Freshdesk convention).
 Requires FRESHDESK_DOMAIN to construct the API base URL.
 """

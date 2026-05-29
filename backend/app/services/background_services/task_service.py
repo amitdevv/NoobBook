@@ -1,7 +1,7 @@
 """
 Task Service - Background task management using ThreadPoolExecutor.
 
-Educational Note: This service manages background tasks without external
+This service manages background tasks without external
 dependencies like Celery or Redis. It uses Python's built-in ThreadPoolExecutor
 for concurrent execution and Supabase for task tracking.
 
@@ -39,7 +39,7 @@ class TaskService:
     """
     Service class for managing background tasks.
 
-    Educational Note: This is a simple task queue implementation using
+    This is a simple task queue implementation using
     Python's built-in ThreadPoolExecutor with Supabase for persistence.
     """
 
@@ -67,7 +67,7 @@ class TaskService:
         """
         Clean up tasks that were running when server stopped.
 
-        Educational Note: If the server restarts while tasks are running,
+        If the server restarts while tasks are running,
         those tasks will be stuck in "running" or "pending" state forever.
         We mark them as failed on startup.
         """
@@ -103,7 +103,7 @@ class TaskService:
         """
         Submit a task for background execution.
 
-        Educational Note: This method returns immediately after queuing the task.
+        This method returns immediately after queuing the task.
         The actual execution happens in a background thread.
 
         Args:
@@ -241,7 +241,7 @@ class TaskService:
         """
         Cancel a running or pending task.
 
-        Educational Note: Cancellation is cooperative - we set a flag that
+        Cancellation is cooperative - we set a flag that
         the running task should check periodically. For ThreadPoolExecutor,
         we can also try to cancel the future if it hasn't started yet.
 
@@ -281,7 +281,7 @@ class TaskService:
         """
         Check if a task has been cancelled.
 
-        Educational Note: Long-running tasks should call this periodically
+        Long-running tasks should call this periodically
         and stop early if True. This enables cooperative cancellation.
 
         Args:
@@ -316,7 +316,7 @@ class TaskService:
         """
         Check if any task for a target has been cancelled.
 
-        Educational Note: This is useful for long-running operations that
+        This is useful for long-running operations that
         need to check if they should stop early, but don't know their task_id.
 
         Args:
@@ -338,7 +338,7 @@ class TaskService:
         """
         Remove completed/failed tasks older than specified hours.
 
-        Educational Note: Call this periodically to prevent the database
+        Call this periodically to prevent the database
         from growing indefinitely with old task records.
 
         Args:

@@ -1,7 +1,7 @@
 """
 Ad Creative endpoints - AI-generated marketing images.
 
-Educational Note: Ad creatives demonstrate AI image generation:
+Ad creatives demonstrate AI image generation:
 1. Claude generates ad copy and visual descriptions
 2. Gemini Imagen creates the actual images
 3. Multiple ad variants are generated for A/B testing
@@ -45,7 +45,7 @@ def generate_ad_creative(project_id: str):
     """
     Start ad creative generation as a background task.
 
-    Educational Note: This endpoint is non-blocking:
+    This endpoint is non-blocking:
     1. Creates a job record with status="pending"
     2. Submits background task via task_service
     3. Returns job_id immediately for status polling

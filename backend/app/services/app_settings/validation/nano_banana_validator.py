@@ -1,7 +1,7 @@
 """
 Nano Banana (Image Generation) API key validator.
 
-Educational Note: Validates API keys for Gemini 3 Pro Image Preview model
+Validates API keys for Gemini 3 Pro Image Preview model
 by making a minimal image generation request.
 """
 import logging
@@ -16,7 +16,7 @@ def validate_nano_banana_key(api_key: str) -> Tuple[bool, str]:
     """
     Validate Nano Banana (Image Generation) API key.
 
-    Educational Note: This tests if the API key is valid and enabled for
+    This tests if the API key is valid and enabled for
     Gemini 3 Pro Image Preview model. We use minimal settings for fastest test.
 
     Args:

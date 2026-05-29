@@ -1,7 +1,7 @@
 """
 UI Component Job Management - Tracks component generation jobs.
 
-Educational Note: Component jobs use AI to generate reusable UI components
+Component jobs use AI to generate reusable UI components
 (buttons, cards, forms, etc.) with multiple variations using HTML/CSS/Tailwind.
 """
 from datetime import datetime

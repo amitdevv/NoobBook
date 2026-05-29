@@ -1,6 +1,6 @@
 /**
  * WebsiteSection Component
- * Educational Note: Self-contained section for website generation.
+ * Self-contained section for website generation.
  */
 
 import React, { useEffect, useCallback } from 'react';

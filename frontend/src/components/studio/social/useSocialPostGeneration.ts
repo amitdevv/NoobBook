@@ -1,6 +1,6 @@
 /**
  * useSocialPostGeneration Hook
- * Educational Note: Custom hook for social post generation logic.
+ * Custom hook for social post generation logic.
  * Handles state management, API calls, and polling.
  */
 
@@ -148,7 +148,7 @@ export const useSocialPostGeneration = (projectId: string) => {
 
   /**
    * Handle iterative editing of existing social posts
-   * Educational Note: Follows the same pattern as video editing —
+   * Follows the same pattern as video editing —
    * previous posts array is passed to Claude for refinement.
    */
   const handleSocialPostEdit = async (parentJob: SocialPostJob, editInstructions: string) => {

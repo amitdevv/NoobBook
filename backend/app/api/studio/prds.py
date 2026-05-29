@@ -1,7 +1,7 @@
 """
 PRD Generator endpoints - AI-generated Product Requirements Documents.
 
-Educational Note: PRD generation demonstrates the agentic loop pattern:
+PRD generation demonstrates the agentic loop pattern:
 1. Agent plans the document structure (sections to write)
 2. Agent writes sections incrementally using write_prd_section tool
 3. Agent signals completion via is_last_section=true flag

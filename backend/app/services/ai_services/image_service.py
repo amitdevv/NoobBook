@@ -1,7 +1,7 @@
 """
 Image Service - Manages image processing and content extraction using tool-based approach.
 
-Educational Note: This service extracts comprehensive content from images using Claude's
+This service extracts comprehensive content from images using Claude's
 vision capabilities. It uses a tool-based approach similar to PDF extraction:
 - Images are sent as base64-encoded content blocks
 - Claude analyzes the image and calls submit_image_extraction tool
@@ -31,7 +31,7 @@ class ImageService:
     """
     Service class for extracting content from images using Claude's vision.
 
-    Educational Note: This service handles image analysis:
+    This service handles image analysis:
     1. Reads image file and encodes to base64
     2. Sends to Claude with submit_image_extraction tool
     3. Parses structured response (subject, text, visuals, data, etc.)
@@ -52,7 +52,7 @@ class ImageService:
         """
         Parse image extraction tool response from Claude.
 
-        Educational Note: Uses claude_parsing_utils for generic tool parsing,
+        Uses claude_parsing_utils for generic tool parsing,
         then extracts image-specific fields.
         """
         tool_inputs = claude_parsing_utils.extract_tool_inputs(response, "submit_image_extraction")
@@ -82,7 +82,7 @@ class ImageService:
         """
         Format extracted image data as page content.
 
-        Educational Note: Returns just the content (no header). The header
+        Returns just the content (no header). The header
         and page markers are added by build_processed_output.
         """
         lines = [
@@ -115,7 +115,7 @@ class ImageService:
         """
         Extract content from a single image file.
 
-        Educational Note: This is the main entry point for image processing.
+        This is the main entry point for image processing.
         1. Loads image and encodes to base64
         2. Sends to Claude with image content block
         3. Forces tool use for structured extraction
@@ -244,7 +244,7 @@ class ImageService:
         """
         Extract content from multiple images in a single source.
 
-        Educational Note: When multiple images are uploaded together,
+        When multiple images are uploaded together,
         we process each one and combine results into a single output file.
 
         Args:

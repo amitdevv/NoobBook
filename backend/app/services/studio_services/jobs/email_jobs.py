@@ -1,7 +1,7 @@
 """
 Email Template Job Management - Tracks email template generation jobs.
 
-Educational Note: Email jobs use an AI agent with iterative refinement to
+Email jobs use an AI agent with iterative refinement to
 generate responsive HTML email templates with AI-generated images.
 """
 from datetime import datetime

@@ -1,7 +1,7 @@
 """
 Opik API key validator.
 
-Educational Note: Validates Opik credentials by attempting to configure
+Validates Opik credentials by attempting to configure
 the client. Gracefully handles missing opik package.
 """
 import logging

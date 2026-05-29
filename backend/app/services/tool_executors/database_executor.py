@@ -1,7 +1,7 @@
 """
 Database Executor - Executes database agent tools (schema_fetcher, query_runner).
 
-Educational Note: This executor powers the database analyzer agent by:
+This executor powers the database analyzer agent by:
 1) Fetching schema metadata (tables, columns, keys)
 2) Running safe, read-only SQL queries (SELECT/WITH only)
 3) Returning structured results for the agent to reason over
@@ -104,7 +104,7 @@ class DatabaseExecutor:
     """
     Executor for database agent tools.
 
-    Educational Note: The database analyzer agent is scoped to a single DATABASE source_id.
+    The database analyzer agent is scoped to a single DATABASE source_id.
     Tool inputs do not include credentials or connection info; we resolve that server-side.
     """
 

@@ -1,6 +1,6 @@
 /**
  * useVideoGeneration Hook
- * Educational Note: Custom hook for video generation logic using Google Veo 2.0.
+ * Custom hook for video generation logic using Google Veo 2.0.
  * Handles state management, API calls, and polling for video generation jobs.
  * Videos are generated in two steps: Claude creates optimized prompt -> Google Veo generates video.
  */
@@ -82,7 +82,7 @@ export const useVideoGeneration = (projectId: string) => {
 
   /**
    * Handle video generation
-   * Educational Note: Videos can take 10-20 minutes to generate with Google Veo
+   * Videos can take 10-20 minutes to generate with Google Veo
    * Default parameters: 16:9 aspect ratio, 8 seconds duration, 1 video
    */
   const handleVideoGeneration = async (
@@ -138,7 +138,7 @@ export const useVideoGeneration = (projectId: string) => {
 
   /**
    * Handle video edit - regenerate video with refined prompt
-   * Educational Note: For videos, "editing" means refining the generated prompt
+   * For videos, "editing" means refining the generated prompt
    * and regenerating the video with Google Veo. The previous prompt is passed
    * as context so Claude can modify it based on edit instructions.
    */

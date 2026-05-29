@@ -1,6 +1,6 @@
 /**
  * BusinessReportProgressIndicator Component
- * Educational Note: Shows progress during business report generation.
+ * Shows progress during business report generation.
  * Displays status message, analysis count, and chart count. Uses teal/green theme.
  */
 

@@ -1,7 +1,7 @@
 """
 Chats API Blueprint.
 
-Educational Note: This blueprint handles all chat CRUD operations.
+This blueprint handles all chat CRUD operations.
 Chats are containers for conversations - they hold messages but don't
 process AI responses themselves (that's the messages blueprint's job).
 """

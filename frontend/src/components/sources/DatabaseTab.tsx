@@ -1,6 +1,6 @@
 /**
  * DatabaseTab Component
- * Educational Note: Attaches an account-level database connection to a project as a DATABASE source.
+ * Attaches an account-level database connection to a project as a DATABASE source.
  */
 
 import React, { useEffect, useState } from 'react';

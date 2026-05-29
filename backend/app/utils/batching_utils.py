@@ -1,7 +1,7 @@
 """
 Batching Utils - Generic utilities for splitting items into batches.
 
-Educational Note: Batching is a common pattern when processing large datasets
+Batching is a common pattern when processing large datasets
 with APIs that have:
 - Rate limits (max requests per minute)
 - Context limits (max items per request)
@@ -21,7 +21,7 @@ from typing import List, TypeVar
 T = TypeVar('T')
 
 # Default batch size for vision-based extraction (PDF, PPTX)
-# Educational Note: Balances context awareness (more pages = better cross-page
+# Balances context awareness (more pages = better cross-page
 # understanding) vs API limits (too many pages = token overflow).
 DEFAULT_BATCH_SIZE = 5
 
@@ -30,7 +30,7 @@ def create_batches(items: List[T], batch_size: int) -> List[List[T]]:
     """
     Split a list of items into batches of specified size.
 
-    Educational Note: This is a simple chunking algorithm that divides
+    This is a simple chunking algorithm that divides
     a list into sublists of maximum `batch_size` items each. The last
     batch may have fewer items if the total doesn't divide evenly.
 
@@ -66,7 +66,7 @@ def get_batch_info(items: List[T], batch_size: int) -> dict:
     """
     Get information about how items will be batched.
 
-    Educational Note: Useful for logging and progress tracking before
+    Useful for logging and progress tracking before
     starting batch processing. Helps estimate time and resources needed.
 
     Args:

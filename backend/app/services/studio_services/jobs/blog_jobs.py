@@ -1,7 +1,7 @@
 """
 Blog Post Job Management - Tracks blog post generation jobs.
 
-Educational Note: Blog jobs use an AI agent with image generation capabilities
+Blog jobs use an AI agent with image generation capabilities
 to create comprehensive, SEO-optimized blog posts in Markdown format.
 The agent can generate images to embed within the blog content.
 """

@@ -1,7 +1,7 @@
 """
 Studio Signal Executor - Execute studio_signal tool calls from main chat.
 
-Educational Note: This executor handles the studio_signal tool when Claude
+This executor handles the studio_signal tool when Claude
 identifies opportunities to activate studio generation options. The flow is:
 
 1. Main chat Claude calls studio_signal tool with signals array
@@ -24,7 +24,7 @@ class StudioSignalExecutor:
     """
     Executor for studio_signal tool calls.
 
-    Educational Note: Provides immediate response to tool call while
+    Provides immediate response to tool call while
     delegating actual signal storage to background task.
     """
 
@@ -37,7 +37,7 @@ class StudioSignalExecutor:
         """
         Execute the studio_signal tool call.
 
-        Educational Note: This method:
+        This method:
         1. Validates signals array
         2. Queues background task to store signals
         3. Returns immediate success (non-blocking)
@@ -107,7 +107,7 @@ class StudioSignalExecutor:
             }
 
         # Store signals synchronously (not background task)
-        # Educational Note: We do this synchronously to avoid race conditions
+        # We do this synchronously to avoid race conditions
         # with the main chat service which also reads/writes chat data.
         # Signal storage is fast (just inserting to Supabase) so no need for background.
         activated = [s["studio_item"] for s in valid_signals]
@@ -140,7 +140,7 @@ class StudioSignalExecutor:
         """
         Store signals in Supabase studio_signals table.
 
-        Educational Note: Signals are stored in Supabase and linked to the chat.
+        Signals are stored in Supabase and linked to the chat.
         Each signal becomes a row in the studio_signals table.
 
         Args:
@@ -176,7 +176,7 @@ class StudioSignalExecutor:
                         source_ids.append(src)
 
                 # Auto-fill empty source_ids with project's active embedded sources.
-                # Educational Note: Claude sometimes omits source_ids in studio signals
+                # Claude sometimes omits source_ids in studio signals
                 # even when sources exist in the project. This fallback ensures signals
                 # have valid source references so the frontend generation handlers work.
                 # If the project has NO embedded sources (e.g. user pasted text in chat
@@ -233,7 +233,7 @@ class StudioSignalExecutor:
         """
         Get fallback source IDs from the project's active sources.
 
-        Educational Note: When Claude creates a studio signal but forgets to
+        When Claude creates a studio signal but forgets to
         include source references, we fall back to the project's ready sources.
         By default, DB and CSV sources are excluded since most studio generators
         (email, blog, etc.) need document text, not structured data.

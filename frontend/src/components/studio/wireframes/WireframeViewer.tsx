@@ -1,6 +1,6 @@
 /**
  * WireframeViewer Component
- * Educational Note: Renders wireframes using the Excalidraw React component.
+ * Renders wireframes using the Excalidraw React component.
  * We use convertToExcalidrawElements to convert skeleton elements to full
  * Excalidraw elements - this is the official way to create elements programmatically.
  */

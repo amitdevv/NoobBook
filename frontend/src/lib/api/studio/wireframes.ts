@@ -1,6 +1,6 @@
 /**
  * Wireframes API
- * Educational Note: Handles AI-generated UI/UX wireframes using Excalidraw.
+ * Handles AI-generated UI/UX wireframes using Excalidraw.
  * The backend generates Excalidraw element definitions which are rendered
  * using the Excalidraw React component.
  */
@@ -157,7 +157,7 @@ export const wireframesAPI = {
   /**
    * Poll wireframe job status until complete or error
    *
-   * Educational Note: Includes initial retry tolerance to handle timing
+   * Includes initial retry tolerance to handle timing
    * between job creation and first poll availability.
    */
   async pollJobStatus(

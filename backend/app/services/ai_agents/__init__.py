@@ -1,7 +1,7 @@
 """
 AI Agents - Complex AI agents with agentic loops.
 
-Educational Note: This folder contains AI agents that use tool loops
+This folder contains AI agents that use tool loops
 and multiple API calls to complete complex tasks. Unlike ai_services
 (single API call), these agents iterate until a termination condition.
 

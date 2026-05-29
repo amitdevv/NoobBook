@@ -1,6 +1,6 @@
 /**
  * PRDProgressIndicator Component
- * Educational Note: Shows real-time progress during PRD generation.
+ * Shows real-time progress during PRD generation.
  * Amber theme distinguishes PRDs from other studio items.
  */
 

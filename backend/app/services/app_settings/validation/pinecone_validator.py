@@ -1,7 +1,7 @@
 """
 Pinecone API key validator.
 
-Educational Note: Validates Pinecone API keys and auto-creates the
+Validates Pinecone API keys and auto-creates the
 "growthxlearn" index if it doesn't exist.
 """
 import logging
@@ -18,7 +18,7 @@ def validate_pinecone_key(api_key: str) -> Tuple[bool, str, Optional[Dict[str, s
     """
     Validate Pinecone API key and auto-create/check index.
 
-    Educational Note: This validator does more than just test the API key.
+    This validator does more than just test the API key.
     It also ensures a "growthxlearn" index exists for the application to use.
     If the index doesn't exist, it creates it automatically.
 

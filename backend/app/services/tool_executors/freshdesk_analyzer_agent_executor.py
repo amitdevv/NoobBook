@@ -1,7 +1,7 @@
 """
 Freshdesk Analyzer Agent Executor - Bridge between main_chat_service and the agent.
 
-Educational Note: Follows database_analyzer_agent_executor.py pattern.
+Follows database_analyzer_agent_executor.py pattern.
 Formats the agent result for display in the chat response.
 """
 

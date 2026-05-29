@@ -1,7 +1,7 @@
 """
 Log service — operations on the rotating backend log file.
 
-Educational Note: Both the HTTP `POST /logs/clear` route and the weekly
+Both the HTTP `POST /logs/clear` route and the weekly
 housekeeping scheduler call into this module so the truncate-and-archive-
 delete semantics live in exactly one place. Audit-log emission also lives
 here so every clear is traceable regardless of which call site triggered it.

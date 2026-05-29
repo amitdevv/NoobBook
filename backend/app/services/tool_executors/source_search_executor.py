@@ -1,7 +1,7 @@
 """
 Source Search Executor - Executes source search tool calls with hybrid search.
 
-Educational Note: This service implements a smart search strategy:
+This service implements a smart search strategy:
 1. Small sources (<1000 tokens): Return ALL chunks (no search needed)
 2. Large sources (>=1000 tokens): Hybrid search
    - Local keyword search: Fast text matching with fuzzy support
@@ -27,7 +27,7 @@ class SourceSearchExecutor:
     """
     Executor for source search tool calls with hybrid search capability.
 
-    Educational Note: This class implements two search strategies:
+    This class implements two search strategies:
     1. Small sources: Return all chunks (efficient for <1000 tokens)
     2. Large sources: Hybrid search combining:
        - Local keyword matching (fast, exact + fuzzy)
@@ -57,7 +57,7 @@ class SourceSearchExecutor:
         """
         Execute a source search with smart strategy based on source size.
 
-        Educational Note: The search strategy adapts to source size:
+        The search strategy adapts to source size:
         - Small sources (<1000 tokens): Return all chunks immediately
         - Large sources: Use keywords for text matching and/or query for semantic search
 
@@ -113,7 +113,7 @@ class SourceSearchExecutor:
         """
         Return all chunks for a small source.
 
-        Educational Note: For small sources, it's more efficient to return
+        For small sources, it's more efficient to return
         everything rather than search. Claude can process all chunks and
         find the relevant information itself.
 
@@ -157,7 +157,7 @@ class SourceSearchExecutor:
         """
         Search a large source using hybrid search (keywords + semantic).
 
-        Educational Note: For large sources, we combine two search strategies:
+        For large sources, we combine two search strategies:
         1. Keyword search: Fast local text matching for specific terms
         2. Semantic search: Vector similarity for conceptual relevance
         Results are combined and deduped by chunk_id.
@@ -233,7 +233,7 @@ class SourceSearchExecutor:
         """
         Perform local keyword search with fuzzy matching.
 
-        Educational Note: This search is fast because it operates on local
+        This search is fast because it operates on local
         chunk files (max ~1000 files, each <500 chars). We use:
         - Case-insensitive exact matching
         - Fuzzy matching via difflib for typo tolerance
@@ -293,7 +293,7 @@ class SourceSearchExecutor:
         """
         Perform semantic search via Pinecone.
 
-        Educational Note: Semantic search finds conceptually similar content
+        Semantic search finds conceptually similar content
         even if the exact words don't match. It works by:
         1. Converting query to embedding vector
         2. Finding similar vectors in Pinecone
@@ -354,7 +354,7 @@ class SourceSearchExecutor:
         """
         Dedupe results by chunk_id, keeping highest scored version.
 
-        Educational Note: When combining keyword and semantic search results,
+        When combining keyword and semantic search results,
         the same chunk might appear in both. We keep only one instance,
         preferring the one with the higher search score.
 
@@ -390,7 +390,7 @@ class SourceSearchExecutor:
         """
         Format chunks for Claude's consumption with chunk_ids for citation.
 
-        Educational Note: The formatted output includes chunk_ids that Claude
+        The formatted output includes chunk_ids that Claude
         uses for citations. Format: [[cite:CHUNK_ID]] where chunk_id contains
         source, page, and chunk info.
 

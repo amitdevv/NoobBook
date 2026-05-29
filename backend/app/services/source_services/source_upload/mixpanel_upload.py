@@ -1,7 +1,7 @@
 """
 Mixpanel Upload Handler - Create a MIXPANEL source flag for a project.
 
-Educational Note: Same lightweight pattern as jira_upload — the source acts
+Same lightweight pattern as jira_upload — the source acts
 as a per-project flag that enables Mixpanel chat tools. No data is synced
 locally; all queries go live to the Mixpanel Query API.
 """

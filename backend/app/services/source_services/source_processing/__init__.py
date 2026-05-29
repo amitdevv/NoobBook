@@ -1,7 +1,7 @@
 """
 Source Processing - Processing orchestration for different file types.
 
-Educational Note: This folder contains the processing service and individual
+This folder contains the processing service and individual
 processors for each file type. Each processor handles content extraction,
 embedding generation, and summary creation for its file type.
 

@@ -1,6 +1,6 @@
 /**
  * Sources Components Barrel Export
- * Educational Note: Re-exports all source-related components for cleaner imports.
+ * Re-exports all source-related components for cleaner imports.
  */
 
 export { SourcesPanel } from './SourcesPanel';

@@ -1,7 +1,7 @@
 """
 Chunking - Parse processed text into token-based chunks for embeddings.
 
-Educational Note: This module handles the final step of source processing:
+This module handles the final step of source processing:
 converting processed text (with page markers) into individual chunks that
 can be embedded and stored in Pinecone.
 
@@ -43,7 +43,7 @@ class Chunk:
     """
     Represents a text chunk with metadata for RAG.
 
-    Educational Note: Storing metadata with chunks enables:
+    Storing metadata with chunks enables:
     - Citing page numbers in responses
     - Filtering search by source
     - Tracking which content came from where
@@ -65,7 +65,7 @@ def parse_processed_text(
     """
     Parse processed text (with page markers) into token-based chunks.
 
-    Educational Note: This function handles all source types (PDF, TEXT, DOCX,
+    This function handles all source types (PDF, TEXT, DOCX,
     PPTX, AUDIO, LINK, YOUTUBE, IMAGE). The page markers follow a consistent
     format: === {TYPE} PAGE {N} of {TOTAL} ===
 
@@ -145,7 +145,7 @@ def _split_text_into_token_chunks(text: str) -> List[str]:
     """
     Split text into chunks based on token count.
 
-    Educational Note: We target ~200 tokens per chunk with ±20% margin.
+    We target ~200 tokens per chunk with ±20% margin.
     This ensures chunks are:
     - Small enough for effective semantic search
     - Large enough to maintain context
@@ -220,7 +220,7 @@ def _split_into_sentences(text: str) -> List[str]:
     """
     Split text into sentences for chunk boundary detection.
 
-    Educational Note: We split at sentence boundaries to maintain
+    We split at sentence boundaries to maintain
     semantic coherence within chunks. A sentence ending is detected
     by . ! or ? followed by space or end of text.
 
@@ -245,7 +245,7 @@ def _split_long_sentence(sentence: str, target_tokens: int, max_tokens: int) -> 
     """
     Split a long sentence by words when it exceeds max_tokens.
 
-    Educational Note: This is a fallback for very long sentences
+    This is a fallback for very long sentences
     (like run-on sentences or lists). We split at word boundaries
     to avoid breaking mid-word.
 
@@ -288,7 +288,7 @@ def chunks_to_pinecone_format(
     """
     Convert chunks to Pinecone upsert format.
 
-    Educational Note: Pinecone expects vectors in this format:
+    Pinecone expects vectors in this format:
     {
         "id": "unique_id",
         "values": [0.1, 0.2, ...],  # The embedding vector

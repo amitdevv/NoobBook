@@ -1,7 +1,7 @@
 """
 MCP Connection Service - Manage MCP server connections (account-level).
 
-Educational Note: MCP connections are account-level integrations that can be
+MCP connections are account-level integrations that can be
 used in two ways:
 1. As "MCP" sources — snapshot resources into the RAG pipeline
 2. As live chat tools — MCP tools injected into Claude's tool list
@@ -81,7 +81,7 @@ class McpConnectionService:
         """
         Mask sensitive values in stdio_config for safe frontend display.
 
-        Educational Note: stdio_config.env contains API keys and secrets
+        stdio_config.env contains API keys and secrets
         (e.g., FRESHDESK_API_KEY). We mask these but keep command/args visible.
         """
         if not stdio_config:
@@ -382,7 +382,7 @@ class McpConnectionService:
         """
         Live-discover tools from an MCP server and cache the result.
 
-        Educational Note: Makes a real-time call to the MCP server to list
+        Makes a real-time call to the MCP server to list
         available tools, then caches the full tool definitions (including
         input_schema) in the cached_tools column for use during chat.
         """
@@ -419,7 +419,7 @@ class McpConnectionService:
         """
         Get all connections where tools_enabled=True that the user can access.
 
-        Educational Note: Used by mcp_tool_service during chat to know which
+        Used by mcp_tool_service during chat to know which
         MCP servers should contribute tools to Claude's tool list.
         Returns raw rows (with secrets) for server-side tool execution.
         """

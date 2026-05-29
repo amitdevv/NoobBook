@@ -1,6 +1,6 @@
 /**
  * Studio API - Re-exports all studio feature APIs
- * Educational Note: Centralized exports for clean imports across the app.
+ * Centralized exports for clean imports across the app.
  *
  * Import usage:
  *   import { audioAPI, JobStatus, checkGeminiStatus } from '@/lib/api/studio';
@@ -60,7 +60,7 @@ export interface APIStatusResponse {
 
 /**
  * Check if Gemini API is configured
- * Educational Note: Shared utility for features that use Gemini Imagen (ads, social posts, infographics, emails)
+ * Shared utility for features that use Gemini Imagen (ads, social posts, infographics, emails)
  */
 export async function checkGeminiStatus(): Promise<APIStatusResponse> {
   try {

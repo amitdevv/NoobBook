@@ -1,7 +1,7 @@
 """
 Quiz endpoints - AI-generated multiple choice questions.
 
-Educational Note: Quizzes demonstrate assessment content generation:
+Quizzes demonstrate assessment content generation:
 1. Claude analyzes source content
 2. Identifies testable concepts
 3. Generates questions with answer options
@@ -40,7 +40,7 @@ def generate_quiz(project_id: str):
     """
     Start quiz generation or edit as a background task.
 
-    Educational Note: Quiz questions are generated from source content using
+    Quiz questions are generated from source content using
     Claude to create multiple choice questions for testing knowledge.
     Edits refine existing questions based on user instructions.
 

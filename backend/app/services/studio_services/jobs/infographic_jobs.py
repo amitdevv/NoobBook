@@ -1,7 +1,7 @@
 """
 Infographic Job Management - Tracks infographic generation jobs.
 
-Educational Note: Infographic jobs use AI to extract key information from
+Infographic jobs use AI to extract key information from
 source content and generate visual summaries using AI image generation.
 """
 from datetime import datetime

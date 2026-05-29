@@ -1,7 +1,7 @@
 """
 Notion API key validator.
 
-Educational Note: Validates Notion integration tokens by calling the
+Validates Notion integration tokens by calling the
 /v1/users/me endpoint, which returns the bot user associated with the token.
 This is a free, read-only API call — no data is created or modified.
 """

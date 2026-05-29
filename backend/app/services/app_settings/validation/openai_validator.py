@@ -1,7 +1,7 @@
 """
 OpenAI API key validator.
 
-Educational Note: Validates OpenAI API keys by making a minimal
+Validates OpenAI API keys by making a minimal
 embeddings request - this is cost-effective and tests the key.
 """
 import logging
@@ -15,7 +15,7 @@ def validate_openai_key(api_key: str) -> Tuple[bool, str]:
     """
     Validate an OpenAI API key by making a test embeddings request.
 
-    Educational Note: We use the embeddings endpoint since that's what
+    We use the embeddings endpoint since that's what
     we'll use this key for (text-embedding-3-small model for RAG).
     This is a lightweight way to verify the key works.
 

@@ -17,7 +17,7 @@ from app.services.integrations.claude import claude_service
 from app.config import prompt_loader, tool_loader, brand_context_loader
 from app.utils import claude_parsing_utils
 from app.utils.source_content_utils import get_source_content
-from app.services.data_services import message_service, project_service
+from app.services.data_services import agent_execution_service, project_service
 from app.services.data_services.brand_asset_service import brand_asset_service
 from app.services.data_services.brand_config_service import brand_config_service
 from app.services.integrations.supabase import storage_service
@@ -97,7 +97,7 @@ class ComponentAgentService:
         """
         Download the primary brand logo and save it locally for the component HTML.
 
-        Educational Note: Same pattern as email agent — signed URLs from Supabase
+        Same pattern as email agent — signed URLs from Supabase
         expire, but saved HTML needs stable URLs. We download the logo and save it
         to the component job directory alongside the HTML files.
 
@@ -245,7 +245,7 @@ class ComponentAgentService:
                     brand_colors = brand_config.get("colors")
 
         # Filter brand_colors to only include user-enabled colors.
-        # Educational Note: Users can toggle individual colors off in Settings > Design.
+        # Users can toggle individual colors off in Settings > Design.
         # Disabled colors are omitted from the brand instruction and CSS override so
         # the agent picks its own values for those slots.
         if brand_colors:
@@ -256,7 +256,7 @@ class ComponentAgentService:
             }
 
         # Inject brand requirements directly into user message for higher priority.
-        # Educational Note: Claude weights user message content higher than the tail
+        # Claude weights user message content higher than the tail
         # of long system prompts. By putting exact hex values here mapped to CSS
         # custom properties, the agent is far more likely to use them in the HTML.
         if brand_context and brand_colors:
@@ -443,7 +443,7 @@ class ComponentAgentService:
         source_id: str
     ) -> None:
         """Save execution log for debugging."""
-        message_service.save_agent_execution(
+        agent_execution_service.save_agent_execution(
             project_id=project_id,
             agent_name=self.AGENT_NAME,
             execution_id=execution_id,

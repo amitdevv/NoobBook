@@ -1,7 +1,7 @@
 """
 Quiz Job Management - Tracks quiz generation jobs.
 
-Educational Note: Quiz jobs use AI to generate multiple-choice questions
+Quiz jobs use AI to generate multiple-choice questions
 from source content for testing knowledge retention.
 """
 from datetime import datetime

@@ -1,7 +1,7 @@
 """
 Alternative source upload endpoints - URL, text, and research.
 
-Educational Note: Not all sources are file uploads. This module handles:
+Not all sources are file uploads. This module handles:
 
 1. URL Sources:
    - Regular websites: Fetched via web agent with web_fetch tool
@@ -51,7 +51,7 @@ def add_url_source(project_id: str):
     """
     Add a URL source (website or YouTube link) to a project.
 
-    Educational Note: URL sources demonstrate the web agent pattern:
+    URL sources demonstrate the web agent pattern:
     1. URL is stored as a .link file
     2. Web agent is triggered with web_fetch/web_search tools
     3. Agent extracts relevant content from the page
@@ -126,7 +126,7 @@ def add_text_source(project_id: str):
     """
     Add a pasted text source to a project.
 
-    Educational Note: Text sources are the simplest source type:
+    Text sources are the simplest source type:
     1. Text is saved directly as a .txt file
     2. No extraction needed - text is already plain
     3. Goes straight to chunking and embedding
@@ -208,7 +208,7 @@ def add_research_source(project_id: str):
     """
     Add a deep research source to a project.
 
-    Educational Note: Research sources demonstrate autonomous AI agents:
+    Research sources demonstrate autonomous AI agents:
     1. User provides topic and focus areas
     2. AI agent uses web_search to find relevant sources
     3. Agent synthesizes information into a research document
@@ -290,7 +290,7 @@ def add_database_source(project_id: str):
     """
     Add a database source (Postgres/MySQL) to a project.
 
-    Educational Note: Database sources are connected at the account level
+    Database sources are connected at the account level
     (settings/databases) and then attached to projects as sources.
 
     Request Body:
@@ -334,7 +334,7 @@ def add_freshdesk_source_endpoint(project_id: str):
     """
     Add a Freshdesk ticket source to a project.
 
-    Educational Note: Freshdesk sources sync ticket data from a configured
+    Freshdesk sources sync ticket data from a configured
     Freshdesk account into a local table for fast SQL-based analysis.
     Credentials come from .env (FRESHDESK_API_KEY, FRESHDESK_DOMAIN).
 
@@ -371,7 +371,7 @@ def add_freshdesk_source_endpoint(project_id: str):
 def _run_freshdesk_sync(project_id: str, source_id: str, mode: str, days_back: int, clear_first: bool = False):
     """
     Background worker for Freshdesk sync/backfill.
-    Educational Note: Tickets are stored globally — clear_first deletes ALL
+    Tickets are stored globally — clear_first deletes ALL
     tickets (not just for this source) since there's one shared pool.
     """
     from app.services.integrations.freshdesk.freshdesk_sync_service import freshdesk_sync_service
@@ -470,7 +470,7 @@ def add_jira_source_endpoint(project_id: str):
     """
     Add a Jira source (live API flag) to a project.
 
-    Educational Note: Jira sources are lightweight flags that enable the
+    Jira sources are lightweight flags that enable the
     existing Jira API tools (jira_list_projects, jira_search_issues, etc.)
     per-project. No data is synced locally — all queries go to the live API.
 
@@ -508,7 +508,7 @@ def add_mixpanel_source_endpoint(project_id: str):
     """
     Add a Mixpanel source (live API flag) to a project.
 
-    Educational Note: Mixpanel sources are lightweight flags that enable the
+    Mixpanel sources are lightweight flags that enable the
     Mixpanel chat tools (mixpanel_list_events, mixpanel_query_events, etc.)
     for this specific project. No data is synced locally — all queries hit
     the Mixpanel Query API live using the globally-configured Service Account.
@@ -546,7 +546,7 @@ def add_mcp_source(project_id: str):
     """
     Add an MCP source (external data via MCP server) to a project.
 
-    Educational Note: MCP sources are connected at the account level
+    MCP sources are connected at the account level
     (settings/mcp) and then attached to projects. Users select which
     resources to snapshot, and the content is embedded for RAG search.
 

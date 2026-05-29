@@ -1,7 +1,7 @@
 """
 Project Service - Business logic for project management.
 
-Educational Note: This service layer handles all project-related operations
+This service layer handles all project-related operations
 using Supabase as the database backend. It provides a clean abstraction
 over database operations.
 """
@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, Dict, List, Any
 
-from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+from app.services.data_services.base_service import SupabaseService
 
 logger = logging.getLogger(__name__)
 
@@ -24,22 +24,17 @@ def _resolve_user_id(user_id: Optional[str] = None) -> str:
     return user_id or DEFAULT_USER_ID
 
 
-class ProjectService:
+class ProjectService(SupabaseService):
     """
     Service class for managing projects using Supabase.
 
-    Educational Note: This service uses Supabase's PostgREST API for
+    This service uses Supabase's PostgREST API for
     database operations. Each method maps to SQL queries under the hood.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the project service."""
-        if not is_supabase_enabled():
-            raise RuntimeError(
-                "Supabase is not configured. Please add SUPABASE_URL and "
-                "SUPABASE_ANON_KEY to your .env file."
-            )
-        self.supabase = get_supabase()
+        super().__init__()
         self.table = "projects"
 
     def list_all_projects(self, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -52,7 +47,7 @@ class ProjectService:
         Returns:
             List of project metadata sorted by last_accessed (most recent first)
 
-        Educational Note: Supabase's select() returns a response object.
+        Supabase's select() returns a response object.
         We access .data to get the actual records.
         """
         uid = _resolve_user_id(user_id)
@@ -80,7 +75,7 @@ class ProjectService:
         Raises:
             ValueError: If project name already exists
 
-        Educational Note: Supabase's insert() returns the inserted row(s).
+        Supabase's insert() returns the inserted row(s).
         We use .select() after insert to get the full record back.
         """
         uid = _resolve_user_id(user_id)
@@ -136,7 +131,7 @@ class ProjectService:
         Returns:
             Full project data or None if not found
 
-        Educational Note: We update last_accessed on every get to track
+        We update last_accessed on every get to track
         when the project was last opened.
         """
         uid = _resolve_user_id(user_id)
@@ -236,7 +231,7 @@ class ProjectService:
         Returns:
             True if deleted, False if not found
 
-        Educational Note: Supabase cascades deletes automatically based on
+        Supabase cascades deletes automatically based on
         foreign key constraints. Deleting a project also deletes its
         sources, chats, messages, etc.
         """
@@ -468,7 +463,7 @@ class ProjectService:
         """
         Get the user's global memory.
 
-        Educational Note: User memory persists across all projects
+        User memory persists across all projects
         and stores global preferences like name, communication style, etc.
 
         Args:
@@ -523,7 +518,7 @@ class ProjectService:
         """
         Format project data to return only metadata fields.
 
-        Educational Note: This helper ensures consistent response format
+        This helper ensures consistent response format
         and excludes large fields like memory and full settings.
         """
         return {

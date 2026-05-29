@@ -118,7 +118,7 @@ def get_user_permissions_endpoint(user_id: str):
     """
     Get a user's module permissions.
 
-    Educational Note: Returns the full permission structure with all
+    Returns the full permission structure with all
     5 categories and their sub-items. NULL in the DB is resolved to
     the all-enabled default before returning.
     """
@@ -142,7 +142,7 @@ def update_user_permissions_endpoint(user_id: str):
     """
     Update a user's module permissions AND per-connection access.
 
-    Educational Note: Accepts the full permissions structure plus optional
+    Accepts the full permissions structure plus optional
     connection_access with database_ids and mcp_ids arrays.
     """
     from app.services.auth.permissions import (
@@ -174,7 +174,7 @@ def get_my_permissions():
     """
     Get the current user's module permissions.
 
-    Educational Note: Non-admin endpoint — any authenticated user can
+    Non-admin endpoint — any authenticated user can
     fetch their own permissions so the frontend knows what to show/hide.
     """
     from app.services.auth.rbac import get_request_identity
@@ -421,7 +421,7 @@ def get_my_usage():
     """
     Get the current user's spending usage vs their limit.
 
-    Educational Note: Non-admin endpoint — any authenticated user can
+    Non-admin endpoint — any authenticated user can
     see their own usage. Returns limit, period spend, reset info, and
     lifetime total for the usage card in Profile settings.
     """

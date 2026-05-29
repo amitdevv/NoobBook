@@ -1,6 +1,6 @@
 /**
  * ComponentProgressIndicator Component
- * Educational Note: Shows real-time progress during component generation.
+ * Shows real-time progress during component generation.
  */
 
 import React from 'react';

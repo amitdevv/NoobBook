@@ -1,6 +1,6 @@
 /**
  * FreshdeskTab Component
- * Educational Note: Adds a Freshdesk ticket source to the project.
+ * Adds a Freshdesk ticket source to the project.
  * Simpler than DatabaseTab since there's no connection selection —
  * Freshdesk credentials are configured globally in API Keys settings.
  */

@@ -1,6 +1,6 @@
 /**
  * MindMapProgressIndicator Component
- * Educational Note: Shows real-time progress during mind map generation.
+ * Shows real-time progress during mind map generation.
  * Blue theme distinguishes mind maps from other studio items.
  */
 

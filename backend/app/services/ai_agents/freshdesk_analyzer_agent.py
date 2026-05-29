@@ -1,7 +1,7 @@
 """
 Freshdesk Analyzer Agent - Agentic loop for analyzing Freshdesk ticket data.
 
-Educational Note: Follows the same pattern as database_analyzer_agent.py.
+Follows the same pattern as database_analyzer_agent.py.
 Claude iterates with tools (schema_info, query_runner) until it calls
 return_ticket_analysis to terminate with structured output.
 """
@@ -13,18 +13,18 @@ from typing import Any, Callable, Dict, List, Optional
 
 from app.config import prompt_loader, tool_loader
 from app.services.integrations.claude import claude_service
+from app.services.ai_agents.analyzer_agent_base import AnalyzerAgentBase
 from app.utils import claude_parsing_utils
 from app.services.tool_executors.freshdesk_executor import freshdesk_executor
 
 logger = logging.getLogger(__name__)
 
 
-class FreshdeskAnalyzerAgent:
+class FreshdeskAnalyzerAgent(AnalyzerAgentBase):
     AGENT_NAME = "freshdesk_analyzer_agent"
-    MAX_ITERATIONS = 40
     TERMINATION_TOOL = "return_ticket_analysis"
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._tools = None
 
     def _load_tools(self) -> List[Dict[str, Any]]:

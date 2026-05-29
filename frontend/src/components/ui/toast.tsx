@@ -1,7 +1,7 @@
 /**
  * Simple Toast Notification Component
  *
- * Educational Note: A lightweight toast notification system for showing
+ * A lightweight toast notification system for showing
  * temporary messages to users. Toasts can carry an optional action
  * button (e.g. "View logs") which is admin-gated when `adminOnly` is
  * set on the action.

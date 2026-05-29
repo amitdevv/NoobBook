@@ -1,6 +1,6 @@
 /**
  * AdProgressIndicator Component
- * Educational Note: Shows real-time progress during ad creative generation.
+ * Shows real-time progress during ad creative generation.
  */
 
 import React from 'react';

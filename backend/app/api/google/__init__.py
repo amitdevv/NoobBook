@@ -1,7 +1,7 @@
 """
 Google Drive Integration API Blueprint.
 
-Educational Note: This blueprint demonstrates OAuth 2.0 integration with
+This blueprint demonstrates OAuth 2.0 integration with
 external services. Google Drive integration allows users to import files
 directly from their cloud storage.
 

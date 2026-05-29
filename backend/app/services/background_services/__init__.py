@@ -1,7 +1,7 @@
 """
 Background Services - Services for background task management.
 
-Educational Note: This folder contains services that manage background
+This folder contains services that manage background
 operations like async task execution, job queues, and thread pool management.
 
 Services:

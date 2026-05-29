@@ -1,6 +1,6 @@
 /**
  * BusinessReportSection Component
- * Educational Note: Self-contained section for business report generation.
+ * Self-contained section for business report generation.
  */
 
 import React, { useEffect, useCallback } from 'react';

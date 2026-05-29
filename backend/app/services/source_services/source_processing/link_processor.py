@@ -1,7 +1,7 @@
 """
 Link Processor - Handles website URL processing.
 
-Educational Note: Link sources are stored as .link files containing JSON
+Link sources are stored as .link files containing JSON
 with the URL and metadata. We use the web_agent_service to fetch and
 extract content from the URL.
 
@@ -208,7 +208,7 @@ def _process_embeddings(
     """
     Process embeddings for a source using embedding_service.
 
-    Educational Note: We ALWAYS chunk and embed every source for consistent
+    We ALWAYS chunk and embed every source for consistent
     retrieval. The token count is used for chunk sizing decisions.
     Chunks are uploaded to Supabase Storage.
     """

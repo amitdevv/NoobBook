@@ -1,7 +1,7 @@
 """
 URL Upload Handler - Manages URL source uploads to Supabase Storage.
 
-Educational Note: URLs are stored as .link files containing JSON with the URL
+URLs are stored as .link files containing JSON with the URL
 and metadata. The actual content fetching/processing happens in a separate step
 via the web_agent_service (for websites) or youtube_service (for YouTube).
 
@@ -32,7 +32,7 @@ def upload_url(
     """
     Add a URL source (website or YouTube link) to a project.
 
-    Educational Note: URLs are uploaded to Supabase Storage as .link files
+    URLs are uploaded to Supabase Storage as .link files
     containing JSON with the URL and metadata. The actual content fetching
     happens in a separate processing step.
 
@@ -140,7 +140,7 @@ def _submit_processing_task(project_id: str, source_id: str) -> None:
     """
     Submit a background task to process the URL source.
 
-    Educational Note: URL content extraction runs in background thread
+    URL content extraction runs in background thread
     so it doesn't block the API response.
     """
     try:

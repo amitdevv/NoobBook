@@ -1,7 +1,7 @@
 """
 Analysis Executor - Executes pandas/numpy/matplotlib code for data analysis.
 
-Educational Note: This executor enables dynamic data analysis by:
+This executor enables dynamic data analysis by:
 1. Loading CSV data into a pandas DataFrame
 2. Executing Python code written by the AI agent
 3. Capturing results (data or plots)
@@ -28,7 +28,7 @@ class AnalysisExecutor:
     """
     Executor for running pandas analysis code on CSV data.
 
-    Educational Note: Instead of pre-defined operations, this executor
+    Instead of pre-defined operations, this executor
     lets the AI write custom pandas code for flexible analysis.
     """
 
@@ -66,7 +66,7 @@ class AnalysisExecutor:
         """
         Load CSV into DataFrame with caching.
 
-        Educational Note: We cache the DataFrame to avoid re-downloading
+        We cache the DataFrame to avoid re-downloading
         the file on every query during an analysis session. CSV files are
         downloaded from Supabase Storage where they live after upload.
         """
@@ -93,7 +93,7 @@ class AnalysisExecutor:
         """
         Execute pandas code and return result.
 
-        Educational Note: We create a safe execution environment with:
+        We create a safe execution environment with:
         - df: The loaded DataFrame
         - pd: pandas
         - np: numpy
@@ -129,7 +129,7 @@ class AnalysisExecutor:
                 """
                 Intercept savefig to upload plots to Supabase Storage.
 
-                Educational Note: We ALWAYS use auto-generated unique names to avoid
+                We ALWAYS use auto-generated unique names to avoid
                 conflicts and caching issues. Whatever filename Claude passes is ignored.
                 Plots are rendered to an in-memory buffer and uploaded to Supabase
                 Storage (studio-outputs bucket) instead of local disk.
@@ -233,7 +233,7 @@ class AnalysisExecutor:
         """
         Format pandas/numpy result as readable string.
 
-        Educational Note: Different result types need different formatting:
+        Different result types need different formatting:
         - DataFrame/Series: Use to_string() with limits
         - Scalar: Convert directly
         - Other: Use str()

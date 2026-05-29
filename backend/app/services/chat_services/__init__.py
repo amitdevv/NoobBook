@@ -1,7 +1,7 @@
 """
 Chat Services - Services for chat orchestration and message flow.
 
-Educational Note: This folder contains services that handle chat conversations,
+This folder contains services that handle chat conversations,
 including message processing, AI response generation, and tool execution loops.
 
 Services:

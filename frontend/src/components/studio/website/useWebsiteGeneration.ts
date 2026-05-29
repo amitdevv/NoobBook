@@ -1,6 +1,6 @@
 /**
  * useWebsiteGeneration Hook
- * Educational Note: Custom hook for website generation logic.
+ * Custom hook for website generation logic.
  * Handles state management, API calls, and polling.
  */
 
@@ -83,7 +83,7 @@ export const useWebsiteGeneration = (projectId: string) => {
 
   /**
    * Handle website generation
-   * Educational Note: Websites open in new window automatically after generation
+   * Websites open in new window automatically after generation
    */
   const handleWebsiteGeneration = async (signal: StudioSignal) => {
     setIsGeneratingWebsite(true);

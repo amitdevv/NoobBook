@@ -1,6 +1,6 @@
 /**
  * SocialPostProgressIndicator Component
- * Educational Note: Shows real-time progress during social post generation.
+ * Shows real-time progress during social post generation.
  * Cyan theme distinguishes from other studio items.
  */
 

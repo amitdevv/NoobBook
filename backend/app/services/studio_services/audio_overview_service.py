@@ -1,7 +1,7 @@
 """
 Audio Overview Service - Generates audio overviews from source content.
 
-Educational Note: This service implements an agentic loop pattern:
+This service implements an agentic loop pattern:
 1. Claude reads source content (read_source_content tool)
 2. Claude writes script sections (write_script_section tool)
 3. Loop continues until is_final=True
@@ -35,7 +35,7 @@ class AudioOverviewService:
     """
     Service for generating audio overviews from source content.
 
-    Educational Note: This service orchestrates the full pipeline:
+    This service orchestrates the full pipeline:
     1. Agentic script generation (Claude reads content, writes script)
     2. TTS conversion (ElevenLabs converts script to audio)
     """
@@ -76,7 +76,7 @@ class AudioOverviewService:
         """
         Generate an audio overview for a source, or edit a previous audio script.
 
-        Educational Note: This is the main orchestrator that:
+        This is the main orchestrator that:
         1. Gets source metadata
         2. Runs the agentic script generation loop
         3. Converts script to audio
@@ -267,7 +267,7 @@ class AudioOverviewService:
         """
         Generate script using agentic loop.
 
-        Educational Note: The agent reads source content and writes script sections
+        The agent reads source content and writes script sections
         until it signals completion with is_final=True. Script is stored in
         Supabase Storage at: {project_id}/audio/{job_id}/script.txt
 

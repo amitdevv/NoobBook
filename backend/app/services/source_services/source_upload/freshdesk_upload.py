@@ -1,7 +1,7 @@
 """
 Freshdesk Upload Handler - Create a FRESHDESK source from configured Freshdesk account.
 
-Educational Note: Freshdesk tickets are stored globally (not per-source).
+Freshdesk tickets are stored globally (not per-source).
 When adding Freshdesk to a new project, we check if tickets already exist
 in the global pool. If so, the source is marked ready immediately (no re-sync).
 If not, a full backfill sync is triggered.

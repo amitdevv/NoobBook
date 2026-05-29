@@ -1,6 +1,6 @@
 /**
  * API Client Configuration
- * Educational Note: We create an axios instance with base configuration
+ * We create an axios instance with base configuration
  * to avoid repeating the base URL and headers in every request.
  * This is the single source of truth for API communication.
  */
@@ -324,7 +324,7 @@ function scheduleTransientRetry(
 }
 
 // Shared response error handler used by both the `api` instance and global `axios` interceptors.
-// Educational Note: axios.create() instances have separate interceptor chains, so registering
+// axios.create() instances have separate interceptor chains, so registering
 // on both the `api` instance AND the global `axios` default won't double-fire for `api` requests.
 // The shared `refreshPromise` correctly deduplicates concurrent refresh attempts across both.
 async function handleResponseError(error: AxiosError, retryWith: typeof api | typeof axios): Promise<unknown> {
@@ -421,7 +421,7 @@ axios.interceptors.response.use(
 /**
  * Build an authenticated URL for browser elements that can't send Authorization headers.
  *
- * Educational Note: Elements like <img>, <video>, <audio>, and <iframe> make their own
+ * Elements like <img>, <video>, <audio>, and <iframe> make their own
  * HTTP requests without axios interceptors. We append the JWT as a query parameter
  * so the backend auth middleware can validate it. The backend checks ?token= as a
  * fallback when no Authorization header is present.

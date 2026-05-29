@@ -1,7 +1,7 @@
 """
 Memory Executor - Execute memory tool calls from main chat.
 
-Educational Note: This executor handles the store_memory tool when Claude
+This executor handles the store_memory tool when Claude
 decides to save user or project memory. The execution flow is:
 
 1. Main chat Claude calls store_memory tool with user_memory/project_memory
@@ -26,7 +26,7 @@ class MemoryExecutor:
     """
     Executor for store_memory tool calls.
 
-    Educational Note: Provides immediate response to tool call while
+    Provides immediate response to tool call while
     delegating actual work to background task for non-blocking operation.
     """
 
@@ -41,7 +41,7 @@ class MemoryExecutor:
         """
         Execute the store_memory tool call.
 
-        Educational Note: This method:
+        This method:
         1. Validates inputs
         2. Queues background tasks for memory updates
         3. Returns immediate success (non-blocking)
@@ -107,7 +107,7 @@ class MemoryExecutor:
         """
         Background thread to update user memory.
 
-        Educational Note: This runs in a daemon thread (fire-and-forget).
+        This runs in a daemon thread (fire-and-forget).
         It calls memory_service which uses AI to merge memories.
         """
         try:
@@ -134,7 +134,7 @@ class MemoryExecutor:
         """
         Background thread to update project memory.
 
-        Educational Note: This runs in a daemon thread (fire-and-forget).
+        This runs in a daemon thread (fire-and-forget).
         It calls memory_service which uses AI to merge memories.
         """
         try:

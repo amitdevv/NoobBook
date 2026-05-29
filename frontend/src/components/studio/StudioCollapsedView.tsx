@@ -1,6 +1,6 @@
 /**
  * StudioCollapsedView Component
- * Educational Note: Collapsed icon bar view for the Studio panel.
+ * Collapsed icon bar view for the Studio panel.
  * Shows icons for each studio item with active indicators.
  */
 

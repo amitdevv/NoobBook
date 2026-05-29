@@ -1,7 +1,7 @@
 """
 Messages API Blueprint.
 
-Educational Note: This blueprint handles the core AI interaction - sending
+This blueprint handles the core AI interaction - sending
 messages to Claude and receiving responses. This is where the RAG pipeline
 and tool-use loop happens (delegated to main_chat_service).
 

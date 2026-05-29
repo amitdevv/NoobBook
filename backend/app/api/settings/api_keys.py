@@ -1,7 +1,7 @@
 """
 API Key management endpoints.
 
-Educational Note: Managing API keys securely is critical for any LLM application.
+Managing API keys securely is critical for any LLM application.
 This module demonstrates several security patterns:
 
 1. Key Masking:
@@ -224,7 +224,7 @@ def get_api_keys():
     """
     Get all API keys (with values masked for security).
 
-    Educational Note: We never send actual API key values to the frontend.
+    We never send actual API key values to the frontend.
     Instead, we send masked versions (showing only first/last few characters).
     This prevents accidental exposure via browser dev tools, logs, etc.
 
@@ -306,7 +306,7 @@ def update_api_keys():
     """
     Update API keys in the .env file and trigger Flask reload.
 
-    Educational Note: This endpoint demonstrates safe key update pattern:
+    This endpoint demonstrates safe key update pattern:
     1. Skip masked values (haven't changed)
     2. Save new values to .env file
     3. Reload environment variables
@@ -411,7 +411,7 @@ def delete_api_key(key_id):
     """
     Delete a specific API key from the .env file.
 
-    Educational Note: This removes the key entirely from the .env file,
+    This removes the key entirely from the .env file,
     not just clearing its value. For some keys, we also clean up
     related configuration (e.g., Pinecone index name and region).
 
@@ -453,7 +453,7 @@ def validate_api_key():
     """
     Validate an API key by making a test request to the service.
 
-    Educational Note: Validation tests if a key actually works by making
+    Validation tests if a key actually works by making
     a minimal API call to each service. This prevents users from saving
     invalid keys and only discovering the problem later.
 
@@ -524,7 +524,7 @@ def _validate_key(key_id: str, value: str) -> tuple:
     """
     Validate a specific API key using the appropriate validator.
 
-    Educational Note: Each API service has different validation requirements.
+    Each API service has different validation requirements.
     This function routes to the correct validator and handles special cases
     like Pinecone's auto-configuration.
     """

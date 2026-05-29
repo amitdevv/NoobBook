@@ -80,7 +80,7 @@ Models are configured per-prompt in `data/prompts/*_prompt.json`. Hardcoded fall
 
 ## Code rules (the important ones)
 
-1. **DRY.** Extract repeated logic. The DB-style analyzer agents (Freshdesk, Mixpanel) all mirror the same pattern — when adding a new one, copy don't reinvent.
+1. **DRY.** Extract repeated logic. The DB-style analyzer agents (Freshdesk, Mixpanel) all mirror the same pattern and share `AnalyzerAgentBase` — when adding a new one, subclass the base and follow an existing agent.
 2. **One thing per file when it exceeds ~100 lines.** Keeps blast radius small.
 3. **Comments explain WHY, not WHAT.** Especially around LLM choices, prompt engineering, rate limits, and any non-obvious workaround. Don't write comments that just paraphrase the code.
 4. **Type hints on every Python function** (params + return). PEP 8 throughout.
@@ -261,9 +261,14 @@ backend/data/prompts/<name>_analyzer_agent_prompt.json
      frontend/src/components/settings/sections/promptsLib.ts)
 
 backend/app/services/ai_agents/<name>_analyzer_agent.py
+  ↳ subclass AnalyzerAgentBase (analyzer_agent_base.py) for the shared
+     MAX_ITERATIONS (40) + _save_execution; set AGENT_NAME / TERMINATION_TOOL /
+     EXECUTION_TASK_PREFIX. The agentic loop BODY stays per-agent — they
+     diverge in essential ways (progress events, pre-flight checks,
+     termination timing, result shape), so don't force a shared loop template.
   ↳ singleton; .run(project_id, source_id, query, chat_id, user_id, on_event)
   ↳ tool_loader.load_tools_from_category("<name>_agent")
-  ↳ loop up to MAX_ITERATIONS (40), terminate on return_<name>_analysis
+  ↳ loop terminates on return_<name>_analysis
   ↳ MAX_TOOL_RESULT_CHARS cap on per-call payload (avoids context blow-up)
 
 backend/app/services/tool_executors/<name>_analyzer_agent_executor.py
@@ -394,7 +399,7 @@ Per-project, stored in `projects.costs` JSONB. Every `claude_service.send_messag
 - **JWT fail-open requires `JWT_SECRET`** — if unset and GoTrue blips, the auth middleware fails closed (no more "trust the unverified `sub`" path). This is intentional security hardening.
 - **`messages.content` shape varies** — string | dict `{text}` | list of typed blocks. Filters in `chat_service.get_chat` and `_is_displayable_message` must distinguish "tool-chain list" (skip) from "user image+text list" (keep).
 - **Migration numbering can collide** when develop and main fork — check `ls backend/supabase/migrations/ | sort` before adding.
-- **The `freshdesk_analyzer_agent` and `mixpanel_analyzer_agent` patterns are load-bearing examples** — if you're tempted to deviate, ask first.
+- **The `freshdesk_analyzer_agent` and `mixpanel_analyzer_agent` patterns are load-bearing examples** — if you're tempted to deviate, ask first. All four analyzers (csv/database/freshdesk/mixpanel) now share `AnalyzerAgentBase` for the iteration ceiling + execution logging, but each owns its loop body by design.
 
 ---
 

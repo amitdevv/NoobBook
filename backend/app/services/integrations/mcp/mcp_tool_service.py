@@ -1,7 +1,7 @@
 """
 MCP Tool Service - Orchestrates MCP tools in chat conversations.
 
-Educational Note: This service follows the knowledge_base_service pattern to
+This service follows the knowledge_base_service pattern to
 provide MCP tools to Claude during chat. It:
 
 1. Discovers available MCP tools from user's tool-enabled connections
@@ -41,7 +41,7 @@ class McpToolService:
     """
     Orchestrator for MCP tools in chat, following the knowledge_base_service pattern.
 
-    Educational Note: This service is called by main_chat_service to:
+    This service is called by main_chat_service to:
     - get_available_tools(): Returns Claude-format tool definitions
     - can_handle(tool_name): Checks if a tool is an MCP tool
     - execute(tool_name, tool_input): Calls the MCP server and returns result
@@ -51,7 +51,7 @@ class McpToolService:
         """
         Get all MCP tools available for chat, formatted for Claude API.
 
-        Educational Note: Loads cached tools from all tools_enabled connections
+        Loads cached tools from all tools_enabled connections
         accessible to the user. Returns Claude-format tool definitions with
         namespaced names, plus a registry mapping namespaced names back to
         (connection_id, original_tool_name) for execution routing.
@@ -118,7 +118,7 @@ class McpToolService:
         """
         Execute an MCP tool call and return the result text.
 
-        Educational Note: Looks up the connection and original tool name from
+        Looks up the connection and original tool name from
         the registry, loads the connection's secrets, then calls mcp_client.call_tool()
         which spawns a fresh connection to the MCP server.
 

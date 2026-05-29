@@ -1,7 +1,7 @@
 """
 Wireframe endpoints - AI-generated UI/UX wireframes using Excalidraw.
 
-Educational Note: Wireframes demonstrate visual UI/UX prototyping:
+Wireframes demonstrate visual UI/UX prototyping:
 1. Claude analyzes source content for UI requirements
 2. Generates Excalidraw element definitions (shapes, text, layout)
 3. Frontend renders using Excalidraw React component
@@ -31,7 +31,7 @@ def generate_wireframe(project_id: str):
     """
     Start wireframe generation or edit as a background task.
 
-    Educational Note: Wireframes are generated from source content using
+    Wireframes are generated from source content using
     Claude to create Excalidraw element definitions for UI prototyping.
 
     Request Body:

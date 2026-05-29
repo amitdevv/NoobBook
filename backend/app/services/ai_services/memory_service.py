@@ -1,7 +1,7 @@
 """
 Memory Service - Manage user and project memory storage.
 
-Educational Note: This service handles persistent memory storage for the chat system.
+This service handles persistent memory storage for the chat system.
 Memory is stored in two types:
 - User memory: Global preferences and context that persists across all projects (in users table)
 - Project memory: Project-specific context that is deleted when the project is deleted (in projects table)
@@ -28,7 +28,7 @@ class MemoryService:
     """
     Service for managing user and project memory.
 
-    Educational Note: Memory helps the AI maintain context across conversations.
+    Memory helps the AI maintain context across conversations.
     - User memory: name, preferences, communication style, general goals
     - Project memory: project goals, milestones, decisions, progress
 
@@ -45,7 +45,7 @@ class MemoryService:
         """
         Load and cache the prompt config.
 
-        Educational Note: We cache the config to avoid reading
+        We cache the config to avoid reading
         the file on every memory update request. Uses prompt_loader
         for consistent prompt loading across all AI tools.
         """
@@ -154,7 +154,7 @@ class MemoryService:
         """
         Build user message from prompt config template.
 
-        Educational Note: The user_message template is stored in the prompt config
+        The user_message template is stored in the prompt config
         file (memory_prompt.json) for consistency across AI tools. This keeps
         all prompt-related content in one place for easy tuning.
 
@@ -188,7 +188,7 @@ class MemoryService:
         """
         Update memory by merging new content with existing memory using AI.
 
-        Educational Note: This method uses Haiku AI to intelligently merge
+        This method uses Haiku AI to intelligently merge
         existing memory with new memory. The AI:
         1. Receives current memory + new memory via templated user message
         2. Creates a merged, condensed version (max 150 tokens)
@@ -232,7 +232,7 @@ class MemoryService:
 
         try:
             # Call Haiku AI with the save_memory tool
-            # Educational Note: tool_choice forces the model to call save_memory,
+            # tool_choice forces the model to call save_memory,
             # preventing it from responding with text instead of using the tool.
             response = claude_service.send_message(
                 messages=[{"role": "user", "content": user_message}],
@@ -313,7 +313,7 @@ class MemoryService:
         """
         Clear project memory in Supabase.
 
-        Educational Note: Called when a project is deleted to clean up
+        Called when a project is deleted to clean up
         associated memory. With Supabase, the memory is stored in the
         projects table and will be deleted when the project is deleted.
 

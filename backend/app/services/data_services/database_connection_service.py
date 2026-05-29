@@ -1,7 +1,7 @@
 """
 Database Connection Service - Manage external database connections (Postgres/MySQL).
 
-Educational Note: These connections are *account-level* integrations that can be
+These connections are *account-level* integrations that can be
 attached to projects as "DATABASE" sources. The actual connection string is stored
 in Supabase for self-hosted deployments.
 

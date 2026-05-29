@@ -1,7 +1,7 @@
 """
 Database connection management endpoints (account-level).
 
-Educational Note: Database connections are integrations that can later be attached
+Database connections are integrations that can later be attached
 to projects as "DATABASE" sources. We keep credentials server-side and only send
 masked connection URIs to the frontend.
 

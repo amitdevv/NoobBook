@@ -1,7 +1,7 @@
 """
 Blog Post endpoints - AI-generated comprehensive blog posts.
 
-Educational Note: Blog posts demonstrate agent-based generation with image support:
+Blog posts demonstrate agent-based generation with image support:
 1. blog_agent_executor orchestrates the generation
 2. Claude creates markdown structure and content
 3. Gemini generates images for hero and sections

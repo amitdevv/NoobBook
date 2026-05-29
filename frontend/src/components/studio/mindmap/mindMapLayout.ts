@@ -1,6 +1,6 @@
 /**
  * Mind Map Layout Utility
- * Educational Note: Uses dagre for automatic horizontal tree layout.
+ * Uses dagre for automatic horizontal tree layout.
  * Dagre is a JavaScript library for laying out directed graphs.
  *
  * The layout algorithm:

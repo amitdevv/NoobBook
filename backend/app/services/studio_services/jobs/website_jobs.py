@@ -1,7 +1,7 @@
 """
 Website Job Management - Tracks website generation jobs.
 
-Educational Note: Website jobs use an AI agent with iterative refinement to
+Website jobs use an AI agent with iterative refinement to
 generate multi-page static websites with HTML, CSS, and JavaScript.
 Unlike email templates (single file), websites have multiple files created iteratively.
 """
@@ -27,7 +27,7 @@ def create_website_job(
     """
     Create a new website generation job in Supabase.
 
-    Educational Note: Tracks website generation with multi-file support.
+    Tracks website generation with multi-file support.
     Unlike email templates (single HTML file), websites have multiple files
     (HTML pages, CSS, JS) that are created iteratively.
     """
@@ -74,7 +74,7 @@ def update_website_job(
     """
     Update a website job with new information.
 
-    Educational Note: Flexible updates for any job fields during
+    Flexible updates for any job fields during
     the agent's iterative workflow. Unlike other job modules, this
     accepts ALL provided fields (including those with None/falsy values)
     to match the original behavior.

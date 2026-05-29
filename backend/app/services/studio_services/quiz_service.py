@@ -1,7 +1,7 @@
 """
 Quiz Service - Generates quiz questions from source content.
 
-Educational Note: This service uses Claude to generate multiple choice quiz
+This service uses Claude to generate multiple choice quiz
 questions for testing knowledge. Like flash cards, this is a single-call service:
 
 1. Read source content (chunked or full)
@@ -29,7 +29,7 @@ class QuizService:
     """
     Service for generating quiz questions from source content.
 
-    Educational Note: Quiz questions are generated in a single Claude call
+    Quiz questions are generated in a single Claude call
     using the generate_quiz tool for structured output.
     """
 
@@ -59,7 +59,7 @@ class QuizService:
         """
         Get source content for quiz generation.
 
-        Educational Note: For large sources, we sample chunks evenly
+        For large sources, we sample chunks evenly
         to stay within token limits while covering the full content.
         Content is downloaded from Supabase Storage.
         """

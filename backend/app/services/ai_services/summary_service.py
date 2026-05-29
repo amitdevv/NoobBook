@@ -1,7 +1,7 @@
 """
 Summary Service - Generate concise summaries for processed sources.
 
-Educational Note: This service generates summaries for source documents
+This service generates summaries for source documents
 after processing is complete. It uses a smart sampling strategy to handle
 documents of varying sizes while keeping API costs low.
 
@@ -29,7 +29,7 @@ class SummaryService:
     """
     Service for generating source summaries.
 
-    Educational Note: Uses Haiku model for cost-effective summarization.
+    Uses Haiku model for cost-effective summarization.
     Input: $1/M tokens, Output: $3/M tokens
     ~20k input + 200 output = ~$0.02 per summary
 
@@ -48,7 +48,7 @@ class SummaryService:
         """
         Load and cache the prompt config.
 
-        Educational Note: We cache the config to avoid reading
+        We cache the config to avoid reading
         the file on every summary generation request. Uses prompt_loader
         for consistent prompt loading across all AI tools.
         """
@@ -62,7 +62,7 @@ class SummaryService:
         """
         Get evenly distributed chunk indices, always including first and last.
 
-        Educational Note: Uses linear interpolation to distribute selection.
+        Uses linear interpolation to distribute selection.
         Formula: index[i] = round(i * (total - 1) / (select - 1))
 
         This ensures:
@@ -115,7 +115,7 @@ class SummaryService:
         """
         Load evenly distributed chunks and concatenate them from Supabase Storage.
 
-        Educational Note: For large documents, we select a sample of chunks
+        For large documents, we select a sample of chunks
         to stay within our token budget while maintaining coverage of the
         document's content from beginning to end.
 
@@ -160,7 +160,7 @@ class SummaryService:
         """
         Build the user message using the template from prompt config.
 
-        Educational Note: The user_message template is stored in the prompt config
+        The user_message template is stored in the prompt config
         file (summary_prompt.json) for consistency across AI tools. This keeps
         all prompt-related content in one place for easy tuning.
 
@@ -209,7 +209,7 @@ class SummaryService:
         """
         Generate a summary for a processed source.
 
-        Educational Note: This is the main entry point for summary generation.
+        This is the main entry point for summary generation.
         It determines the best strategy based on whether the source is chunked,
         loads the appropriate content, and calls the AI for summarization.
 

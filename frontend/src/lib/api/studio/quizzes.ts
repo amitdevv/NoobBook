@@ -1,6 +1,6 @@
 /**
  * Quizzes API
- * Educational Note: Handles AI-generated quizzes for testing knowledge.
+ * Handles AI-generated quizzes for testing knowledge.
  */
 
 import axios from 'axios';

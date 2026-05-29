@@ -1,7 +1,7 @@
 """
 Infographic endpoints - AI-generated visual summaries.
 
-Educational Note: Infographics demonstrate visual content synthesis:
+Infographics demonstrate visual content synthesis:
 1. Claude analyzes source and extracts key points
 2. Creates structured visual descriptions
 3. Gemini Imagen generates the infographic image
@@ -45,7 +45,7 @@ def generate_infographic(project_id: str):
     """
     Start infographic generation as a background task.
 
-    Educational Note: Infographics are visual summaries that organize source
+    Infographics are visual summaries that organize source
     content in an educational format with icons, sections, and visual flow.
 
     Request Body:

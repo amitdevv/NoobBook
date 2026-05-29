@@ -1,7 +1,7 @@
 """
 Google Video Service - Integration with Google Veo 2.0 for video generation.
 
-Educational Note: This is a thin wrapper around Google's Veo API.
+This is a thin wrapper around Google's Veo API.
 The service handles video generation requests and file downloads.
 """
 import logging
@@ -17,7 +17,7 @@ class GoogleVideoService:
     """
     Google Veo 2.0 video generation integration.
 
-    Educational Note: Veo 2.0 generates high-quality videos from text prompts.
+    Veo 2.0 generates high-quality videos from text prompts.
     Supports aspect ratios (16:9, 16:10), durations (5-8 seconds), and batch generation (1-4 videos).
     """
 
@@ -60,7 +60,7 @@ class GoogleVideoService:
         """
         Generate video(s) and return as bytes (for Supabase upload).
 
-        Educational Note: The Google SDK's .save(filepath) only writes to disk,
+        The Google SDK's .save(filepath) only writes to disk,
         so we use a temp directory internally and read the bytes back.
 
         Args:

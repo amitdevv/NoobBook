@@ -1,6 +1,6 @@
 /**
  * ActiveTasksBar Component
- * Educational Note: A floating status bar that shows all active/in-progress
+ * A floating status bar that shows all active/in-progress
  * tasks for the current project. Polls the backend every 3 seconds and
  * displays source processing, studio generation, and chat sending status.
  * Shows chat names and a "Done" button when a chat finishes processing.

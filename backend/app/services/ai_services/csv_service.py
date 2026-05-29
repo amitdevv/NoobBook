@@ -1,7 +1,7 @@
 """
 CSV Service - AI service for analyzing CSV files and generating summaries.
 
-Educational Note: This service uses a simple agentic loop pattern:
+This service uses a simple agentic loop pattern:
 1. Claude receives the filename and available tools
 2. Claude calls csv_analyzer to understand the data
 3. Claude calls return_csv_summary with the final summary (termination)
@@ -15,7 +15,7 @@ CSV files are NOT chunked or embedded - they are analyzed on-demand.
 
 import json
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 
 from app.services.integrations.claude import claude_service
@@ -30,7 +30,7 @@ class CSVService:
     """
     AI service for CSV analysis and summary generation.
 
-    Educational Note: Uses Haiku model with csv_analyzer tool.
+    Uses Haiku model with csv_analyzer tool.
     Claude analyzes the tool output and generates a concise summary.
     """
 
@@ -53,7 +53,7 @@ class CSVService:
                 raise ValueError("csv_processor.json not found in data/prompts/")
         return self._prompt_config
 
-    def _get_tools(self) -> list:
+    def _get_tools(self) -> List[Dict[str, Any]]:
         """Load and cache tools from csv_tool category."""
         if self._tools is None:
             tools_config = tool_loader.load_tools_for_agent("csv_tool")
@@ -69,7 +69,7 @@ class CSVService:
         """
         Analyze a CSV file and generate a summary.
 
-        Educational Note: Simple agentic loop:
+        Simple agentic loop:
         1. Send initial message with source_id
         2. When Claude calls csv_analyzer, executor reads file and analyzes
         3. When Claude calls return_csv_summary, extract and return summary
@@ -200,7 +200,7 @@ class CSVService:
         """
         Format tool result as readable string for Claude.
 
-        Educational Note: Claude needs readable output to understand
+        Claude needs readable output to understand
         the data and generate a good summary. JSON is harder to parse.
         """
         if not result.get("success"):
@@ -266,7 +266,7 @@ class CSVService:
         """
         Build the final result from return_csv_summary tool input.
 
-        Educational Note: The termination tool's input IS the result.
+        The termination tool's input IS the result.
         We just add metadata (iterations, token usage, timestamp).
         """
         return {

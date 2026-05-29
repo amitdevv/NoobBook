@@ -1,6 +1,6 @@
 /**
  * BlogProgressIndicator Component
- * Educational Note: Shows progress during blog post generation.
+ * Shows progress during blog post generation.
  * Displays status message and animated indicator. Uses indigo/blue theme.
  */
 

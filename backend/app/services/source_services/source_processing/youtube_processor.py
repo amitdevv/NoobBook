@@ -1,7 +1,7 @@
 """
 YouTube Processor - Handles YouTube video transcript extraction.
 
-Educational Note: YouTube videos often have captions (manual or auto-generated)
+YouTube videos often have captions (manual or auto-generated)
 that we can fetch directly without downloading the video. This is much faster
 than audio transcription and uses existing caption data.
 
@@ -210,7 +210,7 @@ def _process_embeddings(
     """
     Process embeddings for a source using embedding_service.
 
-    Educational Note: We ALWAYS chunk and embed every source for consistent
+    We ALWAYS chunk and embed every source for consistent
     retrieval. The token count is used for chunk sizing decisions.
     Chunks are uploaded to Supabase Storage.
     """

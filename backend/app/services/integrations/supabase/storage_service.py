@@ -1,7 +1,7 @@
 """
 Supabase Storage Service - File upload/download operations.
 
-Educational Note: Supabase Storage provides S3-compatible file storage.
+Supabase Storage provides S3-compatible file storage.
 Files are organized in buckets:
 - raw-files: Original uploaded files (PDFs, images, audio)
 - processed-files: Extracted text content
@@ -154,11 +154,57 @@ def _build_path(project_id: str, source_id: str, filename: str) -> str:
     return f"{project_id}/{source_id}/{filename}"
 
 
+# ---------------------------------------------------------------------------
+# Single-object download / delete / signed-URL helpers
+#
+# Every bucket exposes the same three operations with identical error handling
+# (log + return None/False). These wrappers carry that shape once so the public
+# functions are one line each; `what` is just the human label used in logs.
+# ---------------------------------------------------------------------------
+
+def _download_bytes(bucket: str, path: str, what: str) -> Optional[bytes]:
+    """Download raw bytes from a bucket; log and return None on failure."""
+    client = _get_client()
+    try:
+        return client.storage.from_(bucket).download(path)
+    except Exception as e:
+        logger.error("Failed to download %s %s: %s", what, path, e)
+        return None
+
+
+def _download_text(bucket: str, path: str, what: str) -> Optional[str]:
+    """Download UTF-8 text from a bucket; None on failure."""
+    data = _download_bytes(bucket, path, what)
+    return data.decode("utf-8") if data is not None else None
+
+
+def _remove_path(bucket: str, path: str, what: str) -> bool:
+    """Remove a single object from a bucket; True on success, False on error."""
+    client = _get_client()
+    try:
+        client.storage.from_(bucket).remove([path])
+        return True
+    except Exception as e:
+        logger.error("Failed to delete %s %s: %s", what, path, e)
+        return False
+
+
+def _signed_url(bucket: str, path: str, expires_in: int, what: str) -> Optional[str]:
+    """Create a browser-reachable signed URL for an object; None on failure."""
+    client = _get_client()
+    try:
+        response = client.storage.from_(bucket).create_signed_url(path, expires_in)
+        return _rewrite_signed_url_for_browser(response.get("signedURL"))
+    except Exception as e:
+        logger.error("Failed to get signed URL for %s %s: %s", what, path, e)
+        return None
+
+
 def _upsert_file(client, bucket: str, path: str, file_data, file_options: dict) -> str:
     """
     Upload a file, replacing it if it already exists.
 
-    Educational Note: We use remove + upload instead of .update() because
+    We use remove + upload instead of .update() because
     the Supabase storage3 .update() method can fail with MissingContentMD5
     due to a boto3/botocore dependency issue. Remove + upload is more reliable.
 
@@ -337,28 +383,12 @@ def download_raw_file(project_id: str, source_id: str, filename: str) -> Optiona
     Returns:
         File bytes or None if not found
     """
-    client = _get_client()
-    path = _build_path(project_id, source_id, filename)
-
-    try:
-        response = client.storage.from_(BUCKET_RAW).download(path)
-        return response
-    except Exception as e:
-        logger.error("Failed to download raw file %s: %s", path, e)
-        return None
+    return _download_bytes(BUCKET_RAW, _build_path(project_id, source_id, filename), "raw file")
 
 
 def delete_raw_file(project_id: str, source_id: str, filename: str) -> bool:
     """Delete a raw file from storage."""
-    client = _get_client()
-    path = _build_path(project_id, source_id, filename)
-
-    try:
-        client.storage.from_(BUCKET_RAW).remove([path])
-        return True
-    except Exception as e:
-        logger.error("Failed to delete raw file %s: %s", path, e)
-        return False
+    return _remove_path(BUCKET_RAW, _build_path(project_id, source_id, filename), "raw file")
 
 
 def get_raw_file_url(project_id: str, source_id: str, filename: str, expires_in: int = 3600) -> Optional[str]:
@@ -374,15 +404,7 @@ def get_raw_file_url(project_id: str, source_id: str, filename: str, expires_in:
     Returns:
         Signed URL or None
     """
-    client = _get_client()
-    path = _build_path(project_id, source_id, filename)
-
-    try:
-        response = client.storage.from_(BUCKET_RAW).create_signed_url(path, expires_in)
-        return _rewrite_signed_url_for_browser(response.get("signedURL"))
-    except Exception as e:
-        logger.error("Failed to get signed URL for %s: %s", path, e)
-        return None
+    return _signed_url(BUCKET_RAW, _build_path(project_id, source_id, filename), expires_in, "raw file")
 
 
 # =============================================================================
@@ -432,30 +454,14 @@ def download_processed_file(project_id: str, source_id: str) -> Optional[str]:
     Returns:
         Text content or None if not found
     """
-    client = _get_client()
-    filename = f"{source_id}.txt"
-    path = _build_path(project_id, source_id, filename)
-
-    try:
-        response = client.storage.from_(BUCKET_PROCESSED).download(path)
-        return response.decode("utf-8")
-    except Exception as e:
-        logger.error("Failed to download processed file %s: %s", path, e)
-        return None
+    path = _build_path(project_id, source_id, f"{source_id}.txt")
+    return _download_text(BUCKET_PROCESSED, path, "processed file")
 
 
 def delete_processed_file(project_id: str, source_id: str) -> bool:
     """Delete a processed file from storage."""
-    client = _get_client()
-    filename = f"{source_id}.txt"
-    path = _build_path(project_id, source_id, filename)
-
-    try:
-        client.storage.from_(BUCKET_PROCESSED).remove([path])
-        return True
-    except Exception as e:
-        logger.error("Failed to delete processed file %s: %s", path, e)
-        return False
+    path = _build_path(project_id, source_id, f"{source_id}.txt")
+    return _remove_path(BUCKET_PROCESSED, path, "processed file")
 
 
 # =============================================================================
@@ -508,23 +514,15 @@ def download_chunk(project_id: str, source_id: str, chunk_id: str) -> Optional[s
     Returns:
         Chunk text content or None if not found
     """
-    client = _get_client()
-    filename = f"{chunk_id}.txt"
-    path = _build_path(project_id, source_id, filename)
-
-    try:
-        response = client.storage.from_(BUCKET_CHUNKS).download(path)
-        return response.decode("utf-8")
-    except Exception as e:
-        logger.error("Failed to download chunk %s: %s", path, e)
-        return None
+    path = _build_path(project_id, source_id, f"{chunk_id}.txt")
+    return _download_text(BUCKET_CHUNKS, path, "chunk")
 
 
 def list_source_chunks(project_id: str, source_id: str) -> List[Dict[str, Any]]:
     """
     List and download all chunks for a source.
 
-    Educational Note: This function retrieves all chunks from Supabase Storage
+    This function retrieves all chunks from Supabase Storage
     for use in RAG search. Returns chunk data as a list of dicts with
     chunk_id, text, page_number, and source_id.
 
@@ -696,23 +694,12 @@ def download_chat_attachment(path: str) -> Optional[bytes]:
     Download a chat attachment by full storage path. Used by the chat
     pipeline when building Claude vision payloads (fresh base64 per send).
     """
-    client = _get_client()
-    try:
-        return client.storage.from_(BUCKET_CHAT_ATTACHMENTS).download(path)
-    except Exception as e:
-        logger.error("Failed to download chat attachment %s: %s", path, e)
-        return None
+    return _download_bytes(BUCKET_CHAT_ATTACHMENTS, path, "chat attachment")
 
 
 def get_chat_attachment_url(path: str, expires_in: int = 3600) -> Optional[str]:
     """Signed URL for in-app chat-history rendering."""
-    client = _get_client()
-    try:
-        response = client.storage.from_(BUCKET_CHAT_ATTACHMENTS).create_signed_url(path, expires_in)
-        return _rewrite_signed_url_for_browser(response.get("signedURL"))
-    except Exception as e:
-        logger.error("Failed to get signed URL for chat attachment %s: %s", path, e)
-        return None
+    return _signed_url(BUCKET_CHAT_ATTACHMENTS, path, expires_in, "chat attachment")
 
 
 def delete_chat_attachment(path: str) -> bool:
@@ -722,13 +709,7 @@ def delete_chat_attachment(path: str) -> bool:
     so a failed third-of-three upload doesn't leak the first two.
     Returns True on success / not-found, False on a real error.
     """
-    client = _get_client()
-    try:
-        client.storage.from_(BUCKET_CHAT_ATTACHMENTS).remove([path])
-        return True
-    except Exception as e:
-        logger.error("Failed to delete chat attachment %s: %s", path, e)
-        return False
+    return _remove_path(BUCKET_CHAT_ATTACHMENTS, path, "chat attachment")
 
 
 def delete_chat_attachments_for_chat(project_id: str, chat_id: str) -> bool:
@@ -821,7 +802,7 @@ def append_studio_file(
     """
     Append content to an existing studio file.
 
-    Educational Note: Supabase Storage doesn't support append, so we
+    Supabase Storage doesn't support append, so we
     download existing content, append new content, then re-upload.
 
     Args:
@@ -864,15 +845,8 @@ def download_studio_file(
     Returns:
         File content as string or None if not found
     """
-    client = _get_client()
     path = _build_studio_path(project_id, job_type, job_id, filename)
-
-    try:
-        response = client.storage.from_(BUCKET_STUDIO).download(path)
-        return response.decode("utf-8")
-    except Exception as e:
-        logger.error("Failed to download studio file %s: %s", path, e)
-        return None
+    return _download_text(BUCKET_STUDIO, path, "studio file")
 
 
 def delete_studio_file(
@@ -882,22 +856,15 @@ def delete_studio_file(
     filename: str
 ) -> bool:
     """Delete a studio output file from storage."""
-    client = _get_client()
     path = _build_studio_path(project_id, job_type, job_id, filename)
-
-    try:
-        client.storage.from_(BUCKET_STUDIO).remove([path])
-        return True
-    except Exception as e:
-        logger.error("Failed to delete studio file %s: %s", path, e)
-        return False
+    return _remove_path(BUCKET_STUDIO, path, "studio file")
 
 
 def delete_studio_job_files(project_id: str, job_type: str, job_id: str) -> bool:
     """
     Delete all files for a studio job, including subdirectories.
 
-    Educational Note: Supabase .list() only returns immediate children.
+    Supabase .list() only returns immediate children.
     For jobs with subdirectories (e.g., websites with assets/, presentations
     with slides/ and screenshots/), we iterate through folders to find all files.
 
@@ -944,7 +911,7 @@ def list_studio_job_files(project_id: str, job_type: str, job_id: str) -> List[D
     """
     List all files for a studio job, including subdirectories.
 
-    Educational Note: Used for ZIP downloads (websites, presentations) where
+    Used for ZIP downloads (websites, presentations) where
     we need to enumerate all files in the job folder. Iterates through
     subdirectories since Supabase .list() only returns immediate children.
 
@@ -1043,15 +1010,8 @@ def download_studio_binary(
     Returns:
         File bytes or None if not found
     """
-    client = _get_client()
     path = _build_studio_path(project_id, job_type, job_id, filename)
-
-    try:
-        response = client.storage.from_(BUCKET_STUDIO).download(path)
-        return response
-    except Exception as e:
-        logger.error("Failed to download studio binary %s: %s", path, e)
-        return None
+    return _download_bytes(BUCKET_STUDIO, path, "studio binary")
 
 
 def get_studio_public_url(
@@ -1063,7 +1023,7 @@ def get_studio_public_url(
     """
     Get the public URL for a studio file.
 
-    Educational Note: This returns a direct public URL if bucket is public,
+    This returns a direct public URL if bucket is public,
     otherwise use get_studio_signed_url for private buckets.
 
     Args:
@@ -1106,15 +1066,8 @@ def get_studio_signed_url(
     Returns:
         Signed URL or None
     """
-    client = _get_client()
     path = _build_studio_path(project_id, job_type, job_id, filename)
-
-    try:
-        response = client.storage.from_(BUCKET_STUDIO).create_signed_url(path, expires_in)
-        return _rewrite_signed_url_for_browser(response.get("signedURL"))
-    except Exception as e:
-        logger.error("Failed to get signed URL for %s: %s", path, e)
-        return None
+    return _signed_url(BUCKET_STUDIO, path, expires_in, "studio file")
 
 
 # =============================================================================
@@ -1130,7 +1083,7 @@ def upload_ai_image(
     """
     Upload an AI-generated image to the studio-outputs bucket.
 
-    Educational Note: AI-generated images (e.g., matplotlib charts from
+    AI-generated images (e.g., matplotlib charts from
     CSV analysis) are stored in Supabase Storage instead of local disk.
     Path pattern: {project_id}/ai-images/{filename}
 
@@ -1168,15 +1121,7 @@ def download_ai_image(project_id: str, filename: str) -> Optional[bytes]:
     Returns:
         Image bytes or None if not found
     """
-    client = _get_client()
-    path = f"{project_id}/ai-images/{filename}"
-
-    try:
-        response = client.storage.from_(BUCKET_STUDIO).download(path)
-        return response
-    except Exception as e:
-        logger.error("Failed to download AI image %s: %s", path, e)
-        return None
+    return _download_bytes(BUCKET_STUDIO, f"{project_id}/ai-images/{filename}", "AI image")
 
 
 def get_ai_image_url(
@@ -1195,15 +1140,7 @@ def get_ai_image_url(
     Returns:
         Signed URL or None
     """
-    client = _get_client()
-    path = f"{project_id}/ai-images/{filename}"
-
-    try:
-        response = client.storage.from_(BUCKET_STUDIO).create_signed_url(path, expires_in)
-        return _rewrite_signed_url_for_browser(response.get("signedURL"))
-    except Exception as e:
-        logger.error("Failed to get AI image URL for %s: %s", path, e)
-        return None
+    return _signed_url(BUCKET_STUDIO, f"{project_id}/ai-images/{filename}", expires_in, "AI image")
 
 
 # =============================================================================
@@ -1299,15 +1236,8 @@ def download_brand_asset(
     Returns:
         File bytes or None if not found
     """
-    client = _get_client()
     path = _build_brand_path(user_id, asset_id, filename)
-
-    try:
-        response = client.storage.from_(BUCKET_BRAND_ASSETS).download(path)
-        return response
-    except Exception as e:
-        logger.error("Failed to download brand asset %s: %s", path, e)
-        return None
+    return _download_bytes(BUCKET_BRAND_ASSETS, path, "brand asset")
 
 
 def delete_brand_asset(
@@ -1326,15 +1256,8 @@ def delete_brand_asset(
     Returns:
         True if successful
     """
-    client = _get_client()
     path = _build_brand_path(user_id, asset_id, filename)
-
-    try:
-        client.storage.from_(BUCKET_BRAND_ASSETS).remove([path])
-        return True
-    except Exception as e:
-        logger.error("Failed to delete brand asset %s: %s", path, e)
-        return False
+    return _remove_path(BUCKET_BRAND_ASSETS, path, "brand asset")
 
 
 def get_brand_asset_url(
@@ -1355,22 +1278,15 @@ def get_brand_asset_url(
     Returns:
         Signed URL or None
     """
-    client = _get_client()
     path = _build_brand_path(user_id, asset_id, filename)
-
-    try:
-        response = client.storage.from_(BUCKET_BRAND_ASSETS).create_signed_url(path, expires_in)
-        return _rewrite_signed_url_for_browser(response.get("signedURL"))
-    except Exception as e:
-        logger.error("Failed to get brand asset signed URL for %s: %s", path, e)
-        return None
+    return _signed_url(BUCKET_BRAND_ASSETS, path, expires_in, "brand asset")
 
 
 def delete_user_brand_assets(user_id: str) -> bool:
     """
     Delete all brand assets for a user.
 
-    Educational Note: Uses iterative folder scanning because Supabase .list()
+    Uses iterative folder scanning because Supabase .list()
     only returns immediate children. Folders have id=None, files have a UUID id.
 
     Args:

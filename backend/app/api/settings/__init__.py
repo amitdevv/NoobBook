@@ -1,7 +1,7 @@
 """
 Settings API Blueprint - Application Configuration.
 
-Educational Note: This blueprint manages application settings including:
+This blueprint manages application settings including:
 
 1. API Keys (api_keys.py):
    - Store/retrieve API keys securely in .env file

@@ -1,7 +1,7 @@
 """
 Anthropic API key validator.
 
-Educational Note: Validates Anthropic API keys using the token counting API.
+Validates Anthropic API keys using the token counting API.
 This is free (no cost) and fast - much better than making a full message request.
 """
 import logging
@@ -15,7 +15,7 @@ def validate_anthropic_key(api_key: str) -> Tuple[bool, str]:
     """
     Validate an Anthropic API key using the token counting API.
 
-    Educational Note: We use count_tokens instead of messages.create because:
+    We use count_tokens instead of messages.create because:
     - Token counting is FREE (no cost)
     - It's faster than generating a response
     - It still validates the API key works

@@ -1,7 +1,7 @@
 """
 Deep Research Agent - AI agent for comprehensive topic research.
 
-Educational Note: This is an agentic loop that researches a topic by:
+This is an agentic loop that researches a topic by:
 1. Searching the web using web_search (server) and tavily_search_advance (client)
 2. Writing research segments incrementally to a file
 3. Terminating when is_last_segment=true in write_research_to_file
@@ -28,7 +28,7 @@ class DeepResearchAgent:
     """
     Deep research agent for comprehensive topic exploration.
 
-    Educational Note: Uses incremental file writing pattern:
+    Uses incremental file writing pattern:
     - Agent searches for information using web_search + tavily_search_advance
     - Agent writes research in segments using write_research_to_file
     - Each segment is appended to the output file
@@ -67,7 +67,7 @@ class DeepResearchAgent:
         """
         Run comprehensive research on a topic.
 
-        Educational Note: The research loop:
+        The research loop:
         1. Agent searches web for information
         2. Agent writes segments to file incrementally
         3. write_research_to_file with is_last_segment=true ends the loop

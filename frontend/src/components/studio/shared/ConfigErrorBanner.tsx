@@ -1,6 +1,6 @@
 /**
  * ConfigErrorBanner Component
- * Educational Note: Inline error banner shown in the Studio panel when a
+ * Inline error banner shown in the Studio panel when a
  * required API key (e.g., Gemini) is missing. More visible than a toast —
  * appears right where the user clicked so they know what to do.
  */

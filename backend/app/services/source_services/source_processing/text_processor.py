@@ -1,7 +1,7 @@
 """
 Text Processor - Handles plain text file processing.
 
-Educational Note: Text files don't have logical page boundaries like PDFs.
+Text files don't have logical page boundaries like PDFs.
 We store the entire content as a single "page" and let token-based chunking
 handle the splitting for embeddings.
 
@@ -129,7 +129,7 @@ def _process_embeddings(
     """
     Process embeddings for a source using embedding_service.
 
-    Educational Note: We ALWAYS chunk and embed every source for consistent
+    We ALWAYS chunk and embed every source for consistent
     retrieval. The token count is used for chunk sizing decisions.
     Chunks are uploaded to Supabase Storage.
     """

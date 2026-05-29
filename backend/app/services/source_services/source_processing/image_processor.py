@@ -1,7 +1,7 @@
 """
 Image Processor - Handles image file processing.
 
-Educational Note: image_service uses Claude's vision capability to
+image_service uses Claude's vision capability to
 analyze images and extract structured content including text, visual
 descriptions, data from charts/tables, and summaries.
 
@@ -122,7 +122,7 @@ def _process_embeddings(
     """
     Process embeddings for a source using embedding_service.
 
-    Educational Note: We ALWAYS chunk and embed every source for consistent
+    We ALWAYS chunk and embed every source for consistent
     retrieval. The token count is used for chunk sizing decisions.
     Chunks are uploaded to Supabase Storage.
     """

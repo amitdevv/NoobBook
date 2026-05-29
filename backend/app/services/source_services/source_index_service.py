@@ -1,7 +1,7 @@
 """
 Source Index Service - CRUD operations for sources using Supabase.
 
-Educational Note: This service manages source metadata in the Supabase `sources` table.
+This service manages source metadata in the Supabase `sources` table.
 Sources represent uploaded files (PDFs, images, audio, URLs, text) that users add to projects.
 
 Source status flow: uploaded → processing → [embedding] → ready
@@ -32,7 +32,7 @@ def load_index(project_id: str) -> Dict[str, Any]:
     """
     Load the sources index for a project.
 
-    Educational Note: Fetches source metadata from Supabase sources table
+    Fetches source metadata from Supabase sources table
     and returns it as a dict keyed by source_id.
 
     Args:
@@ -64,7 +64,7 @@ def save_index(project_id: str, index_data: Dict[str, Any]) -> None:
     """
     Save the sources index for a project.
 
-    Educational Note: This is a no-op for Supabase - data is saved
+    This is a no-op for Supabase - data is saved
     immediately on insert/update. Kept for API compatibility.
 
     Args:
@@ -147,7 +147,7 @@ def _map_source_fields(source: Dict[str, Any]) -> Dict[str, Any]:
     """
     Map Supabase column names to frontend field names.
 
-    Educational Note: The Supabase table uses `is_active` but the frontend
+    The Supabase table uses `is_active` but the frontend
     expects `active`. Fields like file_extension are stored inside the
     embedding_info JSONB column but the frontend expects them at the top level.
     This function flattens nested fields for frontend compatibility.
@@ -215,7 +215,7 @@ def update_source_in_index(
     """
     Update a source's metadata in the index.
 
-    Educational Note: This is a generic update function. Pass a dict
+    This is a generic update function. Pass a dict
     with the fields you want to update.
 
     Args:

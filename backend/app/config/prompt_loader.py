@@ -1,7 +1,7 @@
 """
 Prompt Config - Manages system prompts for AI interactions.
 
-Educational Note: This module handles loading, storing, and retrieving
+This module handles loading, storing, and retrieving
 prompts used in AI conversations. Projects can have custom prompts or
 fall back to the global default.
 
@@ -91,7 +91,7 @@ class PromptLoader:
     """
     Loader class for managing system prompts.
 
-    Educational Note: Prompts define how the AI behaves. Different projects
+    Prompts define how the AI behaves. Different projects
     might need different prompts based on their use case (research, coding,
     learning, etc.).
     """
@@ -196,7 +196,7 @@ class PromptLoader:
         """
         Load the full default prompt configuration.
 
-        Educational Note: Returns the complete prompt config including
+        Returns the complete prompt config including
         model, max_tokens, temperature, and system_prompt. Resolves
         admin overrides — same path ``get_prompt_config`` uses.
 
@@ -217,7 +217,7 @@ class PromptLoader:
         """
         Load the global default system prompt text.
 
-        Educational Note: This is used when projects don't have custom prompts.
+        This is used when projects don't have custom prompts.
         It provides a baseline behavior for the AI assistant.
 
         Returns:
@@ -230,7 +230,7 @@ class PromptLoader:
         """
         Get the prompt for a specific project.
 
-        Educational Note: First checks for a custom prompt in project settings,
+        First checks for a custom prompt in project settings,
         then falls back to the global default.
 
         Args:
@@ -258,7 +258,7 @@ class PromptLoader:
         """
         Get the full prompt config for a specific project.
 
-        Educational Note: Returns the default config but with custom prompt
+        Returns the default config but with custom prompt
         if the project has one. This ensures model/max_tokens/temperature
         come from the default config even when using custom prompts.
 
@@ -291,7 +291,7 @@ class PromptLoader:
         """
         Update a project's custom prompt.
 
-        Educational Note: Setting prompt to None removes the custom prompt
+        Setting prompt to None removes the custom prompt
         and reverts to the default.
 
         Args:
@@ -334,7 +334,7 @@ class PromptLoader:
         """
         Update the global default prompt.
 
-        Educational Note: This affects all projects that don't have
+        This affects all projects that don't have
         custom prompts. Use with caution.
 
         Args:
@@ -357,7 +357,7 @@ class PromptLoader:
         """
         Load a prompt for a specific agent.
 
-        Educational Note: Agents (like web_agent, pdf_agent, etc.) have
+        Agents (like web_agent, pdf_agent, etc.) have
         their own specialized prompts stored in data/prompts/{agent_name}_prompt.json
 
         Args:

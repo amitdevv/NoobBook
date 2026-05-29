@@ -1,6 +1,6 @@
 /**
  * ChatHeader Component
- * Educational Note: Header with chat title dropdown and new chat button.
+ * Header with chat title dropdown and new chat button.
  * Allows quick switching between chats via dropdown menu.
  */
 

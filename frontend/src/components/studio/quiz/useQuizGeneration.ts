@@ -1,6 +1,6 @@
 /**
  * useQuizGeneration Hook
- * Educational Note: Manages quiz generation from sources.
+ * Manages quiz generation from sources.
  * Creates interactive quiz questions with multiple choice answers.
  * Supports iterative editing of existing quizzes.
  */

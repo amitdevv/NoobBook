@@ -72,7 +72,7 @@ class ComponentToolExecutor:
         """
         Handle plan_components tool call.
 
-        Educational Note: Same pattern as email agent — prompt-based reminders
+        Same pattern as email agent — prompt-based reminders
         proved unreliable, so we hard-override the planned color_scheme with
         brand values. The tool result also tells the agent exactly which hex
         values to use in the CSS custom properties.
@@ -132,7 +132,7 @@ class ComponentToolExecutor:
         """
         Post-process generated HTML to enforce brand assets.
 
-        Educational Note: Even with user-message brand instructions, Claude
+        Even with user-message brand instructions, Claude
         sometimes ignores exact colors or omits the logo. This method provides
         a safety net by directly modifying the HTML output.
 
@@ -163,7 +163,7 @@ class ComponentToolExecutor:
                     logger.warning("Could not inject brand logo — no <body> tag found")
 
         # 3. Override CSS :root custom property values with brand colors.
-        # Educational Note: The agent might plan correct colors but write
+        # The agent might plan correct colors but write
         # different ones in the actual CSS. This regex replaces hex values
         # for known variable names in the :root block as a safety net.
         if brand_colors:

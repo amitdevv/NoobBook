@@ -1,7 +1,7 @@
 """
 Studio Blueprint - Content generation features from sources.
 
-Educational Note: Studio features generate various content types from source
+Studio features generate various content types from source
 materials using AI. Each feature follows the same async pattern:
 
 Background Job Pattern:
@@ -82,6 +82,6 @@ from app.api.studio import business_reports  # noqa: F401
 from app.api.studio import job_groups  # noqa: F401
 from app.api.studio import job_actions  # noqa: F401
 
-# Educational Note: The noqa comments tell flake8 to ignore the
+# The noqa comments tell flake8 to ignore the
 # "imported but unused" warning. We import to register routes,
 # not to use the module directly.

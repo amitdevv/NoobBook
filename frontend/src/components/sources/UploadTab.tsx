@@ -1,6 +1,6 @@
 /**
  * UploadTab Component
- * Educational Note: Handles file uploads via drag-and-drop or file picker.
+ * Handles file uploads via drag-and-drop or file picker.
  * Manages its own drag state while upload logic is handled by parent.
  */
 
@@ -26,7 +26,7 @@ interface UploadTabProps {
 
 /**
  * Build accepted file types string from ALLOWED_EXTENSIONS
- * Educational Note: This creates the accept attribute for the file input
+ * This creates the accept attribute for the file input
  */
 const ACCEPTED_FILE_TYPES = Object.values(ALLOWED_EXTENSIONS).flat().join(',');
 
@@ -42,7 +42,7 @@ export const UploadTab: React.FC<UploadTabProps> = ({
 
   /**
    * Validate files before upload
-   * Educational Note: Checks image file sizes against 5MB limit
+   * Checks image file sizes against 5MB limit
    */
   const validateFiles = (files: FileList | File[]): string | null => {
     const fileArray = Array.from(files);

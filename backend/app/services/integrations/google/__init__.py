@@ -1,7 +1,7 @@
 """
 Google Integration - OAuth and Drive file operations.
 
-Educational Note: Google integration provides:
+Google integration provides:
 - OAuth 2.0 authentication for user authorization
 - Google Drive file listing and download
 - Export of Google Workspace files (Docs, Sheets, Slides)

@@ -1,7 +1,7 @@
 """
 Flash Cards Service - Generates flash cards from source content.
 
-Educational Note: This service uses Claude to generate flash cards for
+This service uses Claude to generate flash cards for
 learning and memorization. Unlike the audio overview service which uses
 an agentic loop, this is a single-call service:
 
@@ -29,7 +29,7 @@ class FlashCardsService:
     """
     Service for generating flash cards from source content.
 
-    Educational Note: Flash cards are generated in a single Claude call
+    Flash cards are generated in a single Claude call
     using the generate_flash_cards tool for structured output.
     """
 
@@ -59,7 +59,7 @@ class FlashCardsService:
         """
         Get source content for flash card generation.
 
-        Educational Note: For large sources, we sample chunks evenly
+        For large sources, we sample chunks evenly
         to stay within token limits while covering the full content.
         Content is downloaded from Supabase Storage.
         """

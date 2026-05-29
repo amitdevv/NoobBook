@@ -1,7 +1,7 @@
 """
 Message Service - Handles message persistence and retrieval for chat conversations.
 
-Educational Note: This is a pure CRUD service for messages using Supabase.
+This is a pure CRUD service for messages using Supabase.
 It handles storing and retrieving messages, building message arrays for API calls.
 
 Key Responsibilities:
@@ -15,38 +15,30 @@ For parsing Claude API responses (tool_use blocks, content extraction),
 see utils/claude_parsing_utils.py
 """
 import base64
-import json
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Optional, Dict, List, Any
 
 from config import Config
 from app.utils import claude_parsing_utils
-from app.utils.path_utils import get_web_agent_dir, get_agents_dir
 import logging
 
-from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+from app.services.data_services.base_service import SupabaseService
 
 logger = logging.getLogger(__name__)
 
 
-class MessageService:
+class MessageService(SupabaseService):
     """
     Service class for message persistence using Supabase.
 
-    Educational Note: Messages are stored in the Supabase messages table.
+    Messages are stored in the Supabase messages table.
     This service handles the format conversion between storage and API.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the message service."""
-        if not is_supabase_enabled():
-            raise RuntimeError(
-                "Supabase is not configured. Please add SUPABASE_URL and "
-                "SUPABASE_ANON_KEY to your .env file."
-            )
-        self.supabase = get_supabase()
+        super().__init__()
         self.table = "messages"
         self.chats_table = "chats"
         # Keep local storage for agent execution logs (debugging only)
@@ -93,7 +85,7 @@ class MessageService:
         """
         Add a message to a chat.
 
-        Educational Note: This handles different content types:
+        This handles different content types:
         - String content for simple user/assistant messages
         - List content for tool_use/tool_result blocks
 
@@ -174,7 +166,7 @@ class MessageService:
         """
         Format a message for frontend consumption.
 
-        Educational Note: Content is stored as JSONB {"text": "..."} in Supabase
+        Content is stored as JSONB {"text": "..."} in Supabase
         but frontend expects a plain string. This extracts the text.
 
         Args:
@@ -186,7 +178,7 @@ class MessageService:
         content = message.get("content")
 
         # Extract text from JSONB format
-        # Educational Note: Content can be stored as:
+        # Content can be stored as:
         # - {"text": "..."} for simple messages
         # - A string (legacy)
         # - A list of content blocks (tool_use responses from Claude)
@@ -327,7 +319,7 @@ class MessageService:
         """
         Add an assistant message to a chat.
 
-        Educational Note: Includes metadata about the model and token usage
+        Includes metadata about the model and token usage
         for tracking and debugging purposes.
 
         Args:
@@ -391,7 +383,7 @@ class MessageService:
         Persist ALL tool_result blocks for one assistant tool_use round
         as a SINGLE user message.
 
-        Educational Note: When Claude returns parallel tool_use blocks
+        When Claude returns parallel tool_use blocks
         (`assistant: [tool_use_A, tool_use_B]`), the Anthropic API
         requires the response to be ONE user message containing every
         matching tool_result (`user: [tool_result_A, tool_result_B]`).
@@ -427,7 +419,7 @@ class MessageService:
         """
         Build message array for Claude API call.
 
-        Educational Note: The Claude API expects messages in a specific format.
+        The Claude API expects messages in a specific format.
         This method converts stored messages to the API format, optionally
         including a pending message that hasn't been saved yet.
 
@@ -561,7 +553,7 @@ class MessageService:
         """
         Fix broken tool_use/tool_result sequences in message history.
 
-        Educational Note: The Claude API requires every tool_use block to have a
+        The Claude API requires every tool_use block to have a
         matching tool_result in the next message. If a tool execution error left
         orphaned tool_use blocks in the DB, this method strips them so the chat
         can continue working.
@@ -670,7 +662,7 @@ class MessageService:
         """
         Build API message array from a list of messages.
 
-        Educational Note: This is useful for subagents or other flows
+        This is useful for subagents or other flows
         that don't use stored chat messages but need to build context.
 
         Args:
@@ -693,7 +685,7 @@ class MessageService:
         """
         Update chat metadata (not messages).
 
-        Educational Note: Used for updating things like title, source_references,
+        Used for updating things like title, source_references,
         sub_agents metadata without modifying messages.
 
         Args:
@@ -720,180 +712,6 @@ class MessageService:
         )
 
         return bool(response.data)
-
-    # =========================================================================
-    # Agent Execution Logs - For storing agent debug/execution data
-    # (Kept as local files for debugging - not migrated to Supabase)
-    # =========================================================================
-
-    def _get_agent_dir(self, project_id: str, agent_name: str) -> Path:
-        """
-        Get the directory for a specific agent's execution logs.
-
-        Educational Note: Uses path_utils for centralized path management.
-        Currently supports 'web_agent', can be extended for other agents.
-
-        Args:
-            project_id: The project UUID
-            agent_name: The agent name (e.g., 'web_agent')
-
-        Returns:
-            Path to agent's execution log directory (auto-created)
-        """
-        if agent_name == "web_agent":
-            return get_web_agent_dir(project_id)
-        else:
-            # Generic fallback for future agents
-            agents_dir = get_agents_dir(project_id)
-            agent_dir = agents_dir / agent_name
-            agent_dir.mkdir(parents=True, exist_ok=True)
-            return agent_dir
-
-    def save_agent_execution(
-        self,
-        project_id: str,
-        agent_name: str,
-        execution_id: str,
-        task: str,
-        messages: List[Dict[str, Any]],
-        result: Dict[str, Any],
-        started_at: str,
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> Optional[str]:
-        """
-        Save an agent execution log (local file for debugging).
-
-        Educational Note: Agent execution logs are stored locally for debugging.
-        They capture the full message chain, tool calls, and results.
-
-        Structure: data/projects/{project_id}/agents/{agent_name}/{execution_id}.json
-
-        Args:
-            project_id: The project UUID
-            agent_name: The agent name (e.g., 'web_agent')
-            execution_id: Unique execution ID
-            task: The task description that was given to the agent
-            messages: Full message chain (includes tool_use, tool_result, etc.)
-            result: Final result from the agent
-            started_at: Execution start timestamp (ISO format)
-            metadata: Optional additional metadata (source_id, url, etc.)
-
-        Returns:
-            The execution_id if successful, None if failed
-        """
-        if not project_id:
-            return None
-
-        try:
-            # Get agent directory using path_utils
-            agent_dir = self._get_agent_dir(project_id, agent_name)
-
-            # Build execution log
-            execution_log = {
-                "execution_id": execution_id,
-                "agent_name": agent_name,
-                "task": task,
-                "messages": messages,
-                "result": result,
-                "started_at": started_at,
-                "completed_at": datetime.now().isoformat()
-            }
-
-            # Add optional metadata
-            if metadata:
-                execution_log.update(metadata)
-
-            # Save to file
-            log_file = agent_dir / f"{execution_id}.json"
-            with open(log_file, "w", encoding="utf-8") as f:
-                json.dump(execution_log, f, indent=2, ensure_ascii=False)
-
-            return execution_id
-
-        except Exception as e:
-            logger.error("Failed to save %s execution log: %s", agent_name, e)
-            return None
-
-    def get_agent_execution(
-        self,
-        project_id: str,
-        agent_name: str,
-        execution_id: str
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Get a specific agent execution log.
-
-        Args:
-            project_id: The project UUID
-            agent_name: The agent name (e.g., 'web_agent')
-            execution_id: The execution UUID
-
-        Returns:
-            Execution log dict or None if not found
-        """
-        try:
-            agent_dir = self._get_agent_dir(project_id, agent_name)
-            log_file = agent_dir / f"{execution_id}.json"
-
-            if not log_file.exists():
-                return None
-
-            with open(log_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-
-        except (json.JSONDecodeError, IOError) as e:
-            logger.error("Failed to read %s execution log: %s", agent_name, e)
-            return None
-
-    def list_agent_executions(
-        self,
-        project_id: str,
-        agent_name: str,
-        limit: int = 50
-    ) -> List[Dict[str, Any]]:
-        """
-        List agent execution logs for a project.
-
-        Educational Note: Returns basic metadata for each execution without
-        loading the full message chains. Sorted by completion time (newest first).
-
-        Args:
-            project_id: The project UUID
-            agent_name: The agent name (e.g., 'web_agent')
-            limit: Maximum number of executions to return
-
-        Returns:
-            List of execution summaries (id, task, completed_at, success)
-        """
-        try:
-            agent_dir = self._get_agent_dir(project_id, agent_name)
-
-            if not agent_dir.exists():
-                return []
-
-            executions = []
-            for log_file in agent_dir.glob("*.json"):
-                try:
-                    with open(log_file, "r", encoding="utf-8") as f:
-                        log = json.load(f)
-                        executions.append({
-                            "execution_id": log.get("execution_id"),
-                            "task": log.get("task", "")[:100],  # Truncate task
-                            "completed_at": log.get("completed_at"),
-                            "success": log.get("result", {}).get("success", False)
-                        })
-                except (json.JSONDecodeError, IOError):
-                    continue
-
-            # Sort by completion time (newest first)
-            executions.sort(key=lambda x: x.get("completed_at", ""), reverse=True)
-
-            return executions[:limit]
-
-        except Exception as e:
-            logger.error("Failed to list %s executions: %s", agent_name, e)
-            return []
-
 
 # Singleton instance for easy import
 message_service = MessageService()

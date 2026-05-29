@@ -1,6 +1,6 @@
 /**
  * useFlashCardGeneration Hook
- * Educational Note: Custom hook for flash card generation logic.
+ * Custom hook for flash card generation logic.
  * Handles state management, API calls, polling, and iterative editing.
  */
 

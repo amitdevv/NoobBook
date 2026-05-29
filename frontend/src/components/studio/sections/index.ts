@@ -1,6 +1,6 @@
 /**
  * Studio Sections Index
- * Educational Note: Each section is self-contained and manages its own state.
+ * Each section is self-contained and manages its own state.
  * This isolation prevents unnecessary re-renders across the Studio panel.
  */
 

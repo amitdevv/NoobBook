@@ -1,6 +1,6 @@
 /**
  * JiraTab Component
- * Educational Note: Adds a Jira source to the project for live issue queries in chat.
+ * Adds a Jira source to the project for live issue queries in chat.
  * Similar to FreshdeskTab — Jira credentials are configured globally in API Keys settings.
  */
 

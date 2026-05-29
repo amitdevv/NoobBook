@@ -1,7 +1,7 @@
 """
 Processed Output - Build and save standardized processed text output.
 
-Educational Note: All source types (PDF, DOCX, images, audio, links, YouTube)
+All source types (PDF, DOCX, images, audio, links, YouTube)
 are converted to a standardized text format with page markers. This enables:
 1. Consistent chunking for embeddings
 2. Page-based citations in chat responses
@@ -61,7 +61,7 @@ def _format_token_count(token_count: Any) -> str:
     """
     Format token count for header display.
 
-    Educational Note: Claude API has token limits. If a source is very large
+    Claude API has token limits. If a source is very large
     (>200k tokens) or the API returns an error, we display "200k+" instead
     of the exact count to indicate it's a large file.
 
@@ -93,7 +93,7 @@ def build_processed_output(
     """
     Build standardized processed text output with page markers.
 
-    Educational Note: This function creates a consistent format for all
+    This function creates a consistent format for all
     processed sources. The output includes:
     1. Header with source info and ALL metadata keys for this type
     2. Header ends with "# ---" separator
@@ -161,7 +161,7 @@ def save_processed_text(
     """
     No-op — processed files are saved to Supabase Storage by each processor.
 
-    Educational Note: Previously saved to local disk at
+    Previously saved to local disk at
     data/projects/{project_id}/sources/processed/{source_id}.txt.
     Now all processors upload directly to Supabase Storage via
     storage_service.upload_processed_file(), so this local save is unnecessary.
@@ -188,7 +188,7 @@ def build_and_save_processed_output(
     """
     Build processed output and save to file in one step.
 
-    Educational Note: This is a convenience function that combines
+    This is a convenience function that combines
     build_processed_output() and save_processed_text(). Most processors
     can use this single function to handle their output.
 

@@ -1,6 +1,6 @@
 /**
  * CitationBadge Component
- * Educational Note: Displays an inline citation number that shows
+ * Displays an inline citation number that shows
  * the actual chunk content on hover. Uses shadcn HoverCard and Card.
  * Citation format: [[cite:CHUNK_ID]] where chunk_id = {source_id}_page_{page}_chunk_{n}
  */
@@ -35,7 +35,7 @@ interface CitationBadgeProps {
 
 /**
  * CitationBadge
- * Educational Note: This component renders an inline superscript citation
+ * This component renders an inline superscript citation
  * number using Badge. On hover, it fetches and displays the actual chunk
  * content from the source document using HoverCard and Card components.
  */
@@ -53,7 +53,7 @@ export const CitationBadge: React.FC<CitationBadgeProps> = ({
 
   /**
    * Fetch chunk content when hover card opens
-   * Educational Note: We only fetch once and cache the result.
+   * We only fetch once and cache the result.
    */
   const handleOpenChange = async (open: boolean) => {
     if (open && !hasLoaded && !loading) {
@@ -78,7 +78,7 @@ export const CitationBadge: React.FC<CitationBadgeProps> = ({
 
   /**
    * Clean content for display
-   * Educational Note: Source content may have extra whitespace, multiple
+   * Source content may have extra whitespace, multiple
    * newlines, or formatting artifacts. This cleans it for readable display.
    */
   const cleanContent = (content: string): string => {

@@ -1,7 +1,7 @@
 """
 Video Generation Service - Simple video generation using Google Veo 2.0.
 
-Educational Note: This is a simple service (not an agent) that:
+This is a simple service (not an agent) that:
 1. Uses Claude to generate an optimized video prompt from source content
 2. Calls Google Veo API with the generated prompt
 3. Saves videos and updates job status
@@ -22,7 +22,7 @@ class VideoService:
     """
     Simple video generation service.
 
-    Educational Note: Takes prompt + parameters, calls Google Veo API,
+    Takes prompt + parameters, calls Google Veo API,
     saves videos, and updates job status. No agent loop needed.
     """
 

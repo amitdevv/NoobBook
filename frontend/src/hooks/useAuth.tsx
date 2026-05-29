@@ -1,7 +1,7 @@
 /**
  * Auth Context & Hook
  *
- * Educational Note: React Context provides a way to pass data through the
+ * React Context provides a way to pass data through the
  * component tree without prop drilling. The AuthProvider wraps the entire app
  * and makes auth state (user, loading, login/signup/logout functions) available
  * to any component via the useAuth() hook.

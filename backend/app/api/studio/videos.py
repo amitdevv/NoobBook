@@ -1,7 +1,7 @@
 """
 Video Generation endpoints - AI-generated video clips.
 
-Educational Note: Videos demonstrate advanced generative AI:
+Videos demonstrate advanced generative AI:
 1. video_executor orchestrates the generation
 2. Claude analyzes source and creates video prompts
 3. Google Veo generates the actual video

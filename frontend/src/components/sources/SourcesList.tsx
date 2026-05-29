@@ -1,6 +1,6 @@
 /**
  * SourcesList Component
- * Educational Note: Displays the list of sources with loading and empty states.
+ * Displays the list of sources with loading and empty states.
  * Uses ScrollArea for scrollable content and renders SourceItem for each source.
  */
 

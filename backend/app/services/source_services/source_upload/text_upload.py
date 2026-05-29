@@ -1,7 +1,7 @@
 """
 Text Upload Handler - Manages pasted text source uploads to Supabase Storage.
 
-Educational Note: Pasted text is uploaded to Supabase Storage as a .txt file.
+Pasted text is uploaded to Supabase Storage as a .txt file.
 This is the simplest source type - the raw content IS the processed content
 (after adding page markers for large texts).
 """
@@ -26,7 +26,7 @@ def upload_text(
     """
     Add a pasted text source to a project (uploads to Supabase Storage).
 
-    Educational Note: Pasted text is uploaded to Supabase Storage as a .txt file.
+    Pasted text is uploaded to Supabase Storage as a .txt file.
     Processing will add page markers for large texts.
 
     Args:
@@ -110,7 +110,7 @@ def update_text(
     Replace a TEXT source's body content and re-run the processing
     pipeline so chunks + embeddings reflect the edit.
 
-    Educational Note: TEXT sources are the only type the in-app editor
+    TEXT sources are the only type the in-app editor
     can produce, so they're the only type we know how to round-trip
     through the editor → backend → processed-text path. Other types
     (PDF, DOCX, ...) require re-upload, which the existing delete +
@@ -205,7 +205,7 @@ def _submit_processing_task(project_id: str, source_id: str) -> None:
     """
     Submit a background task to process the text source.
 
-    Educational Note: Even text files go through processing to add
+    Even text files go through processing to add
     page markers for consistent chunking behavior.
     """
     try:

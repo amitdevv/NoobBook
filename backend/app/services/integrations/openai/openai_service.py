@@ -1,7 +1,7 @@
 """
 Embeddings Service - Create embeddings using OpenAI API.
 
-Educational Note: Embeddings convert text into dense vectors that capture
+Embeddings convert text into dense vectors that capture
 semantic meaning. Similar texts have similar vectors (close in vector space).
 
 OpenAI Embedding Models:
@@ -21,7 +21,7 @@ class OpenAIService:
     """
     Service for creating text embeddings using OpenAI API.
 
-    Educational Note: This service:
+    This service:
     1. Manages the OpenAI client connection
     2. Handles single and batch embedding creation
     3. Uses lazy initialization to avoid errors at import time
@@ -40,7 +40,7 @@ class OpenAIService:
         """
         Get or create the OpenAI client.
 
-        Educational Note: Lazy initialization ensures we don't fail
+        Lazy initialization ensures we don't fail
         at import time if the API key isn't set yet.
 
         Raises:
@@ -61,7 +61,7 @@ class OpenAIService:
         """
         Create embedding for a single text string.
 
-        Educational Note: For single texts, this is straightforward.
+        For single texts, this is straightforward.
         The API returns a vector of floats representing the semantic
         meaning of the text. Text is cleaned before embedding to
         remove excessive whitespace.
@@ -100,7 +100,7 @@ class OpenAIService:
         """
         Create embeddings for multiple texts in a single API call.
 
-        Educational Note: Batch processing is more efficient than
+        Batch processing is more efficient than
         individual calls because:
         - Reduces API overhead
         - Lower latency overall
@@ -162,7 +162,7 @@ class OpenAIService:
         """
         Get the number of dimensions for a given model.
 
-        Educational Note: Different models produce different dimension
+        Different models produce different dimension
         vectors. This is important for Pinecone index configuration.
 
         Args:

@@ -1,7 +1,7 @@
 """
 Claude Parsing Utils - Utilities for parsing Claude API responses and building message content.
 
-Educational Note: Claude API has specific message patterns for tool use:
+Claude API has specific message patterns for tool use:
 
 1. Simple text response:
    stop_reason: "end_turn"
@@ -64,7 +64,7 @@ def is_tool_use(response: Dict[str, Any]) -> bool:
     """
     Check if response contains tool_use blocks that need tool_result back.
 
-    Educational Note: When stop_reason is "tool_use", we must:
+    When stop_reason is "tool_use", we must:
     1. Extract all tool_use blocks
     2. Execute each tool
     3. Send back tool_result for each (with matching IDs)
@@ -106,7 +106,7 @@ def extract_text(response: Dict[str, Any]) -> str:
     """
     Extract text content from Claude response.
 
-    Educational Note: Response content_blocks can contain multiple blocks
+    Response content_blocks can contain multiple blocks
     (text + tool_use). This extracts only the text portions.
     For tool_use responses, this gets Claude's explanation like
     "I'll check the weather for you."
@@ -135,7 +135,7 @@ def extract_citations(response: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Extract citations from web_search text blocks.
 
-    Educational Note: When Claude uses web_search, text blocks can include
+    When Claude uses web_search, text blocks can include
     citations with the source information. Each citation contains:
     - url: The source URL
     - title: The page title
@@ -186,7 +186,7 @@ def extract_text_with_citations(response: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract both text and citations from Claude response.
 
-    Educational Note: Convenience method that returns both the text content
+    Convenience method that returns both the text content
     and any citations from web_search. Useful for research agents that need
     to cite their sources.
 
@@ -209,7 +209,7 @@ def extract_tool_use_blocks(
     """
     Extract tool_use blocks from Claude response.
 
-    Educational Note: Claude can call multiple tools in parallel. Each tool_use has:
+    Claude can call multiple tools in parallel. Each tool_use has:
     - id: Unique identifier (e.g., "toolu_01") - MUST match in tool_result
     - name: Tool being called
     - input: Parameters for the tool
@@ -253,7 +253,7 @@ def extract_tool_inputs(
     """
     Extract just the input parameters from tool_use blocks.
 
-    Educational Note: Convenience method when you only need the inputs
+    Convenience method when you only need the inputs
     (not the IDs). Useful for extraction tasks like PDF processing where
     Claude uses submit_page_extraction tool and you just want the data.
 
@@ -279,7 +279,7 @@ def extract_server_tool_use_blocks(
     """
     Extract server_tool_use blocks from Claude response.
 
-    Educational Note: Server tools (web_search, web_fetch) are executed by Claude
+    Server tools (web_search, web_fetch) are executed by Claude
     directly. They appear as "server_tool_use" blocks, and their results come
     back in the same response as "*_tool_result" blocks.
 
@@ -322,7 +322,7 @@ def extract_server_tool_results(
     """
     Extract server tool result blocks from Claude response.
 
-    Educational Note: Server tool results have types like:
+    Server tool results have types like:
     - "web_search_tool_result" - Results from web_search
     - "web_fetch_tool_result" - Results from web_fetch
 
@@ -379,7 +379,7 @@ def build_tool_result_content(
     """
     Build tool_result content blocks for responding to tool_use.
 
-    Educational Note: After Claude calls tools, we send back a single user message
+    After Claude calls tools, we send back a single user message
     with ALL tool_result blocks. Each tool_result must have tool_use_id matching
     the original tool_use block.
 
@@ -438,7 +438,7 @@ def build_single_tool_result(
     """
     Build tool_result content for a single tool call.
 
-    Educational Note: Convenience method for the common case of responding
+    Convenience method for the common case of responding
     to a single tool use (non-parallel).
 
     Args:
@@ -464,7 +464,7 @@ def _serialize_anthropic_object(obj: Any) -> Any:
     """
     Recursively convert Anthropic SDK objects to JSON-serializable dicts.
 
-    Educational Note: Anthropic SDK returns objects with attributes (.type, .url, etc.)
+    Anthropic SDK returns objects with attributes (.type, .url, etc.)
     that aren't JSON serializable. This helper recursively converts them to plain dicts.
     Handles nested objects, lists, and primitive types.
 
@@ -500,7 +500,7 @@ def serialize_content_blocks(content_blocks: List[Any]) -> List[Dict[str, Any]]:
     """
     Convert Anthropic content block objects to JSON-serializable dicts.
 
-    Educational Note: Claude API returns content blocks as Anthropic objects
+    Claude API returns content blocks as Anthropic objects
     with attributes (.type, .text, .id). For storing in JSON files (message
     history, debug logs), we need plain dicts.
 
@@ -587,7 +587,7 @@ def get_token_usage(response: Dict[str, Any]) -> Dict[str, int]:
     """
     Extract token usage from response.
 
-    Educational Note: Token usage is important for:
+    Token usage is important for:
     - Cost tracking (Sonnet: $3/$15, Haiku: $1/$5 per 1M tokens)
     - Debugging context length issues
     - Optimizing prompt sizes

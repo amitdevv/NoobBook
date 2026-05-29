@@ -1,6 +1,6 @@
 /**
  * EmailViewerModal Component
- * Educational Note: Modal for viewing and downloading email templates.
+ * Modal for viewing and downloading email templates.
  * Displays preview iframe, color scheme, and download options.
  */
 

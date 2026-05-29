@@ -1,7 +1,7 @@
 """
 Chat Service - CRUD operations for chat entities.
 
-Educational Note: This service manages chat entity lifecycle within projects
+This service manages chat entity lifecycle within projects
 using Supabase as the database backend.
 
 Separation of Concerns:
@@ -14,7 +14,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional, Dict, List, Any
 
-from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+from app.services.data_services.base_service import SupabaseService
 
 logger = logging.getLogger(__name__)
 
@@ -24,22 +24,17 @@ logger = logging.getLogger(__name__)
 DB_SOURCE_TYPES = ("DATABASE", "CSV", "FRESHDESK", "JIRA", "MIXPANEL", "MCP")
 
 
-class ChatService:
+class ChatService(SupabaseService):
     """
     Service class for chat entity management using Supabase.
 
-    Educational Note: A chat is a conversation container within a project.
+    A chat is a conversation container within a project.
     It has metadata (title, timestamps) and holds messages.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the chat service."""
-        if not is_supabase_enabled():
-            raise RuntimeError(
-                "Supabase is not configured. Please add SUPABASE_URL and "
-                "SUPABASE_ANON_KEY to your .env file."
-            )
-        self.supabase = get_supabase()
+        super().__init__()
         self.table = "chats"
         self.messages_table = "messages"
         self.studio_signals_table = "studio_signals"
@@ -48,7 +43,7 @@ class ChatService:
         """
         List all chats for a project.
 
-        Educational Note: Returns metadata only (not full messages) for
+        Returns metadata only (not full messages) for
         efficient loading of chat lists in the UI. A single RPC
         (`list_chats_with_message_count`, migration 00029) joins each
         chat to its filtered message count in one round-trip — the
@@ -230,7 +225,7 @@ class ChatService:
         """
         Create a new chat in a project.
 
-        Educational Note: Initializes an empty conversation with metadata.
+        Initializes an empty conversation with metadata.
         Messages are added separately via message_service.
 
         Args:
@@ -279,7 +274,7 @@ class ChatService:
         """
         Get full chat data including messages and studio signals.
 
-        Educational Note: Filters out tool_use and tool_result messages
+        Filters out tool_use and tool_result messages
         from the response by default. When include_raw=True, returns ALL
         messages with their original content blocks for debug/raw view.
 
@@ -333,7 +328,7 @@ class ChatService:
                 })
         else:
             # Normal mode: filter out tool chain intermediates
-            # Educational Note: During a tool_use loop, main_chat_service stores:
+            # During a tool_use loop, main_chat_service stores:
             #   1. Intermediate assistant messages with LIST content (serialized content
             #      blocks containing text + tool_use blocks)
             #   2. Tool_result user messages with LIST content
@@ -451,7 +446,7 @@ class ChatService:
         """
         Get chat metadata only (without messages).
 
-        Educational Note: Useful for quick lookups without loading
+        Useful for quick lookups without loading
         the full message history.
 
         Args:
@@ -547,7 +542,7 @@ class ChatService:
         """
         Update chat metadata.
 
-        Educational Note: Currently supports updating title.
+        Currently supports updating title.
         Messages are updated via message_service.
 
         Args:
@@ -609,7 +604,7 @@ class ChatService:
         """
         Delete a chat and all its messages.
 
-        Educational Note: Supabase cascades deletes automatically based on
+        Supabase cascades deletes automatically based on
         foreign key constraints. Deleting a chat also deletes its messages
         and studio signals.
 
@@ -656,7 +651,7 @@ class ChatService:
         """
         Sync a chat's metadata (no-op for Supabase version).
 
-        Educational Note: In Supabase, the data is always in sync.
+        In Supabase, the data is always in sync.
         This method exists for API compatibility.
 
         Args:
@@ -679,7 +674,7 @@ class ChatService:
         """
         Get cost tracking data for a specific chat.
 
-        Educational Note: Mirrors project_service.get_project_costs() —
+        Mirrors project_service.get_project_costs() —
         returns the costs JSONB column, or a default structure if the chat
         exists but has no costs yet.
 

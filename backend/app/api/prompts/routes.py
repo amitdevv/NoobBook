@@ -1,7 +1,7 @@
 """
 Prompt management endpoints.
 
-Educational Note: System prompts are crucial for shaping AI behavior.
+System prompts are crucial for shaping AI behavior.
 These endpoints let users customize how Claude responds in their projects.
 
 The prompt hierarchy:
@@ -23,7 +23,7 @@ def get_project_prompt(project_id):
     """
     Get the system prompt for a project (custom or default).
 
-    Educational Note: Returns the prompt that will be used
+    Returns the prompt that will be used
     for all AI conversations in this project.
 
     Response:
@@ -53,7 +53,7 @@ def update_project_prompt(project_id):
     """
     Update the project's custom system prompt.
 
-    Educational Note: Setting prompt to null/empty reverts to default.
+    Setting prompt to null/empty reverts to default.
     This allows users to customize AI behavior per-project while
     maintaining a sensible fallback.
 
@@ -116,7 +116,7 @@ def get_default_prompt():
     """
     Get the global default prompt.
 
-    Educational Note: This is the fallback prompt used when
+    This is the fallback prompt used when
     projects don't have custom prompts. It's stored in
     data/prompts/default_prompt.json.
 
@@ -147,7 +147,7 @@ def list_all_prompts():
     """
     List all prompt configurations.
 
-    Educational Note: This dynamically reads all prompt files from
+    This dynamically reads all prompt files from
     data/prompts/ directory. Adding new prompt files automatically
     makes them visible in the UI.
 

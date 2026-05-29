@@ -1,7 +1,7 @@
 """
 Embedding Service - Orchestrates the full embedding pipeline.
 
-Educational Note: This service coordinates the embedding workflow:
+This service coordinates the embedding workflow:
 1. Check if source needs embedding (token count > threshold)
 2. Parse processed text into chunks (one page = one chunk)
 3. Upload chunks to Supabase Storage
@@ -38,7 +38,7 @@ class EmbeddingService:
     """
     Service for orchestrating the complete embedding workflow.
 
-    Educational Note: This is a coordinator service that doesn't do
+    This is a coordinator service that doesn't do
     the actual work - it calls specialized services in the right order
     and handles errors gracefully.
     """
@@ -57,7 +57,7 @@ class EmbeddingService:
         """
         Process embeddings for a source if needed.
 
-        Educational Note: This is the main entry point for the embedding
+        This is the main entry point for the embedding
         workflow. It checks if embedding is needed, and if so, runs the
         full pipeline.
 
@@ -139,7 +139,7 @@ class EmbeddingService:
             logger.info("Uploaded %d chunks to Supabase Storage", uploaded_count)
 
             # Step 5: Create embeddings for all chunks
-            # Educational Note: chunk.text is already cleaned by chunking_service
+            # chunk.text is already cleaned by chunking_service
             chunk_texts = [chunk.text for chunk in chunks]
             embeddings = openai_service.create_embeddings_batch(chunk_texts)
             logger.info("Created %d embeddings", len(embeddings))
@@ -178,7 +178,7 @@ class EmbeddingService:
         """
         Delete embeddings and chunk files for a source.
 
-        Educational Note: When a source is deleted, we need to:
+        When a source is deleted, we need to:
         1. Delete vectors from Pinecone
         2. Delete chunk files from Supabase Storage
 
@@ -224,7 +224,7 @@ class EmbeddingService:
         """
         Search for similar content using semantic search.
 
-        Educational Note: This is the retrieval part of RAG:
+        This is the retrieval part of RAG:
         1. Convert query to embedding
         2. Search Pinecone for similar vectors
         3. Load chunk text from Supabase Storage

@@ -1,6 +1,6 @@
 /**
  * Quiz Viewer Component
- * Educational Note: Interactive quiz component for testing knowledge.
+ * Interactive quiz component for testing knowledge.
  *
  * Features:
  * - Single and multi-select question support

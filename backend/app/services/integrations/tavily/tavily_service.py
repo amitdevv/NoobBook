@@ -1,7 +1,7 @@
 """
 Tavily Service - Web search and content extraction using Tavily AI API.
 
-Educational Note: Tavily is an AI-powered search API that provides:
+Tavily is an AI-powered search API that provides:
 - High-quality search results with AI-generated answers
 - Content extraction from specific URLs
 - Topic-based filtering (general, news, finance)
@@ -25,7 +25,7 @@ class TavilyService:
     """
     Service class for Tavily AI web search.
 
-    Educational Note: We lazy-load the client to avoid errors
+    We lazy-load the client to avoid errors
     if the API key isn't configured.
     """
 
@@ -58,7 +58,7 @@ class TavilyService:
         """
         Execute a web search using Tavily with optimized defaults.
 
-        Educational Note: Uses fixed parameters for consistent results:
+        Uses fixed parameters for consistent results:
         - include_answer: "advanced" for AI summary
         - search_depth: "advanced" for better results
         - max_results: 5 for good coverage
@@ -125,7 +125,7 @@ class TavilyService:
         """
         Advanced Tavily operation - supports both search and extract.
 
-        Educational Note: This unified function handles both:
+        This unified function handles both:
         - search: Query-based web search with topic filtering
         - extract: Direct content extraction from specific URLs
 
@@ -187,7 +187,7 @@ class TavilyService:
         """
         Execute advanced web search.
 
-        Educational Note: Returns full results with all fields so the
+        Returns full results with all fields so the
         research agent has complete context for citations.
         """
         if not query:
@@ -243,7 +243,7 @@ class TavilyService:
         """
         Execute URL content extraction.
 
-        Educational Note: Extracts content from specific URLs for analysis.
+        Extracts content from specific URLs for analysis.
         Returns full results with URL, title, and raw_content for citations.
         """
         if not urls:

@@ -1,6 +1,6 @@
 /**
  * MixpanelTab Component
- * Educational Note: Adds a Mixpanel source to the project for live analytics
+ * Adds a Mixpanel source to the project for live analytics
  * queries in chat. Similar to JiraTab — credentials are configured globally
  * in API Keys settings; this just flags the project.
  */

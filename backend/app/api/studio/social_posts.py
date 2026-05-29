@@ -1,7 +1,7 @@
 """
 Social Post endpoints - Platform-specific social media content.
 
-Educational Note: Social posts demonstrate multi-platform content generation:
+Social posts demonstrate multi-platform content generation:
 1. Claude generates platform-optimized copy
 2. Gemini Imagen creates accompanying images
 3. Different formats for LinkedIn, Facebook/Instagram, Twitter/X
@@ -44,7 +44,7 @@ def generate_social_posts(project_id: str):
     """
     Start social post generation as a background task.
 
-    Educational Note: Social posts are generated with platform-specific images
+    Social posts are generated with platform-specific images
     and copy for LinkedIn, Facebook/Instagram, and Twitter/X.
 
     Request Body:

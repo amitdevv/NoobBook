@@ -1,7 +1,7 @@
 """
 Per-request context helpers — req_id propagation.
 
-Educational Note: There is no way today to take a frontend "I was logged out at
+There is no way today to take a frontend "I was logged out at
 14:32" report and find the corresponding backend log line. This helper, paired
 with the X-Request-Id middleware in `app/api/__init__.py` and the matching
 header on the frontend axios client, closes that gap. Every log record gets

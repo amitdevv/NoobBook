@@ -1,7 +1,7 @@
 """
 Brand API endpoints.
 
-Educational Note: These endpoints manage brand assets and configuration
+These endpoints manage brand assets and configuration
 at the workspace (user) level. Brand settings are used by studio agents
 to maintain consistent branding across all projects' generated content.
 
@@ -31,6 +31,7 @@ from app.services.integrations.claude import claude_service
 from app.services.integrations.supabase import storage_service
 from app.utils import claude_parsing_utils
 from app.utils.cost_tracking import record_user_only_usage
+from app.utils.error_responses import error_response
 
 logger = logging.getLogger(__name__)
 
@@ -70,10 +71,7 @@ def list_assets():
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return error_response(e, default_log="Error listing brand assets")
 
 
 @brand_bp.route('/brand/assets', methods=['POST'])
@@ -81,7 +79,7 @@ def upload_asset():
     """
     Upload a new brand asset.
 
-    Educational Note: This endpoint uses multipart/form-data for file upload.
+    This endpoint uses multipart/form-data for file upload.
     The file is stored in Supabase Storage and metadata in the database.
 
     Form Data:
@@ -164,10 +162,7 @@ def upload_asset():
             "error": str(e)
         }), 500
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to upload brand asset: {str(e)}"
-        }), 500
+        return error_response(e, default_log="Error uploading brand asset")
 
 
 @brand_bp.route('/brand/assets/<asset_id>', methods=['GET'])
@@ -197,10 +192,7 @@ def get_asset(asset_id: str):
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return error_response(e, default_log="Error fetching brand asset")
 
 
 @brand_bp.route('/brand/assets/<asset_id>', methods=['PUT'])
@@ -254,10 +246,7 @@ def update_asset(asset_id: str):
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to update brand asset: {str(e)}"
-        }), 500
+        return error_response(e, default_log="Error updating brand asset")
 
 
 @brand_bp.route('/brand/assets/<asset_id>', methods=['DELETE'])
@@ -287,10 +276,7 @@ def delete_asset(asset_id: str):
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to delete brand asset: {str(e)}"
-        }), 500
+        return error_response(e, default_log="Error deleting brand asset")
 
 
 @brand_bp.route('/brand/assets/<asset_id>/download', methods=['GET'])
@@ -298,7 +284,7 @@ def download_asset(asset_id: str):
     """
     Download a brand asset file, proxied through the backend.
 
-    Educational Note: In Docker, Supabase storage signed URLs use internal
+    In Docker, Supabase storage signed URLs use internal
     hostnames (e.g. supabase-kong:8000) that browsers can't resolve.
     Instead of returning a signed URL, we download the file server-side
     and stream it to the browser — same pattern used by studio endpoints.
@@ -329,11 +315,7 @@ def download_asset(asset_id: str):
         return send_file(io.BytesIO(data), mimetype=mimetype, as_attachment=False)
 
     except Exception as e:
-        logger.exception("Failed to download brand asset %s", asset_id)
-        return jsonify({
-            "success": False,
-            "error": "Failed to download brand asset"
-        }), 500
+        return error_response(e, default_log="Error downloading brand asset")
 
 
 @brand_bp.route('/brand/assets/<asset_id>/primary', methods=['POST'])
@@ -374,10 +356,7 @@ def set_asset_primary(asset_id: str):
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return error_response(e, default_log="Error setting primary brand asset")
 
 
 # =============================================================================
@@ -389,7 +368,7 @@ def get_config():
     """
     Get the brand configuration for the authenticated user.
 
-    Educational Note: Creates default config if none exists. This ensures
+    Creates default config if none exists. This ensures
     there's always a valid config to display.
 
     Returns:
@@ -415,10 +394,7 @@ def get_config():
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return error_response(e, default_log="Error fetching brand config")
 
 
 @brand_bp.route('/brand/config', methods=['PUT'])
@@ -473,10 +449,7 @@ def update_config():
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to update brand config: {str(e)}"
-        }), 500
+        return error_response(e, default_log="Error updating brand config")
 
 
 @brand_bp.route('/brand/config/colors', methods=['PUT'])
@@ -519,10 +492,7 @@ def update_colors():
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to update brand colors: {str(e)}"
-        }), 500
+        return error_response(e, default_log="Error updating brand colors")
 
 
 @brand_bp.route('/brand/config/typography', methods=['PUT'])
@@ -562,10 +532,7 @@ def update_typography():
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to update brand typography: {str(e)}"
-        }), 500
+        return error_response(e, default_log="Error updating brand typography")
 
 
 @brand_bp.route('/brand/config/guidelines', methods=['PUT'])
@@ -599,10 +566,7 @@ def update_guidelines():
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to update brand guidelines: {str(e)}"
-        }), 500
+        return error_response(e, default_log="Error updating brand guidelines")
 
 
 @brand_bp.route('/brand/config/voice', methods=['PUT'])
@@ -640,10 +604,7 @@ def update_voice():
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to update brand voice: {str(e)}"
-        }), 500
+        return error_response(e, default_log="Error updating brand voice")
 
 
 @brand_bp.route('/brand/config/features', methods=['PUT'])
@@ -651,7 +612,7 @@ def update_feature_settings():
     """
     Update per-feature brand application settings.
 
-    Educational Note: This controls which studio features should apply
+    This controls which studio features should apply
     the brand configuration. For example, mind maps might not need
     brand colors but presentations do.
 
@@ -687,10 +648,7 @@ def update_feature_settings():
         }), 200
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to update feature settings: {str(e)}"
-        }), 500
+        return error_response(e, default_log="Error updating feature settings")
 
 
 # =============================================================================
@@ -729,8 +687,7 @@ def get_design_md():
         }), 200
 
     except Exception as e:
-        logger.exception("Failed to load design.md for user")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return error_response(e, default_log="Error loading design.md")
 
 
 @brand_bp.route('/brand/design/sample', methods=['GET'])
@@ -785,8 +742,7 @@ def update_design_md():
         }), 200
 
     except Exception as e:
-        logger.exception("Failed to save design.md")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return error_response(e, default_log="Error saving design.md")
 
 
 @brand_bp.route('/brand/design/bootstrap', methods=['POST'])
@@ -867,5 +823,4 @@ def bootstrap_design_md():
         }), 200
 
     except Exception as e:
-        logger.exception("design.md bootstrap failed")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return error_response(e, default_log="design.md bootstrap failed")

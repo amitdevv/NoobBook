@@ -1,6 +1,6 @@
 /**
  * usePRDGeneration Hook
- * Educational Note: Manages PRD (Product Requirements Document) generation.
+ * Manages PRD (Product Requirements Document) generation.
  * PRDs are created incrementally by the agent and stored as markdown files.
  */
 

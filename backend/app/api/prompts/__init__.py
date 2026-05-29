@@ -1,7 +1,7 @@
 """
 Prompts API Blueprint.
 
-Educational Note: System prompts are the instructions that shape how Claude
+System prompts are the instructions that shape how Claude
 responds in conversations. This blueprint manages:
 
 1. Project Prompts:

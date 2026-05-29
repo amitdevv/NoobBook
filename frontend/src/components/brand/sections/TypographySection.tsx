@@ -1,6 +1,6 @@
 /**
  * TypographySection Component
- * Educational Note: Manages brand typography configuration (fonts, sizes, weights).
+ * Manages brand typography configuration (fonts, sizes, weights).
  * Includes font picker dropdowns with popular fonts organized by category.
  */
 import React, { useState, useEffect } from 'react';

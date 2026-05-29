@@ -1,7 +1,7 @@
 """
 Wireframe Job Management - Tracks wireframe generation jobs.
 
-Educational Note: Wireframes use Excalidraw elements to create
+Wireframes use Excalidraw elements to create
 hand-drawn style UI prototypes, perfect for early-stage design.
 """
 from datetime import datetime

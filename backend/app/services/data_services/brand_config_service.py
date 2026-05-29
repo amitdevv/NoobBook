@@ -1,7 +1,7 @@
 """
 Brand Config Service - Business logic for brand configuration management.
 
-Educational Note: Brand configuration stores colors, typography, guidelines,
+Brand configuration stores colors, typography, guidelines,
 and voice settings at the workspace (user) level. This is used by studio agents
 to maintain consistent branding across all projects' generated content.
 
@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from app.services.integrations.supabase import get_supabase, is_supabase_enabled
+from app.services.data_services.base_service import SupabaseService
 
 logger = logging.getLogger(__name__)
 
@@ -90,29 +90,24 @@ DEFAULT_FEATURE_SETTINGS = {
 }
 
 
-class BrandConfigService:
+class BrandConfigService(SupabaseService):
     """
     Service class for managing brand configuration using Supabase.
 
-    Educational Note: Each user has exactly one brand config (workspace-level).
+    Each user has exactly one brand config (workspace-level).
     The config is created automatically on first access with defaults.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the brand config service."""
-        if not is_supabase_enabled():
-            raise RuntimeError(
-                "Supabase is not configured. Please add SUPABASE_URL and "
-                "SUPABASE_ANON_KEY to your .env file."
-            )
-        self.supabase = get_supabase()
+        super().__init__()
         self.table = "brand_config"
 
     def get_config(self, user_id: str) -> Dict[str, Any]:
         """
         Get the brand configuration for a user.
 
-        Educational Note: Creates default config if none exists. This ensures
+        Creates default config if none exists. This ensures
         there's always a valid config to work with.
 
         Args:
@@ -149,7 +144,7 @@ class BrandConfigService:
         """
         Update the brand configuration for a user.
 
-        Educational Note: Only updates the fields that are provided.
+        Only updates the fields that are provided.
         This allows partial updates (e.g., just update colors).
 
         Args:
@@ -328,7 +323,7 @@ class BrandConfigService:
         """
         Update per-feature brand application settings.
 
-        Educational Note: This controls which studio features should apply
+        This controls which studio features should apply
         the brand configuration. For example, mind maps might not need
         brand colors but presentations do.
 

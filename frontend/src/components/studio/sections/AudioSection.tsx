@@ -1,6 +1,6 @@
 /**
  * AudioSection Component
- * Educational Note: Self-contained section for audio generation.
+ * Self-contained section for audio generation.
  * Owns all audio-related state via useAudioGeneration hook.
  * Only re-renders when audio state changes - isolated from other sections.
  */

@@ -1,7 +1,7 @@
 """
 Flash Card Job Management - Tracks flash card generation jobs.
 
-Educational Note: Flash card jobs use AI to extract key concepts from source
+Flash card jobs use AI to extract key concepts from source
 content and generate question-answer pairs for studying.
 """
 from datetime import datetime

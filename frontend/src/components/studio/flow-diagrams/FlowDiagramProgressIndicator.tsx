@@ -1,6 +1,6 @@
 /**
  * FlowDiagramProgressIndicator Component
- * Educational Note: Shows real-time progress during flow diagram generation.
+ * Shows real-time progress during flow diagram generation.
  * Cyan theme distinguishes from other studio items.
  */
 

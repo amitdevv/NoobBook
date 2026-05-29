@@ -1,7 +1,7 @@
 """
 Mixpanel Integration Package.
 
-Educational Note: Provides Mixpanel analytics query access via the Service
+Provides Mixpanel analytics query access via the Service
 Account REST API (HTTP Basic). Tools expose event discovery, segmentation,
 funnels, retention, and cohort path analysis to chat.
 """

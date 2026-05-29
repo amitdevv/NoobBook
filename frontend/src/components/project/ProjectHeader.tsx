@@ -44,7 +44,7 @@ const log = createLogger('project-header');
 
 /**
  * ProjectHeader Component
- * Educational Note: Header for project workspace with navigation and project actions.
+ * Header for project workspace with navigation and project actions.
  * Now loads and saves the system prompt using the real API.
  */
 
@@ -100,7 +100,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
   /**
    * Load project cost tracking data
-   * Educational Note: Costs are tracked cumulatively in Supabase projects table
+   * Costs are tracked cumulatively in Supabase projects table
    */
   const loadCosts = React.useCallback(async () => {
     try {
@@ -115,7 +115,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   }, [project.id]);
 
   /**
-   * Educational Note: Load costs when component mounts.
+   * Load costs when component mounts.
    */
   useEffect(() => {
     loadCosts();
@@ -123,7 +123,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
   /**
    * Refresh costs when costsVersion changes (triggered after chat messages)
-   * Educational Note: Uses version counter pattern for cross-component updates
+   * Uses version counter pattern for cross-component updates
    */
   useEffect(() => {
     if (costsVersion !== undefined && costsVersion > 0) {
@@ -133,7 +133,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
   /**
    * Load memory data (user + project memory)
-   * Educational Note: Memory is loaded when user opens the memory dialog.
+   * Memory is loaded when user opens the memory dialog.
    * Populates both the display state and editable textarea state.
    */
   const loadMemory = async () => {
@@ -156,7 +156,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
   /**
    * Open memory dialog and load memory data
-   * Educational Note: Memory is fetched on-demand when dialog opens.
+   * Memory is fetched on-demand when dialog opens.
    */
   const handleOpenMemory = () => {
     setMemoryDialogOpen(true);
@@ -202,7 +202,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
   /**
    * Load all prompt configurations
-   * Educational Note: Prompts are loaded when settings dialog opens.
+   * Prompts are loaded when settings dialog opens.
    */
   const loadAllPrompts = async () => {
     try {

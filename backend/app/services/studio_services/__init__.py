@@ -1,7 +1,7 @@
 """
 Studio Services - Services for studio features (audio overview, deep dive, etc.).
 
-Educational Note: This folder contains services that handle studio features
+This folder contains services that handle studio features
 like audio overview generation, deep dive conversations, and other interactive
 content creation features.
 

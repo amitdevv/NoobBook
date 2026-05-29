@@ -1,6 +1,6 @@
 /**
  * PRDs API
- * Educational Note: Handles AI-generated Product Requirements Documents.
+ * Handles AI-generated Product Requirements Documents.
  * PRDs are written incrementally by the agent and stored as markdown files.
  */
 
@@ -188,7 +188,7 @@ export const prdsAPI = {
 
   /**
    * Poll PRD job status until complete or error
-   * Educational Note: Added initial delay to avoid race condition where
+   * Added initial delay to avoid race condition where
    * the job might not be saved to disk yet when polling starts.
    */
   async pollJobStatus(

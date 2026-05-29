@@ -1,6 +1,6 @@
 /**
  * FlashCardViewerModal Component
- * Educational Note: Modal with carousel and 3D flip animation.
+ * Modal with carousel and 3D flip animation.
  * Features: card navigation, flip animation, progress bar, reset, and iterative editing.
  */
 

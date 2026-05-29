@@ -1,7 +1,7 @@
 """
 Web Agent Executor - Handles tool execution for the web agent.
 
-Educational Note: This executor routes tool calls from the web agent
+This executor routes tool calls from the web agent
 to the appropriate services. It handles:
     - tavily_search: Routes to tavily_service
     - return_search_result: Extracts final result (termination signal)
@@ -17,7 +17,7 @@ class WebAgentExecutor:
     """
     Executor for web agent tools.
 
-    Educational Note: The executor pattern separates tool routing from
+    The executor pattern separates tool routing from
     the agent loop logic. This makes it easy to add new tools or
     modify execution behavior without changing the agent service.
     """
@@ -37,7 +37,7 @@ class WebAgentExecutor:
         """
         Execute a tool and return the result.
 
-        Educational Note: Returns a tuple of (result, is_termination).
+        Returns a tuple of (result, is_termination).
         The is_termination flag tells the agent loop to stop processing.
 
         Args:
@@ -105,7 +105,7 @@ class WebAgentExecutor:
         """
         Handle the termination tool (return_search_result).
 
-        Educational Note: This tool signals that the agent has finished
+        This tool signals that the agent has finished
         its task. We extract and validate the final result structure.
 
         Args:

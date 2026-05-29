@@ -1,7 +1,7 @@
 """
 AI Services - Simple AI-powered utility services.
 
-Educational Note: This folder contains lightweight AI services that perform
+This folder contains lightweight AI services that perform
 single, focused tasks. These are NOT complex agents with tool loops - they
 are simple request/response AI utilities.
 

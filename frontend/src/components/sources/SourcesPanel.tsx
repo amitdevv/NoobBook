@@ -1,7 +1,6 @@
 /**
- * SourcesPanel Component
- * Educational Note: Main orchestrator for project sources management.
- * Manages state and API calls, delegates rendering to child components.
+ * Orchestrates project source management: owns source state and API calls,
+ * delegates rendering to SourcesList / SourcesFooter / AddSourcesSheet.
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -40,26 +39,10 @@ import {
 } from '../ui/tooltip';
 import {
   Books,
-  File,
-  FilePdf,
-  FileDoc,
-  FilePpt,
-  FileCsv,
-  FileHtml,
-  FilePng,
-  FileJpg,
-  FileText,
-  MarkdownLogo,
-  Table,
-  Link,
-  Image,
-  MusicNote,
-  YoutubeLogo,
   CaretRight,
   Plus,
-  Plug,
-  NotionLogo,
 } from '@phosphor-icons/react';
+import { getSourceIcon } from './sourceIcon';
 import { createLogger } from '@/lib/logger';
 import { patchOne, removeOne, upsertOne } from '@/lib/resourceState';
 
@@ -75,58 +58,6 @@ interface SourcesPanelProps {
   onSelectedSourcesChange?: (ids: string[]) => void;
 }
 
-/**
- * Get icon component for a source in the collapsed sidebar.
- * Educational Note: Mirrors the logic in SourceItem.tsx — extracts extension from
- * source.name (most reliable), falls back to embedding_info.file_extension, then
- * the backend `type` field.
- */
-const getSourceIcon = (source: Source): typeof File => {
-  // 1. Extract extension from source name (most reliable — persists across processing)
-  const name = source.name || '';
-  const lastDot = name.lastIndexOf('.');
-  const nameExtension = lastDot > 0 ? name.substring(lastDot).toLowerCase() : '';
-
-  // 2. Also check embedding_info (available on fresh uploads before processing overwrites it)
-  const embeddingExtension = ((source.embedding_info as Record<string, string>)?.file_extension || '').toLowerCase();
-
-  const fileExtension = nameExtension || embeddingExtension;
-
-  // Map extension to icon
-  switch (fileExtension) {
-    case '.pdf': return FilePdf;
-    case '.docx': return FileDoc;
-    case '.pptx': return FilePpt;
-    case '.txt': return FileText;
-    case '.csv': return FileCsv;
-    case '.database': return Table;
-    case '.mcp': return Plug;
-    case '.notion': return NotionLogo;
-    case '.md': return MarkdownLogo;
-    case '.html': return FileHtml;
-    case '.json': case '.xml': return FileText;
-    case '.mp3': case '.wav': case '.m4a': case '.aac': case '.flac': return MusicNote;
-    case '.jpg': case '.jpeg': return FileJpg;
-    case '.png': return FilePng;
-    case '.gif': case '.webp': return Image;
-  }
-
-  // 3. Fall back to backend `type` field (for URLs, pasted text, etc.)
-  const sourceType = source.type || '';
-  switch (sourceType) {
-    case 'YOUTUBE': return YoutubeLogo;
-    case 'LINK': case 'RESEARCH': return Link;
-    case 'TEXT': return FileText;
-    case 'AUDIO': return MusicNote;
-    case 'IMAGE': return Image;
-    case 'DATA': return Table;
-    case 'DATABASE': return Table;
-    case 'MCP': return Plug;
-    case 'NOTION': return NotionLogo;
-    case 'DOCUMENT': return FileText;
-    default: return File;
-  }
-};
 
 export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   projectId,
@@ -160,7 +91,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   /**
    * Ref for error function to avoid infinite loop in useCallback
-   * Educational Note: Toast functions are recreated each render, causing
+   * Toast functions are recreated each render, causing
    * useCallback to recreate loadSources, triggering useEffect infinitely.
    * Using a ref ensures we always have the latest function without re-renders.
    */
@@ -200,7 +131,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   /**
    * Silent refresh for polling (no loading state to avoid flicker)
-   * Educational Note: This is used for background polling so the UI
+   * This is used for background polling so the UI
    * doesn't flicker on each refresh.
    */
   const refreshSources = useCallback(async () => {
@@ -255,7 +186,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   /**
    * Detect when sources transition to "ready" status
-   * Educational Note: When a source finishes processing, ChatPanel needs to know
+   * When a source finishes processing, ChatPanel needs to know
    * so it can update the active sources count in the header. We compare previous
    * and current sources to detect this transition.
    */
@@ -280,7 +211,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   /**
    * Derive source.active from per-chat selectedSourceIds.
-   * Educational Note: Source checkboxes now reflect the active chat's selection,
+   * Source checkboxes now reflect the active chat's selection,
    * not the global is_active flag from the backend.
    */
   useEffect(() => {
@@ -291,7 +222,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   /**
    * Polling for source status updates
-   * Educational Note: When sources are actively processing or embedding, we poll
+   * When sources are actively processing or embedding, we poll
    * every 3 seconds to update the UI. Polling stops when no sources are working.
    * Note: We check for "processing" and "embedding", not "uploaded" because
    * "uploaded" is also the state after cancellation (waiting for user to retry).
@@ -314,9 +245,39 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     return () => clearInterval(pollInterval);
   }, [sources, refreshSources]);
 
-  /**
-   * Handle file upload
-   */
+  // Pull the user-facing error out of an axios envelope when present,
+  // otherwise fall back to the Error message or a supplied default.
+  const resolveErrorMessage = (err: unknown, fallback: string): string => {
+    const base = err instanceof Error ? err.message : fallback;
+    if (typeof err === 'object' && err !== null && 'response' in err) {
+      return (err as { response?: { data?: { error?: string } } }).response?.data?.error || base;
+    }
+    return base;
+  };
+
+  // Shared path for every "add a single source" flow: enforce the source cap,
+  // optimistically insert the created source (honoring the current selection),
+  // toast, and surface a clean error. File upload stays separate — it has its
+  // own batch/progress/retry control flow.
+  const addSource = async (
+    apiCall: () => Promise<Source>,
+    { successMsg, fallbackErr, logMsg }: { successMsg: string; fallbackErr: string; logMsg: string },
+  ): Promise<void> => {
+    if (sources.length >= MAX_SOURCES) {
+      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
+      return;
+    }
+    try {
+      const created = await apiCall();
+      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
+      success(successMsg);
+      setSheetOpen(false);
+    } catch (err: unknown) {
+      log.error({ err }, logMsg);
+      error(resolveErrorMessage(err, fallbackErr));
+    }
+  };
+
   const handleFileUpload = async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
 
@@ -341,18 +302,11 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       setSheetOpen(false);
     } catch (err: unknown) {
       log.error({ err }, 'failed to upload files');
-      const errorMessage = err instanceof Error ? err.message : 'Upload failed';
-      // Pull the user-facing error out of an axios envelope when present.
-      let resolvedMessage = errorMessage;
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { error?: string } } };
-        resolvedMessage = axiosErr.response?.data?.error || errorMessage;
-      }
       // Inline Retry on the toast: one click re-runs the same upload batch
       // without making the user re-pick files. Snapshot the original list
       // so the closure stays stable even after `setUploading(false)`.
       const retryFiles = fileArray;
-      showToast('error', resolvedMessage, {
+      showToast('error', resolveErrorMessage(err, 'Upload failed'), {
         label: 'Retry',
         onClick: () => handleFileUpload(retryFiles),
       });
@@ -362,218 +316,37 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     }
   };
 
-  /**
-   * Handle adding URL source
-   */
-  const handleAddUrl = async (url: string) => {
-    // Check source limit
-    if (sources.length >= MAX_SOURCES) {
-      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
-      return;
-    }
+  const handleAddUrl = (url: string) =>
+    addSource(() => sourcesAPI.addUrlSource(projectId, url),
+      { successMsg: 'URL source added successfully', fallbackErr: 'Failed to add URL', logMsg: 'failed to add URL source' });
 
-    try {
-      const created = await sourcesAPI.addUrlSource(projectId, url);
-      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
-      success('URL source added successfully');
-      setSheetOpen(false);
-    } catch (err: unknown) {
-      log.error({ err }, 'failed to add URL source');
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add URL';
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { error?: string } } };
-        error(axiosErr.response?.data?.error || errorMessage);
-      } else {
-        error(errorMessage);
-      }
-    }
-  };
+  const handleAddText = (content: string, name: string) =>
+    addSource(() => sourcesAPI.addTextSource(projectId, content, name),
+      { successMsg: 'Text source added successfully', fallbackErr: 'Failed to add text', logMsg: 'failed to add text source' });
 
-  /**
-   * Handle adding text source
-   */
-  const handleAddText = async (content: string, name: string) => {
-    // Check source limit
-    if (sources.length >= MAX_SOURCES) {
-      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
-      return;
-    }
+  const handleAddResearch = (topic: string, description: string, links: string[]) =>
+    addSource(() => sourcesAPI.addResearchSource(projectId, topic, description, links),
+      { successMsg: 'Deep research started - this may take a few minutes', fallbackErr: 'Failed to start research', logMsg: 'failed to start research' });
 
-    try {
-      const created = await sourcesAPI.addTextSource(projectId, content, name);
-      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
-      success('Text source added successfully');
-      setSheetOpen(false);
-    } catch (err: unknown) {
-      log.error({ err }, 'failed to add text source');
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add text';
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { error?: string } } };
-        error(axiosErr.response?.data?.error || errorMessage);
-      } else {
-        error(errorMessage);
-      }
-    }
-  };
+  const handleAddDatabase = (connectionId: string, name?: string, description?: string) =>
+    addSource(() => sourcesAPI.addDatabaseSource(projectId, connectionId, name, description),
+      { successMsg: 'Database source added successfully', fallbackErr: 'Failed to add database', logMsg: 'failed to add database source' });
 
-  /**
-   * Handle adding deep research source
-   * Educational Note: Triggers an AI agent to research a topic and
-   * create a comprehensive source document from the findings.
-   */
-  const handleAddResearch = async (topic: string, description: string, links: string[]) => {
-    // Check source limit
-    if (sources.length >= MAX_SOURCES) {
-      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
-      return;
-    }
+  const handleAddMcp = (connectionId: string, resourceUris: string[], name?: string, description?: string) =>
+    addSource(() => sourcesAPI.addMcpSource(projectId, connectionId, resourceUris, name, description),
+      { successMsg: 'MCP source added successfully', fallbackErr: 'Failed to add MCP source', logMsg: 'failed to add MCP source' });
 
-    try {
-      const created = await sourcesAPI.addResearchSource(projectId, topic, description, links);
-      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
-      success('Deep research started - this may take a few minutes');
-      setSheetOpen(false);
-    } catch (err: unknown) {
-      log.error({ err }, 'failed to start research');
-      const errorMessage = err instanceof Error ? err.message : 'Failed to start research';
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { error?: string } } };
-        error(axiosErr.response?.data?.error || errorMessage);
-      } else {
-        error(errorMessage);
-      }
-    }
-  };
+  const handleAddFreshdesk = (name?: string, description?: string) =>
+    addSource(() => sourcesAPI.addFreshdeskSource(projectId, name, description),
+      { successMsg: 'Freshdesk sync started — fetching last 90 days of tickets. Check the status bar for progress.', fallbackErr: 'Failed to add Freshdesk source', logMsg: 'failed to add Freshdesk source' });
 
-  /**
-   * Handle adding a DATABASE source
-   */
-  const handleAddDatabase = async (connectionId: string, name?: string, description?: string) => {
-    if (sources.length >= MAX_SOURCES) {
-      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
-      return;
-    }
+  const handleAddJira = (name?: string, description?: string) =>
+    addSource(() => sourcesAPI.addJiraSource(projectId, name, description),
+      { successMsg: 'Jira source added — processing issues. Check the status bar for progress.', fallbackErr: 'Failed to add Jira source', logMsg: 'failed to add Jira source' });
 
-    try {
-      const created = await sourcesAPI.addDatabaseSource(projectId, connectionId, name, description);
-      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
-      success('Database source added successfully');
-      setSheetOpen(false);
-    } catch (err: unknown) {
-      log.error({ err }, 'failed to add database source');
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add database';
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { error?: string } } };
-        error(axiosErr.response?.data?.error || errorMessage);
-      } else {
-        error(errorMessage);
-      }
-    }
-  };
-
-  /**
-   * Handle adding an MCP source
-   */
-  const handleAddMcp = async (connectionId: string, resourceUris: string[], name?: string, description?: string) => {
-    if (sources.length >= MAX_SOURCES) {
-      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
-      return;
-    }
-
-    try {
-      const created = await sourcesAPI.addMcpSource(projectId, connectionId, resourceUris, name, description);
-      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
-      success('MCP source added successfully');
-      setSheetOpen(false);
-    } catch (err: unknown) {
-      log.error({ err }, 'failed to add MCP source');
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add MCP source';
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { error?: string } } };
-        error(axiosErr.response?.data?.error || errorMessage);
-      } else {
-        error(errorMessage);
-      }
-    }
-  };
-
-  /**
-   * Handle adding a Freshdesk source
-   */
-  const handleAddFreshdesk = async (name?: string, description?: string) => {
-    if (sources.length >= MAX_SOURCES) {
-      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
-      return;
-    }
-
-    try {
-      const created = await sourcesAPI.addFreshdeskSource(projectId, name, description);
-      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
-      success('Freshdesk sync started — fetching last 90 days of tickets. Check the status bar for progress.');
-      setSheetOpen(false);
-    } catch (err: unknown) {
-      log.error({ err }, 'failed to add Freshdesk source');
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add Freshdesk source';
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { error?: string } } };
-        error(axiosErr.response?.data?.error || errorMessage);
-      } else {
-        error(errorMessage);
-      }
-    }
-  };
-
-  /**
-   * Handle adding a Jira source
-   */
-  const handleAddJira = async (name?: string, description?: string) => {
-    if (sources.length >= MAX_SOURCES) {
-      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
-      return;
-    }
-
-    try {
-      const created = await sourcesAPI.addJiraSource(projectId, name, description);
-      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
-      success('Jira source added — processing issues. Check the status bar for progress.');
-      setSheetOpen(false);
-    } catch (err: unknown) {
-      log.error({ err }, 'failed to add Jira source');
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add Jira source';
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { error?: string } } };
-        error(axiosErr.response?.data?.error || errorMessage);
-      } else {
-        error(errorMessage);
-      }
-    }
-  };
-
-  /**
-   * Handle adding a Mixpanel source
-   */
-  const handleAddMixpanel = async (name?: string, description?: string) => {
-    if (sources.length >= MAX_SOURCES) {
-      error(`Cannot add. Maximum ${MAX_SOURCES} sources allowed.`);
-      return;
-    }
-
-    try {
-      const created = await sourcesAPI.addMixpanelSource(projectId, name, description);
-      setSources((prev) => upsertOne(prev, { ...created, active: selectedSourceIdsRef.current.includes(created.id) }, { prepend: true }));
-      success('Mixpanel source added — verifying connection. Check the status bar for progress.');
-      setSheetOpen(false);
-    } catch (err: unknown) {
-      log.error({ err }, 'failed to add Mixpanel source');
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add Mixpanel source';
-      if (typeof err === 'object' && err !== null && 'response' in err) {
-        const axiosErr = err as { response?: { data?: { error?: string } } };
-        error(axiosErr.response?.data?.error || errorMessage);
-      } else {
-        error(errorMessage);
-      }
-    }
-  };
+  const handleAddMixpanel = (name?: string, description?: string) =>
+    addSource(() => sourcesAPI.addMixpanelSource(projectId, name, description),
+      { successMsg: 'Mixpanel source added — verifying connection. Check the status bar for progress.', fallbackErr: 'Failed to add Mixpanel source', logMsg: 'failed to add Mixpanel source' });
 
   /**
    * Handle Freshdesk sync
@@ -654,7 +427,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   /**
    * Toggle source active state (per-chat selection).
-   * Educational Note: Instead of updating the source's global is_active flag,
+   * Instead of updating the source's global is_active flag,
    * we now update the chat's selected_source_ids array. Each chat maintains
    * its own set of selected sources independently.
    */
@@ -699,7 +472,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   /**
    * Cancel processing for a source
-   * Educational Note: Stops any running tasks, cleans up processed data,
+   * Stops any running tasks, cleans up processed data,
    * but keeps raw file so user can retry later.
    */
   const handleCancelProcessing = async (sourceId: string) => {
@@ -729,7 +502,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
 
   /**
    * View processed content for a source
-   * Educational Note: Fetches the extracted text from the backend and displays
+   * Fetches the extracted text from the backend and displays
    * it in a side sheet. Only available for text-based sources that are ready.
    */
   const handleViewProcessed = (sourceId: string) => {

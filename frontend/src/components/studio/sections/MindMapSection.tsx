@@ -1,6 +1,6 @@
 /**
  * MindMapSection Component
- * Educational Note: Self-contained section for mind map generation.
+ * Self-contained section for mind map generation.
  */
 
 import React, { useEffect, useCallback } from 'react';

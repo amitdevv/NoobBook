@@ -1,7 +1,7 @@
 """
 Video Job Management - Tracks video generation jobs.
 
-Educational Note: Video jobs use AI video generation APIs (like Google Veo)
+Video jobs use AI video generation APIs (like Google Veo)
 to create short video clips from prompts derived from source content.
 """
 from datetime import datetime

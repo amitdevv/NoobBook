@@ -16,7 +16,7 @@ import { useToast } from '../ui/use-toast';
 
 /**
  * Dashboard Component
- * Educational Note: Main dashboard layout for the NotebookLM clone application.
+ * Main dashboard layout for the NotebookLM clone application.
  * This component manages the projects list and application settings.
  */
 

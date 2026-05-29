@@ -1,6 +1,6 @@
 /**
  * Social Posts API
- * Educational Note: Handles AI-generated social media posts with images.
+ * Handles AI-generated social media posts with images.
  */
 
 import axios from 'axios';

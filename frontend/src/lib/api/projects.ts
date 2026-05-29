@@ -1,6 +1,6 @@
 /**
  * Projects API Service
- * Educational Note: These methods abstract the API calls for project management,
+ * These methods abstract the API calls for project management,
  * making them easier to use throughout the application and maintaining consistency.
  */
 
@@ -9,7 +9,7 @@ import { api } from './client';
 
 /**
  * Memory Types
- * Educational Note: Memory helps the AI maintain context across conversations.
+ * Memory helps the AI maintain context across conversations.
  * User memory persists across all projects, project memory is specific to a project.
  */
 export interface MemoryData {
@@ -19,7 +19,7 @@ export interface MemoryData {
 
 /**
  * Cost Tracking Types
- * Educational Note: These types match the backend cost tracking structure.
+ * These types match the backend cost tracking structure.
  */
 export interface ModelCostBreakdown {
   input_tokens: number;

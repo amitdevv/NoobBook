@@ -296,7 +296,7 @@ def require_permission(category: str, item: str | None = None):
     """
     Decorator to enforce per-user module permissions.
 
-    Educational Note: Works alongside @require_auth / @require_admin.
+    Works alongside @require_auth / @require_admin.
     Admins always pass (they have full access). For non-admin users,
     checks the permissions JSONB on the users table.
 

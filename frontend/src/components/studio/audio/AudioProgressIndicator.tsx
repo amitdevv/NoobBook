@@ -1,6 +1,6 @@
 /**
  * AudioProgressIndicator Component
- * Educational Note: Shows real-time progress during audio generation.
+ * Shows real-time progress during audio generation.
  * Primary theme distinguishes audio from other studio items.
  */
 

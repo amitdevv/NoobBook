@@ -1,7 +1,7 @@
 """
 Research Upload Handler - Manages deep research source creation.
 
-Educational Note: Deep research sources are created by an AI agent that:
+Deep research sources are created by an AI agent that:
 1. Searches the web for information on a topic
 2. Analyzes any provided reference links
 3. Synthesizes findings into a comprehensive document
@@ -33,7 +33,7 @@ def upload_research(
     """
     Create a deep research source for a project.
 
-    Educational Note: This uploads a .research file to Supabase Storage containing
+    This uploads a .research file to Supabase Storage containing
     the research parameters. The actual research is performed by a background task
     using an AI agent with web search capabilities.
 
@@ -138,7 +138,7 @@ def _submit_processing_task(project_id: str, source_id: str) -> None:
     """
     Submit a background task to process the research source.
 
-    Educational Note: Research processing can take several minutes as the
+    Research processing can take several minutes as the
     AI agent searches the web and synthesizes findings. This runs in background.
     """
     from app.services.source_services.source_processing import source_processing_service

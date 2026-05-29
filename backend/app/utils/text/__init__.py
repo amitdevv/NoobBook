@@ -1,7 +1,7 @@
 """
 Text Utilities - Modular text processing for the RAG pipeline.
 
-Educational Note: Text processing is central to RAG applications:
+Text processing is central to RAG applications:
 1. Cleaning: Prepare text for embeddings (remove noise, normalize whitespace)
 2. Page Markers: Standardized format for marking page boundaries
 3. Processed Output: Build standardized output format with page markers

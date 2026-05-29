@@ -1,6 +1,6 @@
 /**
  * BlogSection Component
- * Educational Note: Self-contained section for blog post generation.
+ * Self-contained section for blog post generation.
  */
 
 import React, { useEffect, useCallback } from 'react';

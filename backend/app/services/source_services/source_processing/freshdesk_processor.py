@@ -1,7 +1,7 @@
 """
 Freshdesk Processor - Handles FRESHDESK source processing.
 
-Educational Note: Freshdesk tickets are stored globally (not per-source).
+Freshdesk tickets are stored globally (not per-source).
 Processing checks if global tickets already exist — if so, it skips the
 sync and just builds the summary. Only the first Freshdesk source triggers
 a full API sync. Subsequent projects get instant access to existing data.
@@ -42,7 +42,7 @@ def _build_processed_text(
     """
     Build processed text summary of the synced Freshdesk data.
 
-    Educational Note: This text is stored in Supabase processed-files bucket
+    This text is stored in Supabase processed-files bucket
     and displayed in the Sources UI as a quick overview of the Freshdesk data.
     """
     header_lines = [

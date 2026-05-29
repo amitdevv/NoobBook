@@ -1,6 +1,6 @@
 /**
  * GoogleDriveTab Component
- * Educational Note: Tab content for importing files from Google Drive.
+ * Tab content for importing files from Google Drive.
  * Shows file browser when connected, or setup instructions when not.
  * Features: folder navigation, pagination (Load More), client-side search.
  */
@@ -95,7 +95,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
 
   /**
    * Load files from Google Drive
-   * Educational Note: freshLoad=true resets the list, false appends (pagination)
+   * freshLoad=true resets the list, false appends (pagination)
    */
   const loadFiles = useCallback(async (freshLoad: boolean = true) => {
     if (freshLoad) {
@@ -150,7 +150,7 @@ export const GoogleDriveTab: React.FC<GoogleDriveTabProps> = ({
 
   /**
    * Client-side search filtering
-   * Educational Note: Simple case-insensitive name matching
+   * Simple case-insensitive name matching
    */
   const filteredFiles = useMemo(() => {
     if (!searchQuery.trim()) return files;

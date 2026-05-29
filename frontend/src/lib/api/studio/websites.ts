@@ -1,6 +1,6 @@
 /**
  * Websites API
- * Educational Note: Handles AI-generated multi-page websites.
+ * Handles AI-generated multi-page websites.
  * Uses an agentic approach for complex multi-file generation.
  */
 
@@ -128,7 +128,7 @@ export interface ListWebsiteJobsResponse {
 export const websitesAPI = {
   /**
    * Start website generation or edit (background task)
-   * Educational Note: Non-blocking - returns immediately with job_id
+   * Non-blocking - returns immediately with job_id
    */
   async startGeneration(
     projectId: string,

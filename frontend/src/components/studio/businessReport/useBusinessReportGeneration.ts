@@ -1,6 +1,6 @@
 /**
  * useBusinessReportGeneration Hook
- * Educational Note: Manages business report generation with data analysis.
+ * Manages business report generation with data analysis.
  * Business reports combine written analysis with charts from CSV data.
  */
 
@@ -140,7 +140,7 @@ export const useBusinessReportGeneration = (projectId: string) => {
 
   /**
    * Handle business report edit - regenerate report with edit instructions
-   * Educational Note: For business reports, editing means passing the previous
+   * For business reports, editing means passing the previous
    * markdown as context so the agent can refine it based on edit instructions.
    */
   const handleBusinessReportEdit = async (parentJob: BusinessReportJob, editInstructions: string) => {

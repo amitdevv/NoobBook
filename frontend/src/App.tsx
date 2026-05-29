@@ -49,14 +49,14 @@ const log = createLogger('app');
 
 /**
  * Main App Component for NoobBook
- * Educational Note: This component manages the overall application state
+ * This component manages the overall application state
  * and controls which view is shown (project list, create dialog, or project workspace).
  * React Router is used for URL-based navigation between dashboard and project views.
  */
 
 /**
  * Project Type
- * Educational Note: This interface defines the shape of a project object
+ * This interface defines the shape of a project object
  * returned from the API. It's used throughout the app for type safety.
  */
 interface Project {
@@ -83,7 +83,7 @@ interface AppContentProps {
 
 /**
  * AppContent Component
- * Educational Note: Handles the Dashboard view only.
+ * Handles the Dashboard view only.
  * Project workspace is now handled by /projects/:projectId route.
  */
 function AppContent({
@@ -137,7 +137,7 @@ function AppContent({
 
 /**
  * ProjectWorkspaceRoute Component
- * Educational Note: Wrapper that loads project from URL param and renders workspace.
+ * Wrapper that loads project from URL param and renders workspace.
  * This allows direct navigation to /projects/:projectId and proper URL-based routing.
  */
 function ProjectWorkspaceRoute({

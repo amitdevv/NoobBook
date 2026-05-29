@@ -1,6 +1,6 @@
 /**
  * GuidelinesSection Component
- * Educational Note: Manages brand guidelines, voice, and best practices.
+ * Manages brand guidelines, voice, and best practices.
  */
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../ui/button';

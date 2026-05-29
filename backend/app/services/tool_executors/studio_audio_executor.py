@@ -1,7 +1,7 @@
 """
 Studio Audio Executor - Executes tools for audio script generation.
 
-Educational Note: This executor handles two tools for the audio overview agent:
+This executor handles two tools for the audio overview agent:
 1. read_source_content: Reads source content (full for small, chunk by chunk for large)
 2. write_script_section: Writes/appends script sections to file
 
@@ -19,7 +19,7 @@ class StudioAudioExecutor:
     """
     Executor for studio audio generation tools.
 
-    Educational Note: This executor supports an agentic loop where Claude:
+    This executor supports an agentic loop where Claude:
     1. Reads source content (read_source_content) - 5 chunks at a time
     2. Writes script sections (write_script_section)
     3. Repeats until all content is covered
@@ -137,7 +137,7 @@ class StudioAudioExecutor:
         """
         Read a batch of 5 chunks starting from start_chunk from Supabase Storage.
 
-        Educational Note: For large sources, we read 5 chunks at a time.
+        For large sources, we read 5 chunks at a time.
         Claude writes a script section, then reads the next batch, appends,
         and repeats until all chunks are covered.
         """
@@ -203,7 +203,7 @@ class StudioAudioExecutor:
         """
         Execute write_script_section tool.
 
-        Educational Note: Script sections are stored in Supabase Storage under
+        Script sections are stored in Supabase Storage under
         the studio-outputs bucket at: {project_id}/audio/{job_id}/script.txt
 
         Args:

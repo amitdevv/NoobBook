@@ -17,7 +17,7 @@ from app.services.integrations.claude import claude_service
 from app.config import prompt_loader, tool_loader, brand_context_loader
 from app.utils import claude_parsing_utils
 from app.utils.source_content_utils import get_source_content
-from app.services.data_services import message_service, project_service
+from app.services.data_services import agent_execution_service, project_service
 from app.services.data_services.brand_asset_service import brand_asset_service
 from app.services.data_services.brand_config_service import brand_config_service
 from app.services.integrations.supabase import storage_service
@@ -56,7 +56,7 @@ class EmailAgentService:
         """
         Download the primary brand logo and save it locally for the email template.
 
-        Educational Note: Signed URLs from Supabase expire in 1 hour, but saved
+        Signed URLs from Supabase expire in 1 hour, but saved
         HTML needs stable URLs. We download the logo and save it to the email
         templates directory — same pattern as generated Imagen images.
 
@@ -193,7 +193,7 @@ class EmailAgentService:
             }
 
         # Inject brand requirements directly into user message for higher priority.
-        # Educational Note: Claude weights user message content higher than the tail
+        # Claude weights user message content higher than the tail
         # of long system prompts. By putting exact hex values and font names here,
         # the agent is far more likely to use them in the generated HTML.
         if brand_context and brand_colors:
@@ -352,7 +352,7 @@ class EmailAgentService:
         source_id: str
     ) -> None:
         """Save execution log for debugging."""
-        message_service.save_agent_execution(
+        agent_execution_service.save_agent_execution(
             project_id=project_id,
             agent_name=self.AGENT_NAME,
             execution_id=execution_id,

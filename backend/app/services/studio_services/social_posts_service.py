@@ -1,7 +1,7 @@
 """
 Social Posts Service - Generates social media posts with platform-specific images and copy.
 
-Educational Note: This service implements a two-step AI pipeline:
+This service implements a two-step AI pipeline:
 1. Claude generates platform-specific copy and image prompts
 2. Google Gemini generates images with correct aspect ratios for each platform
 
@@ -39,7 +39,7 @@ class SocialPostsService:
     """
     Service for generating social media posts with images.
 
-    Educational Note: This service orchestrates the full pipeline:
+    This service orchestrates the full pipeline:
     1. Claude generates platform-specific copy and image prompts
     2. Gemini generates images with appropriate aspect ratios
     """
@@ -70,7 +70,7 @@ class SocialPostsService:
         """
         Generate social media posts for selected platforms.
 
-        Educational Note: This is the main orchestrator that:
+        This is the main orchestrator that:
         1. Uses Claude to generate copy + image prompts per platform
         2. Uses Gemini to generate images with correct aspect ratios
         3. Updates job status throughout
@@ -297,7 +297,7 @@ class SocialPostsService:
         """
         Generate social media content using Claude.
 
-        Educational Note: Claude creates platform-specific copy and image prompts
+        Claude creates platform-specific copy and image prompts
         tailored to each platform's style, tone, and image dimensions.
         When a brand logo is available, Claude is instructed to write image prompts
         that describe incorporating the logo into the design.

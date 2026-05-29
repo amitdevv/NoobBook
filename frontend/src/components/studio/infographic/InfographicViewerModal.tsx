@@ -1,6 +1,6 @@
 /**
  * InfographicViewerModal Component
- * Educational Note: Modal for viewing and downloading infographics.
+ * Modal for viewing and downloading infographics.
  * Displays full-size image with hover download, key sections, and source info.
  */
 

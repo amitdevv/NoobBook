@@ -1,7 +1,7 @@
 """
 Component Generation endpoints - Reusable UI components.
 
-Educational Note: Components demonstrate code generation patterns:
+Components demonstrate code generation patterns:
 1. component_agent_executor orchestrates generation
 2. Claude creates self-contained HTML components
 3. Components include inline CSS and JavaScript
@@ -243,7 +243,7 @@ def serve_component_asset(project_id: str, job_id: str, filename: str):
     """
     Serve a non-HTML asset (logo, image) from a component job directory.
 
-    Educational Note: The preview route hardcodes mimetype='text/html' for
+    The preview route hardcodes mimetype='text/html' for
     iframe rendering. This route serves other file types (brand logos, images)
     that are referenced by the generated HTML components.
     """

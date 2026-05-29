@@ -1,7 +1,7 @@
 """
 Presentation Agent Executor - Handles studio signal execution for presentation generation.
 
-Educational Note: This executor is triggered by studio signals (from main chat)
+This executor is triggered by studio signals (from main chat)
 and launches the presentation agent as a background task. After the agent generates
 HTML slides, it captures screenshots and exports to PPTX.
 """
@@ -20,7 +20,7 @@ class PresentationAgentExecutor:
     """
     Executor for presentation generation via studio signals.
 
-    Educational Note: The studio signal flow:
+    The studio signal flow:
     1. User chats with AI about sources
     2. AI decides to activate studio (sends studio_signal tool call)
     3. studio_signal_executor routes to this executor

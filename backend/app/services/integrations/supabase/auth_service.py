@@ -1,7 +1,7 @@
 """
 Supabase Auth Service - User authentication and session management.
 
-Educational Note: This service handles all authentication operations using
+This service handles all authentication operations using
 Supabase Auth. It provides a clean interface for sign up, sign in, sign out,
 and session management.
 """
@@ -19,7 +19,7 @@ class AuthService:
     """
     Service for user authentication operations.
 
-    Educational Note: This service wraps Supabase Auth methods to provide
+    This service wraps Supabase Auth methods to provide
     a consistent interface and handle errors gracefully.
     """
 
@@ -52,7 +52,7 @@ class AuthService:
         Raises:
             Exception: If sign up fails (e.g., email already exists)
 
-        Educational Note: Supabase handles password hashing, email validation,
+        Supabase handles password hashing, email validation,
         and user creation automatically. The user is created in the auth.users
         table, and we can add additional data to our public.users table.
         """
@@ -88,7 +88,7 @@ class AuthService:
         Raises:
             Exception: If sign in fails (invalid credentials)
 
-        Educational Note: Supabase returns a JWT token in the session object.
+        Supabase returns a JWT token in the session object.
         This token should be stored client-side and included in subsequent
         requests for authentication.
         """
@@ -112,7 +112,7 @@ class AuthService:
         Returns:
             Dict indicating success or failure
 
-        Educational Note: This invalidates the current session token.
+        This invalidates the current session token.
         The client should clear the stored token after calling this.
         """
         try:
@@ -128,7 +128,7 @@ class AuthService:
         Returns:
             User data if authenticated, None otherwise
 
-        Educational Note: This uses the JWT token from the current session
+        This uses the JWT token from the current session
         to retrieve user information. The token must be valid and not expired.
         """
         try:
@@ -157,7 +157,7 @@ class AuthService:
         Returns:
             Dict containing new session data
 
-        Educational Note: JWT tokens expire after a certain time (default 1 hour).
+        JWT tokens expire after a certain time (default 1 hour).
         This method gets a new token using the refresh token, extending the session.
         """
         try:
@@ -170,7 +170,7 @@ class AuthService:
         """
         Refresh session using a client-provided refresh token.
 
-        Educational Note: Unlike refresh_session() which uses the server-side session,
+        Unlike refresh_session() which uses the server-side session,
         this method accepts a refresh token from the client. This is needed because
         the frontend stores its own tokens and the server doesn't maintain session state.
         When the access_token (JWT) expires, the client sends its refresh_token here
@@ -202,7 +202,7 @@ class AuthService:
         Returns:
             Dict indicating success or failure
 
-        Educational Note: Supabase sends an email with a secure link to reset
+        Supabase sends an email with a secure link to reset
         the password. The link expires after a certain time for security.
         """
         try:
@@ -221,7 +221,7 @@ class AuthService:
         Returns:
             Dict containing updated user data
 
-        Educational Note: This can update email, password, or user metadata.
+        This can update email, password, or user metadata.
         Email changes require confirmation if email confirmation is enabled.
         """
         try:
@@ -277,7 +277,7 @@ class AuthService:
             user_id: The auth user's UUID
             email: User's email address
 
-        Educational Note: Supabase Auth creates users in the auth.users table.
+        Supabase Auth creates users in the auth.users table.
         We create a corresponding record in public.users to store additional
         user data like memory and settings.
         """

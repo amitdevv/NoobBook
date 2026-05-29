@@ -1,7 +1,7 @@
 """
 MCP Upload Handler - Create an MCP source from an account-level MCP connection.
 
-Educational Note: An MCP source is represented similarly to database sources:
+An MCP source is represented similarly to database sources:
 - We store a small `.mcp` "raw file" in Supabase Storage containing metadata
   (connection_id, selected resource URIs, timestamp).
 - The actual server credentials live in the account-level mcp_connections table.

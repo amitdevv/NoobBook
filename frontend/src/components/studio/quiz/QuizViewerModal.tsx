@@ -1,6 +1,6 @@
 /**
  * QuizViewerModal Component
- * Educational Note: Modal for viewing interactive quiz questions.
+ * Modal for viewing interactive quiz questions.
  * Uses QuizViewer component for question display and answer checking.
  * Supports iterative editing of quiz content.
  */

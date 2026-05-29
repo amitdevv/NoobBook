@@ -1,7 +1,7 @@
 """
 API Blueprint initialization.
 
-Educational Note: Blueprints help organize Flask applications by
+Blueprints help organize Flask applications by
 grouping related routes together. This makes the code more modular
 and easier to maintain.
 
@@ -159,7 +159,7 @@ def _emit_request_id_and_timing(response):
 # =============================================================================
 # Authentication - Protect all routes except /auth/*
 # =============================================================================
-# Educational Note: before_request runs before every request to any route
+# before_request runs before every request to any route
 # under api_bp. We skip auth endpoints (login, signup, refresh) since those
 # are public. All other routes require a valid JWT token.
 

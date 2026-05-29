@@ -1,6 +1,6 @@
 /**
  * useMarketingStrategyGeneration Hook
- * Educational Note: Manages Marketing Strategy document generation.
+ * Manages Marketing Strategy document generation.
  * Marketing strategies are created incrementally by the agent and stored as markdown files.
  */
 

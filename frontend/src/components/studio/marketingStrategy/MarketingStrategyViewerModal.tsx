@@ -1,6 +1,6 @@
 /**
  * MarketingStrategyViewerModal Component
- * Educational Note: Modal for viewing marketing strategy markdown content.
+ * Modal for viewing marketing strategy markdown content.
  * Renders markdown with proper styling for tables, lists, headings.
  */
 

@@ -1,7 +1,7 @@
 """
 Tier Configuration - Centralized API tier management.
 
-Educational Note: This module manages rate limit tiers for various APIs:
+This module manages rate limit tiers for various APIs:
 - Anthropic (Claude) - PDF processing, chat
 - OpenAI - Embeddings
 - Pinecone - Vector database operations
@@ -23,7 +23,7 @@ class APIProvider(Enum):
 
 
 # Anthropic (Claude) tier configuration
-# Educational Note: Based on Anthropic's rate limits per tier
+# Based on Anthropic's rate limits per tier
 # Workers can be higher than CPU cores because this is I/O-bound
 ANTHROPIC_TIERS: Dict[int, Dict[str, Any]] = {
     1: {
@@ -66,7 +66,7 @@ ANTHROPIC_TIERS: Dict[int, Dict[str, Any]] = {
 
 
 # OpenAI tier configuration (for embeddings)
-# Educational Note: OpenAI has different rate limits for embeddings vs chat
+# OpenAI has different rate limits for embeddings vs chat
 OPENAI_TIERS: Dict[int, Dict[str, Any]] = {
     1: {
         "name": "Tier 1 (Free)",
@@ -100,7 +100,7 @@ OPENAI_TIERS: Dict[int, Dict[str, Any]] = {
 
 
 # Pinecone tier configuration
-# Educational Note: Pinecone rate limits depend on pod type and index size
+# Pinecone rate limits depend on pod type and index size
 PINECONE_TIERS: Dict[int, Dict[str, Any]] = {
     1: {
         "name": "Starter (Free)",

@@ -1,6 +1,6 @@
 /**
  * WebsiteProgressIndicator Component
- * Educational Note: Shows real-time progress during website generation.
+ * Shows real-time progress during website generation.
  * Purple theme distinguishes from other studio items.
  */
 

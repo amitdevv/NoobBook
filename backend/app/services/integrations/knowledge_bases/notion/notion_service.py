@@ -1,7 +1,7 @@
 """
 Notion Integration Service - Notion API integration for NoobBook.
 
-Educational Note: This service provides methods to query Notion pages and databases
+This service provides methods to query Notion pages and databases
 using the Notion API. It follows NoobBook's service pattern with lazy-loaded
 client initialization and environment-based configuration.
 
@@ -31,7 +31,7 @@ class NotionService:
     """
     Notion API integration service.
 
-    Educational Note: Singleton pattern with lazy client initialization.
+    Singleton pattern with lazy client initialization.
     Configuration is read from environment variables on first use.
     """
 

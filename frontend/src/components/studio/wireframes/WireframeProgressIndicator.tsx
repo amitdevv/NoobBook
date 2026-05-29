@@ -1,6 +1,6 @@
 /**
  * WireframeProgressIndicator Component
- * Educational Note: Shows real-time progress during wireframe generation.
+ * Shows real-time progress during wireframe generation.
  * Purple theme distinguishes from other studio items.
  */
 

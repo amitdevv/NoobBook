@@ -1,7 +1,7 @@
 """
 PRD Job Management - Tracks PRD (Product Requirements Document) generation jobs.
 
-Educational Note: PRD jobs use an agentic loop pattern where Claude:
+PRD jobs use an agentic loop pattern where Claude:
 1. Plans the document structure (sections to write)
 2. Writes sections incrementally to a markdown file
 3. Signals completion via is_last_section flag

@@ -1,6 +1,6 @@
 /**
  * StudioToolItem Component
- * Educational Note: Renders a single studio tool button with active/inactive state.
+ * Renders a single studio tool button with active/inactive state.
  * Active items (with signals) are highlighted and clickable.
  * Inactive items are dimmed but still visible for context.
  */

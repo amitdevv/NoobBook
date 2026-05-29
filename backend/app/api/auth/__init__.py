@@ -1,7 +1,7 @@
 """
 Auth / identity endpoints.
 
-Educational Note: NoobBook supports multi-user setup with RBAC.
+NoobBook supports multi-user setup with RBAC.
 This blueprint provides authentication endpoints and /me for frontend RBAC gating.
 
 Routes:

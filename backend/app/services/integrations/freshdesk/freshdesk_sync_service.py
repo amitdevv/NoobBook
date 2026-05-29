@@ -1,7 +1,7 @@
 """
 Freshdesk Sync Service - Syncs Freshdesk tickets into local Supabase table.
 
-Educational Note: This service bridges the Freshdesk API and local storage.
+This service bridges the Freshdesk API and local storage.
 It fetches tickets from the Freshdesk API, transforms them with resolved
 names and computed metrics, and upserts them into the `freshdesk_tickets`
 Supabase table for fast local querying by the analysis agent.
@@ -31,7 +31,7 @@ class FreshdeskSyncService:
     """
     Service for syncing Freshdesk ticket data into local Supabase tables.
 
-    Educational Note: By storing ticket data locally, the analysis agent
+    By storing ticket data locally, the analysis agent
     can run fast SQL queries without hitting the Freshdesk API for every
     question. The sync can be re-run to keep data fresh.
     """
@@ -175,7 +175,7 @@ class FreshdeskSyncService:
         """
         Get statistics about synced Freshdesk tickets (global).
 
-        Educational Note: Tickets are stored globally (not per-source), so
+        Tickets are stored globally (not per-source), so
         stats reflect the entire Freshdesk account regardless of which
         project triggered the sync.
         """
@@ -255,7 +255,7 @@ class FreshdeskSyncService:
         """
         Determine the updated_since filter based on sync mode.
 
-        Educational Note: Since tickets are global, incremental sync queries
+        Since tickets are global, incremental sync queries
         the max synced_at across ALL tickets (not per-source).
         """
         if mode == "incremental":
@@ -290,7 +290,7 @@ class FreshdeskSyncService:
         """
         Transform a raw Freshdesk API ticket into the local table schema.
 
-        Educational Note: We resolve numeric IDs to human-readable names
+        We resolve numeric IDs to human-readable names
         and compute derived metrics (resolution time, first response time)
         so the analysis agent doesn't need to do these lookups at query time.
 
@@ -494,7 +494,7 @@ class FreshdeskSyncService:
 
     # ------------------------------------------------------------------
     # Auto-sync: single global background thread for incremental sync
-    # Educational Note: Since tickets are stored globally, only one
+    # Since tickets are stored globally, only one
     # auto-sync thread is needed regardless of how many projects use
     # Freshdesk. Any project can trigger it, but it only runs once.
     # ------------------------------------------------------------------

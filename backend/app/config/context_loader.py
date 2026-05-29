@@ -1,7 +1,7 @@
 """
 Context Loader - Builds dynamic source and memory context for chat system prompts.
 
-Educational Note: This module creates formatted context blocks for the system prompt:
+This module creates formatted context blocks for the system prompt:
 
 1. Source Context - List of available sources with IDs, types, and summaries
 2. Memory Context - User and project memory for personalization
@@ -21,7 +21,7 @@ class ContextLoader:
     """
     Loader for building source and memory context for chat prompts.
 
-    Educational Note: This loader is called by main_chat_service
+    This loader is called by main_chat_service
     before each API call to build up-to-date context including:
     - Available sources with metadata
     - User memory (persistent across projects)
@@ -36,7 +36,7 @@ class ContextLoader:
         """
         Get list of active and ready sources for a project.
 
-        Educational Note: When selected_source_ids is a list, only those sources
+        When selected_source_ids is a list, only those sources
         with status "ready" are returned. When None (legacy chats that predate
         per-chat selection), falls back to all ready+active sources for backwards
         compatibility. An empty list [] means explicitly no sources selected.
@@ -81,7 +81,7 @@ class ContextLoader:
         """
         Build formatted source context for the system prompt.
 
-        Educational Note: This creates a structured text block that tells
+        This creates a structured text block that tells
         the AI what sources are available and how to reference them.
         The format is designed to be clear and parseable by the model.
 
@@ -209,7 +209,7 @@ class ContextLoader:
         """
         Build formatted memory context for the system prompt.
 
-        Educational Note: Memory context includes:
+        Memory context includes:
         - User memory: Persistent preferences and context across all projects
         - Project memory: Context specific to the current project
 
@@ -258,7 +258,7 @@ class ContextLoader:
         """
         Build context about available MCP tools for the system prompt.
 
-        Educational Note: Tells Claude about external MCP tools it can use
+        Tells Claude about external MCP tools it can use
         during chat. Includes a safety reminder for destructive actions.
         """
         if not user_id:
@@ -302,7 +302,7 @@ class ContextLoader:
         """
         Build complete context including sources, memory, and MCP tools.
 
-        Educational Note: Combines all context types for the system prompt.
+        Combines all context types for the system prompt.
         Order: Memory context first (general context), then source context
         (available tools), then MCP tools context (external integrations).
 

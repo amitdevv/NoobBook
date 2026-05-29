@@ -1,6 +1,6 @@
 /**
  * useVoiceRecording Hook
- * Educational Note: Custom hook for ElevenLabs real-time speech-to-text.
+ * Custom hook for ElevenLabs real-time speech-to-text.
  * Extracts all WebSocket and audio capture logic from ChatPanel for reusability.
  *
  * Flow:
@@ -183,7 +183,7 @@ export const useVoiceRecording = ({
   }, [partialTranscript, onTranscriptCommit, onVoiceSessionPolished, projectId]);
 
   /**
-   * Educational Note: Start capturing audio from microphone and stream to WebSocket.
+   * Start capturing audio from microphone and stream to WebSocket.
    * Uses AudioWorklet for efficient real-time processing without blocking the main thread.
    *
    * ElevenLabs expects audio as JSON messages with base64-encoded PCM data:
@@ -206,7 +206,7 @@ export const useVoiceRecording = ({
       const audioContext = new AudioContext({ sampleRate });
       audioContextRef.current = audioContext;
 
-      // Educational Note: AudioWorklet processes audio in a separate thread.
+      // AudioWorklet processes audio in a separate thread.
       // It converts Float32 to Int16 PCM and sends to main thread.
       const workletCode = `
         class PCMProcessor extends AudioWorkletProcessor {
@@ -283,7 +283,7 @@ export const useVoiceRecording = ({
   }, [onError, stopRecording]);
 
   /**
-   * Educational Note: Start real-time transcription with ElevenLabs WebSocket.
+   * Start real-time transcription with ElevenLabs WebSocket.
    */
   const startRecording = useCallback(async () => {
     try {
@@ -314,7 +314,7 @@ export const useVoiceRecording = ({
           const data = JSON.parse(event.data);
           log.debug(`WS message: ${data.message_type || data.type}`);
 
-          // Educational Note: ElevenLabs uses message_type field
+          // ElevenLabs uses message_type field
           const messageType = data.message_type || data.type;
 
           if (messageType === 'session_started') {

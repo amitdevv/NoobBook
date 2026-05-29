@@ -1,6 +1,6 @@
 /**
  * ColorsSection Component
- * Educational Note: Manages brand color palette configuration.
+ * Manages brand color palette configuration.
  * Each color has an enable/disable toggle so users only include
  * the colors they need in generated content.
  */

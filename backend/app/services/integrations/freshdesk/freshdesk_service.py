@@ -1,7 +1,7 @@
 """
 Freshdesk Integration Service - Freshdesk API client for NoobBook.
 
-Educational Note: This service provides methods to query Freshdesk tickets
+This service provides methods to query Freshdesk tickets
 using the Freshdesk REST API v2. It follows NoobBook's service pattern with
 lazy-loaded client initialization and environment-based configuration.
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 # Freshdesk ticket field mappings
-# Educational Note: Freshdesk stores these as integer codes in the API response.
+# Freshdesk stores these as integer codes in the API response.
 # We resolve them to human-readable labels for the analysis agent.
 STATUS_MAP: Dict[int, str] = {
     2: "Open",
@@ -52,7 +52,7 @@ class FreshdeskService:
     """
     Freshdesk API integration service.
 
-    Educational Note: Singleton pattern with lazy client initialization.
+    Singleton pattern with lazy client initialization.
     Configuration is read from environment variables on first use.
     Freshdesk API uses Basic Auth: (api_key, 'X').
     """
@@ -83,7 +83,7 @@ class FreshdeskService:
         """
         Lazy-load Freshdesk configuration from environment variables.
 
-        Educational Note: Freshdesk API base URL is:
+        Freshdesk API base URL is:
         https://{domain}.freshdesk.com/api/v2
         """
         if self._configured is not None:
@@ -131,7 +131,7 @@ class FreshdeskService:
         """
         Make a GET request to the Freshdesk API with automatic rate-limit retry.
 
-        Educational Note: Freshdesk API uses Basic Auth with the API key as
+        Freshdesk API uses Basic Auth with the API key as
         username and 'X' as password. Rate limits are communicated via the
         X-RateLimit-Remaining header. On 429 responses, we sleep and retry
         automatically (up to 3 times) instead of failing.
@@ -323,7 +323,7 @@ class FreshdeskService:
         Smart fetch: try a single fetch first, only use date-range batching
         if we hit the 300-page limit (30k+ tickets).
 
-        Educational Note: Freshdesk's updated_since is a >= filter with no
+        Freshdesk's updated_since is a >= filter with no
         upper bound, so naively splitting into date-range batches causes
         massive duplication (each batch overlaps with all later batches).
         Instead, we only split when a single fetch proves insufficient.
@@ -389,7 +389,7 @@ class FreshdeskService:
         """
         Populate internal caches for agents, groups, and products.
 
-        Educational Note: Freshdesk tickets reference agents, groups, and products
+        Freshdesk tickets reference agents, groups, and products
         by numeric ID. We fetch these lookup tables once and cache them so we can
         resolve IDs to human-readable names during ticket transformation.
 

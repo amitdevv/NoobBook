@@ -1,7 +1,7 @@
 """
 Cost Tracking Utility - Track and calculate API costs per project.
 
-Educational Note: This utility tracks Claude API usage costs by model.
+This utility tracks Claude API usage costs by model.
 Costs are stored in Supabase projects table and updated after each API call.
 
 Pricing (per 1M tokens):
@@ -191,7 +191,7 @@ def _get_default_costs() -> Dict[str, Any]:
     """
     Get default cost tracking structure.
 
-    Educational Note: Returns the initial cost tracking structure
+    Returns the initial cost tracking structure
     for projects that don't have costs yet.
     """
     return {
@@ -205,7 +205,7 @@ def _ensure_cost_structure(costs: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Ensure costs dict has proper structure.
 
-    Educational Note: Initializes the cost tracking structure if it
+    Initializes the cost tracking structure if it
     doesn't exist, preserving any existing data.
     """
     if costs is None:
@@ -283,7 +283,7 @@ def add_usage(
     """
     Add API usage to project (and optionally chat) cost tracking.
 
-    Educational Note: This function is called after each Claude API call
+    This function is called after each Claude API call
     to update the cumulative cost tracking in Supabase. When chat_id is
     provided, the same usage is also added to chats.costs so per-chat
     spend can be shown in the chat header. Both updates happen inside a
@@ -453,7 +453,7 @@ def check_user_spending_limit(user_id: Optional[str]) -> Optional[str]:
     """
     Check if a user has exceeded their spending limit.
 
-    Educational Note: Supports period-based resets (daily/weekly/monthly).
+    Supports period-based resets (daily/weekly/monthly).
     When a reset_frequency is configured, checks period_spend instead of
     lifetime total. Auto-resets the period if expired.
 
@@ -555,7 +555,7 @@ def record_user_period_spend(user_id: Optional[str], call_cost: float) -> None:
     """
     Increment the user's period_spend after a successful API call.
 
-    Educational Note: Only fires when the user has a cost_limit with
+    Only fires when the user has a cost_limit with
     a reset_frequency. Called from add_usage() alongside project/chat
     cost updates.
     """

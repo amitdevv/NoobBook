@@ -1,6 +1,6 @@
 /**
  * useWireframeGeneration Hook
- * Educational Note: Manages Excalidraw wireframe generation from sources.
+ * Manages Excalidraw wireframe generation from sources.
  * Creates UI/UX wireframes for visual prototyping.
  */
 

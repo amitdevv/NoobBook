@@ -1,7 +1,7 @@
 """
 Source Upload Module - Handles different types of source uploads.
 
-Educational Note: Upload logic is separated by type for cleaner code:
+Upload logic is separated by type for cleaner code:
 - file_upload: File uploads (PDF, DOCX, images, audio, etc.)
 - url_upload: URL sources (websites, YouTube links)
 - text_upload: Pasted text content

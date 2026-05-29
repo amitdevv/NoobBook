@@ -1,7 +1,7 @@
 """
 MCP connection management endpoints (account-level).
 
-Educational Note: MCP connections are integrations that can be used as:
+MCP connections are integrations that can be used as:
 1. "MCP" sources — snapshot resources into the RAG pipeline
 2. Live chat tools — MCP tools injected into Claude's tool list
 
@@ -230,7 +230,7 @@ def list_mcp_tools(connection_id: str):
     """
     Discover tools from an MCP server (live call + cache).
 
-    Educational Note: Makes a real-time call to discover tools, caches them
+    Makes a real-time call to discover tools, caches them
     in the database, and returns the full tool definitions including input schemas.
     """
     try:

@@ -1,6 +1,6 @@
 /**
  * Blog Posts API
- * Educational Note: Handles AI-generated comprehensive blog posts with images.
+ * Handles AI-generated comprehensive blog posts with images.
  * Blog posts are SEO-optimized and stored as markdown files with images.
  */
 
@@ -238,7 +238,7 @@ export const blogsAPI = {
 
   /**
    * Poll blog job status until complete or error
-   * Educational Note: Added initial delay to avoid race condition where
+   * Added initial delay to avoid race condition where
    * the job might not be saved to disk yet when polling starts.
    */
   async pollJobStatus(

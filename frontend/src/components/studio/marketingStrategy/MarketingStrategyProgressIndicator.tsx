@@ -1,6 +1,6 @@
 /**
  * MarketingStrategyProgressIndicator Component
- * Educational Note: Shows real-time progress during marketing strategy generation.
+ * Shows real-time progress during marketing strategy generation.
  * Emerald/teal theme distinguishes marketing strategies from other studio items.
  */
 

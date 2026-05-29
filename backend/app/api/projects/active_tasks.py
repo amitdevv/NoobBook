@@ -1,7 +1,7 @@
 """
 Active Tasks endpoint - returns all in-progress tasks for a project.
 
-Educational Note: Provides a single consolidated endpoint for the frontend
+Provides a single consolidated endpoint for the frontend
 status bar to poll. Aggregates sources being processed, studio jobs in progress,
 and background tasks into a unified list.
 """

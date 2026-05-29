@@ -1,7 +1,7 @@
 """
 Google Drive file operations endpoints.
 
-Educational Note: These endpoints handle listing and importing files
+These endpoints handle listing and importing files
 from Google Drive. This demonstrates:
 
 1. Paginated API responses - Drive can have thousands of files
@@ -54,7 +54,7 @@ def google_list_files():
     """
     List files from Google Drive.
 
-    Educational Note: This endpoint demonstrates paginated API design:
+    This endpoint demonstrates paginated API design:
     - page_size: How many items per page
     - page_token: Opaque token for the next page (from Google)
 
@@ -105,7 +105,7 @@ def google_import_file(project_id):
     """
     Import a file from Google Drive to project sources.
 
-    Educational Note: This endpoint demonstrates file processing pipeline:
+    This endpoint demonstrates file processing pipeline:
     1. Get file metadata from Drive API
     2. Determine appropriate export format (for Workspace files)
     3. Download/export file to local storage
@@ -218,7 +218,7 @@ def _get_category_from_mime_type(mime_type: str, extension: str) -> str:
     """
     Determine source category from MIME type.
 
-    Educational Note: Categories help the UI display appropriate icons
+    Categories help the UI display appropriate icons
     and help the processing pipeline choose the right extractor.
     """
     if mime_type.startswith('image/'):
@@ -235,7 +235,7 @@ def _map_google_mime_type(mime_type: str) -> str:
     """
     Map Google Workspace MIME types to standard MIME types.
 
-    Educational Note: Google Workspace files (Docs, Sheets, Slides)
+    Google Workspace files (Docs, Sheets, Slides)
     have special MIME types that we need to map to their exported formats.
     """
     mime_type_mapping = {

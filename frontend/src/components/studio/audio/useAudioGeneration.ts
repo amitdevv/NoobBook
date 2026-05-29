@@ -1,6 +1,6 @@
 /**
  * useAudioGeneration Hook
- * Educational Note: Manages audio overview generation with ElevenLabs TTS.
+ * Manages audio overview generation with ElevenLabs TTS.
  * Includes playback state management with a shared audio element.
  */
 

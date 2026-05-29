@@ -1,6 +1,6 @@
 /**
  * McpTab Component
- * Educational Note: Attaches an account-level MCP connection to a project as an MCP source.
+ * Attaches an account-level MCP connection to a project as an MCP source.
  * Users select a connection, browse available resources, pick which ones to snapshot,
  * and NoobBook will embed them for RAG search in chat.
  */

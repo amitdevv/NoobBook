@@ -1,7 +1,7 @@
 """
 Knowledge Base Service - Orchestrates all external knowledge base integrations.
 
-Educational Note: This service acts as the single entry point for all knowledge
+This service acts as the single entry point for all knowledge
 base tools (Jira, Notion, GitHub, etc.). It handles:
 - Loading tool definitions for configured integrations only
 - Calling service methods directly for simple integrations
@@ -20,7 +20,7 @@ class KnowledgeBaseService:
     """
     Orchestrator for all knowledge base integration tools.
 
-    Educational Note: This service checks which integrations are configured
+    This service checks which integrations are configured
     and dynamically provides only available tools to Claude. For example:
     - If Jira is configured: Adds 4 Jira tools
     - If Notion is configured: Adds Notion tools
@@ -73,7 +73,7 @@ class KnowledgeBaseService:
         """
         Get non-Jira knowledge base tools (Notion, GitHub, etc.).
 
-        Educational Note: Jira tools are now project-scoped — they are only
+        Jira tools are now project-scoped — they are only
         added when a project has a .jira source. Use get_jira_tools() for
         Jira-specific tools. This method returns everything else.
 
@@ -99,7 +99,7 @@ class KnowledgeBaseService:
         """
         Get Jira-specific tools if Jira is configured.
 
-        Educational Note: Jira tools are project-scoped — they are only added
+        Jira tools are project-scoped — they are only added
         to the chat tool list when the project has an active .jira source.
         This allows per-project access control via the source flag pattern.
 
@@ -132,7 +132,7 @@ class KnowledgeBaseService:
         """
         Execute a knowledge base tool.
 
-        Educational Note: Uses a dispatch table to route tool calls to the
+        Uses a dispatch table to route tool calls to the
         appropriate executor. No separate executors needed for simple API
         integrations.
 

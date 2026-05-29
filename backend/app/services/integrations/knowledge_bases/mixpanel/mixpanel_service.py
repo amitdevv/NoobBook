@@ -1,7 +1,7 @@
 """
 Mixpanel Integration Service - Query API access for NoobBook chat.
 
-Educational Note: Uses Mixpanel's Service Account auth (HTTP Basic) against
+Uses Mixpanel's Service Account auth (HTTP Basic) against
 the Query API (https://mixpanel.com/api/query/). No OAuth — admin configures
 one service account globally; all users in the app share access to that
 Mixpanel project.
@@ -81,7 +81,7 @@ class MixpanelService:
         """
         Call the Mixpanel Query API.
 
-        Educational Note: Mixpanel's Query API returns either JSON objects or
+        Mixpanel's Query API returns either JSON objects or
         NDJSON (for /export). The endpoints we use here all return JSON.
         """
         self._load_config()

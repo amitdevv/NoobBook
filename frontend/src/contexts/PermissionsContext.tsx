@@ -1,6 +1,6 @@
 /**
  * PermissionsContext
- * Educational Note: Provides per-user permission state to the entire app tree.
+ * Provides per-user permission state to the entire app tree.
  * Fetches the current user's permissions from the backend on mount and exposes
  * a `hasPermission(category, item?)` helper that components can call to gate UI
  * features. Defaults to "allow" while loading or on error so the app stays

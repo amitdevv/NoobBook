@@ -1,7 +1,7 @@
 """
 Project CRUD endpoints.
 
-Educational Note: These endpoints demonstrate RESTful API design principles:
+These endpoints demonstrate RESTful API design principles:
 
 HTTP Methods and Their Meanings:
 - GET: Retrieve data (safe, idempotent, cacheable)
@@ -37,7 +37,7 @@ def list_projects():
     """
     List all available projects.
 
-    Educational Note: GET requests should never modify data, only retrieve it.
+    GET requests should never modify data, only retrieve it.
     This is a "safe" HTTP method.
 
     Returns:
@@ -67,7 +67,7 @@ def create_project():
     """
     Create a new project.
 
-    Educational Note: POST creates new resources.
+    POST creates new resources.
     Always validate input data before processing!
 
     Request Body:
@@ -132,7 +132,7 @@ def get_project(project_id):
     """
     Get details of a specific project.
 
-    Educational Note: Use URL parameters for resource identifiers.
+    Use URL parameters for resource identifiers.
     This follows RESTful design: /resource/{id}
 
     URL Parameters:
@@ -171,7 +171,7 @@ def update_project(project_id):
     """
     Update a project (rename, update description, etc.).
 
-    Educational Note: PUT is traditionally for full replacement,
+    PUT is traditionally for full replacement,
     PATCH for partial updates. We use PUT but only update provided
     fields for flexibility (a common pragmatic choice).
 
@@ -238,7 +238,7 @@ def delete_project(project_id):
     """
     Delete a project and all its data.
 
-    Educational Note: DELETE operations should be idempotent -
+    DELETE operations should be idempotent -
     calling DELETE multiple times should have the same effect
     as calling it once. Deleting a non-existent resource returns 404.
 
@@ -283,7 +283,7 @@ def open_project(project_id):
     """
     Mark a project as opened (update last accessed time).
 
-    Educational Note: This is an "action" endpoint - sometimes REST
+    This is an "action" endpoint - sometimes REST
     needs endpoints that don't fit pure CRUD. Using POST for actions
     is a common pattern. The verb is in the URL (/open) which some
     consider non-RESTful, but it's pragmatic and clear.

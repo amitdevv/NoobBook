@@ -1,6 +1,6 @@
 /**
  * BlogViewerModal Component
- * Educational Note: Modal for viewing blog post markdown content with images.
+ * Modal for viewing blog post markdown content with images.
  * Renders markdown with proper styling for headings, lists, images.
  */
 

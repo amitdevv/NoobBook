@@ -1,7 +1,7 @@
 """
 Jira Integration Service - Jira API integration for NoobBook.
 
-Educational Note: This service provides methods to query Jira projects and issues
+This service provides methods to query Jira projects and issues
 using the Jira REST API v3. It follows NoobBook's service pattern with lazy-loaded
 client initialization and environment-based configuration.
 """
@@ -19,7 +19,7 @@ class JiraService:
     """
     Jira API integration service.
 
-    Educational Note: Singleton pattern with lazy client initialization.
+    Singleton pattern with lazy client initialization.
     Configuration is read from environment variables on first use.
     """
 
@@ -33,7 +33,7 @@ class JiraService:
         """
         Lazy-load Jira configuration from environment variables.
 
-        Educational Note: Supports both old and new Jira API formats:
+        Supports both old and new Jira API formats:
         - Old: https://your-company.atlassian.net/rest/api/3
         - New: https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3
 
@@ -250,7 +250,7 @@ class JiraService:
         """
         Search for Jira issues using JQL or filters.
 
-        Educational Note: Uses Jira's enhanced JQL search API (POST /search/jql)
+        Uses Jira's enhanced JQL search API (POST /search/jql)
         which supports pagination and is the recommended endpoint.
 
         Args:

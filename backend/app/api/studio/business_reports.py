@@ -1,7 +1,7 @@
 """
 Business Report endpoints - AI-generated data-driven business reports.
 
-Educational Note: Business reports demonstrate multi-agent orchestration:
+Business reports demonstrate multi-agent orchestration:
 1. business_report_agent_executor orchestrates the generation
 2. The agent calls csv_analyzer_agent for data analysis and charts
 3. Context from non-CSV sources is incorporated

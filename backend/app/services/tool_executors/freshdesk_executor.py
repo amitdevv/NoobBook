@@ -1,7 +1,7 @@
 """
 Freshdesk Executor - Runs SQL queries against the global freshdesk_tickets table.
 
-Educational Note: Unlike database_executor which connects to external databases,
+Unlike database_executor which connects to external databases,
 this executor queries the local Supabase PostgreSQL directly since Freshdesk
 tickets are synced into a global table. All tickets belong to the same Freshdesk
 account, so no per-source scoping is needed.

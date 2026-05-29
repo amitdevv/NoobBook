@@ -1,6 +1,6 @@
 /**
  * SocialPostViewerModal Component
- * Educational Note: Modal for viewing social posts across multiple platforms.
+ * Modal for viewing social posts across multiple platforms.
  * Features: Platform-specific styling, images with download, copy to clipboard.
  */
 

@@ -1,7 +1,7 @@
 """
 Transcription API Blueprint - ElevenLabs Speech-to-Text.
 
-Educational Note: This blueprint demonstrates real-time audio transcription
+This blueprint demonstrates real-time audio transcription
 using ElevenLabs' Scribe API via WebSockets.
 
 Why WebSockets for Transcription?

@@ -1,7 +1,7 @@
 """
 Infographic Service - Generates visual infographics from source content.
 
-Educational Note: This service implements a two-step AI pipeline:
+This service implements a two-step AI pipeline:
 1. Claude analyzes source content and creates a detailed image prompt
 2. Google Gemini generates the infographic image
 
@@ -32,7 +32,7 @@ class InfographicService:
     """
     Service for generating infographic images from source content.
 
-    Educational Note: This service orchestrates the full pipeline:
+    This service orchestrates the full pipeline:
     1. Read and sample source content
     2. Claude generates infographic layout and image prompt
     3. Gemini generates the visual infographic image
@@ -57,7 +57,7 @@ class InfographicService:
         """
         Get source content for infographic generation.
 
-        Educational Note: For large sources, we sample chunks evenly
+        For large sources, we sample chunks evenly
         to stay within token limits while covering the full content.
         Content is downloaded from Supabase Storage.
         """
@@ -112,7 +112,7 @@ class InfographicService:
         """
         Generate an infographic image for a source.
 
-        Educational Note: This is the main orchestrator that:
+        This is the main orchestrator that:
         1. Reads source content
         2. Uses Claude to generate image prompt details
         3. Uses Gemini to generate the infographic image
@@ -318,7 +318,7 @@ class InfographicService:
         """
         Generate infographic image prompt using Claude.
 
-        Educational Note: Claude analyzes the source content and creates
+        Claude analyzes the source content and creates
         a detailed image prompt describing the visual layout, sections,
         icons, and color scheme for the infographic.
 

@@ -20,7 +20,7 @@ const ResizablePanel = ResizablePrimitive.Panel
 
 /**
  * ResizableHandle Component
- * Educational Note: Wide gutter-style handle that creates visual separation between panels.
+ * Wide gutter-style handle that creates visual separation between panels.
  * The handle itself IS the gap - matches background color to look like space between cards.
  * Cursor changes on hover to indicate draggable area.
  */

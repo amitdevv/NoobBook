@@ -1,7 +1,7 @@
 """
 Tool Loader - Loads tool definitions from JSON files.
 
-Educational Note: This module provides a centralized way to load tool definitions
+This module provides a centralized way to load tool definitions
 stored in JSON files. By storing tools in separate files:
 - Tools can be versioned and edited independently
 - Different extraction tasks can use different tool sets
@@ -25,7 +25,7 @@ class ToolLoader:
     """
     Loader class for tool definitions from JSON files.
 
-    Educational Note: Tool definitions follow the Claude API tool schema:
+    Tool definitions follow the Claude API tool schema:
     - name: Unique identifier for the tool
     - description: Explains when/how to use the tool (important for Claude!)
     - input_schema: JSON Schema defining the parameters
@@ -45,7 +45,7 @@ class ToolLoader:
         """
         Load a single tool definition from a JSON file.
 
-        Educational Note: Each tool is stored in its own JSON file
+        Each tool is stored in its own JSON file
         with the schema Claude expects for tool definitions.
 
         Args:
@@ -79,7 +79,7 @@ class ToolLoader:
         """
         Load all tool definitions from a category directory.
 
-        Educational Note: Useful when an agent needs multiple tools
+        Useful when an agent needs multiple tools
         from the same category (e.g., all PDF processing tools).
 
         Args:
@@ -112,7 +112,7 @@ class ToolLoader:
         """
         Validate that a tool definition has required fields.
 
-        Educational Note: Claude requires specific fields for tools:
+        Claude requires specific fields for tools:
         - name: Identifier Claude uses to call the tool
         - description: Helps Claude understand when to use it
         - input_schema: Defines expected parameters
@@ -176,7 +176,7 @@ class ToolLoader:
         """
         Load all tools from a category, separated by type.
 
-        Educational Note: Agent tools can be of different types:
+        Agent tools can be of different types:
         - server_tools: Claude handles execution (web_search, web_fetch)
         - client_tools: We execute them (tavily_search, custom tools)
         - termination_tools: Signal agent completion (return_search_result)

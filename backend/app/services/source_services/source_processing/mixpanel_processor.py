@@ -1,7 +1,7 @@
 """
 Mixpanel Processor - Handles MIXPANEL source processing.
 
-Educational Note: Lightweight verifier. Confirms the Mixpanel Query API is
+Lightweight verifier. Confirms the Mixpanel Query API is
 reachable with the configured Service Account, fetches a sample of tracked
 event names for the summary, and marks the source ready. All real queries
 happen live via the chat tools (mixpanel_list_events, mixpanel_query_events,
